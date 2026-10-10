@@ -1,4 +1,4 @@
-use retroboy::emulator::Emulator;
+use retroboy_core::emulator::Emulator;
 use sdl2::audio::{AudioCallback, AudioDevice, AudioSpecDesired};
 use std::collections::VecDeque;
 

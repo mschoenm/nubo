@@ -82,7 +82,7 @@ pub struct AddressBus {
 }
 
 impl AddressBus {
-    pub(super) fn new(renderer: fn(&[u8]), processor_test_mode: bool) -> AddressBus {
+    pub(super) fn new(processor_test_mode: bool) -> AddressBus {
         AddressBus {
             in_bios: true,
             bios: [0; 0x100].to_vec(),
@@ -94,7 +94,7 @@ impl AddressBus {
             processor_test_mode,
             interrupts: initialize_interrupt_registers(),
             timers: TimerRegisters::new(),
-            gpu: Gpu::new(renderer),
+            gpu: Gpu::new(),
             joypad: Joypad::new(),
             apu: Apu::new(),
             dma: DMAState::new(),
@@ -405,7 +405,7 @@ pub(crate) mod test_utils {
     }
 
     pub(crate) fn initialize_test_address_bus() -> AddressBus {
-        AddressBus::new(|_| {}, false)
+        AddressBus::new(false)
     }
 }
 

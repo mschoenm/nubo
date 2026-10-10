@@ -104,14 +104,14 @@ pub(super) fn parse_gamegenie_code(gamegenie_code: &str) -> Result<Cheat> {
     }
 }
 
-pub(crate) fn validate_gameshark_code(cheat_code: &str) -> Option<String> {
+pub fn validate_gameshark_code(cheat_code: &str) -> Option<String> {
     match parse_gameshark_code(cheat_code) {
         Ok(_) => None,
         Err(error) => Some(error.to_string())
     }
 }
 
-pub(crate) fn validate_gamegenie_code(cheat_code: &str) -> Option<String> {
+pub fn validate_gamegenie_code(cheat_code: &str) -> Option<String> {
     match parse_gamegenie_code(cheat_code) {
         Ok(_) => None,
         Err(error) => Some(error.to_string())

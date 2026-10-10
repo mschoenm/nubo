@@ -64,7 +64,11 @@ pub struct Gpu {
     #[getset(set = "pub(super)")]
     cgb_double_speed: bool,
     
-    renderer: fn(&[u8]),
+    #[getset(get = "pub(crate)")]
+    completed_frame: Vec<u8>,
+
+    #[getset(get_copy = "pub(crate)", set = "pub(crate)")]
+    frame_ready: bool,
     
     #[getset(get_copy = "pub(super)", set = "pub(super)")]
     stat_interrupt: bool,
@@ -106,7 +110,7 @@ fn initialize_blank_frame() -> Vec<u8> {
 }
 
 impl Gpu {
-    pub(super) fn new(renderer: fn(&[u8])) -> Self {
+    pub(super) fn new() -> Self {
         Gpu {
             mode: 2,
             mode_clock: 0,
@@ -128,7 +132,8 @@ impl Gpu {
             object_attribute_memory: [0; 0xa0],
             cgb_mode: false,
             cgb_double_speed: false,
-            renderer,
+            completed_frame: initialize_blank_frame(),
+            frame_ready: false,
             stat_interrupt: false,
             vblank_interrupt: false,
             oam_scan_row: 0xFF,
@@ -208,7 +213,8 @@ impl Gpu {
 
                         if self.ly == FRAME_SCANLINE_COUNT - VBLANK_SCANLINE_COUNT - 1 {
                             self.update_mode(VBLANK_MODE);
-                            (self.renderer)(&self.frame_buffer);
+                            self.completed_frame.copy_from_slice(&self.frame_buffer);
+                            self.frame_ready = true;
                             self.vblank_interrupt = true;
                         }
                         else {

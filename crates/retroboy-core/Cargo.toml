@@ -1,0 +1,9 @@
+[package]
+name = "retroboy-core"
+license.workspace = true
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serializable_derive.workspace = true
+getset = "0.1.6"

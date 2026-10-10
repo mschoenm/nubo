@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn should_get_ten_sprites_from_oam_memory() {
-        let mut gpu = Gpu::new(|_| {});
+        let mut gpu = Gpu::new();
         
         gpu.ly = 0;
 
@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn should_parse_sprite_attributes_correctly() {
-        let mut gpu = Gpu::new(|_| {});
+        let mut gpu = Gpu::new();
         
         write_sprite(&mut gpu.object_attribute_memory, 0, 16, 0, 0b11000000);
         

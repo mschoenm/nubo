@@ -1,17 +1,15 @@
 [package]
 name = "retroboy-sdl"
-license = "Apache-2.0"
-version = "0.1.0"
-edition = "2021"
+license.workspace = true
+version.workspace = true
+edition.workspace = true
 
 [package.metadata.bundle]
 name = "RetroBoy"
 identifier = "com.retroboy.emulator"
 category = "Game"
 
-[dependencies.retroboy]
-path = "../../"
-
 [dependencies]
+retroboy-core.workspace = true
 sdl2 = "0.37"
 rfd = "0.14"

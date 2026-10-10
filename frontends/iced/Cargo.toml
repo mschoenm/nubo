@@ -1,0 +1,11 @@
+[package]
+name = "retroboy-iced"
+license.workspace = true
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+retroboy-core.workspace = true
+iced = { version = "0.14", features = ["image"] }
+cpal = "0.18"
+rfd = "0.17"

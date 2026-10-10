@@ -1,15 +1,13 @@
 use chrono::Local;
 use clap::Parser;
 use image::{ImageBuffer, Rgba};
-use retroboy::emulator::{CartridgeEffects, Emulator, RTCState};
+use retroboy_core::emulator::{CartridgeEffects, Emulator, RTCState};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 const SCREEN_WIDTH: u32 = 160;
 const SCREEN_HEIGHT: u32 = 144;
-const BUFFER_SIZE: usize = (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize;
 
 #[derive(Parser)]
 #[command(name = "retroboy-headless")]
@@ -31,31 +29,9 @@ struct Args {
     cgb: bool,
 }
 
-static FRAME_BUFFER: OnceLock<Arc<Mutex<Vec<u8>>>> = OnceLock::new();
-
-fn frame_callback(buffer: &[u8]) {
-    if let Some(fb) = FRAME_BUFFER.get() {
-        if let Ok(mut locked) = fb.lock() {
-            locked.copy_from_slice(buffer);
-        }
-    }
-}
-
-fn init_frame_buffer() {
-    let buffer = Arc::new(Mutex::new(vec![0u8; BUFFER_SIZE]));
-    let _ = FRAME_BUFFER.set(buffer);
-}
-
-fn save_screenshot(rom_path: &PathBuf, output_dir: Option<&PathBuf>) -> Result<PathBuf, String> {
-    let frame_data = FRAME_BUFFER
-        .get()
-        .ok_or("Frame buffer not initialized")?
-        .lock()
-        .map_err(|_| "Failed to lock frame buffer")?
-        .clone();
-
+fn save_screenshot(frame: &[u8], rom_path: &PathBuf, output_dir: Option<&PathBuf>) -> Result<PathBuf, String> {
     let img: ImageBuffer<Rgba<u8>, Vec<u8>> =
-        ImageBuffer::from_raw(SCREEN_WIDTH, SCREEN_HEIGHT, frame_data)
+        ImageBuffer::from_raw(SCREEN_WIDTH, SCREEN_HEIGHT, frame.to_vec())
             .ok_or("Failed to create image buffer")?;
 
     let rom_stem = rom_path
@@ -113,9 +89,7 @@ fn main() -> Result<(), String> {
     let rom_data = fs::read(&args.rom)
         .map_err(|e| format!("Failed to read ROM file: {}", e))?;
 
-    init_frame_buffer();
-
-    let mut emulator = Emulator::new(frame_callback, false);
+    let mut emulator = Emulator::new(false);
     emulator.set_cgb_mode(args.cgb);
     emulator.set_sample_rate(44100);
 
@@ -144,7 +118,7 @@ fn main() -> Result<(), String> {
     );
 
     if args.screenshot {
-        let path = save_screenshot(&args.rom, args.screenshot_path.as_ref())?;
+        let path = save_screenshot(emulator.frame_buffer(), &args.rom, args.screenshot_path.as_ref())?;
         println!("Screenshot saved to: {}", path.display());
     }
 

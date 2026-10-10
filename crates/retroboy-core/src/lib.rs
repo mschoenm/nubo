@@ -5,7 +5,6 @@ mod apu;
 mod utils;
 mod joypad;
 pub mod emulator;
-mod wasm;
 mod serial;
 mod serializable;
 mod bios;

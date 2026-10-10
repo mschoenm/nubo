@@ -1,4 +1,4 @@
-use retroboy::emulator::{Emulator, Registers, BusActivityEntry, BusActivityType};
+use retroboy_core::emulator::{Emulator, Registers, BusActivityEntry, BusActivityType};
 use serde::Deserialize;
 use std::fs;
 use std::io;
@@ -120,7 +120,7 @@ fn bus_activity_matches(
 }
 
 fn run_cpu_test(test: &JsonCpuTest) {
-    let mut emulator = Emulator::new(|_| {}, true);
+    let mut emulator = Emulator::new(true);
 
     for entry in &test.initial.ram {
         emulator.set_processor_test_ram(entry.0, entry.1);

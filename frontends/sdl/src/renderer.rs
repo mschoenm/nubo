@@ -1,45 +1,16 @@
 use sdl2::rect::Rect;
-use std::sync::{Arc, Mutex, OnceLock};
 
 pub const GAME_BOY_WIDTH: u32 = 160;
 pub const GAME_BOY_HEIGHT: u32 = 144;
 
-const BUFFER_SIZE: usize = (GAME_BOY_WIDTH * GAME_BOY_HEIGHT * 4) as usize;
-
-static FRAME_BUFFER: OnceLock<Arc<Mutex<Vec<u8>>>> = OnceLock::new();
-
-pub fn init() -> Result<(), &'static str> {
-    let buffer = Arc::new(Mutex::new(vec![0u8; BUFFER_SIZE]));
-    FRAME_BUFFER
-        .set(buffer)
-        .map_err(|_| "Frame buffer already initialized")
-}
-
-pub fn callback(buffer: &[u8]) {
-    if let Some(fb) = FRAME_BUFFER.get() {
-        if let Ok(mut locked) = fb.lock() {
-            locked.copy_from_slice(buffer);
-        }
-    }
-}
-
-fn with_frame_buffer<F, R>(f: F) -> Option<R>
-where
-    F: FnOnce(&[u8]) -> R,
-{
-    FRAME_BUFFER
-        .get()
-        .and_then(|fb| fb.lock().ok())
-        .map(|guard| f(&guard))
-}
-
 pub fn render_frame(
     canvas: &mut sdl2::render::Canvas<sdl2::video::Window>,
     texture: &mut sdl2::render::Texture,
+    frame: &[u8],
     window_width: u32,
     window_height: u32,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    update_texture(texture)?;
+    update_texture(texture, frame)?;
     canvas.clear();
 
     let (w, h, x, y) = calculate_scaled_dimensions(window_width, window_height);
@@ -62,11 +33,9 @@ fn copy_rgba_to_rgb24(src: &[u8], dst: &mut [u8], pitch: usize) {
     }
 }
 
-fn update_texture(texture: &mut sdl2::render::Texture) -> Result<(), Box<dyn std::error::Error>> {
+fn update_texture(texture: &mut sdl2::render::Texture, frame: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
-        with_frame_buffer(|fb| {
-            copy_rgba_to_rgb24(fb, buffer, pitch);
-        });
+        copy_rgba_to_rgb24(frame, buffer, pitch);
     })?;
     Ok(())
 }

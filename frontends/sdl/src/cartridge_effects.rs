@@ -1,4 +1,4 @@
-use retroboy::emulator::{CartridgeEffects, RTCState};
+use retroboy_core::emulator::{CartridgeEffects, RTCState};
 
 pub struct DesktopCartridgeEffects {}
 

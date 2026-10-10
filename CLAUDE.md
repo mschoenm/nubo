@@ -11,11 +11,15 @@ RetroBoy is a cycle-accurate Game Boy (DMG) and Game Boy Color (CGB) emulator wr
 ```bash
 # Core library
 make build           # Build core emulator library
-cargo test           # Run core emulator tests
-make check           # Run cargo check on all components
+cargo test           # Run core emulator tests (default workspace members)
+make check           # Run cargo check on all workspace crates
 
 # WASM build (requires wasm-pack: cargo install wasm-pack)
 make build-wasm      # Build WASM and generate JS bindings in frontends/web/src/core/
+
+# Iced frontend (desktop app)
+make iced-run                          # Open a ROM from the toolbar
+make iced-run ROM=path/to/rom.gb CGB=1 # Run specific ROM in CGB mode
 
 # SDL frontend (for local testing)
 make sdl-run                          # Run with file dialog
@@ -35,7 +39,16 @@ make screenshot ROM=path/to/rom.gbc SECONDS=5 CGB=1 # CGB mode
 
 ## Architecture
 
-### Core Emulator (src/)
+### Workspace Layout
+
+The root `Cargo.toml` is a virtual workspace. `default-members` covers only the core crates so `cargo build`/`cargo test` at the root don't require SDL or GUI system libraries.
+
+- `crates/retroboy-core/`: The emulator itself, a plain Rust library with no platform dependencies
+- `crates/retroboy-wasm/`: wasm-bindgen bindings for the web frontend, built with `make build-wasm`
+- `crates/serializable_derive/`: Derive macro for save-state serialization
+- `frontends/*`: One crate per frontend, each depending on `retroboy-core`
+
+### Core Emulator (crates/retroboy-core/src/)
 
 The emulator follows a component-based architecture reflecting real Game Boy hardware:
 
@@ -65,16 +78,17 @@ The emulator follows a component-based architecture reflecting real Game Boy har
 
 ### Serialization System
 
-The project uses a custom `Serializable` trait with a derive macro (`tools/serializable_derive/`) for save states. Components implement `serialize`/`deserialize` methods for binary state persistence.
+The project uses a custom `Serializable` trait with a derive macro (`crates/serializable_derive/`) for save states. Components implement `serialize`/`deserialize` methods for binary state persistence.
 
 ### Frontends
 
 - **Web** (`frontends/web/`): React/TypeScript app using Material UI, Web Audio API, and HTML Canvas
+- **Iced** (`frontends/iced/`): Desktop app built with Iced. Emulation runs on its own thread paced by the cpal audio queue; the UI pulls the latest frame on each `window::frames()` tick
 - **SDL** (`frontends/sdl/`): Native test frontend using SDL2 for quick iteration
 - **Headless** (`frontends/headless/`): No-display frontend for running ROMs and capturing screenshots
 - **JSON Test Runner** (`frontends/json_test_runner/`): Runs CPU tests from JSON test suites
 
-### WASM Bindings (src/wasm/)
+### WASM Bindings (crates/retroboy-wasm/src/)
 
 - `api.rs`: Main WASM API exposed to JavaScript
 - `emulator_settings.rs`, `rom_metadata.rs`, `save_state_result.rs`: Data transfer types
@@ -83,7 +97,7 @@ The project uses a custom `Serializable` trait with a derive macro (`tools/seria
 
 - **Cycle-accurate timing**: The CPU's `step()` function advances one instruction with proper timing propagated through all components
 - **Audio sync**: `step_until_next_audio_buffer()` runs until the APU buffer is full, providing the main emulation loop timing
-- **Callback-based rendering**: The GPU takes a renderer callback `fn(&[u8])` for frame output
+- **Pull-based rendering**: At vblank the GPU copies the finished frame into a completed-frame buffer. Frontends read it with `Emulator::frame_buffer()` (latest frame) or `Emulator::take_frame()` (returns `Some` once per new frame)
 - **CGB mode**: Toggled via `set_cgb_mode()`, affects memory banking, palettes, and speed switching
 
 ## Style Guidelines

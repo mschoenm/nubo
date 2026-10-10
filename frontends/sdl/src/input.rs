@@ -1,4 +1,4 @@
-use retroboy::emulator::{Emulator, Key};
+use retroboy_core::emulator::{Emulator, Key};
 use sdl2::keyboard::Keycode;
 
 pub fn map_keycode(keycode: Keycode) -> Option<Key> {

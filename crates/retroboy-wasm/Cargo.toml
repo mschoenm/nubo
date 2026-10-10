@@ -1,0 +1,13 @@
+[package]
+name = "retroboy-wasm"
+license.workspace = true
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+retroboy-core.workspace = true
+wasm-bindgen = "0.2.92"
+console_error_panic_hook = "0.1.7"

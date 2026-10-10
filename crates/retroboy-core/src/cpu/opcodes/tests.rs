@@ -14,7 +14,7 @@ fn init_rom_with_test_instructions(test_instructions: Vec<u8>) -> Vec<u8> {
 }
 
 fn init_cpu_from_rom(rom: Vec<u8>) -> Cpu {
-    let address_bus = AddressBus::new(|_| {}, false);
+    let address_bus = AddressBus::new(false);
     let mut cpu = Cpu::new(address_bus);
     cpu.address_bus.load_rom_buffer(rom, empty_cartridge_effects()).unwrap();
     cpu.address_bus.set_in_bios(false);
@@ -1431,7 +1431,7 @@ fn toggles_cgb_double_speed_mode() {
 
 #[test]
 fn records_bus_activity_for_loading_immediate_byte_into_register_b() {
-    let address_bus = AddressBus::new(|_| {}, true);
+    let address_bus = AddressBus::new(true);
     let mut cpu = Cpu::new(address_bus);
 
     cpu.address_bus.processor_test_ram_mut()[0x00] = 0x06;
@@ -1455,7 +1455,7 @@ fn records_bus_activity_for_loading_immediate_byte_into_register_b() {
 
 #[test]
 fn records_bus_activity_for_jump_to_address_nn() {
-    let address_bus = AddressBus::new(|_| {}, true);
+    let address_bus = AddressBus::new(true);
     let mut cpu = Cpu::new(address_bus);
 
     cpu.address_bus.set_processor_test_mode(true);

@@ -5,6 +5,7 @@ use getset::{Getters, MutGetters};
 use serializable_derive::Serializable;
 use std::io::Result;
 
+pub use crate::address_bus::cheats::{validate_gamegenie_code, validate_gameshark_code};
 pub use crate::address_bus::effects::CartridgeEffects;
 pub use crate::address_bus::{CartridgeHeader, RTCState};
 pub use crate::cpu::{Registers, BusActivityEntry, BusActivityType};
@@ -17,8 +18,8 @@ pub struct Emulator {
 }
 
 impl Emulator {
-    pub fn new(renderer: fn(&[u8]), processor_test_mode: bool) -> Emulator {
-        let address_bus = AddressBus::new(renderer, processor_test_mode);
+    pub fn new(processor_test_mode: bool) -> Emulator {
+        let address_bus = AddressBus::new(processor_test_mode);
         Emulator {
             cpu: Cpu::new(address_bus)
         }
@@ -70,6 +71,18 @@ impl Emulator {
         let right_samples_slice = apu.get_right_sample_queue();
 
         (left_samples_slice, right_samples_slice)        
+    }
+
+    pub fn frame_buffer(&self) -> &[u8] {
+        self.address_bus().gpu().completed_frame()
+    }
+
+    pub fn take_frame(&mut self) -> Option<&[u8]> {
+        if !self.address_bus().gpu().frame_ready() {
+            return None;
+        }
+        self.address_bus_mut().gpu_mut().set_frame_ready(false);
+        Some(self.frame_buffer())
     }
 
     pub fn handle_key_press(&mut self, key: &Key) {

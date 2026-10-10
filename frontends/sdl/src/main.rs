@@ -1,6 +1,6 @@
 use audio::AudioState;
 use renderer::{GAME_BOY_HEIGHT, GAME_BOY_WIDTH};
-use retroboy::emulator::Emulator;
+use retroboy_core::emulator::Emulator;
 use sdl2::audio::AudioDevice;
 use sdl2::event::Event;
 use sdl2::pixels::PixelFormatEnum;
@@ -117,7 +117,7 @@ fn run_game_loop(
         audio::pump(audio_device, emulator);
 
         if timing.should_render() {
-            renderer::render_frame(canvas, texture, window_state.width, window_state.height)?;
+            renderer::render_frame(canvas, texture, emulator.frame_buffer(), window_state.width, window_state.height)?;
         } else {
             std::thread::sleep(Duration::from_micros(100));
         }
@@ -161,7 +161,7 @@ fn handle_events(
 }
 
 fn setup_emulator(rom_data: &[u8], cgb_mode: bool) -> Result<Emulator, Box<dyn std::error::Error>> {
-    let mut emulator = Emulator::new(renderer::callback, false);
+    let mut emulator = Emulator::new(false);
     emulator.set_cgb_mode(cgb_mode);
     emulator.set_sample_rate(44100);
 
@@ -205,8 +205,6 @@ fn init_sdl() -> Result<
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (rom_data_opt, cgb_mode) = parse_args()?;
-
-    renderer::init()?;
 
     let (sdl_context, mut canvas, mut audio_device) = init_sdl()?;
     let rom_data = load_rom_data(rom_data_opt)?;

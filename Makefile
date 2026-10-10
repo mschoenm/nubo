@@ -1,4 +1,4 @@
-.PHONY: help sdl-run sdl-run-cgb sdl-watch sdl-watch-cgb screenshot clean check test
+.PHONY: help iced-run sdl-run sdl-run-cgb sdl-watch sdl-watch-cgb screenshot clean check test
 
 help:
 	@echo "RetroBoy Emulator Development Commands:"
@@ -6,6 +6,7 @@ help:
 	@echo "  make help           - Show this help message"
 	@echo "  make build          - Build the core emulator library"
 	@echo "  make build-wasm     - Build WASM version for web frontend"
+	@echo "  make iced-run       - Run Iced desktop frontend (ROM=..., CGB=1 optional)"
 	@echo "  make sdl-run        - Run SDL frontend once (shows file dialog)"
 	@echo "  make sdl-run-cgb    - Run SDL frontend once in CGB mode"
 	@echo "  make sdl-watch      - Auto-rebuild and run SDL frontend on changes"
@@ -14,6 +15,10 @@ help:
 	@echo "  make check          - Run cargo check on all components"
 	@echo "  make test           - Run all tests"
 	@echo "  make clean          - Clean all build artifacts"
+	@echo ""
+	@echo "Iced Examples:"
+	@echo "  make iced-run                             # Open a ROM from the toolbar"
+	@echo "  make iced-run ROM=path/to/rom.gb CGB=1    # Run with ROM in CGB mode"
 	@echo ""
 	@echo "SDL Examples:"
 	@echo "  make sdl-run                              # Run with file dialog to pick game"
@@ -29,20 +34,25 @@ help:
 	@echo "  make screenshot ROM=game.gb SECONDS=5        # Run and capture screenshot"
 	@echo "  make screenshot ROM=game.gbc SECONDS=5 CGB=1 # CGB mode"
 
-CORE_SOURCES := $(shell find src -name "*.rs" 2>/dev/null)
+CORE_SOURCES := $(shell find crates -name "*.rs" 2>/dev/null)
+CORE_MANIFESTS := Cargo.toml $(wildcard crates/*/Cargo.toml)
 
-target/debug/libretroboy.rlib: $(CORE_SOURCES) Cargo.toml
+target/debug/libretroboy_core.rlib: $(CORE_SOURCES) $(CORE_MANIFESTS)
 	@echo "🔨 Building core emulator library..."
 	cargo build
 
-build: target/debug/libretroboy.rlib
+build: target/debug/libretroboy_core.rlib
 
-frontends/web/src/core/retroboyCore_bg.wasm: $(CORE_SOURCES) Cargo.toml
+frontends/web/src/core/retroboyCore_bg.wasm: $(CORE_SOURCES) $(CORE_MANIFESTS)
 	@echo "🌐 Building WASM version for web frontend..."
 	@echo "📁 Output: ./frontends/web/src/core/"
-	wasm-pack build --target web --out-dir ./frontends/web/src/core --out-name retroboyCore --release
+	wasm-pack build crates/retroboy-wasm --target web --out-dir ../../frontends/web/src/core --out-name retroboyCore --release
 
 build-wasm: frontends/web/src/core/retroboyCore_bg.wasm
+
+iced-run:
+	@echo "🧊 Running Iced frontend..."
+	cargo run --release -p retroboy-iced -- $(if $(ROM),"$(ROM)") $(if $(CGB),--cgb)
 
 sdl-run:
 	@echo "🎮 Running SDL frontend..."
@@ -67,7 +77,7 @@ endif
 sdl-watch:
 	@echo "🔄 Starting SDL frontend with auto-reload..."
 	@echo "📁 Watching for changes in:"
-	@echo "   • src/ (emulator core)"
+	@echo "   • crates/retroboy-core/src/ (emulator core)"
 	@echo "   • frontends/sdl/src/ (SDL frontend)"
 	@echo ""
 ifdef ROM
@@ -76,7 +86,7 @@ ifdef CGB
 	@echo "⏹️  Press Ctrl+C to stop watching"
 	@echo ""
 	cd frontends/sdl && cargo watch \
-		-w ../../src \
+		-w ../../crates/retroboy-core/src \
 		-w src \
 		--clear \
 		-x 'run -- "$(ROM)" --cgb'
@@ -85,7 +95,7 @@ else
 	@echo "⏹️  Press Ctrl+C to stop watching"
 	@echo ""
 	cd frontends/sdl && cargo watch \
-		-w ../../src \
+		-w ../../crates/retroboy-core/src \
 		-w src \
 		--clear \
 		-x 'run -- "$(ROM)"'
@@ -96,7 +106,7 @@ ifdef CGB
 	@echo "⏹️  Press Ctrl+C to stop watching"
 	@echo ""
 	cd frontends/sdl && cargo watch \
-		-w ../../src \
+		-w ../../crates/retroboy-core/src \
 		-w src \
 		--clear \
 		-x 'run -- --cgb'
@@ -105,7 +115,7 @@ else
 	@echo "⏹️  Press Ctrl+C to stop watching"
 	@echo ""
 	cd frontends/sdl && cargo watch \
-		-w ../../src \
+		-w ../../crates/retroboy-core/src \
 		-w src \
 		--clear \
 		-x 'run'
@@ -137,21 +147,15 @@ else
 endif
 
 check:
-	@echo "🔍 Running cargo check..."
-	cargo check
-	@echo "🎮 Checking SDL frontend..."
-	cd frontends/sdl && cargo check
+	@echo "🔍 Running cargo check on all crates..."
+	cargo check --workspace
 
 test:
-	@echo "🧪 Running core emulator tests..."
-	cargo test
-	@echo "🎮 Running SDL frontend tests..."
-	cd frontends/sdl && cargo test
+	@echo "🧪 Running tests for all crates..."
+	cargo test --workspace
 
 clean:
-	@echo "🧹 Cleaning core emulator..."
+	@echo "🧹 Cleaning all crates..."
 	cargo clean
-	@echo "🎮 Cleaning SDL frontend..."
-	cd frontends/sdl && cargo clean
 	@echo "🌐 Cleaning WASM artifacts..."
 	rm -rf frontends/web/src/core/

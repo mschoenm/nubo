@@ -1,7 +1,7 @@
-use crate::emulator::CartridgeEffects;
-use crate::emulator::RTCState;
-use crate::wasm::api::{current_time_millis, load_rtc_state, save_rtc_state, load_ram, save_ram};
-use crate::wasm::wasm_rtc_state::WasmRTCState;
+use retroboy_core::emulator::CartridgeEffects;
+use retroboy_core::emulator::RTCState;
+use crate::api::{current_time_millis, load_rtc_state, save_rtc_state, load_ram, save_ram};
+use crate::wasm_rtc_state::WasmRTCState;
 
 pub struct WasmCartridgeEffects;
 

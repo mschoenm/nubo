@@ -1,6 +1,7 @@
 use crate::utils::{reset_bit, set_bit};
 use getset::{CopyGetters, Setters};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
     Down,
     Up,

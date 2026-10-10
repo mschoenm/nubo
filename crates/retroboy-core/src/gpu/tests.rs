@@ -2,7 +2,7 @@ use crate::address_bus::hdma::HDMAState;
 use crate::gpu::{Gpu, GpuParams};
 
 fn initialize_test_gpu() -> Gpu {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
     gpu.lcdc = 0b10000000;
     gpu
 }

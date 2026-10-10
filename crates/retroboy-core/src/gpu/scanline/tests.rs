@@ -121,7 +121,7 @@ fn assert_that(frame_buffer: &Vec<u8>) -> FrameBufferAssertion {
 
 #[test]
 fn should_render_tile_line() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     initialize_monochrome_palettes(&mut gpu.palettes);
 
@@ -141,7 +141,7 @@ fn should_render_tile_line() {
 
 #[test]
 fn should_render_multiple_tile_lines() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     initialize_monochrome_palettes(&mut gpu.palettes);
 
@@ -171,7 +171,7 @@ fn should_render_multiple_tile_lines() {
 
 #[test]
 fn should_render_multiple_tile_lines_in_color_mode() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
     
     gpu.cgb_mode = true;
 
@@ -209,7 +209,7 @@ fn should_render_multiple_tile_lines_in_color_mode() {
 
 #[test]
 fn should_render_multiple_tile_lines_in_color_mode_from_bank_one() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     gpu.cgb_mode = true;
 
@@ -247,7 +247,7 @@ fn should_render_multiple_tile_lines_in_color_mode_from_bank_one() {
 
 #[test]
 fn should_flip_background_tile_on_y_axis() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     gpu.cgb_mode = true;
 
@@ -285,7 +285,7 @@ fn should_flip_background_tile_on_y_axis() {
 
 #[test]
 fn should_flip_background_tile_on_x_axis() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     gpu.cgb_mode = true;
 
@@ -311,7 +311,7 @@ fn should_flip_background_tile_on_x_axis() {
 
 #[test]
 fn should_overlay_window_over_multiple_tile_lines() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     initialize_monochrome_palettes(&mut gpu.palettes);
 
@@ -345,7 +345,7 @@ fn should_overlay_window_over_multiple_tile_lines() {
 
 #[test]
 fn should_render_tile_line_in_middle_of_frame() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     initialize_monochrome_palettes(&mut gpu.palettes);
 
@@ -368,7 +368,7 @@ fn should_render_tile_line_in_middle_of_frame() {
 
 #[test]
 fn should_render_tile_line_properly_with_greater_scroll_x_value() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     initialize_monochrome_palettes(&mut gpu.palettes);
 
@@ -391,7 +391,7 @@ fn should_render_tile_line_properly_with_greater_scroll_x_value() {
 
 #[test]
 fn should_wrap_around_when_rendering_past_max_tile_map_x_value() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     initialize_monochrome_palettes(&mut gpu.palettes);
 
@@ -413,7 +413,7 @@ fn should_wrap_around_when_rendering_past_max_tile_map_x_value() {
 
 #[test]
 fn should_wrap_around_when_rendering_past_max_tile_map_y_value() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     initialize_monochrome_palettes(&mut gpu.palettes);
 
@@ -435,7 +435,7 @@ fn should_wrap_around_when_rendering_past_max_tile_map_y_value() {
 
 #[test]
 fn should_render_tile_line_with_sprite() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     initialize_monochrome_palettes(&mut gpu.palettes);
 
@@ -469,7 +469,7 @@ fn should_render_tile_line_with_sprite() {
 
 #[test]
 fn should_render_sprite_with_white_background_if_background_and_window_enabled_is_cleared() {
-     let mut gpu = Gpu::new(|_| {});
+     let mut gpu = Gpu::new();
 
     initialize_monochrome_palettes(&mut gpu.palettes);
 
@@ -503,7 +503,7 @@ fn should_render_sprite_with_white_background_if_background_and_window_enabled_i
 
 #[test]
 fn should_render_tile_line_with_sprite_having_negative_y_pos() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     initialize_monochrome_palettes(&mut gpu.palettes);
 
@@ -537,7 +537,7 @@ fn should_render_tile_line_with_sprite_having_negative_y_pos() {
 
 #[test]
 fn should_flip_sprite_on_x_axis() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     initialize_monochrome_palettes(&mut gpu.palettes);
 
@@ -571,7 +571,7 @@ fn should_flip_sprite_on_x_axis() {
 
 #[test]
 fn should_flip_sprite_on_y_axis() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     initialize_monochrome_palettes(&mut gpu.palettes);
 
@@ -605,7 +605,7 @@ fn should_flip_sprite_on_y_axis() {
 
 #[test]
 fn should_render_eight_by_sixteen_sprite() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     initialize_monochrome_palettes(&mut gpu.palettes);
 
@@ -647,7 +647,7 @@ fn should_render_eight_by_sixteen_sprite() {
 
 #[test]
 fn should_prioritize_non_color_id_zero_background_colors_when_sprite_priority_flag_set_to_true() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     initialize_monochrome_palettes(&mut gpu.palettes);
 
@@ -681,7 +681,7 @@ fn should_prioritize_non_color_id_zero_background_colors_when_sprite_priority_fl
 
 #[test]
 fn should_prioritize_background_colors_when_lcdc_bit_1_is_off() {
-    let mut gpu = Gpu::new(|_| {});
+    let mut gpu = Gpu::new();
 
     initialize_monochrome_palettes(&mut gpu.palettes);
 

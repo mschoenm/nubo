@@ -1,12 +1,11 @@
-use crate::address_bus::cheats;
-use crate::emulator::Emulator;
-use crate::emulator::CartridgeHeader;
-use crate::joypad::Key;
-use crate::wasm::emulator_settings::EmulatorSettings;
-use crate::wasm::rom_metadata::{RomMetadata, RomMetadataResult};
-use crate::wasm::save_state_result::SaveStateResult;
-use crate::wasm::wasm_cartridge_effects::WasmCartridgeEffects;
-use crate::wasm::wasm_rtc_state::WasmRTCState;
+use retroboy_core::emulator::Emulator;
+use retroboy_core::emulator::CartridgeHeader;
+use retroboy_core::emulator::Key;
+use crate::emulator_settings::EmulatorSettings;
+use crate::rom_metadata::{RomMetadata, RomMetadataResult};
+use crate::save_state_result::SaveStateResult;
+use crate::wasm_cartridge_effects::WasmCartridgeEffects;
+use crate::wasm_rtc_state::WasmRTCState;
 use std::cell::RefCell;
 use wasm_bindgen::prelude::*;
 
@@ -38,7 +37,7 @@ extern "C" {
 }
 
 fn initialize_web_emulator() -> Emulator {
-    Emulator::new(canvas_render, false)
+    Emulator::new(false)
 }
 
 thread_local! {
@@ -94,6 +93,10 @@ pub fn step_until_next_audio_buffer() {
         let right_samples_slice = audio_buffers.1;
 
         play_audio_samples(left_samples_slice, right_samples_slice);
+
+        if let Some(frame) = emulator.take_frame() {
+            canvas_render(frame);
+        }
     })
 }
 
@@ -143,12 +146,12 @@ pub fn release_key(key_code: &str) {
 
 #[wasm_bindgen(js_name = validateGamesharkCode)]
 pub fn validate_gameshark_code(cheat: &str) -> Option<String> {
-    cheats::validate_gameshark_code(cheat)
+    retroboy_core::emulator::validate_gameshark_code(cheat)
 }
 
 #[wasm_bindgen(js_name = validateGamegenieCode)]
 pub fn validate_gamegenie_code(cheat: &str) -> Option<String> {
-    cheats::validate_gamegenie_code(cheat)
+    retroboy_core::emulator::validate_gamegenie_code(cheat)
 }
 
 #[wasm_bindgen(js_name = registerGamesharkCheat)]
