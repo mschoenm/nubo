@@ -70,11 +70,16 @@ fn notes_for(metainfo: &str, version: &str) -> Result<String> {
     notes.push_str(&format!(
         "\n## Install\n\
          \n\
-         Download the `.flatpak` file for your computer (`x86_64` for most PCs, `aarch64` for ARM) \
-         and open it with your software center, or run:\n\
+         **Windows:** run `Nubo-{version}-windows-x64-setup.exe`, which installs Nubo for your \
+         user and updates an installed Nubo, or unpack `Nubo-{version}-windows-x64.zip` to run it \
+         without installing. The files aren't signed yet, so Windows may say it protected your \
+         PC: choose *More info* and then *Run anyway*.\n\
+         \n\
+         **Linux:** download the `.flatpak` file for your computer (`x86_64` for most PCs, \
+         `aarch64` for ARM) and open it with your software center, or run:\n\
          \n\
          ```bash\n\
-         flatpak install --user Nubo-{version}-x86_64.flatpak\n\
+         flatpak install --user Nubo-{version}-linux-x86_64.flatpak\n\
          ```\n\
          \n\
          Flatpak downloads the runtime Nubo needs from Flathub. To replace a Nubo you installed \
@@ -178,7 +183,8 @@ mod tests {
              - Save states load twice as fast\n\
              - Fixes *Pokémon* crashing\n\n## Install\n"
         ));
-        assert!(notes.contains("flatpak install --user Nubo-0.2.0-x86_64.flatpak"));
+        assert!(notes.contains("flatpak install --user Nubo-0.2.0-linux-x86_64.flatpak"));
+        assert!(notes.contains("`Nubo-0.2.0-windows-x64-setup.exe`"));
     }
 
     #[test]

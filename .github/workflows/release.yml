@@ -1,8 +1,9 @@
 name: Release
 
 # Pushing a version tag such as v0.2.0 runs every check, the nightly ones
-# included, builds the Flatpaks and makes a draft GitHub release with them to
-# read over and publish. "Making a release" in CLAUDE.md lists the steps.
+# included, builds the Flatpaks and the Windows installer and makes a draft
+# GitHub release with them to read over and publish. "Making a release" in
+# CLAUDE.md lists the steps.
 on:
   push:
     tags: ["v*"]
@@ -39,7 +40,8 @@ jobs:
     needs: notes
     uses: ./.github/workflows/ci.yml
 
-  # Includes the test ROMs with --verify-boot and the Flatpak builds.
+  # Includes the test ROMs with --verify-boot, the Flatpaks and the Windows
+  # installer.
   nightly:
     name: Nightly
     needs: notes
@@ -57,11 +59,11 @@ jobs:
         with:
           path: artifacts
 
-      - name: Make a draft release with the Flatpaks
+      - name: Make a draft release with the downloads
         run: >-
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"
           --draft --verify-tag --title "Nubo ${GITHUB_REF_NAME#v}"
           --notes-file artifacts/release-notes/notes.md
-          artifacts/flatpak-*/*.flatpak
+          artifacts/flatpak-*/*.flatpak artifacts/windows-*/*
         env:
           GH_TOKEN: ${{ github.token }}

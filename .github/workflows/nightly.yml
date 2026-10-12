@@ -128,3 +128,7 @@ jobs:
   flatpak:
     name: Flatpak
     uses: ./.github/workflows/flatpak.yml
+
+  windows:
+    name: Windows
+    uses: ./.github/workflows/windows.yml

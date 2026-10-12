@@ -34,27 +34,26 @@ jobs:
       COMMIT: ${{ github.event.workflow_run.head_sha }}
     steps:
       # Publishing takes several API calls, so the tag alone doesn't prove the
-      # last one finished: it must also be a published release with both
-      # Flatpaks, or this run publishes it again.
+      # last one finished: it must also be a published release with all four
+      # downloads, or this run publishes it again.
       - name: Check whether main changed since the last nightly build
         id: changed
         run: |
           published=$(gh api "repos/$GH_REPO/git/ref/tags/nightly" --jq .object.sha 2>/dev/null || true)
           release=$(gh release view nightly --json isDraft,assets \
-            --jq '"\(.isDraft) \([.assets[] | select(.name | endswith(".flatpak"))] | length)"' \
+            --jq '"\(.isDraft) \(.assets | length)"' \
             2>/dev/null || true)
-          if [ "$published" = "$COMMIT" ] && [ "$release" = "false 2" ]; then
+          if [ "$published" = "$COMMIT" ] && [ "$release" = "false 4" ]; then
             echo "The nightly build of $COMMIT is already published"
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Download the Flatpaks from the nightly run
+      - name: Download the Flatpaks and the Windows files from the nightly run
         if: steps.changed.outputs.changed == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: flatpak-*
           path: artifacts
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
@@ -66,8 +65,10 @@ jobs:
           short=${COMMIT::7}
           mkdir upload
           for arch in x86_64 aarch64; do
-            cp artifacts/flatpak-$arch/*.flatpak "upload/Nubo-nightly-$date-$arch.flatpak"
+            cp artifacts/flatpak-$arch/*.flatpak "upload/Nubo-nightly-$date-linux-$arch.flatpak"
           done
+          cp artifacts/windows-x64/*-setup.exe "upload/Nubo-nightly-$date-windows-x64-setup.exe"
+          cp artifacts/windows-x64/*.zip "upload/Nubo-nightly-$date-windows-x64.zip"
           stable=$(gh release view --json tagName --jq .tagName 2>/dev/null || true)
           if [ -n "$stable" ]; then
             changes="[the changes since $stable](https://github.com/$GH_REPO/compare/$stable...$COMMIT)"
@@ -79,13 +80,15 @@ jobs:
 
           ## Install
 
-          Download the \`.flatpak\` file for your computer (\`x86_64\` for most PCs, \`aarch64\` for ARM) and run:
+          A nightly build replaces the Nubo you have installed, keeping your saves and settings. Save states made with a nightly build may not load in a release if their format changed. To go back to the release, install it the same way.
+
+          **Windows:** run \`Nubo-nightly-$date-windows-x64-setup.exe\`, or unpack \`Nubo-nightly-$date-windows-x64.zip\` to run Nubo without installing. The files aren't signed yet, so Windows may say it protected your PC: choose *More info* and then *Run anyway*.
+
+          **Linux:** download the \`.flatpak\` file for your computer (\`x86_64\` for most PCs, \`aarch64\` for ARM) and run:
 
           \`\`\`bash
-          flatpak install --user --reinstall Nubo-nightly-$date-x86_64.flatpak
+          flatpak install --user --reinstall Nubo-nightly-$date-linux-x86_64.flatpak
           \`\`\`
-
-          This replaces the Nubo you have installed, keeping your saves and settings. Save states made with a nightly build may not load in a release if their format changed. To go back to the release, install its file the same way.
           EOF
           echo "date=$date" >> "$GITHUB_ENV"
 
@@ -94,5 +97,5 @@ jobs:
         if: steps.changed.outputs.changed == 'true'
         run: |
           gh release delete nightly --cleanup-tag --yes 2>/dev/null || true
-          gh release create nightly upload/*.flatpak --prerelease --latest=false \
+          gh release create nightly upload/* --prerelease --latest=false \
             --target "$COMMIT" --title "Nightly build $date" --notes-file notes.md
