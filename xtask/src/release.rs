@@ -77,7 +77,9 @@ fn notes_for(metainfo: &str, version: &str) -> Result<String> {
          flatpak install --user Nubo-{version}-x86_64.flatpak\n\
          ```\n\
          \n\
-         Flatpak downloads the runtime Nubo needs from Flathub.\n"
+         Flatpak downloads the runtime Nubo needs from Flathub. To replace a Nubo you installed \
+         from an earlier file or a nightly build, add `--reinstall`; your saves and settings \
+         stay.\n"
     ));
     Ok(notes)
 }
