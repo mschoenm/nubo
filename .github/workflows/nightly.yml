@@ -1,0 +1,124 @@
+name: Nightly
+
+# The checks too slow for every pull request. GitHub emails whoever last
+# changed the schedule below when a scheduled run fails.
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  advisories:
+    name: Security advisories
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: cargo-deny@0.20
+
+      - name: Check the RustSec advisories
+        run: cargo deny --locked check advisories
+
+  verify-boot:
+    name: Test ROMs with real boots
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: release
+          save-if: false
+
+      - uses: ./.github/actions/test-roms
+
+      # Runs the boot ROM before every test and checks that the shortcut the
+      # other runs take (starting from a copy of an earlier boot) would have
+      # left each test in exactly the same state.
+      - name: Run test ROMs
+        run: cargo test-roms --verify-boot
+
+      - name: Upload screens of failing tests
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-rom-failures
+          path: target/test-roms/failures
+          if-no-files-found: ignore
+
+  save-states:
+    name: Save states of all test ROMs
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: release
+          save-if: false
+
+      - uses: ./.github/actions/test-roms
+
+      # Downloads the test ROMs if the cache had none, and runs only a few.
+      - name: Download the test ROMs
+        run: cargo test-roms acid2
+
+      # Halfway through each run a save state is loaded into a new emulator,
+      # which must go on to make exactly the same frames, sound and state.
+      - name: Check save states
+        run: >-
+          cargo benchmark target/test-roms/v* target/test-roms/gb-emulator-shootout-*
+          --seconds 6 --jobs "$(nproc)" --check-save-states
+
+  eager:
+    name: Lazy components against every M-cycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: release
+          save-if: false
+
+      - uses: ./.github/actions/test-roms
+
+      - name: Download the test ROMs
+        run: cargo test-roms acid2
+
+      - name: Record fingerprints with the lazy shortcuts
+        run: >-
+          cargo benchmark target/test-roms/v* target/test-roms/gb-emulator-shootout-*
+          --seconds 4 --jobs "$(nproc)" --record "$RUNNER_TEMP/lazy.txt"
+
+      # The eager feature runs every M-cycle on its own, with nothing left
+      # behind; the lazy PPU and APU must give bit for bit the same output.
+      - name: Compare with running every M-cycle on its own
+        run: >-
+          cargo run --release -p nubo-benchmark --features nubo-core/eager --
+          target/test-roms/v* target/test-roms/gb-emulator-shootout-*
+          --seconds 4 --jobs "$(nproc)" --compare "$RUNNER_TEMP/lazy.txt"

@@ -22,7 +22,7 @@ cargo fmt --all               # Format with rustfmt
 cargo test-roms               # Run the test ROM suites and compare with the list of passing tests
 cargo test-roms mooneye       # Only run tests whose name contains "mooneye" (e.g. "cgb blargg", "dmg mealybug")
 cargo test-roms --update      # Record the results of this run in the list of passing tests
-cargo test-roms --verify-boot # Run the boot ROM before every test and check the boot cache against it (CI does this)
+cargo test-roms --verify-boot # Run the boot ROM before every test and check the boot cache against it (the nightly CI run does this)
 cargo cpu-tests               # Run the JSON CPU tests (every opcode, checked cycle by cycle)
 
 # Iced frontend (desktop app)
@@ -143,7 +143,7 @@ The project uses a custom `Serializable` trait with a derive macro (`crates/seri
 
 ## Verifying Emulator Behavior with Test ROMs
 
-`cargo test-roms` runs every test ROM suite in about 30 seconds (pass a filter such as `gambatte/oamdma` to run part of it) and compares the results with `frontends/test_rom_runner/passing.txt`. It exits with an error both when a listed test stops passing and when an unlisted test starts passing, so after fixing an accuracy issue run `cargo test-roms --update` and commit the updated list. CI (`.github/workflows/ci.yml`) runs it with `--verify-boot`, together with `cargo cpu-tests`, on every pull request and push to main, next to `cargo fmt --check`, both clippy runs above with warnings as errors, and `cargo test --workspace` on Linux, macOS and Windows; a push to main that passes all of them publishes the web version to GitHub Pages.
+`cargo test-roms` runs every test ROM suite in about 30 seconds (pass a filter such as `gambatte/oamdma` to run part of it) and compares the results with `frontends/test_rom_runner/passing.txt`. It exits with an error both when a listed test stops passing and when an unlisted test starts passing, so after fixing an accuracy issue run `cargo test-roms --update` and commit the updated list. CI (`.github/workflows/ci.yml`) runs it, together with `cargo cpu-tests`, on every pull request and push to main, next to `cargo fmt --check`, both clippy runs above and `cargo doc` with warnings as errors, `cargo deny check licenses bans sources` (`deny.toml` allows only GPLv3-compatible licenses) and `cargo test --workspace` on Linux, macOS and Windows; a push to main that passes all of them publishes the web version to GitHub Pages. Branch protection only requires the "CI passed" job, which needs all the others. The slow checks run nightly (`.github/workflows/nightly.yml`): `cargo test-roms --verify-boot`, `cargo benchmark --check-save-states` and the lazy-against-`eager` fingerprint comparison on all test ROMs, and `cargo deny check advisories`. A release build must also run `cargo test-roms --verify-boot`. The Rust version is pinned in `rust-toolchain.toml`; Dependabot proposes new Rust versions, crates and actions (pinned to commits) every week.
 
 `frontends/test_rom_runner/FAILING_TESTS.md` explains every test that still fails, what was tried and what to try next; keep it up to date when a fix makes one of them pass. `docs/ACCURACY_PLAN.md` is the plan towards claiming to be the most accurate emulator (comparison with other emulators, hardware checks, missing hardware); update it when a phase moves on. Use `--verbose` to see why each test fails. Failing screenshot tests write the emulator's screen and a `.diff.png` (the reference with differing pixels in red) to `target/test-roms/failures/<model>/`.
 

@@ -184,8 +184,8 @@ need them run.
 2. Add Nubo to the GB Emulator Shootout.
 3. Report wrong expectations to test suite authors, and publish Nubo's own hardware-verified test ROMs
    (Phase 3) for other emulators to use.
-4. Keep `cargo test-roms --verify-boot` and `cargo cpu-tests` running in CI on every push to main
-   (once GitHub Actions is enabled), and keep `passing.txt` and FAILING_TESTS.md current.
+4. Keep `cargo test-roms` and `cargo cpu-tests` running in CI on every pull request (and
+   `--verify-boot` nightly and for releases), and keep `passing.txt` and FAILING_TESTS.md current.
 5. Ask the gbdev community, who have the hardware and the knowledge, to review the results.
 
 ## The claim itself

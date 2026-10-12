@@ -1,6 +1,6 @@
 //! Checks the results of the Gambatte test ROMs the way Gambatte's own test
-//! runner does (test/testrunner.cpp in
-//! https://github.com/pokemon-speedrunning/gambatte-core): after a fixed
+//! runner does (`test/testrunner.cpp` in
+//! <https://github.com/pokemon-speedrunning/gambatte-core>): after a fixed
 //! number of frames, a test either shows a hexadecimal number in the top-left
 //! corner, plays sound or stays silent, or matches a reference screenshot.
 

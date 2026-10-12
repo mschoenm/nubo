@@ -1,0 +1,42 @@
+# What `cargo deny check` allows in the dependency tree. CI checks licenses,
+# bans and sources on every pull request, and the nightly workflow checks the
+# RustSec advisories, which change without any change to this repository.
+
+[graph]
+all-features = true
+
+[advisories]
+# Unmaintained crates deep inside Iced's dependency tree are not ours to
+# replace; only report the ones we depend on directly.
+unmaintained = "workspace"
+
+[licenses]
+# Licenses compatible with GPL-3.0-or-later, which Nubo is distributed under.
+# Never add GPL-2.0-only: Nubo can't take in code under it (see CLAUDE.md).
+allow = [
+    "0BSD",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "GPL-3.0-or-later",
+    "ISC",
+    "MIT",
+    "MPL-2.0",
+    "NCSA",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+
+[bans]
+# Iced pulls in several versions of some crates; that costs build time, not
+# correctness.
+multiple-versions = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

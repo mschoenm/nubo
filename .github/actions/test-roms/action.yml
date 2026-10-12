@@ -1,0 +1,15 @@
+name: Cache test ROMs
+description: >-
+  Restores the test ROMs and JSON CPU tests the runners download. They are
+  pinned and checksummed, so the cache only changes when the pins do. Every
+  workflow uses this one key, so the nightly runs reuse what CI downloaded.
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          target/test-roms/v*
+          target/test-roms/gb-emulator-shootout-*
+          target/json-cpu-tests
+        key: test-roms-${{ hashFiles('frontends/test_rom_runner/src/download.rs', 'frontends/test_rom_runner/shootout.sha256', 'frontends/json_test_runner/src/download.rs', 'frontends/json_test_runner/v2.sha256') }}

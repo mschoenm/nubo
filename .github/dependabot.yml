@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/*
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # Pinned to the same exact version in Cargo.toml; they must be upgraded
+      # together.
+      wasm-bindgen:
+        patterns: ["wasm-bindgen", "wasm-bindgen-cli-support"]
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: rust-toolchain
+    directory: /
+    schedule:
+      interval: weekly

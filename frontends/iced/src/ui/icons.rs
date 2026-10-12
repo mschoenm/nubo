@@ -1,4 +1,4 @@
-//! Icons from the Lucide icon font (https://lucide.dev, ISC License),
+//! Icons from the Lucide icon font (<https://lucide.dev>, ISC License),
 //! drawn as text so they stay sharp at any size and take the text color.
 
 use iced::Font;
