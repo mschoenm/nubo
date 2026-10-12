@@ -107,7 +107,7 @@ These aren't run, because nothing can check them automatically or they need hard
 - CasualPokePlayer's `gb-camera-test` and `open-bus-ss-test`: the first needs the Pocket Camera, the second only has a photo of real hardware to compare with.
 - The [144p Test Suite](https://github.com/pinobatch/240p-test-mini) (judged by eye) and [AntonioND's GBC hardware tests](https://github.com/AntonioND/gbc-hw-tests) (results recorded from real consoles, which would need a checker of their own).
 
-Additionally, this emulator passes all [JSON CPU tests](https://github.com/adtennant/GameboyCPUTests). `cargo cpu-tests` downloads them and runs them in under a second, and CI runs them on every push.
+Additionally, this emulator passes all [JSON CPU tests](https://github.com/adtennant/GameboyCPUTests). `cargo cpu-tests` downloads them and runs them in under a second, and CI runs them on every pull request and push to main.
 
 ## Test Suite
 
