@@ -1,0 +1,86 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Iced",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": ["build", "--package=nubo", "--bin=nubo"],
+        "filter": { "name": "nubo", "kind": "bin" }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Iced: ROM",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": ["build", "--package=nubo", "--bin=nubo"],
+        "filter": { "name": "nubo", "kind": "bin" }
+      },
+      "args": ["${input:romPath}"],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Iced: ROM (CGB)",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": ["build", "--package=nubo", "--bin=nubo"],
+        "filter": { "name": "nubo", "kind": "bin" }
+      },
+      "args": ["${input:romPath}", "--cgb"],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Headless: screenshot",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": ["build", "--release", "--package=nubo-headless", "--bin=nubo-headless"],
+        "filter": { "name": "nubo-headless", "kind": "bin" }
+      },
+      "args": [
+        "${input:romPath}",
+        "${input:seconds}",
+        "--screenshot",
+        "--screenshot-path",
+        "${workspaceFolder}/target/screenshots"
+      ],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "JSON CPU tests",
+      "type": "lldb",
+      "request": "launch",
+      "cargo": {
+        "args": ["build", "--package=json_test_runner", "--bin=json_test_runner"],
+        "filter": { "name": "json_test_runner", "kind": "bin" }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}/frontends/json_test_runner"
+    },
+    {
+      "name": "Web (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://127.0.0.1:8080/",
+      "preLaunchTask": "web: serve"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "romPath",
+      "type": "promptString",
+      "description": "Path to a .gb or .gbc ROM"
+    },
+    {
+      "id": "seconds",
+      "type": "promptString",
+      "description": "Seconds to run before taking the screenshot",
+      "default": "10"
+    }
+  ]
+}

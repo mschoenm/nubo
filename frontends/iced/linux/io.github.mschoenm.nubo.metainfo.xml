@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.mschoenm.nubo</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <name>Nubo</name>
+  <summary>Play Game Boy and Game Boy Color games</summary>
+  <developer id="io.github.mschoenm">
+    <name>Michel Schoenmakers</name>
+  </developer>
+
+  <description>
+    <p>
+      Nubo is a cycle-accurate Game Boy and Game Boy Color emulator. It emulates every model from
+      the first Game Boy to the Game Boy Advance and is checked against thousands of hardware test
+      ROMs.
+    </p>
+    <ul>
+      <li>A game library built from your ROM folders, with each game's title screen or box art</li>
+      <li>Save states with pictures, and continuing where you left off</li>
+      <li>Fast forward, fullscreen and screenshots</li>
+      <li>Keyboard and controller controls you can change, and menus you can use with a controller</li>
+      <li>GameShark and Game Genie cheats</li>
+      <li>Gray, green or Pocket colors for Game Boy games, and light and dark themes</li>
+    </ul>
+    <p>
+      Nubo comes without games: it plays the ROM files (.gb, .gbc or .zip) you add.
+    </p>
+    <p>
+      The screenshot shows Tobu Tobu Girl Deluxe by Tangram Games, licensed under CC BY 4.0.
+    </p>
+  </description>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/mschoenm/nubo/main/images/flatpak/tobu-tobu-girl-deluxe.png</image>
+      <caption>Playing Tobu Tobu Girl Deluxe by Tangram Games</caption>
+    </screenshot>
+  </screenshots>
+
+  <launchable type="desktop-id">io.github.mschoenm.nubo.desktop</launchable>
+  <provides>
+    <binary>nubo</binary>
+  </provides>
+  <url type="homepage">https://github.com/mschoenm/nubo</url>
+  <url type="bugtracker">https://github.com/mschoenm/nubo/issues</url>
+
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <control>gamepad</control>
+  </supports>
+  <content_rating type="oars-1.1"/>
+  <branding>
+    <color type="primary" scheme_preference="light">#d9d3fd</color>
+    <color type="primary" scheme_preference="dark">#352a73</color>
+  </branding>
+</component>

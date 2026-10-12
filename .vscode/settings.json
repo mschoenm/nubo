@@ -1,0 +1,8 @@
+{
+  "rust-analyzer.showUnlinkedFileNotification": false,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "[rust]": {
+    "editor.formatOnSave": false
+  }
+}

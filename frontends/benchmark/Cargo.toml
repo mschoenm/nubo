@@ -1,0 +1,13 @@
+[package]
+name = "nubo-benchmark"
+license.workspace = true
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+nubo-core.workspace = true
+clap = { version = "4", features = ["derive"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[lints]
+workspace = true

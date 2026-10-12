@@ -1,0 +1,344 @@
+//! The game library: its folders, scans, pictures and box art, searching
+//! it, and moving through its cards with the D-pad.
+
+use super::playing::read_rom;
+use super::{App, Message};
+use crate::background;
+use crate::box_art::{self, GameList};
+use crate::controls::Action;
+use crate::library::{self, DownloadedArt, FileCheck, LoadedPicture, ScanResult, WatchEvent};
+use crate::settings::LibraryFolder;
+use crate::title_screens;
+use crate::views;
+use iced::Task;
+use iced::widget;
+use iced::widget::scrollable::AbsoluteOffset;
+use std::path::PathBuf;
+use std::sync::Arc;
+
+/// The height of the library's top bar, used until the page reports how
+/// much of it is visible.
+const LIBRARY_BAR_HEIGHT: f32 = 50.0;
+/// The room kept above and below a card scrolled into view, enough for the
+/// heading above the first row.
+const SCROLL_MARGIN: f32 = 48.0;
+
+/// What happens in the library: the player searching and changing its
+/// folders, and the background work that fills it.
+#[derive(Debug, Clone)]
+pub enum LibraryMessage {
+    SearchChanged(String),
+    /// The library page scrolled to this offset, showing this much height.
+    Scrolled(f32, f32),
+    AddFolder,
+    FolderPicked(Option<PathBuf>),
+    RemoveFolder(usize),
+    IncludeSubfolders(usize, bool),
+    Rescan,
+    Scanned(ScanResult),
+    /// The quick startup look at whether the games' files still exist is
+    /// done.
+    FilesChecked(FileCheck),
+    /// The folder watcher saw a change, or stopped working.
+    Watch(WatchEvent),
+    DownloadBoxArtToggled(bool),
+    GameListLoaded(Result<Arc<GameList>, String>),
+    /// A game's box art was looked up: a PNG, `None` if there is none, or
+    /// why the download failed.
+    BoxArtDownloaded(PathBuf, Result<Option<DownloadedArt>, String>),
+    /// The saved pictures of the games were read and decoded, or why they
+    /// weren't.
+    PicturesLoaded(Result<Vec<LoadedPicture>, String>),
+    /// A game was run to capture its title screen; `None` if it showed
+    /// nothing worth keeping.
+    TitleScreenCaptured(PathBuf, Option<Vec<u8>>),
+}
+
+impl From<LibraryMessage> for Message {
+    fn from(message: LibraryMessage) -> Self {
+        Message::Library(message)
+    }
+}
+
+impl App {
+    pub(super) fn update_library(&mut self, message: LibraryMessage) -> Task<Message> {
+        match message {
+            LibraryMessage::SearchChanged(search) => {
+                self.search = search;
+                self.library_selection = None;
+            }
+            LibraryMessage::Scrolled(offset, height) => self.library_scroll = (offset, height),
+            LibraryMessage::AddFolder => {
+                return Task::perform(library::pick_folder(), |path| {
+                    LibraryMessage::FolderPicked(path).into()
+                });
+            }
+            LibraryMessage::FolderPicked(Some(path)) => {
+                if !self
+                    .settings
+                    .library_folders
+                    .iter()
+                    .any(|folder| folder.path == path)
+                {
+                    self.change_settings(|settings| {
+                        settings.library_folders.push(LibraryFolder {
+                            path,
+                            include_subfolders: true,
+                        });
+                    });
+                    return self.rescan();
+                }
+            }
+            LibraryMessage::FolderPicked(None) => {}
+            LibraryMessage::RemoveFolder(index) => {
+                if index < self.settings.library_folders.len() {
+                    self.change_settings(|settings| {
+                        settings.library_folders.remove(index);
+                    });
+                    return self.rescan();
+                }
+            }
+            LibraryMessage::IncludeSubfolders(index, include) => {
+                if index < self.settings.library_folders.len() {
+                    self.change_settings(|settings| {
+                        settings.library_folders[index].include_subfolders = include;
+                    });
+                    return self.rescan();
+                }
+            }
+            LibraryMessage::Rescan | LibraryMessage::Watch(WatchEvent::Changed) => {
+                return self.rescan();
+            }
+            LibraryMessage::Watch(WatchEvent::Failed(error)) => self.toasts.error(format!(
+                "New games won't show up by themselves ({error}). Use the Rescan button instead."
+            )),
+            LibraryMessage::Scanned(result) => {
+                if let Err(error) = self.library.finish_scan(result) {
+                    self.toasts.error(error);
+                }
+                let rescan = if self.library.take_rescan_wanted() {
+                    self.rescan()
+                } else {
+                    Task::none()
+                };
+                return Task::batch([
+                    rescan,
+                    self.load_pictures(true),
+                    self.capture_title_screens(),
+                    self.download_box_art(),
+                ]);
+            }
+            LibraryMessage::FilesChecked(check) => {
+                if let Err(error) = self.library.finish_check(check) {
+                    self.toasts.error(error);
+                }
+                self.library_selection = None;
+            }
+            LibraryMessage::DownloadBoxArtToggled(enabled) => {
+                self.change_settings(|settings| settings.download_box_art = enabled);
+                return Task::batch([self.load_pictures(false), self.download_box_art()]);
+            }
+            LibraryMessage::GameListLoaded(result) => {
+                self.loading_game_list = false;
+                match result {
+                    Ok(list) => {
+                        self.game_list = Some(list);
+                        return self.download_box_art();
+                    }
+                    Err(error) => self
+                        .toasts
+                        .error(format!("Box art couldn't be downloaded: {error}")),
+                }
+            }
+            LibraryMessage::BoxArtDownloaded(path, result) => {
+                if let Err(error) = self.library.finish_download(&path, result) {
+                    self.toasts.error(error);
+                }
+                return self.download_box_art();
+            }
+            LibraryMessage::PicturesLoaded(Ok(pictures)) => self.library.set_pictures(pictures),
+            LibraryMessage::PicturesLoaded(Err(error)) => self
+                .toasts
+                .error(format!("The games' pictures couldn't be read: {error}")),
+            LibraryMessage::TitleScreenCaptured(path, pixels) => {
+                if let Err(error) =
+                    self.library
+                        .finish_capture(&path, pixels, self.settings.dmg_palette)
+                {
+                    self.toasts.error(error);
+                }
+                return self.capture_title_screens();
+            }
+        }
+
+        Task::none()
+    }
+
+    /// Moves through the library's cards with a direction, scrolling the
+    /// selected card into view, and starts the selected game with A or
+    /// Start.
+    pub(super) fn navigate_library(&mut self, action: Action) -> Task<Message> {
+        let shelves = views::library::Shelves::new(&self.library, &self.settings, &self.search);
+        let count = shelves.len();
+        if count == 0 {
+            return Task::none();
+        }
+        let current = self.library_selection.map(|index| index.min(count - 1));
+
+        if matches!(action, Action::A | Action::Start) {
+            return match current.and_then(|index| shelves.entry(index)) {
+                Some(entry) => read_rom(entry.path.clone()),
+                None => Task::none(),
+            };
+        }
+
+        if !action.is_direction() {
+            return Task::none();
+        }
+
+        let next = current.map_or(0, |index| shelves.step(index, action, self.window_width));
+        let (top, bottom) = shelves.card_bounds(next, self.window_width);
+        self.library_selection = Some(next);
+
+        // Keep the card in view, with room for the heading above the first
+        // row.
+        let (offset, mut height) = self.library_scroll;
+        if height <= 0.0 {
+            height = self.window_height - LIBRARY_BAR_HEIGHT;
+        }
+        let target = if top - SCROLL_MARGIN < offset {
+            Some(top - SCROLL_MARGIN)
+        } else if bottom + SCROLL_MARGIN > offset + height {
+            Some(bottom + SCROLL_MARGIN - height)
+        } else {
+            None
+        };
+
+        match target {
+            Some(y) => widget::operation::scroll_to(
+                views::library::scroll_id(),
+                AbsoluteOffset {
+                    x: None,
+                    y: Some(y.max(0.0)),
+                },
+            ),
+            None => Task::none(),
+        }
+    }
+
+    /// Starts capturing the title screens of games that have none yet, a
+    /// few at a time in the background.
+    fn capture_title_screens(&mut self) -> Task<Message> {
+        Task::batch(self.library.next_captures().into_iter().map(|path| {
+            let rom_path = path.clone();
+            Task::perform(
+                background::run(move || {
+                    if let Some(saved) = library::saved_title_screen(&rom_path) {
+                        return Some(saved);
+                    }
+                    let rom = std::fs::read(&rom_path).ok()?;
+                    title_screens::capture(&rom)
+                }),
+                move |pixels| {
+                    LibraryMessage::TitleScreenCaptured(path, pixels.ok().flatten()).into()
+                },
+            )
+        }))
+    }
+
+    /// Looks up the box art of games that weren't looked up yet, a few at a
+    /// time on background threads, if the player turned box art on. The
+    /// game lists are read (or downloaded) first, and only when a game needs
+    /// them, so a library whose box art is all looked up touches neither the
+    /// network nor the lists.
+    fn download_box_art(&mut self) -> Task<Message> {
+        if !box_art::AVAILABLE || !self.settings.download_box_art || !self.library.needs_downloads()
+        {
+            return Task::none();
+        }
+
+        let Some(list) = self.game_list.clone() else {
+            if self.loading_game_list {
+                return Task::none();
+            }
+            self.loading_game_list = true;
+            return Task::perform(
+                background::run(|| box_art::load_game_list().map(Arc::new)),
+                |result| LibraryMessage::GameListLoaded(result.flatten()).into(),
+            );
+        };
+
+        Task::batch(
+            self.library
+                .next_downloads()
+                .into_iter()
+                .map(|(path, supports_cgb)| {
+                    let list = list.clone();
+                    let rom_path = path.clone();
+                    Task::perform(
+                        background::run(move || {
+                            if let Some(saved) = library::saved_box_art(&rom_path) {
+                                return Ok(Some(saved));
+                            }
+                            box_art::find(&rom_path, supports_cgb, &list)
+                                .map(|png| png.and_then(DownloadedArt::decode))
+                        }),
+                        move |result| {
+                            LibraryMessage::BoxArtDownloaded(path, result.flatten()).into()
+                        },
+                    )
+                }),
+        )
+    }
+
+    /// Reads and decodes the games' saved pictures on a background thread.
+    /// With `missing_only`, only for games that have none on screen yet,
+    /// such as games a scan just found.
+    pub(super) fn load_pictures(&self, missing_only: bool) -> Task<Message> {
+        if !library::AVAILABLE {
+            return Task::none();
+        }
+
+        Task::perform(
+            self.library.load_pictures(
+                self.settings.dmg_palette,
+                self.settings.download_box_art,
+                missing_only,
+            ),
+            |pictures| LibraryMessage::PicturesLoaded(pictures).into(),
+        )
+    }
+
+    /// Starts a quick background look at whether the games' files still
+    /// exist, so games that were deleted disappear right away, before the
+    /// slower scan of the folders.
+    pub(super) fn check_files(&self) -> Task<Message> {
+        if !library::AVAILABLE {
+            return Task::none();
+        }
+
+        Task::perform(
+            self.library
+                .start_check(self.settings.library_folders.clone()),
+            |check| LibraryMessage::FilesChecked(check).into(),
+        )
+    }
+
+    /// Starts scanning the library folders in the background. The Rescan
+    /// buttons, the folder watcher and folder changes all come here; while a
+    /// scan runs, they lead to one more scan after it instead of a second
+    /// scan at the same time.
+    pub(super) fn rescan(&mut self) -> Task<Message> {
+        if !library::AVAILABLE {
+            return Task::none();
+        }
+
+        match self
+            .library
+            .start_scan(self.settings.library_folders.clone())
+        {
+            Some(scan) => Task::perform(scan, |result| LibraryMessage::Scanned(result).into()),
+            None => Task::none(),
+        }
+    }
+}

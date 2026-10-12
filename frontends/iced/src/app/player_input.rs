@@ -1,0 +1,227 @@
+//! Keys and controller buttons: picking one for an action in the settings,
+//! the app's shortcuts, moving through the menus, and playing.
+
+use super::window_events::toggle_fullscreen;
+use super::{App, GameMessage, Message};
+use crate::controllers::ControllerEvent;
+use crate::controls::{Action, Device, KeyboardKey, PadButton};
+use crate::input::{self, KeyInput};
+use crate::save_states::Slot;
+use iced::Task;
+use iced::keyboard::{self, key::Named};
+use nubo_core::{ControllerButton, Key};
+
+impl App {
+    /// Handles a key going down or up: picking a key in the settings, the
+    /// fixed shortcuts, and then the player's controls.
+    pub(super) fn handle_key(&mut self, input: &KeyInput) -> Task<Message> {
+        if input.pressed && !input.repeat {
+            if let Some((device, action)) = self.capture {
+                match input.key.as_ref() {
+                    keyboard::Key::Named(Named::Escape) => self.capture = None,
+                    keyboard::Key::Named(Named::Backspace) => {
+                        self.capture = None;
+                        self.change_controls(|controls| controls.clear(device, action));
+                    }
+                    _ => {
+                        if device == Device::Keyboard
+                            && let Some(key) = input.code.and_then(KeyboardKey::from_code)
+                        {
+                            self.capture = None;
+                            self.change_controls(|controls| {
+                                controls.keyboard.bind(action, Some(key));
+                            });
+                        }
+                    }
+                }
+                return Task::none();
+            }
+
+            if let Some(message) = input::fixed_shortcut(&input.key, input.modifiers) {
+                return self.update(message);
+            }
+        }
+
+        if input.pressed && input.modifiers.command() {
+            return Task::none();
+        }
+
+        let Some(action) = input
+            .code
+            .and_then(KeyboardKey::from_code)
+            .and_then(|key| self.settings.controls.keyboard.action(key))
+        else {
+            return Task::none();
+        };
+
+        if input.pressed && action.navigates() && self.in_menus() {
+            // Holding a direction keeps moving, like in other apps.
+            if input.repeat && !action.is_direction() {
+                return Task::none();
+            }
+            return self.navigate(action);
+        }
+
+        if input.repeat {
+            return Task::none();
+        }
+        self.perform(action, input.pressed)
+    }
+
+    /// Handles news from the controllers: picking a button in the settings,
+    /// the shortcuts on controller buttons, and passing the rest to the game.
+    pub(super) fn handle_controller(&mut self, event: ControllerEvent) -> Task<Message> {
+        match event {
+            ControllerEvent::Connected(name) => {
+                self.toasts.info(format!("{name} connected"));
+                self.controllers.push(name);
+                Task::none()
+            }
+            ControllerEvent::Disconnected(name) => {
+                self.toasts.info(format!("{name} disconnected"));
+                if let Some(index) = self.controllers.iter().position(|known| *known == name) {
+                    self.controllers.remove(index);
+                }
+                Task::none()
+            }
+            ControllerEvent::Unavailable(error) => {
+                self.toasts
+                    .error(format!("Controllers can't be used: {error}"));
+                Task::none()
+            }
+            ControllerEvent::Changed(state) => {
+                let previous = std::mem::replace(&mut self.controller_state, state);
+                let changed: Vec<(ControllerButton, bool)> = ControllerButton::ALL
+                    .into_iter()
+                    .filter(|&button| state.is_pressed(button) != previous.is_pressed(button))
+                    .map(|button| (button, state.is_pressed(button)))
+                    .collect();
+
+                self.menu_presses.update(&previous, &state, self.in_menus());
+                if let Some(game) = &mut self.game {
+                    game.set_controller_state(self.menu_presses.hide_from(&state));
+                }
+
+                if let Some((device, action)) = self.capture {
+                    let pressed = changed
+                        .iter()
+                        .find(|&&(_, pressed)| pressed)
+                        .map(|&(button, _)| PadButton(button));
+
+                    match (device, pressed) {
+                        (Device::Controller, Some(button)) => {
+                            self.capture = None;
+                            self.change_controls(|controls| {
+                                controls.controller.bind(action, Some(button));
+                            });
+                        }
+                        // Waiting for a keyboard key: the controller's B
+                        // cancels, and its other buttons are ignored.
+                        (Device::Keyboard, Some(button))
+                            if self.settings.controls.controller.action(button)
+                                == Some(Action::B) =>
+                        {
+                            self.capture = None;
+                        }
+                        _ => {}
+                    }
+                    return Task::none();
+                }
+
+                let mut tasks = Vec::new();
+
+                if self.in_menus() {
+                    let held_before: Vec<Key> = previous.stick_directions().collect();
+                    let stick = state
+                        .stick_directions()
+                        .filter(|key| !held_before.contains(key))
+                        .filter_map(Action::for_direction);
+                    let buttons = changed.iter().filter(|&&(_, pressed)| pressed).filter_map(
+                        |&(button, _)| {
+                            let action = self
+                                .settings
+                                .controls
+                                .controller
+                                .action(PadButton(button))?;
+                            action.navigates().then_some(action)
+                        },
+                    );
+                    let steps: Vec<Action> = stick.chain(buttons).collect();
+
+                    for action in steps {
+                        tasks.push(self.navigate(action));
+                    }
+                }
+
+                let shortcuts: Vec<(Action, bool)> = changed
+                    .into_iter()
+                    .filter_map(|(button, pressed)| {
+                        let action = self
+                            .settings
+                            .controls
+                            .controller
+                            .action(PadButton(button))?;
+                        action.game_boy_key().is_none().then_some((action, pressed))
+                    })
+                    .collect();
+
+                for (action, pressed) in shortcuts {
+                    tasks.push(self.perform(action, pressed));
+                }
+                Task::batch(tasks)
+            }
+        }
+    }
+
+    /// Moves through the menu on screen with a direction, picks with A or
+    /// Start, and steps back with B.
+    fn navigate(&mut self, action: Action) -> Task<Message> {
+        if self.settings_tab.is_some() {
+            return self.navigate_settings(action);
+        }
+
+        if self.game.is_some() {
+            self.navigate_pause_menu(action)
+        } else {
+            self.navigate_library(action)
+        }
+    }
+
+    /// Does what a key or controller button is bound to, as it goes down
+    /// (`pressed`) or up. Game Boy buttons only go down while the game runs.
+    fn perform(&mut self, action: Action, pressed: bool) -> Task<Message> {
+        if let Some(key) = action.game_boy_key() {
+            let running = self.is_running();
+            if let Some(game) = &mut self.game {
+                if !pressed {
+                    game.release(key);
+                } else if running {
+                    game.press(key);
+                }
+            }
+            return Task::none();
+        }
+
+        if action == Action::FastForward {
+            if let Some(game) = &mut self.game {
+                game.hold_fast_forward(pressed);
+            }
+            return Task::none();
+        }
+
+        if !pressed {
+            return Task::none();
+        }
+
+        match action {
+            Action::PauseMenu => return self.update(GameMessage::TogglePause.into()),
+            Action::QuickSave => self.save_state(Slot::Quick),
+            Action::QuickLoad => self.load_state(Slot::Quick),
+            Action::Fullscreen => return toggle_fullscreen(),
+            Action::Screenshot => self.take_screenshot(),
+            _ => {}
+        }
+
+        Task::none()
+    }
+}

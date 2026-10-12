@@ -1,0 +1,19 @@
+[package]
+name = "nubo-core"
+license.workspace = true
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serializable_derive.workspace = true
+getset = "0.1.6"
+zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
+[features]
+# Runs every M-cycle on its own, with no M-cycles waiting to run in bulk and the PPU and APU
+# never left behind, to check with `cargo benchmark --compare` that those shortcuts change
+# nothing (see the module docs of address_bus.rs). Much slower.
+eager = []
+
+[lints]
+workspace = true

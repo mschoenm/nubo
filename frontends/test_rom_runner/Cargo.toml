@@ -1,0 +1,16 @@
+[package]
+name = "test_rom_runner"
+license.workspace = true
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+nubo-core.workspace = true
+clap = { version = "4", features = ["derive"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+sha2 = "0.11"
+zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
+[lints]
+workspace = true

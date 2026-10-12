@@ -1,0 +1,155 @@
+//! Builds `Nubo.app`, the macOS app bundle, so the app has its own icon in
+//! the Dock and can be put in the Applications folder. Also writes the logo
+//! as a PNG.
+
+use super::{APP_ID, Result, cargo, licenses, run, target_dir};
+use image::ImageFormat;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+const APP_NAME: &str = "Nubo";
+const EXECUTABLE: &str = "nubo";
+
+/// The empty border Apple's app icons leave around their shape: an 824 pixel
+/// square on a 1024 pixel canvas.
+const MACOS_ICON_MARGIN: f32 = 100.0 / 1024.0;
+
+/// The pictures an `.iconset` folder needs: the file name and its size in
+/// pixels (the `@2x` versions are for Retina screens).
+const ICONSET: [(&str, u32); 10] = [
+    ("icon_16x16.png", 16),
+    ("icon_16x16@2x.png", 32),
+    ("icon_32x32.png", 32),
+    ("icon_32x32@2x.png", 64),
+    ("icon_128x128.png", 128),
+    ("icon_128x128@2x.png", 256),
+    ("icon_256x256.png", 256),
+    ("icon_256x256@2x.png", 512),
+    ("icon_512x512.png", 512),
+    ("icon_512x512@2x.png", 1024),
+];
+
+/// Builds the app in release mode and puts it in `target/bundle/Nubo.app`
+/// with its icon and license files, returning where the bundle is. Needs macOS, for its
+/// `iconutil` tool.
+pub fn build_app_bundle() -> Result<PathBuf> {
+    if !cfg!(target_os = "macos") {
+        return Err(String::from("app bundles can only be built on macOS"));
+    }
+
+    run(cargo().args(["build", "--release", "--package", EXECUTABLE]))?;
+
+    let bundle_dir = target_dir().join("bundle");
+    let app = bundle_dir.join(format!("{APP_NAME}.app"));
+    let contents = app.join("Contents");
+    if app.exists() {
+        fs::remove_dir_all(&app).map_err(|error| error.to_string())?;
+    }
+    for folder in ["MacOS", "Resources"] {
+        fs::create_dir_all(contents.join(folder)).map_err(|error| error.to_string())?;
+    }
+
+    let binary = target_dir().join("release").join(EXECUTABLE);
+    fs::copy(&binary, contents.join("MacOS").join(EXECUTABLE))
+        .map_err(|error| format!("failed to copy {}: {error}", binary.display()))?;
+    fs::write(contents.join("Info.plist"), info_plist()).map_err(|error| error.to_string())?;
+    licenses::write_license_files(
+        &contents.join("Resources"),
+        EXECUTABLE,
+        &licenses::host_target()?,
+    )?;
+
+    let iconset = bundle_dir.join(format!("{APP_NAME}.iconset"));
+    write_iconset(&iconset)?;
+    run(Command::new("iconutil")
+        .arg("--convert")
+        .arg("icns")
+        .arg(&iconset)
+        .arg("--output")
+        .arg(contents.join("Resources").join(format!("{APP_NAME}.icns"))))?;
+    fs::remove_dir_all(&iconset).map_err(|error| error.to_string())?;
+
+    // Sign the bundle for this Mac only ("ad hoc"), so macOS treats the
+    // copied binary and its resources as one app.
+    if let Err(error) = run(Command::new("codesign")
+        .args(["--force", "--deep", "--sign", "-"])
+        .arg(&app))
+    {
+        eprintln!("warning: the app bundle isn't signed: {error}");
+    }
+
+    Ok(app)
+}
+
+/// Writes the logo to `path` without a border: as an SVG when the path ends
+/// in `.svg`, otherwise as a PNG `size` pixels wide.
+pub fn write_icon(path: &Path, size: u32) -> Result {
+    if path
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("svg"))
+    {
+        fs::write(path, nubo_logo::svg())
+            .map_err(|error| format!("failed to write {}: {error}", path.display()))
+    } else {
+        write_png(path, size, 0.0)
+    }
+}
+
+/// Writes the pictures of an `.iconset` folder for `iconutil`.
+fn write_iconset(iconset: &Path) -> Result {
+    fs::create_dir_all(iconset).map_err(|error| error.to_string())?;
+
+    for (file_name, size) in ICONSET {
+        write_png(&iconset.join(file_name), size, MACOS_ICON_MARGIN)?;
+    }
+    Ok(())
+}
+
+fn write_png(path: &Path, size: u32, margin: f32) -> Result {
+    image::save_buffer_with_format(
+        path,
+        &nubo_logo::render(size, margin),
+        size,
+        size,
+        image::ExtendedColorType::Rgba8,
+        ImageFormat::Png,
+    )
+    .map_err(|error| format!("failed to write {}: {error}", path.display()))
+}
+
+/// The bundle's description for macOS: its name, program, icon and version.
+fn info_plist() -> String {
+    let version = env!("CARGO_PKG_VERSION");
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>{APP_NAME}</string>
+    <key>CFBundleDisplayName</key>
+    <string>{APP_NAME}</string>
+    <key>CFBundleIdentifier</key>
+    <string>{APP_ID}</string>
+    <key>CFBundleExecutable</key>
+    <string>{EXECUTABLE}</string>
+    <key>CFBundleIconFile</key>
+    <string>{APP_NAME}</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleVersion</key>
+    <string>{version}</string>
+    <key>CFBundleShortVersionString</key>
+    <string>{version}</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.games</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+</dict>
+</plist>
+"#
+    )
+}

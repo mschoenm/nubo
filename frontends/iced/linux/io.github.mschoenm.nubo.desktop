@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Nubo
+Comment=Play Game Boy and Game Boy Color games
+Exec=nubo %f
+Icon=io.github.mschoenm.nubo
+Terminal=false
+Categories=Game;Emulator;
+Keywords=Game Boy;GameBoy;GBC;emulator;
+MimeType=application/x-gameboy-rom;application/x-gameboy-color-rom;

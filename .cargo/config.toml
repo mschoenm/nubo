@@ -1,0 +1,7 @@
+[alias]
+xtask = "run --package xtask --"
+play = "run --release --package nubo --"
+screenshot = "run --release --package nubo-headless -- --screenshot --screenshot-path target/screenshots"
+test-roms = "run --release --package test_rom_runner --"
+cpu-tests = "run --release --package json_test_runner --"
+benchmark = "run --release --package nubo-benchmark --"

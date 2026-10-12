@@ -1,0 +1,409 @@
+//! Writes the license files that go with every copy of the app: Nubo's own
+//! LICENSE, LICENSE-APACHE and NOTICE, and `THIRD_PARTY_LICENSES.txt` with the
+//! license texts of every Rust crate the app is built from, which their
+//! licenses (MIT, BSD, Apache-2.0 and the like) ask to include with every copy.
+
+use super::{Result, cargo, workspace_root};
+use serde_json::Value;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Write;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+/// Nubo's own license files, and the names their copies get. The `.txt`
+/// extension makes browsers and Finder show them as text.
+const OWN_LICENSE_FILES: [(&str, &str); 3] = [
+    ("LICENSE", "LICENSE.txt"),
+    ("LICENSE-APACHE", "LICENSE-APACHE.txt"),
+    ("NOTICE", "NOTICE.txt"),
+];
+
+const THIRD_PARTY_LICENSES: &str = "THIRD_PARTY_LICENSES.txt";
+
+/// Crates keep their license texts and notices in files whose names start
+/// with one of these.
+const LICENSE_FILE_PREFIXES: [&str; 6] = [
+    "LICENSE",
+    "LICENCE",
+    "COPYING",
+    "NOTICE",
+    "UNLICENSE",
+    "COPYRIGHT",
+];
+
+/// The licenses a crate that ships no license text can be given the standard
+/// text of, most preferred first. A crate licensed "MIT OR Apache-2.0" gets
+/// the first one its license allows.
+const STANDARD_TEXT_PREFERENCE: [&str; 4] = ["Apache-2.0", "MIT", "ISC", "CC0-1.0"];
+
+const MIT_TEMPLATE: &str = "\
+MIT License
+
+Copyright (c) {holders}
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the \"Software\"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.";
+
+const ISC_TEMPLATE: &str = "\
+ISC License
+
+Copyright (c) {holders}
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
+IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.";
+
+const CC0_TEXT: &str = "\
+Released into the public domain under the Creative Commons CC0 1.0 Universal
+dedication (https://creativecommons.org/publicdomain/zero/1.0/), which asks
+for no notice.";
+
+/// A crate from crates.io (or another registry or git) that the app is built
+/// from.
+struct Crate {
+    name: String,
+    version: String,
+    /// The license as the crate's Cargo.toml states it, as an SPDX expression
+    /// such as "MIT OR Apache-2.0".
+    license: String,
+    authors: Vec<String>,
+    /// The folder with the crate's source, where its license files are.
+    directory: PathBuf,
+    /// The file Cargo.toml names with `license-file`, relative to `directory`.
+    license_file: Option<String>,
+}
+
+impl Crate {
+    fn label(&self) -> String {
+        format!("{} {}", self.name, self.version)
+    }
+}
+
+/// The license texts of the crates, each listed once with the crates that
+/// use it.
+#[derive(Default)]
+struct LicenseTexts {
+    /// Each text, whether it is a standard text given to crates that ship
+    /// none, and the crates that use it, in the order first seen.
+    texts: Vec<(String, bool, Vec<String>)>,
+    /// Where each text is in `texts`, keyed by the text with its whitespace
+    /// collapsed (copies often differ only in line breaks) and whether it is
+    /// a standard text.
+    index: HashMap<(String, bool), usize>,
+}
+
+impl LicenseTexts {
+    fn add(&mut self, text: &str, standard: bool, user: String) {
+        let key = (
+            text.split_whitespace().collect::<Vec<_>>().join(" "),
+            standard,
+        );
+        let position = *self.index.entry(key).or_insert_with(|| {
+            self.texts
+                .push((text.trim().to_owned(), standard, Vec::new()));
+            self.texts.len() - 1
+        });
+        let users = &mut self.texts[position].2;
+        if !users.contains(&user) {
+            users.push(user);
+        }
+    }
+}
+
+/// Copies Nubo's license files into `directory` and writes the license texts
+/// of the crates `package` is built from for `target` (a Rust target triple)
+/// next to them.
+pub fn write_license_files(directory: &Path, package: &str, target: &str) -> Result {
+    fs::create_dir_all(directory)
+        .map_err(|error| format!("failed to create {}: {error}", directory.display()))?;
+    for (source, copy) in OWN_LICENSE_FILES {
+        let source = workspace_root().join(source);
+        fs::copy(&source, directory.join(copy))
+            .map_err(|error| format!("failed to copy {}: {error}", source.display()))?;
+    }
+
+    let crates = dependencies(package, target)?;
+    let path = directory.join(THIRD_PARTY_LICENSES);
+    fs::write(&path, third_party_licenses(&crates)?)
+        .map_err(|error| format!("failed to write {}: {error}", path.display()))
+}
+
+/// The target triple of this computer, such as `aarch64-apple-darwin`.
+pub fn host_target() -> Result<String> {
+    let output = cargo()
+        .arg("-vV")
+        .output()
+        .map_err(|error| format!("failed to run cargo: {error}"))?;
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .find_map(|line| line.strip_prefix("host: "))
+        .map(str::to_owned)
+        .ok_or_else(|| String::from("cargo -vV didn't name the host target"))
+}
+
+/// The crates outside the workspace that `package` uses when it is built for
+/// `target`, directly or through other crates, sorted by name and version.
+/// Build scripts' and tests' dependencies aren't part of the app and are left
+/// out.
+fn dependencies(package: &str, target: &str) -> Result<Vec<Crate>> {
+    let output = cargo()
+        .args([
+            "metadata",
+            "--format-version",
+            "1",
+            "--filter-platform",
+            target,
+        ])
+        .current_dir(workspace_root())
+        .output()
+        .map_err(|error| format!("failed to run cargo metadata: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "cargo metadata failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    let metadata: Value = serde_json::from_slice(&output.stdout)
+        .map_err(|error| format!("failed to read cargo metadata's output: {error}"))?;
+
+    let packages: HashMap<&str, &Value> = list(&metadata["packages"])
+        .iter()
+        .map(|package| (string(&package["id"]), package))
+        .collect();
+    let nodes: HashMap<&str, &Value> = list(&metadata["resolve"]["nodes"])
+        .iter()
+        .map(|node| (string(&node["id"]), node))
+        .collect();
+    let root = packages
+        .values()
+        .find(|candidate| string(&candidate["name"]) == package && candidate["source"].is_null())
+        .map(|root| string(&root["id"]))
+        .ok_or_else(|| format!("the workspace has no package named {package}"))?;
+
+    let mut seen = HashSet::new();
+    let mut pending = vec![root];
+    while let Some(id) = pending.pop() {
+        if !seen.insert(id) {
+            continue;
+        }
+        let Some(node) = nodes.get(id) else {
+            continue;
+        };
+        for dependency in list(&node["deps"]) {
+            let normal = list(&dependency["dep_kinds"])
+                .iter()
+                .any(|kind| kind["kind"].is_null());
+            if normal {
+                pending.push(string(&dependency["pkg"]));
+            }
+        }
+    }
+
+    let mut crates: Vec<Crate> = seen
+        .into_iter()
+        .filter_map(|id| packages.get(id))
+        .filter(|package| !package["source"].is_null())
+        .map(|package| Crate {
+            name: string(&package["name"]).to_owned(),
+            version: string(&package["version"]).to_owned(),
+            license: package["license"]
+                .as_str()
+                .unwrap_or("not stated")
+                .to_owned(),
+            authors: list(&package["authors"])
+                .iter()
+                .map(|author| string(author).to_owned())
+                .collect(),
+            directory: Path::new(string(&package["manifest_path"]))
+                .parent()
+                .map(Path::to_path_buf)
+                .unwrap_or_default(),
+            license_file: package["license_file"].as_str().map(str::to_owned),
+        })
+        .collect();
+    crates.sort_by(|a, b| (&a.name, &a.version).cmp(&(&b.name, &b.version)));
+    Ok(crates)
+}
+
+fn list(value: &Value) -> &[Value] {
+    value.as_array().map_or(&[], Vec::as_slice)
+}
+
+fn string(value: &Value) -> &str {
+    value.as_str().unwrap_or_default()
+}
+
+/// The license files a crate ships, read as text.
+fn license_files(krate: &Crate) -> Vec<String> {
+    let mut paths: Vec<PathBuf> = fs::read_dir(&krate.directory)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|entry| {
+            let name = entry.file_name().to_string_lossy().to_uppercase();
+            LICENSE_FILE_PREFIXES
+                .iter()
+                .any(|prefix| name.starts_with(prefix))
+        })
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file())
+        .collect();
+    if let Some(file) = &krate.license_file {
+        paths.push(krate.directory.join(file));
+    }
+    paths.sort();
+    paths.dedup();
+    paths
+        .iter()
+        .filter_map(|path| fs::read(path).ok())
+        .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+        .filter(|text| !text.trim().is_empty())
+        .collect()
+}
+
+/// The standard texts of the licenses a crate that ships no license text is
+/// used under: for each part of an "AND" expression, the first license of
+/// `STANDARD_TEXT_PREFERENCE` its "OR" alternatives allow. `None` when a part
+/// allows none of them.
+fn standard_texts(krate: &Crate) -> Option<Vec<String>> {
+    let holders = holders(krate);
+    krate
+        .license
+        .split(" AND ")
+        .map(|part| {
+            let alternatives: Vec<&str> = part
+                .trim_matches(|character: char| character == '(' || character == ')')
+                .split(" OR ")
+                .flat_map(|alternative| alternative.split('/'))
+                .map(str::trim)
+                .collect();
+            let license = STANDARD_TEXT_PREFERENCE
+                .into_iter()
+                .find(|license| alternatives.contains(license))?;
+            Some(match license {
+                "Apache-2.0" => fs::read_to_string(workspace_root().join("LICENSE-APACHE")).ok()?,
+                "MIT" => MIT_TEMPLATE.replace("{holders}", &holders),
+                "ISC" => ISC_TEMPLATE.replace("{holders}", &holders),
+                _ => CC0_TEXT.to_owned(),
+            })
+        })
+        .collect()
+}
+
+/// The copyright holders to name in a standard license text: the crate's
+/// authors without their email addresses.
+fn holders(krate: &Crate) -> String {
+    let names: Vec<&str> = krate
+        .authors
+        .iter()
+        .map(|author| author.split('<').next().unwrap_or_default().trim())
+        .filter(|name| !name.is_empty())
+        .collect();
+    if names.is_empty() {
+        format!("the authors of {}", krate.name)
+    } else {
+        names.join(", ")
+    }
+}
+
+/// The contents of `THIRD_PARTY_LICENSES.txt`: the crates with their
+/// licenses, then every license text once with the crates that use it.
+fn third_party_licenses(crates: &[Crate]) -> Result<String> {
+    let mut texts = LicenseTexts::default();
+    let mut unlicensed = Vec::new();
+    for krate in crates {
+        let files = license_files(krate);
+        if !files.is_empty() {
+            for text in &files {
+                texts.add(text, false, krate.label());
+            }
+        } else if let Some(standard) = standard_texts(krate) {
+            for text in &standard {
+                texts.add(text, true, krate.label());
+            }
+        } else {
+            unlicensed.push(format!("{} ({})", krate.label(), krate.license));
+        }
+    }
+    if !unlicensed.is_empty() {
+        return Err(format!(
+            "these crates ship no license text and have no standard text to give them: {}",
+            unlicensed.join(", ")
+        ));
+    }
+
+    let mut output = String::from(
+        "Third-party licenses\n\
+         ====================\n\n",
+    );
+    output.push_str(&wrap(
+        "Nubo is built from the Rust crates listed below, which are distributed \
+         under their own licenses. Each crate is listed with the license its \
+         Cargo.toml states (\"OR\" means it may be used under either license). \
+         The license texts follow, each listed once with the crates that ship it. \
+         For crates that ship no license text, the standard text of their \
+         license is given instead, naming the authors they list. Nubo itself and \
+         the code it includes from other projects are covered by LICENSE.txt, \
+         LICENSE-APACHE.txt and NOTICE.txt.",
+    ));
+    output.push_str("\n\nCrates\n------\n\n");
+    for krate in crates {
+        let _ = writeln!(output, "{}: {}", krate.label(), krate.license);
+    }
+    output.push_str("\nLicense texts\n-------------\n");
+
+    let rule = "=".repeat(80);
+    for (text, standard, users) in &texts.texts {
+        let heading = if *standard {
+            "Standard text for crates that ship none"
+        } else {
+            "Shipped by"
+        };
+        let _ = write!(
+            output,
+            "\n{rule}\n{}\n{rule}\n\n{text}\n",
+            wrap(&format!("{heading}: {}", users.join(", ")))
+        );
+    }
+    Ok(output)
+}
+
+/// Breaks `text` into lines of at most 80 characters, between words.
+fn wrap(text: &str) -> String {
+    let mut lines = vec![String::new()];
+    for word in text.split_whitespace() {
+        let line = lines.last_mut().expect("lines starts with one line");
+        if line.is_empty() {
+            line.push_str(word);
+        } else if line.chars().count() + 1 + word.chars().count() <= 80 {
+            line.push(' ');
+            line.push_str(word);
+        } else {
+            lines.push(word.to_owned());
+        }
+    }
+    lines.join("\n")
+}

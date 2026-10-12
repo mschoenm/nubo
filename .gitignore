@@ -1,0 +1,6 @@
+/target
+gameboy_emulator/target
+bios.bin
+pkg
+.claude/*
+.DS_Store

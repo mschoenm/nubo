@@ -1,0 +1,195 @@
+//! Runs the emulator for the window. On the desktop it runs on a thread of
+//! its own that the sound card paces (`emulation/thread.rs`); in the
+//! browser, which gives WebAssembly a single thread, it runs on each frame
+//! tick until the audio queue is full again (`emulation/web.rs`). Both kinds
+//! of session take the same [`Command`]s, which [`Machine::handle`] carries
+//! out.
+
+use crate::audio::AudioOutput;
+use crate::battery::{BatteryCartridgeEffects, BatterySaves};
+use crate::cheats::Cheat;
+use crate::notices::Notices;
+use crate::rom::Rom;
+use crate::settings::FastForwardSpeed;
+use iced::time::Duration;
+use nubo_core::{ControllerMapping, ControllerState, Emulator, Key, Model};
+use std::sync::Arc;
+use std::sync::mpsc::{self, Sender};
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use thread::Session;
+#[cfg(target_arch = "wasm32")]
+pub use web::Session;
+
+/// Whether the game runs, how fast and how loud.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Playback {
+    pub running: bool,
+    /// The fast forward speed, or `None` for real time.
+    pub fast_forward: Option<FastForwardSpeed>,
+    /// How loud to play, from 0 (silent) to 1 (as loud as the game).
+    pub volume: f32,
+}
+
+impl Playback {
+    /// How many audio buffers to emulate for each one played: one at normal
+    /// speed, and the speed's multiplier while fast forwarding. The sound of
+    /// the others is dropped, so it keeps its pitch.
+    pub fn buffers_per_played(self) -> u32 {
+        self.fast_forward.map_or(1, FastForwardSpeed::multiplier)
+    }
+}
+
+/// A request from the UI to the emulator.
+#[derive(Debug)]
+pub enum Command {
+    Press(Key),
+    Release(Key),
+    SetPlayback(Playback),
+    SetControllerState(ControllerState),
+    SetControllerMapping(ControllerMapping),
+    /// Turns a cheat on or off, as its `enabled` field says.
+    SetCheat(Cheat),
+    /// Asks for a save state, sent back over the channel.
+    SaveState(Sender<Vec<u8>>),
+    /// Restores a save state and sends back whether that worked.
+    LoadState(Vec<u8>, Sender<Result<(), String>>),
+}
+
+/// The emulated Game Boy with its sound output and battery saves, playing
+/// the way the last [`Playback`] said. Dropping it writes the battery saves
+/// still waiting.
+pub struct Machine {
+    emulator: Emulator,
+    audio: AudioOutput,
+    saves: Arc<BatterySaves>,
+    playback: Playback,
+}
+
+impl Machine {
+    /// Opens the sound output and loads `rom` on `model` with its battery
+    /// saves, returning the load error if it couldn't. It plays as
+    /// `playback` says from the start, so a muted player hears nothing.
+    /// Problems while it runs, such as a missing sound device, go to
+    /// `notices`.
+    fn start(
+        rom: &Rom,
+        model: Model,
+        playback: Playback,
+        notices: &Notices,
+    ) -> Result<Machine, String> {
+        let saves = BatterySaves::for_rom(&rom.path, notices.clone());
+        let audio = AudioOutput::open(notices);
+        Machine::new(&rom.bytes, saves, audio, model, playback)
+    }
+
+    /// Loads `rom` on `model`, playing through `audio` as `playback` says and
+    /// keeping its battery saves in `saves`.
+    fn new(
+        rom: &[u8],
+        saves: Arc<BatterySaves>,
+        mut audio: AudioOutput,
+        model: Model,
+        playback: Playback,
+    ) -> Result<Machine, String> {
+        audio.set_volume(playback.volume);
+        if !playback.running {
+            audio.set_paused(true);
+        }
+
+        let mut emulator = Emulator::new(model);
+        emulator.set_sample_rate(audio.sample_rate());
+        emulator
+            .load_rom(rom, Box::new(BatteryCartridgeEffects::new(saves.clone())))
+            .map_err(|error| error.to_string())?;
+
+        Ok(Machine {
+            emulator,
+            audio,
+            saves,
+            playback,
+        })
+    }
+
+    /// Carries out a command from the UI.
+    fn handle(&mut self, command: Command) {
+        match command {
+            Command::Press(key) => self.emulator.press_key(key),
+            Command::Release(key) => self.emulator.release_key(key),
+            Command::SetPlayback(playback) => self.set_playback(playback),
+            Command::SetControllerState(state) => self.emulator.set_controller_state(&state),
+            Command::SetControllerMapping(mapping) => self.emulator.set_controller_mapping(mapping),
+            Command::SetCheat(cheat) => cheat.apply_to(&mut self.emulator),
+            Command::SaveState(reply) => {
+                let _ = reply.send(self.emulator.save_state());
+            }
+            Command::LoadState(state, reply) => {
+                let result = self
+                    .emulator
+                    .load_state(&state)
+                    .map_err(|error| error.to_string());
+                let _ = reply.send(result);
+            }
+        }
+    }
+
+    /// Plays as `playback` says from now on. Pausing also writes the battery
+    /// saves still waiting: the game can't finish them while it is paused,
+    /// and nothing else would write them before it goes on.
+    fn set_playback(&mut self, playback: Playback) {
+        if playback.running != self.playback.running {
+            self.audio.set_paused(!playback.running);
+            if !playback.running {
+                self.saves.flush();
+            }
+        }
+        self.audio.set_volume(playback.volume);
+        self.playback = playback;
+    }
+
+    /// Emulates one audio buffer's worth of time and queues its sound.
+    /// Returns how long that sound takes to play, and the frame that
+    /// finished meanwhile, if one did.
+    fn play_buffer(&mut self) -> (Duration, Option<&[u8]>) {
+        let (left, right) = self.emulator.step_until_next_audio_buffer();
+        let playing_time = self.audio.queue(left, right);
+        (playing_time, self.emulator.take_frame())
+    }
+
+    /// Emulates one audio buffer's worth of time without playing it, for
+    /// fast forward. Returns the frame that finished meanwhile, if one did.
+    fn skip_buffer(&mut self) -> Option<&[u8]> {
+        self.emulator.step_until_next_audio_buffer();
+        self.emulator.take_frame()
+    }
+}
+
+impl Drop for Machine {
+    fn drop(&mut self) {
+        self.saves.flush();
+    }
+}
+
+/// Sends a command that answers over a channel with `send`, and waits for
+/// the answer. In the browser the command is carried out before `send`
+/// returns, so the answer is already there and this doesn't wait.
+fn ask<T>(
+    send: impl FnOnce(Command),
+    command: impl FnOnce(Sender<T>) -> Command,
+) -> Result<T, String> {
+    let (reply, answer) = mpsc::channel();
+    send(command(reply));
+    answer.recv().map_err(|_| stopped_error())
+}
+
+/// What went wrong when the emulator thread ended before it answered.
+fn stopped_error() -> String {
+    String::from("the emulator stopped unexpectedly")
+}
+
+#[cfg(test)]
+mod tests;
+#[cfg(not(target_arch = "wasm32"))]
+mod thread;
+#[cfg(target_arch = "wasm32")]
+mod web;

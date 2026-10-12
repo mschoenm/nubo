@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "web: serve",
+      "type": "shell",
+      "command": "cargo xtask web",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "rustc",
+        "pattern": { "regexp": "^$" },
+        "background": {
+          "activeBegins": true,
+          "beginsPattern": "Compiling|Finished",
+          "endsPattern": "Serving the Iced frontend"
+        }
+      }
+    }
+  ]
+}

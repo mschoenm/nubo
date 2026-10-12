@@ -1,0 +1,155 @@
+//! Runs the Game Boy test ROM suites (Blargg, Mooneye, SameSuite, the acid
+//! tests, Mealybug Tearoom, Gambatte, GBMicrotest, AGE, rtc3test, Bully,
+//! Strikethrough, and daid's and CasualPokePlayer's tests from the GB
+//! Emulator Shootout) and compares the results with `passing.txt`, so both
+//! regressions and newly passing tests are noticed.
+
+use clap::Parser;
+use runner::Outcome;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::process::ExitCode;
+use std::time::Instant;
+
+/// Run the Game Boy test ROM suites and compare the results with the list of passing tests
+#[derive(Parser)]
+#[command(name = "test_rom_runner")]
+struct Args {
+    /// Only run tests whose name contains this text, such as "mooneye" or "cgb blargg"
+    filter: Option<String>,
+
+    /// Record the results of this run in the list of passing tests
+    #[arg(long)]
+    update: bool,
+
+    /// List every failing test with the reason it failed
+    #[arg(long)]
+    verbose: bool,
+
+    /// Run the boot ROM before every test instead of starting from a copy of an earlier boot,
+    /// and check that the copy would have been identical
+    #[arg(long)]
+    verify_boot: bool,
+}
+
+fn main() -> ExitCode {
+    match run(&Args::parse()) {
+        Ok(true) => ExitCode::SUCCESS,
+        Ok(false) => ExitCode::FAILURE,
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// Runs the selected tests and reports the results. Returns whether they
+/// match the list of passing tests (always true with `--update`).
+fn run(args: &Args) -> Result<bool, String> {
+    let rom_dirs = download::ensure_test_roms()?;
+    let failures_dir = download::work_dir().join("failures");
+    let _ = fs::remove_dir_all(&failures_dir);
+
+    let tests: Vec<_> = suites::discover(&rom_dirs)
+        .into_iter()
+        .filter(|test| {
+            args.filter
+                .as_ref()
+                .is_none_or(|filter| test.id().contains(filter.as_str()))
+        })
+        .collect();
+    if tests.is_empty() {
+        return Err("no tests match the filter".to_string());
+    }
+
+    println!("Running {} test ROMs", tests.len());
+    let start = Instant::now();
+    let outcomes = runner::run_all(&rom_dirs, &tests, &failures_dir, args.verify_boot)?;
+    println!("Finished in {:.1}s\n", start.elapsed().as_secs_f64());
+
+    print_summary(&tests, &outcomes);
+
+    if args.verbose {
+        println!("\nFailing tests:");
+        for (test, outcome) in tests.iter().zip(&outcomes) {
+            if let Outcome::Fail(reason) = outcome {
+                println!("  {}: {}", test.id(), reason);
+            }
+        }
+    }
+
+    let run_ids: BTreeSet<String> = tests.iter().map(suites::TestCase::id).collect();
+    let passing: BTreeSet<String> = tests
+        .iter()
+        .zip(&outcomes)
+        .filter(|(_, outcome)| matches!(outcome, Outcome::Pass))
+        .map(|(test, _)| test.id())
+        .collect();
+    let expected = expectations::load()?;
+
+    if args.update {
+        let updated: BTreeSet<String> = expected
+            .difference(&run_ids)
+            .cloned()
+            .chain(passing)
+            .collect();
+        expectations::save(&updated)?;
+        println!("\nUpdated {}", expectations::path().display());
+        return Ok(true);
+    }
+
+    let expected_in_run: BTreeSet<String> = expected.intersection(&run_ids).cloned().collect();
+    let regressions: Vec<_> = expected_in_run.difference(&passing).collect();
+    let improvements: Vec<_> = passing.difference(&expected_in_run).collect();
+
+    if !regressions.is_empty() {
+        println!("\nNo longer passing:");
+        for (test, outcome) in tests.iter().zip(&outcomes) {
+            if let (true, Outcome::Fail(reason)) = (expected_in_run.contains(&test.id()), outcome) {
+                println!("  {}: {}", test.id(), reason);
+            }
+        }
+    }
+    if !improvements.is_empty() {
+        println!("\nNewly passing (run with --update to record them):");
+        for id in &improvements {
+            println!("  {id}");
+        }
+    }
+    if failures_dir.exists() {
+        println!(
+            "\nScreens of failing screenshot tests are in {}",
+            failures_dir.display()
+        );
+    }
+
+    Ok(regressions.is_empty() && improvements.is_empty())
+}
+
+/// Prints how many tests passed per suite and model, and in total.
+fn print_summary(tests: &[suites::TestCase], outcomes: &[Outcome]) {
+    let mut totals: BTreeMap<(String, String), (usize, usize)> = BTreeMap::new();
+    for (test, outcome) in tests.iter().zip(outcomes) {
+        let entry = totals
+            .entry((test.suite(), suites::model_label(test.model)))
+            .or_default();
+        entry.1 += 1;
+        if matches!(outcome, Outcome::Pass) {
+            entry.0 += 1;
+        }
+    }
+
+    for ((suite, model), (passed, total)) in &totals {
+        println!("  {suite:<28} {model:<6} {passed:>3}/{total:<3}");
+    }
+    let passed: usize = totals.values().map(|(passed, _)| passed).sum();
+    println!("  {:<28} {:>8}/{}", "total", passed, tests.len());
+}
+
+mod boot;
+mod download;
+mod expectations;
+mod gambatte;
+mod runner;
+mod screen;
+mod suites;

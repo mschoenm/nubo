@@ -1,0 +1,143 @@
+//! Compares the emulator's screen with the reference screenshots of the
+//! test suites.
+
+use crate::suites::Model;
+use image::RgbImage;
+use nubo_core::DMG_SHADES;
+use std::path::Path;
+
+pub(crate) const WIDTH: u32 = 160;
+pub(crate) const HEIGHT: u32 = 144;
+/// How far a color channel may be from the reference and still match.
+const CHANNEL_TOLERANCE: u8 = 4;
+/// How far a pixel's brightness may be from a GB Emulator Shootout
+/// screenshot and still match, as in the shootout's own comparison.
+const GRAYSCALE_TOLERANCE: u8 = 50;
+
+/// Loads a reference screenshot and checks that it is the size of the
+/// Game Boy screen.
+pub(crate) fn load_reference(path: &Path) -> Result<RgbImage, String> {
+    let image = image::open(path)
+        .map_err(|error| format!("failed to load {}: {}", path.display(), error))?
+        .to_rgb8();
+
+    if image.dimensions() != (WIDTH, HEIGHT) {
+        return Err(format!("{} is not {}x{}", path.display(), WIDTH, HEIGHT));
+    }
+    Ok(image)
+}
+
+/// Converts an RGBA frame from the emulator into the colors the reference
+/// screenshots use for `model`.
+pub(crate) fn normalize(frame: &[u8], model: Model) -> RgbImage {
+    let channel = if model.is_cgb() {
+        cgb_channel
+    } else {
+        dmg_shade
+    };
+    let pixels = frame
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .flat_map(|pixel| [channel(pixel[0]), channel(pixel[1]), channel(pixel[2])])
+        .collect();
+    RgbImage::from_raw(WIDTH, HEIGHT, pixels).expect("the frame buffer is 160x144 RGBA")
+}
+
+/// Counts the pixels that don't match.
+pub(crate) fn differing_pixels(actual: &RgbImage, expected: &RgbImage) -> usize {
+    count_differences(actual, expected, pixels_match)
+}
+
+/// Counts the pixels whose brightness doesn't match.
+pub(crate) fn differing_pixels_in_grayscale(actual: &RgbImage, expected: &RgbImage) -> usize {
+    count_differences(actual, expected, grays_match)
+}
+
+/// A copy of `expected` with every pixel that differs from `actual` painted
+/// red.
+pub(crate) fn highlight_differences(actual: &RgbImage, expected: &RgbImage) -> RgbImage {
+    paint_differences(actual, expected, pixels_match)
+}
+
+/// Like [`highlight_differences`], comparing brightness only.
+pub(crate) fn highlight_differences_in_grayscale(
+    actual: &RgbImage,
+    expected: &RgbImage,
+) -> RgbImage {
+    paint_differences(actual, expected, grays_match)
+}
+
+/// Counts the pixels for which `matches` is false.
+fn count_differences(
+    actual: &RgbImage,
+    expected: &RgbImage,
+    matches: fn(image::Rgb<u8>, image::Rgb<u8>) -> bool,
+) -> usize {
+    actual
+        .pixels()
+        .zip(expected.pixels())
+        .filter(|&(actual, expected)| !matches(*actual, *expected))
+        .count()
+}
+
+/// A copy of `expected` with every pixel for which `matches` is false painted
+/// red.
+fn paint_differences(
+    actual: &RgbImage,
+    expected: &RgbImage,
+    matches: fn(image::Rgb<u8>, image::Rgb<u8>) -> bool,
+) -> RgbImage {
+    let mut highlighted = expected.clone();
+    for (pixel, actual) in highlighted.pixels_mut().zip(actual.pixels()) {
+        if !matches(*actual, *pixel) {
+            *pixel = image::Rgb([0xFF, 0x00, 0x00]);
+        }
+    }
+    highlighted
+}
+
+/// Whether every channel is within `CHANNEL_TOLERANCE` of the reference.
+fn pixels_match(actual: image::Rgb<u8>, expected: image::Rgb<u8>) -> bool {
+    actual
+        .0
+        .iter()
+        .zip(expected.0.iter())
+        .all(|(actual, expected)| actual.abs_diff(*expected) <= CHANNEL_TOLERANCE)
+}
+
+/// Whether the brightness of the two pixels is within `GRAYSCALE_TOLERANCE`.
+fn grays_match(actual: image::Rgb<u8>, expected: image::Rgb<u8>) -> bool {
+    brightness(actual).abs_diff(brightness(expected)) <= GRAYSCALE_TOLERANCE
+}
+
+/// A pixel's brightness, weighted like the ITU-R 601 luma that the Pillow
+/// library (which the shootout uses) converts to grayscale with.
+fn brightness(pixel: image::Rgb<u8>) -> u8 {
+    let [red, green, blue] = pixel.0.map(u32::from);
+    ((red * 19_595 + green * 38_470 + blue * 7_471 + 0x8000) >> 16) as u8
+}
+
+/// A channel of the emulator's light gray, the second of its four shades of
+/// the original Game Boy (DMG).
+const LIGHT_GRAY: u8 = DMG_SHADES[1][0];
+/// A channel of the emulator's dark gray, the third shade.
+const DARK_GRAY: u8 = DMG_SHADES[2][0];
+
+/// Maps the emulator's two middle gray shades of the original Game Boy (DMG)
+/// palette to the evenly spaced grays of the reference screenshots.
+fn dmg_shade(value: u8) -> u8 {
+    match value {
+        LIGHT_GRAY => 0xAA,
+        DARK_GRAY => 0x55,
+        other => other,
+    }
+}
+
+/// Game Boy Color (CGB) colors have 5 bits per channel. This rounds an 8-bit
+/// channel to 5 bits and expands it back the way the reference screenshots
+/// do, by repeating the top bits.
+fn cgb_channel(value: u8) -> u8 {
+    let five_bit = (u32::from(value) * 31 + 127) / 255;
+    ((five_bit << 3) | (five_bit >> 2)) as u8
+}
