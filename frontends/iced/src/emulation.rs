@@ -1,7 +1,7 @@
 //! Runs the emulator for the window. On the desktop it runs on a thread of
 //! its own that the sound card paces (`emulation/thread.rs`); in the
-//! browser, which gives WebAssembly a single thread, it runs on each frame
-//! tick until the audio queue is full again (`emulation/web.rs`). Both kinds
+//! browser, which gives WebAssembly a single thread, it runs the frames due
+//! on each frame tick (`emulation/web.rs`). Both kinds
 //! of session take the same [`Command`]s, which [`Machine::handle`] carries
 //! out.
 
@@ -157,10 +157,13 @@ impl Machine {
     }
 
     /// Emulates one audio buffer's worth of time without playing it, for
-    /// fast forward. Returns the frame that finished meanwhile, if one did.
-    fn skip_buffer(&mut self) -> Option<&[u8]> {
-        self.emulator.step_until_next_audio_buffer();
-        self.emulator.take_frame()
+    /// fast forward. Returns how long that sound would have taken to play,
+    /// and the frame that finished meanwhile, if one did.
+    fn skip_buffer(&mut self) -> (Duration, Option<&[u8]>) {
+        let samples = self.emulator.step_until_next_audio_buffer().0.len();
+        let emulated_time =
+            Duration::from_secs_f64(samples as f64 / f64::from(self.audio.sample_rate()));
+        (emulated_time, self.emulator.take_frame())
     }
 }
 
