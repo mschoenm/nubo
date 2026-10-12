@@ -1,0 +1,98 @@
+name: Nightly build
+
+# Once a scheduled (or hand-started) nightly run has passed every check,
+# publishes its Flatpaks as the "nightly" pre-release, replacing the one
+# before. Skipped when main hasn't changed since the last nightly build.
+# Pre-releases don't count as GitHub's latest release, so the stable version
+# stays the default download.
+on:
+  workflow_run:
+    workflows: [Nightly]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish the nightly build
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      (github.event.workflow_run.event == 'schedule' || github.event.workflow_run.event == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    concurrency:
+      group: nightly-build
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      COMMIT: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      # Publishing takes several API calls, so the tag alone doesn't prove the
+      # last one finished: it must also be a published release with both
+      # Flatpaks, or this run publishes it again.
+      - name: Check whether main changed since the last nightly build
+        id: changed
+        run: |
+          published=$(gh api "repos/$GH_REPO/git/ref/tags/nightly" --jq .object.sha 2>/dev/null || true)
+          release=$(gh release view nightly --json isDraft,assets \
+            --jq '"\(.isDraft) \([.assets[] | select(.name | endswith(".flatpak"))] | length)"' \
+            2>/dev/null || true)
+          if [ "$published" = "$COMMIT" ] && [ "$release" = "false 2" ]; then
+            echo "The nightly build of $COMMIT is already published"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download the Flatpaks from the nightly run
+        if: steps.changed.outputs.changed == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: flatpak-*
+          path: artifacts
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Name the files and write the notes
+        if: steps.changed.outputs.changed == 'true'
+        run: |
+          date=$(date -u +%Y-%m-%d)
+          short=${COMMIT::7}
+          mkdir upload
+          for arch in x86_64 aarch64; do
+            cp artifacts/flatpak-$arch/*.flatpak "upload/Nubo-nightly-$date-$arch.flatpak"
+          done
+          stable=$(gh release view --json tagName --jq .tagName 2>/dev/null || true)
+          if [ -n "$stable" ]; then
+            changes="[the changes since $stable](https://github.com/$GH_REPO/compare/$stable...$COMMIT)"
+          else
+            changes="[everything on main](https://github.com/$GH_REPO/commits/$COMMIT)"
+          fi
+          cat > notes.md <<EOF
+          The newest Nubo, built from [\`$short\`](https://github.com/$GH_REPO/commit/$COMMIT) on main on $date after it passed every check, the nightly ones included. It has $changes, which may also bring new bugs; for everyday play, take the latest release instead.
+
+          ## Install
+
+          Download the \`.flatpak\` file for your computer (\`x86_64\` for most PCs, \`aarch64\` for ARM) and run:
+
+          \`\`\`bash
+          flatpak install --user --reinstall Nubo-nightly-$date-x86_64.flatpak
+          \`\`\`
+
+          This replaces the Nubo you have installed, keeping your saves and settings. Save states made with a nightly build may not load in a release if their format changed. To go back to the release, install its file the same way.
+          EOF
+          echo "date=$date" >> "$GITHUB_ENV"
+
+      # The nightly tag moves to the new commit with the release.
+      - name: Replace the nightly pre-release
+        if: steps.changed.outputs.changed == 'true'
+        run: |
+          gh release delete nightly --cleanup-tag --yes 2>/dev/null || true
+          gh release create nightly upload/*.flatpak --prerelease --latest=false \
+            --target "$COMMIT" --title "Nightly build $date" --notes-file notes.md
