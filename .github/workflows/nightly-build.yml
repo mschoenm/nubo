@@ -33,11 +33,17 @@ jobs:
       GH_REPO: ${{ github.repository }}
       COMMIT: ${{ github.event.workflow_run.head_sha }}
     steps:
+      # Publishing takes several API calls, so the tag alone doesn't prove the
+      # last one finished: it must also be a published release with both
+      # Flatpaks, or this run publishes it again.
       - name: Check whether main changed since the last nightly build
         id: changed
         run: |
           published=$(gh api "repos/$GH_REPO/git/ref/tags/nightly" --jq .object.sha 2>/dev/null || true)
-          if [ "$published" = "$COMMIT" ]; then
+          release=$(gh release view nightly --json isDraft,assets \
+            --jq '"\(.isDraft) \([.assets[] | select(.name | endswith(".flatpak"))] | length)"' \
+            2>/dev/null || true)
+          if [ "$published" = "$COMMIT" ] && [ "$release" = "false 2" ]; then
             echo "The nightly build of $COMMIT is already published"
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
