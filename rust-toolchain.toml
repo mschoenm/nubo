@@ -1,0 +1,6 @@
+# The Rust version CI and local builds use. Pinned so a new Rust release can't
+# turn every pull request red with new clippy lints; Dependabot proposes the
+# next version in a pull request of its own.
+[toolchain]
+channel = "1.99.0"
+components = ["rustfmt", "clippy"]
