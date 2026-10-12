@@ -166,6 +166,18 @@ impl AudioOutput {
         std::thread::park_timeout(wait);
     }
 
+    /// How many stereo samples the sound card takes from the queue at a
+    /// time, as far as it says, or `QUEUE_LOW_THRESHOLD` when it doesn't.
+    #[cfg(target_arch = "wasm32")]
+    pub fn buffer_samples(&self) -> usize {
+        self.stream
+            .as_ref()
+            .and_then(|stream| stream.buffer_size().ok())
+            .and_then(|frames| usize::try_from(frames).ok())
+            .filter(|&frames| frames > 0)
+            .unwrap_or(QUEUE_LOW_THRESHOLD)
+    }
+
     /// Sets how loud to play, from 0 (silent) to 1 (as loud as the game).
     pub fn set_volume(&mut self, volume: f32) {
         self.volume = volume.clamp(0.0, 1.0);
