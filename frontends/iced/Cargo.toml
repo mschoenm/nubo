@@ -27,7 +27,7 @@ ureq = { version = "2.12", default-features = false, features = ["tls"] }
 iced = { version = "0.14", features = ["image", "canvas", "webgl", "fira-sans"] }
 cpal = { version = "0.18", features = ["wasm-bindgen"] }
 console_error_panic_hook = "0.1"
-base64 = "0.22"
+base64 = "0.23"
 web-sys = { version = "0.3", features = ["Window", "Storage"] }
 # Not used directly: pins wasm-bindgen to the version of the bindings
 # generator in xtask, which must match it exactly.
