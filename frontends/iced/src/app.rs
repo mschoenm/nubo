@@ -116,7 +116,8 @@ pub enum Message {
     /// Time to show the newest frame and check what changes with time alone,
     /// such as toasts expiring: the emulator finished a new frame, a timer
     /// check is due (desktop, see `App::check_interval`), or the window is
-    /// about to draw (browser).
+    /// about to draw (browser, which also emulates the frames due by then,
+    /// see `emulation/web.rs`).
     Tick,
     DismissToast(usize),
 }
@@ -210,6 +211,8 @@ impl App {
             }
             Message::Tick => {
                 if let Some(game) = self.game.as_mut().filter(|_| !self.minimized) {
+                    #[cfg(target_arch = "wasm32")]
+                    game.advance();
                     game.refresh_screen();
                 }
                 self.toasts.remove_expired(iced::time::Instant::now());
