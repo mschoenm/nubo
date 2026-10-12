@@ -128,15 +128,17 @@ impl AudioOutput {
 
     /// Whether the queue is running low and the emulator should produce more
     /// audio.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn needs_samples(&mut self) -> bool {
+        self.queued_samples() < QUEUE_LOW_THRESHOLD
+    }
+
+    /// How many stereo samples are waiting to be played.
+    pub fn queued_samples(&mut self) -> usize {
         if self.stream.is_none() {
             self.drain_elapsed();
         }
 
-        self.queued_samples() < QUEUE_LOW_THRESHOLD
-    }
-
-    fn queued_samples(&self) -> usize {
         self.queue.samples.lock().map_or(0, |samples| samples.len())
     }
 
@@ -156,7 +158,6 @@ impl AudioOutput {
         let wait = if self.stream.is_some() {
             limit
         } else {
-            self.drain_elapsed();
             let excess = self
                 .queued_samples()
                 .saturating_sub(QUEUE_LOW_THRESHOLD - 1);

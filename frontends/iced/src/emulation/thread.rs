@@ -270,7 +270,7 @@ impl EmulatorThread {
 
     /// Emulates one audio buffer without playing it, for fast forward.
     fn skip_buffer(&mut self) {
-        if let Some(pixels) = self.machine.skip_buffer() {
+        if let Some(pixels) = self.machine.skip_buffer().1 {
             publish_frame(&self.frame, pixels);
         }
     }
