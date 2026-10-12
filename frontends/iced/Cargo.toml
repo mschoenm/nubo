@@ -33,5 +33,10 @@ web-sys = { version = "0.3", features = ["Window", "Storage"] }
 # generator in xtask, which must match it exactly.
 wasm-bindgen.workspace = true
 
+# For the Windows executable's icon and file properties (build.rs).
+[build-dependencies]
+nubo-logo.workspace = true
+winresource = { version = "0.1", default-features = false }
+
 [lints]
 workspace = true

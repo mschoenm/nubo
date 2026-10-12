@@ -12,12 +12,12 @@ Nubo is a cycle-accurate Game Boy emulator written in Rust. It runs as a native 
 
 | Platform | Download |
 | -------- | -------- |
+| Windows | [Installer](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64-setup.exe) · [Zip](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.zip) (runs without installing) |
 | Linux | [Flatpak for x86_64](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-x86_64.flatpak) (most PCs) · [Flatpak for ARM](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-aarch64.flatpak) |
-| Windows | Not available yet; build it from source (see [Getting Started](#getting-started)) |
 | macOS | Not available yet; build `Nubo.app` with `cargo xtask bundle` (see [Desktop App](#desktop-app)) |
 | Browser | [Play in the browser](https://mschoenm.github.io/nubo/) |
 
-These are the files of the [latest release](https://github.com/mschoenm/nubo/releases/latest). Open the `.flatpak` file with your software center to install it, or run `flatpak install --user Nubo-linux-x86_64.flatpak`. The [nightly build](https://github.com/mschoenm/nubo/releases/tag/nightly) has the newest `main` that passed every check.
+These are the files of the [latest release](https://github.com/mschoenm/nubo/releases/latest). On Windows, the files aren't signed yet, so SmartScreen may warn the first time: choose More info and then Run anyway. On Linux, open the `.flatpak` file with your software center to install it, or run `flatpak install --user Nubo-linux-x86_64.flatpak`. The [nightly build](https://github.com/mschoenm/nubo/releases/tag/nightly) has the newest `main` that passed every check.
 
 ## Features
 
@@ -48,6 +48,7 @@ cargo play path/to/rom.gb --model mgb  # Run on another model: dmg-0, dmg, mgb, 
 cargo xtask web                     # Build the app for the browser and serve it at http://127.0.0.1:8080
 cargo xtask bundle                  # Build Nubo.app with its icon into target/bundle/ (macOS)
 cargo xtask flatpak                 # Build the app as a Flatpak, install it for your user and write a .flatpak file into target/bundle/
+cargo xtask windows                 # Build the Windows installer and a zip into target/bundle/ (Windows, needs Inno Setup 6)
 cargo screenshot path/to/rom.gb 10  # Run headless for 10 emulated seconds and save a screenshot to target/screenshots/
 cargo test                          # Run the test suite
 cargo test-roms                     # Download and run the test ROM suites
@@ -59,11 +60,13 @@ On Linux, audio and controller support need the ALSA and udev development files,
 
 The app lives in the frontends/iced folder. Add your ROM folders under Settings > Library to fill the library, or open a single ROM. Everything it keeps (settings, the library, in-game saves, save states, cheats and pictures) goes in the user's data folder: `~/Library/Application Support/Nubo` on macOS, `%APPDATA%\Nubo` on Windows and `~/.local/share/nubo` (or `$XDG_DATA_HOME/nubo`) on Linux, with settings in `~/.config/nubo` on Linux.
 
+On Windows, `cargo xtask windows` builds `Nubo-<version>-windows-x64-setup.exe` in `target/bundle/`, which installs Nubo for your user (no administrator rights) with a Start menu entry and an uninstaller, and can offer Nubo for opening `.gb` and `.gbc` files, plus a zip of the same files to run Nubo without installing. It needs [Inno Setup 6](https://jrsoftware.org/isinfo.php). Each release has both files (as `Nubo-windows-x64-setup.exe` and `Nubo-windows-x64.zip`), and so does the `nightly` pre-release. They aren't signed yet, so Windows SmartScreen may warn the first time: choose More info and then Run anyway.
+
 On macOS, `cargo xtask bundle` builds `Nubo.app` in `target/bundle/`, with its own icon in the Dock. Drag it to the Applications folder to install it.
 
 On Linux, `cargo xtask flatpak` builds the app as a Flatpak and installs it for your user, to try it in the sandbox that Flathub apps run in. Start it from the app grid or with `flatpak run io.github.mschoenm.nubo`, and remove it with `flatpak uninstall --user io.github.mschoenm.nubo`. It needs flatpak-builder; the first build downloads the freedesktop runtime from Flathub, adding Flathub for your user if it isn't there yet. In the sandbox the app keeps its data in `~/.var/app/io.github.mschoenm.nubo/`, and it can read ROM folders in your home folder and on external drives.
 
-It also writes `target/bundle/Nubo-<version>-<architecture>.flatpak` (each [release](https://github.com/mschoenm/nubo/releases) has these files for x86_64 and ARM as `Nubo-linux-<architecture>.flatpak`, and the `nightly` pre-release has them for the newest `main` that passed every check), a single file to give to others: opening it in a software center such as GNOME Software installs Nubo with its icon and menu entry (or run `flatpak install --user Nubo-<version>-<architecture>.flatpak`), and uninstalling it removes both. The computer needs Flatpak; the file points to Flathub for the runtime, which is downloaded the first time.
+It also writes `target/bundle/Nubo-<version>-linux-<architecture>.flatpak` (each [release](https://github.com/mschoenm/nubo/releases) has these files for x86_64 and ARM as `Nubo-linux-<architecture>.flatpak`, and the `nightly` pre-release has them for the newest `main` that passed every check), a single file to give to others: opening it in a software center such as GNOME Software installs Nubo with its icon and menu entry (or run `flatpak install --user Nubo-<version>-linux-<architecture>.flatpak`), and uninstalling it removes both. The computer needs Flatpak; the file points to Flathub for the runtime, which is downloaded the first time.
 
 The default controls are below; all of them can be changed under Settings > Controls.
 

@@ -1,7 +1,7 @@
 //! Project tasks run with `cargo xtask <command>`: building the Iced
 //! frontend for the browser and serving it locally, building the macOS app
-//! bundle and the Flatpak, writing the license files that go with them, and
-//! checking a release's version and notes.
+//! bundle, the Flatpak and the Windows installer, writing the license files
+//! that go with them, and checking a release's version and notes.
 
 use std::env;
 use std::fs;
@@ -33,7 +33,10 @@ Commands:
   bundle        Build Nubo.app, the macOS app with its icon, into target/bundle (macOS only)
   flatpak       Build the desktop app as a Flatpak, install it for this user and write it into
                 target/bundle as a .flatpak file to share (Linux with flatpak-builder only)
-  icon <path>   Write the Nubo logo to <path>: an SVG if it ends in .svg, else a 256 pixel PNG
+  windows       Build the Windows installer (with Inno Setup 6) and a zip to run without
+                installing into target/bundle (Windows only)
+  icon <path>   Write the Nubo logo to <path>: an SVG if it ends in .svg, a Windows icon if it
+                ends in .ico, else a 256 pixel PNG
   licenses <folder>
                 Write Nubo's license files and the licenses of the crates the desktop app is built
                 from into <folder> (the app bundle, the Flatpak and the web version include them)
@@ -246,6 +249,14 @@ fn main() -> ExitCode {
                 bundle.display()
             );
         }),
+        Some("windows") => windows::build_windows_downloads().map(|(installer, zip)| {
+            println!(
+                "Built {}, which installs Nubo for the current user, and {}, which runs without \
+                 installing.",
+                installer.display(),
+                zip.display()
+            );
+        }),
         Some("icon") => match env::args().nth(2) {
             Some(path) => bundle::write_icon(Path::new(&path), 256),
             None => Err(format!("icon needs a path to write to\n\n{USAGE}")),
@@ -279,3 +290,4 @@ mod bundle;
 mod flatpak;
 mod licenses;
 mod release;
+mod windows;

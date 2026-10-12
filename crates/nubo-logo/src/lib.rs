@@ -163,6 +163,78 @@ pub fn svg() -> String {
     svg + "</svg>\n"
 }
 
+/// The sizes, in pixels, of the pictures in the Windows icon: what Explorer,
+/// the taskbar and the Start menu pick from at the usual display scales.
+const ICO_SIZES: [u32; 7] = [16, 24, 32, 48, 64, 128, 256];
+
+/// The logo as a Windows `.ico` file, for the executable and its installer.
+/// Each size is stored as an uncompressed 32-bit bitmap with its alpha
+/// channel, which every Windows since Vista reads.
+pub fn ico() -> Vec<u8> {
+    let images: Vec<Vec<u8>> = ICO_SIZES.iter().map(|&size| ico_bitmap(size)).collect();
+
+    let mut ico = Vec::new();
+    // ICONDIR: reserved, type 1 (icon), number of images.
+    for field in [0, 1, ICO_SIZES.len() as u16] {
+        ico.extend_from_slice(&field.to_le_bytes());
+    }
+    let mut offset = 6 + 16 * ICO_SIZES.len();
+    for (&size, image) in ICO_SIZES.iter().zip(&images) {
+        // ICONDIRENTRY: width and height (0 means 256), no palette, one
+        // plane, 32 bits per pixel, then where the image is.
+        let side = if size >= 256 { 0 } else { size as u8 };
+        ico.extend_from_slice(&[side, side, 0, 0]);
+        ico.extend_from_slice(&1_u16.to_le_bytes());
+        ico.extend_from_slice(&32_u16.to_le_bytes());
+        ico.extend_from_slice(&(image.len() as u32).to_le_bytes());
+        ico.extend_from_slice(&(offset as u32).to_le_bytes());
+        offset += image.len();
+    }
+    for image in images {
+        ico.extend_from_slice(&image);
+    }
+    ico
+}
+
+/// One picture of the `.ico` file: a BITMAPINFOHEADER, the pixels as BGRA
+/// from the bottom row up, and the 1-bit mask of fully transparent pixels
+/// that icons also carry (each row padded to four bytes).
+fn ico_bitmap(size: u32) -> Vec<u8> {
+    let pixels = render(size, 0.0);
+    let mask_row_bytes = size.div_ceil(32) * 4;
+    let mut bitmap = Vec::new();
+
+    // The height counts the pixels and the mask together, as icons do.
+    for field in [40, size, size * 2] {
+        bitmap.extend_from_slice(&field.to_le_bytes());
+    }
+    bitmap.extend_from_slice(&1_u16.to_le_bytes());
+    bitmap.extend_from_slice(&32_u16.to_le_bytes());
+    // No compression, and the fields for sizes, resolution and palette left
+    // at zero.
+    bitmap.extend_from_slice(&[0; 24]);
+
+    for row in (0..size).rev() {
+        for column in 0..size {
+            let index = ((row * size + column) * 4) as usize;
+            let [red, green, blue, alpha] = pixels[index..index + 4] else {
+                unreachable!("every pixel has four channels");
+            };
+            bitmap.extend_from_slice(&[blue, green, red, alpha]);
+        }
+    }
+    for row in (0..size).rev() {
+        let mut mask_row = vec![0_u8; mask_row_bytes as usize];
+        for column in 0..size {
+            if pixels[((row * size + column) * 4 + 3) as usize] == 0 {
+                mask_row[(column / 8) as usize] |= 0x80 >> (column % 8);
+            }
+        }
+        bitmap.extend_from_slice(&mask_row);
+    }
+    bitmap
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -203,5 +275,61 @@ mod tests {
         assert!(
             svg.contains(r##"<rect x="0" y="0" width="64" height="64" rx="15" fill="#8B7CF6"/>"##)
         );
+    }
+
+    #[test]
+    fn the_ico_lists_every_size_and_points_at_its_bitmaps() {
+        let ico = ico();
+        let u16_at = |at: usize| u16::from_le_bytes([ico[at], ico[at + 1]]);
+        let u32_at = |at: usize| u32::from_le_bytes(ico[at..at + 4].try_into().unwrap());
+
+        assert_eq!((u16_at(0), u16_at(2)), (0, 1));
+        assert_eq!(usize::from(u16_at(4)), ICO_SIZES.len());
+
+        let mut expected_offset = 6 + 16 * ICO_SIZES.len();
+        for (entry, &size) in ICO_SIZES.iter().enumerate() {
+            let at = 6 + 16 * entry;
+            let side = if size == 256 { 0 } else { size as u8 };
+            assert_eq!((ico[at], ico[at + 1]), (side, side));
+            assert_eq!(u16_at(at + 6), 32);
+
+            let (length, offset) = (u32_at(at + 8) as usize, u32_at(at + 12) as usize);
+            assert_eq!(offset, expected_offset);
+            let mask_bytes = size.div_ceil(32) * 4 * size;
+            assert_eq!(length as u32, 40 + size * size * 4 + mask_bytes);
+            assert_eq!(u32_at(offset), 40);
+            assert_eq!((u32_at(offset + 4), u32_at(offset + 8)), (size, size * 2));
+            expected_offset += length;
+        }
+        assert_eq!(ico.len(), expected_offset);
+    }
+
+    #[test]
+    fn the_ico_bitmaps_are_bgra_from_the_bottom_with_a_transparency_mask() {
+        let size = 16;
+        let bitmap = ico_bitmap(size);
+        let pixels = render(size, 0.0);
+
+        // The first stored row is the bottom one.
+        let bottom_middle = pixel(&pixels, size, 8, 15);
+        let stored = &bitmap[40 + 8 * 4..40 + 8 * 4 + 4];
+        assert_eq!(
+            stored,
+            [
+                bottom_middle[2],
+                bottom_middle[1],
+                bottom_middle[0],
+                bottom_middle[3]
+            ]
+        );
+
+        // The rounded corners are transparent, so their mask bits are set,
+        // while the middle of the top row is opaque. The top row is stored
+        // last.
+        let top_row_mask = &bitmap[40 + (size * size * 4) as usize + 15 * 4..];
+        assert_eq!(pixel(&pixels, size, 0, 0)[3], 0);
+        assert_eq!(top_row_mask[0] & 0x80, 0x80);
+        assert_eq!(pixel(&pixels, size, 8, 0)[3], 255);
+        assert_eq!(top_row_mask[1] & 0x80, 0);
     }
 }
