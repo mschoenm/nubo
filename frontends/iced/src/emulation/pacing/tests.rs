@@ -88,6 +88,37 @@ fn the_rate_is_measured_again_when_the_screen_changes() {
     assert_eq!(rate.lock().map(|lock| lock.refreshes_per_frame), Some(1.0));
 }
 
+#[test]
+fn moving_to_a_screen_with_another_refresh_rate_unlocks_frames_at_once() {
+    for (from_hz, to_hz) in [(60.0, 75.0), (60.0, 50.0), (120.0, 144.0)] {
+        let mut rate = measured(from_hz, 0.0005, 20_000);
+        rate.observe(1.0 / to_hz);
+        assert_eq!(rate.lock(), None, "{from_hz} to {to_hz} Hz");
+
+        for elapsed in ticks(to_hz, 0.0005, 300, 4) {
+            rate.observe(elapsed);
+        }
+        let interval = rate.interval().unwrap();
+        assert!(
+            (interval * to_hz - 1.0).abs() < 0.001,
+            "{from_hz} to {to_hz} Hz: measured {} Hz",
+            1.0 / interval
+        );
+    }
+}
+
+#[test]
+fn ticks_rounded_to_the_millisecond_still_lock_at_120_hz() {
+    let mut rate = RefreshRate::default();
+    let mut last = 0.0;
+    for tick in 1..=300 {
+        let seen = (f64::from(tick) * 1000.0 / 120.0).round() / 1000.0;
+        rate.observe(seen - last);
+        last = seen;
+    }
+    assert_eq!(rate.lock().map(|lock| lock.refreshes_per_frame), Some(2.0));
+}
+
 /// What the browser's sound did in [`simulate`].
 struct Sound {
     /// The fewest samples left in the queue right before the sound card took

@@ -23,11 +23,22 @@ pub const FRAME_DURATION: Duration = Duration::from_nanos(16_742_706);
 /// the refreshes: about two seconds at 60 Hz.
 const STEADY_TICKS_TO_LOCK: u32 = 120;
 /// How many ticks in a row that don't fit the measured refresh rate make it
-/// measure again, such as after the window moved to another screen.
+/// measure again, such as when the browser starts drawing every other
+/// refresh.
 const ODD_TICKS_TO_REMEASURE: u32 = 10;
+/// The share each new time between refreshes has in the recent average.
+const RECENT_AVERAGING: f64 = 0.1;
+/// How far, as a share, the recent time between refreshes may be from the
+/// measured one before the screen counts as having changed its rate, such
+/// as when the window moved to another screen. Jitter mostly averages out,
+/// a change of rate doesn't.
+const CHANGE_TOLERANCE: f64 = 0.05;
 /// How far, as a share of a refresh, a tick may come early or late and still
-/// count as a whole number of refreshes.
-const REFRESH_TOLERANCE: f64 = 0.25;
+/// count as a whole number of refreshes. Small enough that the ticks of a
+/// screen changing from 60 to 75 Hz (0.8 of a refresh), 60 to 50 Hz or 120 to
+/// 144 Hz don't, and large enough for browsers that round their timestamps
+/// to the millisecond (8 or 9 ms apart at 120 Hz).
+const REFRESH_TOLERANCE: f64 = 0.15;
 /// How far a whole number of refreshes may be from a Game Boy frame, as a
 /// share, for frames to lock to them. Covers 59.94 to about 60.3 Hz and
 /// their multiples.
@@ -60,6 +71,8 @@ pub struct RefreshRate {
     total_time: f64,
     /// How many refreshes that time held.
     total_refreshes: f64,
+    /// The average time between refreshes over the latest ticks, in seconds.
+    recent: f64,
     /// Ticks in a row that came one refresh apart.
     steady_ticks: u32,
     /// Ticks in a row that didn't come one refresh apart.
@@ -69,8 +82,9 @@ pub struct RefreshRate {
 impl RefreshRate {
     /// Takes in the time in seconds since the last tick. A tick a whole
     /// number of refreshes later (one the browser skipped) keeps frames
-    /// locked; one in between refreshes unlocks them until the ticks are
-    /// steady again.
+    /// locked; any other tick unlocks them at once, and ten in a row, such
+    /// as after the window moved to a screen with another refresh rate,
+    /// start the measurement over.
     pub fn observe(&mut self, elapsed: f64) {
         let Some(interval) = self.interval() else {
             if elapsed > 0.0 {
@@ -80,8 +94,14 @@ impl RefreshRate {
         };
 
         let refreshes = elapsed / interval;
-        let whole = refreshes.round();
-        let fits = whole >= 1.0 && (refreshes - whole).abs() < REFRESH_TOLERANCE;
+        let whole = refreshes.round().max(1.0);
+        self.recent += (elapsed / whole - self.recent) * RECENT_AVERAGING;
+        if (self.recent / interval - 1.0).abs() > CHANGE_TOLERANCE {
+            self.measure_from(self.recent);
+            return;
+        }
+
+        let fits = (refreshes - whole).abs() < REFRESH_TOLERANCE;
         if fits {
             self.total_time += elapsed;
             self.total_refreshes += whole;
@@ -101,11 +121,12 @@ impl RefreshRate {
         }
     }
 
-    /// Starts measuring again, from one tick `elapsed` seconds long.
-    fn measure_from(&mut self, elapsed: f64) {
+    /// Starts measuring again, from one refresh `interval` seconds long.
+    fn measure_from(&mut self, interval: f64) {
         *self = RefreshRate {
-            total_time: elapsed,
+            total_time: interval,
             total_refreshes: 1.0,
+            recent: interval,
             ..RefreshRate::default()
         };
     }

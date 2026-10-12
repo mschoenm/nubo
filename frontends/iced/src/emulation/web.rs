@@ -208,7 +208,7 @@ impl Session {
     fn run_frame(&mut self, play: bool) {
         self.screen_off_credit += FRAME_DURATION.as_secs_f64();
         loop {
-            let (emulated_time, frame) = if play {
+            let (playing_time, frame) = if play {
                 self.machine.play_buffer()
             } else {
                 self.machine.skip_buffer()
@@ -218,7 +218,11 @@ impl Session {
                 self.screen_off_credit = 0.0;
                 return;
             }
-            self.screen_off_credit -= emulated_time.as_secs_f64();
+            // The buffer holds samples at the emulator's rate, not the sound
+            // card's, which its playing time was worked out with.
+            self.screen_off_credit -= playing_time.as_secs_f64()
+                * f64::from(self.machine.audio.sample_rate())
+                / f64::from(self.emulator_sample_rate);
             if self.screen_off_credit <= 0.0 {
                 return;
             }
