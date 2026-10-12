@@ -52,6 +52,26 @@
     <control>gamepad</control>
   </supports>
   <content_rating type="oars-1.1"/>
+
+  <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
+       GitHub release, and CI checks that it is the version in Cargo.toml. -->
+  <releases>
+    <release version="0.1.0" date="2026-10-12">
+      <description>
+        <p>
+          The first release of Nubo: a cycle-accurate Game Boy and Game Boy Color emulator that
+          passes thousands of hardware test ROMs.
+        </p>
+        <ul>
+          <li>Every model from the first Game Boy to the Game Boy Advance</li>
+          <li>A game library with title screens and box art</li>
+          <li>Save states, fast forward, fullscreen and screenshots</li>
+          <li>Keyboard and controller controls you can change</li>
+          <li>GameShark and Game Genie cheats</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
   <branding>
     <color type="primary" scheme_preference="light">#d9d3fd</color>
     <color type="primary" scheme_preference="dark">#352a73</color>

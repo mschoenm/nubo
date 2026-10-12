@@ -1,0 +1,75 @@
+name: Flatpak
+
+# Builds the Linux app as a Flatpak for x86_64 and ARM with `cargo xtask
+# flatpak` and checks it with Flathub's linter. Runs on pull requests that
+# change how it is built, every night, and for releases, which attach the
+# .flatpak files it makes.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/flatpak.yml
+      - xtask/src/flatpak.rs
+      - xtask/src/licenses.rs
+      - frontends/iced/linux/**
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Flatpak (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Ubuntu 26.04's Flatpak is new enough for --device=input, which
+          # gives the app its controllers.
+          - arch: x86_64
+            runner: ubuntu-26.04
+          - arch: aarch64
+            runner: ubuntu-26.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install flatpak-builder
+        run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      # Installs the freedesktop runtime from Flathub the first time, builds
+      # the app in it and writes target/bundle/Nubo-<version>-<arch>.flatpak.
+      - name: Build the Flatpak
+        run: cargo xtask flatpak
+
+      # Flathub shows the AppStream file as it is in the repository, so it
+      # has to pass Flathub's checks as it is.
+      - name: Check the AppStream file with Flathub's linter
+        if: matrix.arch == 'x86_64'
+        run: >-
+          docker run --rm -v "$PWD:/mnt" ghcr.io/flathub/flatpak-builder-lint:latest
+          appstream /mnt/frontends/iced/linux/io.github.mschoenm.nubo.metainfo.xml
+
+      # Lists what Flathub's linter would still flag in the build, such as
+      # its permissions, without failing: the Flathub submission will have a
+      # manifest of its own.
+      - name: Report what Flathub's linter would flag in the build
+        if: matrix.arch == 'x86_64'
+        continue-on-error: true
+        run: >-
+          docker run --rm -v "$PWD:/mnt" ghcr.io/flathub/flatpak-builder-lint:latest
+          repo /mnt/target/flatpak/repo
+
+      - name: Upload the Flatpak
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: flatpak-${{ matrix.arch }}
+          path: target/bundle/*.flatpak
+          if-no-files-found: error

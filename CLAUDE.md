@@ -55,6 +55,7 @@ cargo xtask flatpak           # Build the app as a Flatpak, install it for this 
 cargo xtask icon path.png     # Write the logo as a 256 px PNG (images/icon.png in the README)
 cargo xtask icon path.svg     # Write the logo as an SVG (images/icon.svg)
 cargo xtask licenses folder   # Write LICENSE, NOTICE and the crates' licenses for the desktop app into folder
+cargo xtask release-notes v0.2.0   # Check the tag, Cargo.toml and the newest AppStream release agree, and print its notes
 ```
 
 ## Architecture
@@ -143,7 +144,7 @@ The project uses a custom `Serializable` trait with a derive macro (`crates/seri
 
 ## Verifying Emulator Behavior with Test ROMs
 
-`cargo test-roms` runs every test ROM suite in about 30 seconds (pass a filter such as `gambatte/oamdma` to run part of it) and compares the results with `frontends/test_rom_runner/passing.txt`. It exits with an error both when a listed test stops passing and when an unlisted test starts passing, so after fixing an accuracy issue run `cargo test-roms --update` and commit the updated list. CI (`.github/workflows/ci.yml`) runs it, together with `cargo cpu-tests`, on every pull request and push to main, next to `cargo fmt --check`, both clippy runs above and `cargo doc` with warnings as errors, `cargo deny check licenses bans sources` (`deny.toml` allows only GPLv3-compatible licenses) and `cargo test --workspace` on Linux, macOS and Windows; a push to main that passes all of them publishes the web version CI built to GitHub Pages (`.github/workflows/deploy.yml`, a workflow of its own so pull requests don't list a deploy job that is always skipped for them). Branch protection only requires the "CI passed" job, which needs all the others. The slow checks run nightly (`.github/workflows/nightly.yml`): `cargo test-roms --verify-boot`, `cargo benchmark --check-save-states` and the lazy-against-`eager` fingerprint comparison on all test ROMs, and `cargo deny check advisories`. A release build must also run `cargo test-roms --verify-boot`. The Rust version is pinned in `rust-toolchain.toml`; Dependabot proposes new Rust versions, crates and actions (pinned to commits) every week.
+`cargo test-roms` runs every test ROM suite in about 30 seconds (pass a filter such as `gambatte/oamdma` to run part of it) and compares the results with `frontends/test_rom_runner/passing.txt`. It exits with an error both when a listed test stops passing and when an unlisted test starts passing, so after fixing an accuracy issue run `cargo test-roms --update` and commit the updated list. CI (`.github/workflows/ci.yml`) runs it, together with `cargo cpu-tests`, on every pull request and push to main, next to `cargo fmt --check`, both clippy runs above and `cargo doc` with warnings as errors, `cargo deny check licenses bans sources` (`deny.toml` allows only GPLv3-compatible licenses) and `cargo test --workspace` on Linux, macOS and Windows; a push to main that passes all of them publishes the web version CI built to GitHub Pages (`.github/workflows/deploy.yml`, a workflow of its own so pull requests don't list a deploy job that is always skipped for them). Branch protection only requires the "CI passed" job, which needs all the others. The slow checks run nightly (`.github/workflows/nightly.yml`): `cargo test-roms --verify-boot`, `cargo benchmark --check-save-states` and the lazy-against-`eager` fingerprint comparison on all test ROMs, `cargo deny check advisories`, and the Flatpak build for x86_64 and ARM (`.github/workflows/flatpak.yml`, which also runs on pull requests that change how it is built, with Flathub's linter on the AppStream file). Releases run CI and the nightly checks (see Making a Release). The Rust version is pinned in `rust-toolchain.toml`; Dependabot proposes new Rust versions, crates and actions (pinned to commits) every week.
 
 `frontends/test_rom_runner/FAILING_TESTS.md` explains every test that still fails, what was tried and what to try next; keep it up to date when a fix makes one of them pass. `docs/ACCURACY_PLAN.md` is the plan towards claiming to be the most accurate emulator (comparison with other emulators, hardware checks, missing hardware); update it when a phase moves on. Use `--verbose` to see why each test fails. Failing screenshot tests write the emulator's screen and a `.diff.png` (the reference with differing pixels in red) to `target/test-roms/failures/<model>/`.
 
@@ -152,3 +153,11 @@ For a ROM outside the suites, the headless frontend runs it and saves a screensh
 ```bash
 cargo screenshot path/to/test_rom.gb 10
 ```
+
+## Making a Release
+
+Release notes are written once, in the `<releases>` list of `frontends/iced/linux/io.github.mschoenm.nubo.metainfo.xml`, which Linux software centers and Flathub show; CI checks that its newest entry is the version in the root `Cargo.toml`.
+
+1. In a pull request, set `version` under `[workspace.package]` in the root `Cargo.toml` (every crate shares it; run `cargo build` to update `Cargo.lock`) and add a `<release version="..." date="YYYY-MM-DD">` with a `<description>` at the top of `<releases>`, dated the day of the release. `cargo xtask release-notes` shows the notes as the GitHub release will.
+2. Once it is merged, tag `main` and push the tag: `git tag v0.2.0 origin/main && git push origin v0.2.0`.
+3. `.github/workflows/release.yml` checks the tag against the version, runs CI and the nightly checks (`--verify-boot`, save states, the `eager` comparison, advisories), builds the Flatpaks for x86_64 and ARM and makes a draft GitHub release with them, in about half an hour. Read it over on the Releases page and publish it.

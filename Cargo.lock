@@ -5893,6 +5893,7 @@ version = "0.1.0"
 dependencies = [
  "image",
  "nubo-logo",
+ "roxmltree",
  "serde_json",
  "toml",
  "wasm-bindgen-cli-support",
