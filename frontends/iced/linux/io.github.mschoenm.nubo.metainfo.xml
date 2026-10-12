@@ -56,6 +56,17 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.2.0" date="2026-10-13">
+      <description>
+        <p>Nubo now runs on Windows.</p>
+        <ul>
+          <li>An installer for Windows that needs no administrator rights, with a Start menu entry, an uninstaller and an option to open Game Boy games with Nubo</li>
+          <li>A zip for Windows to run Nubo without installing it</li>
+          <li>Nubo has its own icon on Windows and no longer opens a console window next to it</li>
+          <li>Downloads are named after their system, and the README links to the latest ones</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-10-12">
       <description>
         <p>

@@ -2304,7 +2304,7 @@ dependencies = [
 
 [[package]]
 name = "json_test_runner"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "nubo-core",
  "serde",
@@ -2843,7 +2843,7 @@ dependencies = [
 
 [[package]]
 name = "nubo"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.23.1",
  "console_error_panic_hook",
@@ -2868,7 +2868,7 @@ dependencies = [
 
 [[package]]
 name = "nubo-benchmark"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "image",
@@ -2877,7 +2877,7 @@ dependencies = [
 
 [[package]]
 name = "nubo-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "getset",
  "serializable_derive",
@@ -2886,7 +2886,7 @@ dependencies = [
 
 [[package]]
 name = "nubo-headless"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "clap",
@@ -2896,7 +2896,7 @@ dependencies = [
 
 [[package]]
 name = "nubo-logo"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "num-bigint"
@@ -4198,7 +4198,7 @@ dependencies = [
 
 [[package]]
 name = "serializable_derive"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4529,7 +4529,7 @@ dependencies = [
 
 [[package]]
 name = "test_rom_runner"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "image",
@@ -5899,7 +5899,7 @@ checksum = "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7"
 
 [[package]]
 name = "xtask"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "image",
  "nubo-logo",
