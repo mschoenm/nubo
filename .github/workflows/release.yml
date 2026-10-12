@@ -57,11 +57,20 @@ jobs:
         with:
           path: artifacts
 
+      # The files keep the same names in every release, so the README can link
+      # to them in the latest one.
+      - name: Name the files
+        run: |
+          mkdir upload
+          for arch in x86_64 aarch64; do
+            cp artifacts/flatpak-$arch/*.flatpak "upload/Nubo-linux-$arch.flatpak"
+          done
+
       - name: Make a draft release with the Flatpaks
         run: >-
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"
           --draft --verify-tag --title "Nubo ${GITHUB_REF_NAME#v}"
           --notes-file artifacts/release-notes/notes.md
-          artifacts/flatpak-*/*.flatpak
+          upload/*.flatpak
         env:
           GH_TOKEN: ${{ github.token }}

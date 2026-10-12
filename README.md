@@ -8,6 +8,17 @@
 
 Nubo is a cycle-accurate Game Boy emulator written in Rust. It runs as a native desktop app built with [Iced](https://iced.rs), and the same app compiles to WebAssembly to run in the browser.
 
+## Download
+
+| Platform | Download |
+| -------- | -------- |
+| Linux | [Flatpak for x86_64](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-x86_64.flatpak) (most PCs) · [Flatpak for ARM](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-aarch64.flatpak) |
+| Windows | Not available yet; build it from source (see [Getting Started](#getting-started)) |
+| macOS | Not available yet; build `Nubo.app` with `cargo xtask bundle` (see [Desktop App](#desktop-app)) |
+| Browser | [Play in the browser](https://mschoenm.github.io/nubo/) |
+
+These are the files of the [latest release](https://github.com/mschoenm/nubo/releases/latest). Open the `.flatpak` file with your software center to install it, or run `flatpak install --user Nubo-linux-x86_64.flatpak`. The [nightly build](https://github.com/mschoenm/nubo/releases/tag/nightly) has the newest `main` that passed every check.
+
 ## Features
 
 - Accurate CPU that passes all [JSON CPU tests](https://github.com/adtennant/GameboyCPUTests)
@@ -52,7 +63,7 @@ On macOS, `cargo xtask bundle` builds `Nubo.app` in `target/bundle/`, with its o
 
 On Linux, `cargo xtask flatpak` builds the app as a Flatpak and installs it for your user, to try it in the sandbox that Flathub apps run in. Start it from the app grid or with `flatpak run io.github.mschoenm.nubo`, and remove it with `flatpak uninstall --user io.github.mschoenm.nubo`. It needs flatpak-builder; the first build downloads the freedesktop runtime from Flathub, adding Flathub for your user if it isn't there yet. In the sandbox the app keeps its data in `~/.var/app/io.github.mschoenm.nubo/`, and it can read ROM folders in your home folder and on external drives.
 
-It also writes `target/bundle/Nubo-<version>-<architecture>.flatpak` (each [release](https://github.com/mschoenm/nubo/releases) has these files for x86_64 and ARM, and the `nightly` pre-release has them for the newest `main` that passed every check), a single file to give to others: opening it in a software center such as GNOME Software installs Nubo with its icon and menu entry (or run `flatpak install --user Nubo-<version>-<architecture>.flatpak`), and uninstalling it removes both. The computer needs Flatpak; the file points to Flathub for the runtime, which is downloaded the first time.
+It also writes `target/bundle/Nubo-<version>-<architecture>.flatpak` (each [release](https://github.com/mschoenm/nubo/releases) has these files for x86_64 and ARM as `Nubo-linux-<architecture>.flatpak`, and the `nightly` pre-release has them for the newest `main` that passed every check), a single file to give to others: opening it in a software center such as GNOME Software installs Nubo with its icon and menu entry (or run `flatpak install --user Nubo-<version>-<architecture>.flatpak`), and uninstalling it removes both. The computer needs Flatpak; the file points to Flathub for the runtime, which is downloaded the first time.
 
 The default controls are below; all of them can be changed under Settings > Controls.
 
