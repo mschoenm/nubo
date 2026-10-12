@@ -190,6 +190,14 @@ fn stopped_error() -> String {
     String::from("the emulator stopped unexpectedly")
 }
 
+#[cfg_attr(
+    all(not(target_arch = "wasm32"), not(test)),
+    expect(
+        dead_code,
+        reason = "only the browser session paces frames this way so far"
+    )
+)]
+mod pacing;
 #[cfg(test)]
 mod tests;
 #[cfg(not(target_arch = "wasm32"))]

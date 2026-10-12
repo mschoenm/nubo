@@ -314,6 +314,12 @@ impl Game {
         self.session.load_state(data)
     }
 
+    /// Emulates the frames due by the screen's latest refresh (browser).
+    #[cfg(target_arch = "wasm32")]
+    pub fn advance(&mut self) {
+        self.session.advance();
+    }
+
     /// Replaces the shown image if the emulator finished a new frame.
     pub fn refresh_screen(&mut self) {
         if let Some((sequence, pixels)) = self.session.frame_since(self.screen.sequence) {
