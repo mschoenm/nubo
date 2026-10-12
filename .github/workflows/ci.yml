@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels the checks still running for the old
+# one; runs on main always finish, so every commit there gets deployed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    name: Format and clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install audio and controller libraries
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Clippy for the browser build
+        run: cargo clippy -p nubo --target wasm32-unknown-unknown --locked -- -D warnings
+
+  test:
+    name: Tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install audio and controller libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      # Builds every crate, the desktop app included, on each platform.
+      - name: Run tests
+        run: cargo test --workspace --locked
+
+  test-roms:
+    name: Test ROMs and CPU tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      # The runners download pinned, checksummed files; keeping them saves
+      # downloading them again on every run.
+      - name: Cache test ROMs
+        uses: actions/cache@v6
+        with:
+          path: |
+            target/test-roms/v*
+            target/test-roms/gb-emulator-shootout-*
+            target/json-cpu-tests
+          key: test-roms-${{ hashFiles('frontends/test_rom_runner/src/download.rs', 'frontends/test_rom_runner/shootout.sha256', 'frontends/json_test_runner/src/download.rs', 'frontends/json_test_runner/v2.sha256') }}
+
+      - name: Run test ROMs
+        # --verify-boot runs the boot ROM before every test and checks that the
+        # shortcut local runs take (starting from a copy of an earlier boot)
+        # would have left each test in exactly the same state.
+        run: cargo test-roms --verify-boot
+
+      - name: Run JSON CPU tests
+        run: cargo cpu-tests
+
+      - name: Upload screens of failing tests
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-rom-failures
+          path: target/test-roms/failures
+          if-no-files-found: ignore
+
+  web:
+    name: Web build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build the web version
+        run: cargo xtask build-web
+
+      - name: Upload the web version for GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: target/web
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [lint, test, test-roms, web]
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
