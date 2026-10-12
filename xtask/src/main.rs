@@ -1,6 +1,7 @@
 //! Project tasks run with `cargo xtask <command>`: building the Iced
 //! frontend for the browser and serving it locally, building the macOS app
-//! bundle and the Flatpak, and writing the license files that go with them.
+//! bundle and the Flatpak, writing the license files that go with them, and
+//! checking a release's version and notes.
 
 use std::env;
 use std::fs;
@@ -36,6 +37,9 @@ Commands:
   licenses <folder>
                 Write Nubo's license files and the licenses of the crates the desktop app is built
                 from into <folder> (the app bundle, the Flatpak and the web version include them)
+  release-notes [tag]
+                Check that the newest release in the AppStream file is the version in Cargo.toml
+                (and that the tag, such as v1.2.3, names it) and print its notes as Markdown
   help          Show this message";
 
 /// Every task reports failures as a message for the user.
@@ -252,6 +256,9 @@ fn main() -> ExitCode {
             }),
             None => Err(format!("licenses needs a folder to write to\n\n{USAGE}")),
         },
+        Some("release-notes") => {
+            release::release_notes(env::args().nth(2).as_deref()).map(|notes| print!("{notes}"))
+        }
         Some("help") | None => {
             println!("{USAGE}");
             Ok(())
@@ -271,3 +278,4 @@ fn main() -> ExitCode {
 mod bundle;
 mod flatpak;
 mod licenses;
+mod release;

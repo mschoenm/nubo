@@ -6,6 +6,8 @@ on:
       - main
   pull_request:
   workflow_dispatch:
+  # The release workflow runs these checks too.
+  workflow_call:
 
 permissions:
   contents: read
@@ -149,6 +151,10 @@ jobs:
 
       - name: Build the web version
         run: cargo xtask build-web
+
+      # Reuses the xtask build above.
+      - name: Check the newest release in the AppStream file is this version
+        run: cargo xtask release-notes > /dev/null
 
       # deploy.yml publishes it once every job here has passed.
       - name: Keep the web version for the deploy workflow

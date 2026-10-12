@@ -6,6 +6,8 @@ on:
   schedule:
     - cron: "17 2 * * *"
   workflow_dispatch:
+  # The release workflow runs these checks too.
+  workflow_call:
 
 permissions:
   contents: read
@@ -122,3 +124,7 @@ jobs:
           cargo run --release -p nubo-benchmark --features nubo-core/eager --
           target/test-roms/v* target/test-roms/gb-emulator-shootout-*
           --seconds 4 --jobs "$(nproc)" --compare "$RUNNER_TEMP/lazy.txt"
+
+  flatpak:
+    name: Flatpak
+    uses: ./.github/workflows/flatpak.yml
