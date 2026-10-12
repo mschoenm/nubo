@@ -52,7 +52,7 @@ const FINISH_ARGS: [&str; 11] = [
 ];
 
 /// Builds the Flatpak in `target/flatpak`, installs it for the current user
-/// and writes it to `target/bundle/Nubo-<version>-<architecture>.flatpak`,
+/// and writes it to `target/bundle/Nubo-<version>-linux-<architecture>.flatpak`,
 /// returning where that file is. Needs Linux with flatpak-builder.
 pub fn build_flatpak() -> Result<PathBuf> {
     if !cfg!(target_os = "linux") {
@@ -117,7 +117,7 @@ pub fn build_flatpak() -> Result<PathBuf> {
     let bundle_dir = target_dir().join("bundle");
     fs::create_dir_all(&bundle_dir).map_err(|error| error.to_string())?;
     let bundle = bundle_dir.join(format!(
-        "{APP_NAME}-{}-{}.flatpak",
+        "{APP_NAME}-{}-linux-{}.flatpak",
         env!("CARGO_PKG_VERSION"),
         env::consts::ARCH
     ));

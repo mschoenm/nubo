@@ -83,17 +83,20 @@ pub fn build_app_bundle() -> Result<PathBuf> {
 }
 
 /// Writes the logo to `path` without a border: as an SVG when the path ends
-/// in `.svg`, otherwise as a PNG `size` pixels wide.
+/// in `.svg`, as a Windows icon with every size when it ends in `.ico`, and
+/// otherwise as a PNG `size` pixels wide.
 pub fn write_icon(path: &Path, size: u32) -> Result {
-    if path
+    let extension = path
         .extension()
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("svg"))
-    {
-        fs::write(path, nubo_logo::svg())
-            .map_err(|error| format!("failed to write {}: {error}", path.display()))
-    } else {
-        write_png(path, size, 0.0)
-    }
+        .and_then(|extension| extension.to_str())
+        .map(str::to_ascii_lowercase);
+    let contents = match extension.as_deref() {
+        Some("svg") => nubo_logo::svg().into_bytes(),
+        Some("ico") => nubo_logo::ico(),
+        _ => return write_png(path, size, 0.0),
+    };
+    fs::write(path, contents)
+        .map_err(|error| format!("failed to write {}: {error}", path.display()))
 }
 
 /// Writes the pictures of an `.iconset` folder for `iconutil`.

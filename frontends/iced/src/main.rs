@@ -2,6 +2,11 @@
 //! (or, in the browser build, on each frame tick) and the window shows the
 //! latest frame. Run it with `cargo play [rom] [--cgb] [--model <name>]`.
 
+// Release builds are Windows apps rather than console programs, so no empty
+// console window opens next to Nubo. Debug builds keep the console for
+// their messages.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use app::App;
 use nubo_core::Model;
 use rom::Rom;
