@@ -82,8 +82,9 @@ jobs:
       - name: Check licenses, banned crates and sources
         run: cargo deny --locked check licenses bans sources
 
-  # Linux only, so pull requests get their answer in a minute or two; the
-  # nightly workflow, which releases run, also tests on macOS and Windows.
+  # Linux only, so pull requests get their answer in a minute or two.
+  # platforms.yml tests on macOS and Windows next to it without holding up
+  # merges, and the nightly workflow, which releases run, calls it too.
   test:
     name: Tests
     runs-on: ubuntu-latest
