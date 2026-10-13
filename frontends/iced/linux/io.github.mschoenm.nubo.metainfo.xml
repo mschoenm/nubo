@@ -56,6 +56,15 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.3.0" date="2026-10-13">
+      <description>
+        <p>A small release that smooths the browser version on power-saving browsers and corrects a license text.</p>
+        <ul>
+          <li>Browsers that save power by drawing only 30 times a second, such as Chrome with Energy Saver on, now get two frames on every refresh, so the picture no longer stutters every few seconds</li>
+          <li>The third-party licenses that come with Nubo for Windows give the Boost Software License's exact text</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-10-13">
       <description>
         <p>Nubo now runs on Windows.</p>
