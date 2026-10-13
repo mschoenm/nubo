@@ -138,6 +138,11 @@ impl fmt::Debug for SharedRom {
     }
 }
 
+/// The most PPU dots since power-on a save state may hold: about 35,000
+/// years of emulation, far from where adding to it or working out the next
+/// frame boundary (`Emulator::run_frame`) could overflow.
+const MAX_ELAPSED_DOTS: u64 = 1 << 62;
+
 /// The memory map and the hardware components connected to it.
 ///
 /// Its `Debug` output is part of the emulator's, which test runners compare to
@@ -234,7 +239,8 @@ pub struct AddressBus {
 
     /// PPU dots (ticks of the 4 MHz clock at normal speed) since power-on,
     /// which a cartridge clock following [`RtcClock::EmulatedTime`] counts.
-    /// Save states keep it, so such a clock goes on where it was.
+    /// Save states keep it, so such a clock goes on where it was, and a
+    /// loaded value above `MAX_ELAPSED_DOTS` fails the load.
     elapsed_dots: u64,
 
     /// Dots that have passed but that the PPU hasn't run yet. Running the PPU in
@@ -1145,7 +1151,15 @@ impl AddressBus {
                     "interrupt_enable" => self.interrupt_enable.deserialize(bytes)?,
                     "undocumented_registers" => self.undocumented_registers.deserialize(bytes)?,
                     "extra_oam" => self.extra_oam.deserialize(bytes)?,
-                    "elapsed_dots" => self.elapsed_dots.deserialize(bytes)?,
+                    "elapsed_dots" => {
+                        self.elapsed_dots.deserialize(bytes)?;
+                        if self.elapsed_dots > MAX_ELAPSED_DOTS {
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::InvalidData,
+                                "time since power-on out of range",
+                            ));
+                        }
+                    }
                     "ppu_dot_debt" => self.ppu_dot_debt.deserialize(bytes)?,
                     _ => return Ok(false),
                 }

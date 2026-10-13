@@ -537,3 +537,26 @@ fn run_frame_goes_on_alike_after_loading_a_save_state() {
         assert!(first == second, "{name} on {model:?} went on differently");
     }
 }
+
+#[test]
+fn a_save_state_with_an_impossible_time_since_power_on_does_not_load() {
+    let rom = busy_rom();
+    let mut emulator = booted(Model::CgbE, &rom);
+    let mut state = emulator.save_state();
+    let name = b"\x0celapsed_dots";
+    let start = state
+        .windows(name.len())
+        .position(|window| window == name)
+        .expect("the state holds the time since power-on")
+        + name.len()
+        + size_of::<u32>();
+    state[start..start + size_of::<u64>()].copy_from_slice(&u64::MAX.to_le_bytes());
+    let before = emulator.save_state();
+
+    assert!(emulator.load_state(&state).is_err());
+    assert!(
+        emulator.save_state() == before,
+        "the failed load changed the emulator"
+    );
+    emulator.run_frame(&mut Vec::new(), &mut Vec::new());
+}
