@@ -1,6 +1,6 @@
 //! Problems found away from the UI, such as a missing sound device or a save
 //! that couldn't be written. They are collected here so the window can show
-//! them, and printed on stderr as well.
+//! them as toasts, and printed on stderr as well.
 
 use std::sync::{Arc, Mutex, PoisonError};
 

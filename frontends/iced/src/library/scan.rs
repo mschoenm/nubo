@@ -1,4 +1,5 @@
-//! Finds the ROMs in the library folders and reads their headers.
+//! Finds the ROMs in the library folders and reads their headers with
+//! `Emulator::read_rom_header`.
 
 use super::LibraryEntry;
 use crate::settings::LibraryFolder;

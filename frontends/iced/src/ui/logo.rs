@@ -1,6 +1,7 @@
-//! The Nubo logo drawn in the app, from the shapes in the `nubo-logo`
-//! crate. Its background takes the theme's accent color, so it fits both
-//! the light and the dark theme.
+//! The Nubo logo drawn in the app with a canvas, from the shapes in the
+//! `nubo-logo` crate: a pixel buddy puffed into a cloud, on a rounded square
+//! that is purple elsewhere. Here its background takes the theme's accent
+//! color, so it fits both the light and the dark theme.
 
 use iced::widget::canvas::{self, Frame, Geometry, Path};
 use iced::{Color, Element, Point, Rectangle, Renderer, Size, Theme, mouse};

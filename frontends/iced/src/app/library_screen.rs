@@ -311,7 +311,7 @@ impl App {
 
     /// Starts a quick background look at whether the games' files still
     /// exist, so games that were deleted disappear right away, before the
-    /// slower scan of the folders.
+    /// slower scan of the folders. The app runs it when it starts.
     pub(super) fn check_files(&self) -> Task<Message> {
         if !library::AVAILABLE {
             return Task::none();

@@ -1,5 +1,5 @@
-//! Finding and downloading box art (desktop build). The game lists are
-//! kept in `box_art/lists` in the user's data folder.
+//! Finding and downloading box art (desktop build), with `ureq`. The game
+//! lists are kept in `box_art/lists` in the user's data folder.
 
 use crate::storage::files::{project_directories, write_atomically};
 use image::ImageFormat;

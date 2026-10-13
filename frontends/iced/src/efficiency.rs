@@ -91,6 +91,9 @@ pub fn run_from_command_line() -> Option<i32> {
 /// - `fast_forward`: at the default fast forward speed;
 /// - `still_screen`: a cartridge that never starts, so the screen stays
 ///   still after the boot ROM and no frames should reach the window.
+///
+/// The game's battery saves go to a temporary folder, so the player's own
+/// saves are never touched.
 pub fn measure(rom_path: &Path, model: Model) -> Result<String, String> {
     let rom = Rom::read(rom_path)?;
     let saves_directory = std::env::temp_dir().join("nubo-efficiency");
