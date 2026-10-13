@@ -56,6 +56,18 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.4.0" date="2026-10-13">
+      <description>
+        <p>Save states now keep working when Nubo is updated.</p>
+        <ul>
+          <li>Save states store every value with its name, so later versions of Nubo load them, and earlier versions load newer ones as far as they can</li>
+          <li>A save state made on Linux, macOS or Windows loads on the others</li>
+          <li>Every change to Nubo is now checked against save states that earlier versions made</li>
+          <li>A save state made with another version of a game, such as a patched copy, is refused instead of loaded into the wrong game</li>
+          <li>Save states made by Nubo 0.3.0 and earlier can't be loaded by this version, because the new format is what keeps later updates from breaking them. Nubo keeps such a state next to its slot instead of overwriting it. In-game saves are not affected</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.3.0" date="2026-10-13">
       <description>
         <p>A small release that smooths the browser version on power-saving browsers and corrects a license text.</p>

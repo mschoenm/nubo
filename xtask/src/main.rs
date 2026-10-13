@@ -67,9 +67,38 @@ fn target_dir() -> PathBuf {
     env::var_os("CARGO_TARGET_DIR").map_or_else(|| workspace_root().join("target"), PathBuf::from)
 }
 
-/// The cargo that runs xtask, so the same toolchain builds everything.
+/// The cargo that runs xtask, so the same toolchain builds everything, with
+/// `NUBO_COMMIT` set to the commit it builds ([`build_commit`]), which save
+/// states store.
 fn cargo() -> Command {
-    Command::new(env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
+    let mut command = Command::new(env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
+    command.env("NUBO_COMMIT", build_commit());
+    command
+}
+
+/// The commit of the working tree, followed by `-dirty` when tracked files
+/// have changes that aren't committed, or what `NUBO_COMMIT` already says.
+/// Without git it is `GITHUB_SHA` in GitHub Actions, and empty elsewhere.
+fn build_commit() -> String {
+    if let Some(commit) = env::var_os("NUBO_COMMIT") {
+        return commit.to_string_lossy().into_owned();
+    }
+    let git = |args: &[&str]| {
+        Command::new("git")
+            .args(args)
+            .current_dir(workspace_root())
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+    };
+    match git(&["rev-parse", "HEAD"]) {
+        Some(commit) => match git(&["status", "--porcelain", "--untracked-files=no"]) {
+            Some(changes) if !changes.is_empty() => format!("{commit}-dirty"),
+            _ => commit,
+        },
+        None => env::var("GITHUB_SHA").unwrap_or_default(),
+    }
 }
 
 /// Runs a command and turns a failure to start or a non-zero exit into an
@@ -296,6 +325,22 @@ fn main() -> ExitCode {
             eprintln!("error: {error}");
             ExitCode::FAILURE
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_commit;
+
+    #[test]
+    fn the_build_commit_is_a_commit_hash() {
+        let commit = build_commit();
+        let hash = commit.strip_suffix("-dirty").unwrap_or(&commit);
+        assert_eq!(hash.len(), 40, "{commit}");
+        assert!(
+            hash.chars().all(|digit| digit.is_ascii_hexdigit()),
+            "{commit}"
+        );
     }
 }
 

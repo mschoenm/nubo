@@ -204,6 +204,7 @@ header.model = MGB
 header.model = SGB
 header.model = SGB2
 header.model: text
+header.nubo_commit: text
 header.nubo_version: text
 joypad.group_select: u8
 joypad.interrupt: bool
