@@ -12,6 +12,11 @@
 //! DMA and STOP affect the PPU (`access.rs`), the shortcuts that run many dots at once
 //! (`steady.rs`), save states (`save_state.rs`), and the renderer that produces the pixels in
 //! mode 3 (`pipeline.rs`).
+//!
+//! Which timing rules apply depends on the model and speed (`TimingVariant`). The start of each
+//! line (when STAT shows each mode, LY=LYC, the mode 0 and mode 2 interrupt sources, line 153)
+//! and the window's WY checks follow Gambatte's timing at both speeds, measured by comparing the
+//! CPU's register reads and writes and the interrupt requests in both emulators.
 
 pub use crate::gpu::palettes::DMG_SHADES;
 
@@ -301,7 +306,9 @@ pub struct Gpu {
 
     countdowns: Countdowns,
 
-    /// The last finished frame, copied from `frame_buffer` at the start of vblank.
+    /// The last finished frame, copied from `frame_buffer` at the start of vblank. Frontends pull
+    /// it when they are ready: `Emulator::frame_buffer` returns the latest frame, and
+    /// `Emulator::take_frame` returns it only once per new frame (see `frame_ready`).
     completed_frame: Vec<u8>,
 
     /// Set when `completed_frame` holds a frame the frontend hasn't taken yet.

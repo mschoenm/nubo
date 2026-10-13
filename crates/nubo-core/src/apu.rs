@@ -493,6 +493,10 @@ impl ApuState {
 /// The Game Boy's audio processing unit. It runs the four channels, mixes their
 /// output and queues the resulting stereo samples for the frontend.
 ///
+/// Its fields are private to `apu` and its submodules, so code elsewhere can
+/// only reach the APU's state through methods that run the pending M-cycles
+/// first (see `catch_up`).
+///
 /// `Clone` and `Debug` are written out in `catch_up`: copies for reads can
 /// leave out the sample queues, and `Debug` prints the state with the pending
 /// M-cycles run and without the catch-up's scheduling.
@@ -605,6 +609,9 @@ impl Apu {
         }
     }
 
+    /// Sets the hardware revision the APU emulates. Many quirks differ between
+    /// revisions, as in SameBoy (which SameSuite's tests check), so the APU
+    /// asks `model` wherever they do.
     pub(crate) fn set_model(&mut self, model: Model) {
         self.prepare_for_change();
         self.model = model;
@@ -1174,6 +1181,10 @@ impl Apu {
         self.update_held_back_events();
     }
 
+    /// Whether both sample queues hold a whole buffer (`MAX_AUDIO_BUFFER_SIZE`
+    /// samples). `Emulator::step_until_next_audio_buffer` runs the emulator
+    /// until this is true and then hands the samples to the frontend, so the
+    /// audio output paces the main emulation loop.
     pub(crate) fn audio_buffers_full(&self) -> bool {
         self.left_sample_queue.len() >= MAX_AUDIO_BUFFER_SIZE
             && self.right_sample_queue.len() >= MAX_AUDIO_BUFFER_SIZE
@@ -1428,7 +1439,9 @@ fn highpass_rate(sample_rate: u32) -> f32 {
 }
 
 /// The bit of the system counter (the internal counter behind DIV) whose
-/// falling edge steps the frame sequencer.
+/// falling edge steps the frame sequencer: DIV bit 4, or DIV bit 5 in double
+/// speed, where the counter runs twice as fast, so the frame sequencer still
+/// steps 512 times per second.
 fn div_apu_bit(cgb_double_speed: bool) -> u16 {
     if cgb_double_speed { 0x2000 } else { 0x1000 }
 }
@@ -1461,7 +1474,10 @@ impl MemoryMapped for Apu {
 /// filter's charge and the channel levels last mixed), so a loaded state
 /// sounds exactly like the run it was saved from. They leave out what the
 /// model decides (`cgb_mode`), since states only load on the same model, and
-/// what only schedules the catch-up.
+/// what only schedules the catch-up. The sound hardware includes the address
+/// on the CPU's bus that the wave channel's glitches read (`bus_address`).
+/// Loading rejects every value a corrupted state could make the APU overflow
+/// with (`ApuState::validate`, the sample clock and the levels).
 ///
 /// The sample rate belongs to the frontend's sound card, not the console, so
 /// it isn't saved: a state loaded into an emulator with another rate goes on

@@ -16,7 +16,8 @@ use crate::apu::{Apu, Channel, triggers};
 use crate::model::Model;
 use serializable_derive::Serializable;
 
-/// One channel's length counter.
+/// One channel's length counter. All four channels use this same type; only
+/// their full length differs.
 #[derive(Debug, Default, Clone, Copy, Serializable)]
 pub(super) struct LengthCounter {
     /// Length steps left before the channel turns itself off, while

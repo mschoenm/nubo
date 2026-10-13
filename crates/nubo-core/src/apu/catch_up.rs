@@ -25,6 +25,14 @@
 //! at the M-cycle's own position within the output sample. Each channel's next
 //! change stays known between cuts, so a cut only works out the next change of
 //! the channel that just changed.
+//!
+//! The APU unit tests check this: they play fixed and random register writes
+//! on every model lazily, in bulk (`advance_cycles`) and one M-cycle at a time,
+//! and compare the audio and the end state (and, for the lazy run, the
+//! PCM12/PCM34 reads). Debug builds also check that a frame sequencer step
+//! judged quiet changed nothing the channels read, that cached predictions
+//! match freshly worked out ones, and that the mixer's test for skipping a
+//! channel covers everything the channel's output is worked out from.
 
 use crate::apu::{
     Apu, CHANNEL_COUNT, Channel, MAX_AUDIO_BUFFER_SIZE, NR51, SYSTEM_COUNTER_TICKS_PER_M_CYCLE,
