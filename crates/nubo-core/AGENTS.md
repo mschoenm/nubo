@@ -15,7 +15,7 @@ The emulator itself: a plain Rust library with no platform dependencies and no C
 | PPU | `gpu.rs`, `gpu/` | Line timeline, pixel pipeline (SameBoy port), bulk stretches (`steady.rs`), palettes |
 | APU | `apu.rs`, `apu/` | Four channels (SameBoy port), lazy catch-up (`catch_up.rs`), band-limited output |
 | Input, serial | `joypad.rs`, `controller.rs`, `serial.rs` | |
-| Boot ROMs | `bios.rs`, `boot_roms/` | Nubo's own, timed to the cycle like the ones they replaced |
+| Boot ROMs | `bios.rs`, and their sources in `crates/nubo-core/boot_roms/` | Nubo's own, timed to the cycle like the ones they replaced |
 
 ## How Time Moves
 
@@ -35,7 +35,7 @@ Running every component every M-cycle is slow, so the core takes shortcuts. They
 
 Players must never lose a save state to an update. The format is in `emulator/save_state.rs`, how values are stored in `serializable.rs`. What every change needs to know:
 
-- Every value is stored with its name, so adding, removing or reordering fields needs nothing: a value a state lacks starts at its power-on value, and values this version doesn't know are skipped.
+- Every value is stored with its name, so adding, removing or reordering fields never breaks loading: a value a state lacks starts at its power-on value, and values this version doesn't know are skipped. (The layout check below still asks for a new kept set.)
 - Stored names are permanent. A field or variant renamed in the code keeps its stored name; a field whose type or meaning changes (another size, other units, other values) is stored under a new name. How a stored name is kept depends on how the type is stored:
   - Types with `#[derive(Serializable)]`: `#[serializable(name = "stored_name")]` on the field or variant.
   - Hand-written implementations (`Emulator`, `Apu`, `CartridgeMapper`, `Palettes`, the pipeline FIFOs, `BlepBuffer`, `OamDmaAccess`): the stored name is the text the implementation writes (`FieldWriter::field` or `field_with` for a field, `write_variant` for a variant) and matches when reading; keep that text.

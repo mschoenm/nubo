@@ -27,13 +27,14 @@ Run what CI runs, so a pull request is green the first time:
 2. `cargo clippy --workspace --all-targets -- -D warnings` and `cargo clippy -p nubo --target wasm32-unknown-unknown -- -D warnings`
 3. `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items` (broken links in private docs fail CI too)
 4. `cargo test --workspace`
-5. If emulation may have changed: `cargo test-roms`. When results change on purpose, run `cargo test-roms --update` and commit `passing.txt`; when a test in `frontends/test_rom_runner/FAILING_TESTS.md` starts passing, update that file too.
-6. If the CPU changed: `cargo cpu-tests`.
-7. If what save states store changed: `cargo save-states` (it needs the benchmark games: `cargo xtask benchmark-roms` once), and keep a new set with `cargo save-states --record` in the same pull request.
-8. If dependencies changed: `cargo deny check licenses bans sources`.
-9. If the change must not alter output (an optimization, a refactor): record fingerprints on a build without it (`git stash -u`, so new files go too), then compare with it. Do this on the benchmark games (`cargo xtask benchmark-roms`, then `cargo benchmark target/benchmark-roms --record before.txt` and later `--compare before.txt`) and on the test ROMs (`cargo benchmark target/test-roms/v7.0 --seconds 4 --jobs <cores>` with the same flags). For a change to the lazy components, also compare against the `eager` build (`frontends/benchmark/AGENTS.md`).
+5. If the Iced app changed: `cargo xtask build-web --quick`, as CI does; `cargo xtask web` serves it to look at in a browser.
+6. If emulation may have changed: `cargo test-roms`. When results change on purpose, run `cargo test-roms --update` and commit `passing.txt`; when a test in `frontends/test_rom_runner/FAILING_TESTS.md` starts passing, update that file too.
+7. If the CPU changed: `cargo cpu-tests`.
+8. If what save states store changed: `cargo save-states` (it needs the benchmark games: `cargo xtask benchmark-roms` once), and keep a new set with `cargo save-states --record` in the same pull request.
+9. If dependencies changed: `cargo deny check licenses bans sources`.
+10. If the change must not alter output (an optimization, a refactor): record fingerprints on a build without it (`git stash -u`, so new files go too), then compare with it. Do this on the benchmark games (`cargo xtask benchmark-roms`, then `cargo benchmark target/benchmark-roms --record before.txt` and later `--compare before.txt`) and on the test ROMs (`cargo benchmark target/test-roms/v7.0 --seconds 4 --jobs <cores>` with the same flags). For a change to the lazy components, also compare a normal build with an `eager` one (`frontends/benchmark/AGENTS.md`).
 
-CI also builds the browser version (`cargo xtask build-web --quick`); the slow checks run nightly. What runs where: `docs/CI.md`.
+The slow checks run nightly. What runs where: `docs/CI.md`.
 
 ## Rules
 
@@ -44,7 +45,7 @@ These keep Nubo exact, and players' saves safe. Never break them.
 - **Timing calibration moves only with the test ROMs.** The PPU's dot positions, each model's state after the boot ROM and the other timings are calibrated against test ROMs and other emulators. Change them only together with `cargo test-roms`.
 - **Players never lose a save state to an update.** A field or variant's stored name is permanent: when you rename it in the code, keep the stored name with `#[serializable(name = "...")]` (hand-written implementations and the PPU store names differently; see `crates/nubo-core/AGENTS.md`). A field whose type or meaning changes gets a new stored name. Stored values are fixed-size and little-endian, never `usize`. How: `crates/nubo-core/AGENTS.md`.
 - **Only GPLv3-compatible code and dependencies** (MIT, BSD, ISC, Zlib, Apache-2.0, MPL-2.0 and the like, never GPL-2.0-only). Gambatte is GPL-2.0-only: use it as a reference only (its test ROMs, traces of a local build, its behavior) and never port its code or tables. When you port code, tables or data, credit the project with its link and license at the top of the file, in `NOTICE` and in the README's Credits; SameBoy-derived files point to the Expat notice in `apu.rs`.
-- **Code the browser build shares** takes `Instant`, `SystemTime` and `Duration` from `iced::time` (std's panic on wasm32), and views set fonts with `theme::BODY_FONT` or `theme::HEADING_FONT`, never `Font::DEFAULT` or a font of their own, which draw nothing in the browser (only `ui/theme.rs` builds fonts).
+- **Code the browser build shares** takes `Instant`, `SystemTime` and `Duration` from `iced::time` (std's panic on wasm32), and text that sets a font uses `theme::BODY_FONT` or `theme::HEADING_FONT`, never `Font::DEFAULT` or another font of its own, which draw nothing in the browser. Plain `text()` without `.font()` is fine, and so are the icons (`ui::icons`).
 - **No `unsafe`.** The workspace lints forbid it.
 - **Newest stable versions** of Rust, crates, GitHub Actions and tools, never a pre-release unless nothing else works; test data stays pinned. Details, and the Flatpak's exception: `docs/CI.md`.
 - **Merging a pull request:** follow the `merge` skill (CI green, Codex's review done and handled). **Making a release:** follow the `release` skill.
@@ -60,7 +61,7 @@ These keep Nubo exact, and players' saves safe. Never break them.
 
 ## Where Things Are
 
-The root `Cargo.toml` is a virtual workspace whose default members are the core crates, so `cargo build` and `cargo test` don't build the frontends or xtask.
+The root `Cargo.toml` is a virtual workspace whose default members are `nubo-core` and `serializable_derive`, so `cargo build` and `cargo test` don't build the frontends or xtask.
 
 - `crates/nubo-core/` (`AGENTS.md`): the emulator, a plain library with no platform dependencies. `Emulator` in `emulator.rs` is its API.
 - `crates/serializable_derive/`: the derive macro behind save states.

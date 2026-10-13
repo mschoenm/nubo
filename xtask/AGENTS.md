@@ -14,7 +14,7 @@ cargo xtask flatpak           # Build, install for this user and export target/b
 cargo xtask windows           # The installer and a zip into target/bundle/ (Windows, needs Inno Setup 6)
 cargo xtask icon <path.png|path.svg|path.ico>   # Write the logo (images/icon.png and images/icon.svg in the README)
 cargo xtask licenses <folder> # LICENSE, NOTICE and every crate's license for the desktop app
-cargo xtask release-notes v<version>   # Check the tag, Cargo.toml and the newest AppStream release agree, and print the notes
+cargo xtask release-notes [v<version>]   # Check Cargo.toml, the newest AppStream release and the tag (if given) agree, and print the notes
 
 # Speed next to other emulators (docs/EMULATOR_COMPARISON.md)
 cargo xtask compare-emulators [roms]          # Nubo, SameBoy, Gambatte, mGBA, binjgb and Gearboy, best of 3 rounds of 30 s
