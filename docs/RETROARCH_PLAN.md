@@ -70,6 +70,10 @@ only has to:
 
 ## Phase 1: core additions (one pull request)
 
+Steps 1 and 2 of [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md) come first. Step 2 adds `run_frame()`
+(item 1 below) and moves the palettes and the model rule into `nubo-frontend` (item 4), so this phase
+only does what is still left after them.
+
 All of these add to the public API without changing what the emulator does.
 `cargo benchmark --compare`, `cargo test-roms` and `cargo save-states` must give the same results as
 before.
@@ -96,11 +100,11 @@ before.
 3. **Share the `.rtc` file layout.** Move `encode_rtc`/`decode_rtc` (`frontends/iced/src/battery.rs`,
    17 bytes) into nubo-core, for example as `RtcState::to_bytes`/`from_bytes`. Battery saves can then
    move between the Nubo app and RetroArch: `.sav` and `.srm` are both the raw cartridge RAM.
-4. **Share the model rule and the palettes.**
-   - Move `ModelPreference::Automatic`'s rule (`frontends/iced/src/settings.rs`: `supports_cgb` →
-     `Model::CgbE`, else `Model::Dmg`) into nubo-core, for example `Model::automatic_for(&CartridgeHeader)`.
-   - Move the palette colors and `recolor` from `frontends/iced/src/palettes.rs` into nubo-core next to
-     `DMG_SHADES`. Leave serde out of the core: the Iced app keeps its settings enum and maps it.
+4. **Share the model rule and the palettes.** Done by step 2 of the restructuring plan:
+   `nubo-frontend`'s `model` module has `ModelPreference::Automatic`'s rule (`supports_cgb` →
+   `Model::CgbE`, else `Model::Dmg`), and its `palettes` module has the palette colors and `recolor`.
+   The core uses `nubo-frontend` without default features, so neither Iced nor any platform library
+   comes along.
 5. **Read access to memory for achievements:** work RAM (all banks), HRAM and cartridge RAM as `&[u8]`.
    They are read-only, so no pointers into the emulator are needed (see Phase 4).
 6. **Optional: a rumble hook.** MBC5 rumble cartridges are recognised, but nothing reports the motor.
@@ -112,7 +116,8 @@ before.
 1. Create the crate `frontends/libretro`, package `nubo-libretro`, with
    `[lib] name = "nubo_libretro", crate-type = ["cdylib", "rlib"]` (the `rlib` is for tests).
    - Make it a workspace member but not a default member, like the other frontends.
-   - It depends only on `nubo-core`. Write the C types with `core::ffi`, without `libc`.
+   - It depends only on `nubo-core` and `nubo-frontend` (without default features). Write the C types
+     with `core::ffi`, without `libc`.
 2. Split it in two:
    - `core.rs`: a safe `Core` type with all the logic. It loads the game, runs a frame, converts video
      and audio, maps input, frames save states, syncs save RAM, handles options and parses cheats.
