@@ -5,13 +5,15 @@ emulators and publishes a table of their results. Getting Nubo into it is step 2
 [ACCURACY_PLAN.md](ACCURACY_PLAN.md), and running its harness locally on all emulators also covers much
 of Phase 1 (measuring other emulators on the same tests).
 
-The work has four parts, plus an optional fifth:
+The work has five parts:
 
 - Parts 1 and 2 can be done in a cloud session.
 - Part 3 needs a Windows PC and is done by the maintainer.
-- Part 4 is a pull request to another project's repository, so it only happens once the maintainer says
-  to go ahead.
-- Part 5 adds the Shootout's checks to `cargo test-roms`.
+- Part 4 is a pull request to another project's repository. It waits until Nubo would land at the top
+  of the published table (Part 5 shows where it stands), and then for the maintainer's go.
+- Part 5 adds the Shootout's tests to `cargo test-roms`, so CI and the nightly run check them, and the
+  nightly metrics on the wiki show where Nubo would rank. It doesn't depend on the other parts and can
+  go first.
 
 ## Where the code lives
 
@@ -28,11 +30,11 @@ The work has four parts, plus an optional fifth:
   through a pull request from the maintainer's fork (Part 4). Until then their draft lives in this
   document (Part 2), never in the Nubo crates: ACCURACY_PLAN.md keeps harnesses for other emulators
   out of them.
-- **Optionally, in the test ROM runner (`tools/test_rom_runner` after the restructuring's step 1,
-  `frontends/test_rom_runner` before it).** Part 5 runs the Shootout's tests headless with its
-  reference images and tolerance, so `cargo test-roms` catches a Shootout regression before a release
-  does. It needs no new tool: the runner already runs daid's and CasualPokePlayer's Shootout tests
-  this way (`Check::GrayscaleScreen`).
+- **In the test ROM runner (`tools/test_rom_runner` after the restructuring's step 1,
+  `frontends/test_rom_runner` before it), the nightly workflow and `cargo xtask metrics`.** Part 5 runs
+  the Shootout's tests headless with its reference images and tolerance, and compares the result with
+  the published table. It needs no new tool: the runner already runs daid's and CasualPokePlayer's
+  Shootout tests this way (`Check::GrayscaleScreen`).
 
 Everything below about the Shootout was read from its repository,
 [gbdev/GBEmulatorShootout](https://github.com/gbdev/GBEmulatorShootout), at commit `38b926b` (July
@@ -180,7 +182,8 @@ Before Part 3, a cloud session can estimate the results with the headless fronte
    the script in the scratchpad, not in the repository.
 
 This checks only the last frame, while the harness accepts the first frame that matches, so it is an
-approximation. It still catches wrong palettes, models or timing, and improves the table above.
+approximation. It still catches wrong palettes, models or timing, and improves the table above. Once
+Part 5 is built, `cargo test-roms` does this properly and the dry run is no longer needed.
 
 ## Part 2: the harness class
 
@@ -255,7 +258,9 @@ the Part 1 pull request or in this document; they don't belong in the Nubo crate
 
 ## Part 4: the pull request to the Shootout
 
-Only once the maintainer says to go ahead: open a pull request to `gbdev/GBEmulatorShootout` from the
+Wait until Part 5 shows Nubo ranking first on the published tests, and Part 3's run on Windows confirms
+it: the maintainer wants Nubo to enter the table at the top. Then, only once the maintainer says to go
+ahead, open a pull request to `gbdev/GBEmulatorShootout` from the
 maintainer's fork with `emulators/nubo.py`, the `EMULATOR_SPECS` entry and the README line. Mention the
 Nubo version it was tested with and the local results. The Shootout's maintainers rerun the suite and
 publish the table at gbdev.io/GBEmulatorShootout.
@@ -265,49 +270,124 @@ that change accuracy, so the published row doesn't fall behind.
 
 **Done when:** Nubo appears in the published table.
 
-## Part 5 (optional): the Shootout's checks in `cargo test-roms`
+## Part 5: the Shootout's tests in CI, the nightly run and the metrics
 
 The test ROM runner already runs most of the Shootout's ROMs, but with its own checks (registers,
 exact screenshots) and on the models each ROM names. This part also runs every Shootout test the way the
-Shootout judges it, so a change that would cost Nubo a row in the published table fails CI.
+Shootout judges it, and compares the result with the published table. That way:
 
-1. **Files.** Of the Shootout's `testroms/` (32 MB), the ROMs are 31 MB and almost all are already in
-   the c-sp collection the runner downloads (four large Mooneye MBC ROMs alone are most of it). The
-   reference images are 1.3 MB.
+- **CI:** a change that would cost Nubo a row in the table fails, like any other test that stops passing.
+- **The nightly run** checks the same, with the real boot ROM (`--verify-boot`).
+- **The nightly metrics** on the wiki show Nubo's Shootout score and where it would rank, night by
+  night, until it is ready for Part 4.
+
+### The published table
+
+The table at gbdev.io/GBEmulatorShootout is built from the Shootout's `gh-pages` branch: `tests.json`
+lists the tests it shows, and `<emulator>.json` holds each emulator's result per test (with a
+screenshot, so the files add up to 6.4 MB). At `gh-pages` commit `72fd745` (published 2026-06-04), the
+table has 264 tests. The top of it reads:
+
+| Emulator | Passed | Failed | Run |
+|---|---|---|---|
+| DocBoy | 255 | 3 | 261 |
+| Emulicious | 251 | 7 | 261 |
+| SameBoy | 250 | 11 | 264 |
+| Beaten Dying Moon | 244 | 17 | 264 |
+| GSE | 215 | 46 | 264 |
+| bgb | 202 | 59 | 264 |
+
+The other rows are counted as "info": tests with no reference image, such as `which.gb` and
+`rom_and_ram.gb`, and the tests an emulator can't run, such as the Super Game Boy ones.
+
+The published list is older than the Shootout's `main`. It has no Mealybug tests, for example, and none
+of the `main` tests that target one hardware revision on another model. So "would rank first" has to be
+counted on the published list, not on everything `main` runs.
+
+### Steps
+
+1. **The scoreboard.** Check in `shootout_published.txt` next to `shootout.sha256`:
+   - It records the pinned `gh-pages` commit and its date.
+   - It has one line per published test with the emulators that pass it, for example
+     `mooneye/acceptance/div_timing.gb<TAB>DocBoy,Emulicious,SameBoy,...`.
+   - It is written by a small command (for example `cargo xtask shootout-scoreboard <commit>`) that
+     fetches `tests.json` and the `<emulator>.json` files at that commit, so CI never downloads them.
+   - Update it when the Shootout publishes again, in a pull request of its own.
+2. **Files.** Of the Shootout's `testroms/` on `main` (32 MB), the ROMs are 31 MB, and almost all are
+   already in the c-sp collection the runner downloads (four large Mooneye MBC ROMs alone are most of
+   it). The reference images are 1.3 MB.
    - Download only the reference images (`.png` and `.fail.png`) and the few ROMs the collection
-     lacks, at the pinned Shootout commit the runner already uses, and add them to `shootout.sha256`.
+     lacks, at the pinned `main` commit the runner already uses, and add them to `shootout.sha256`.
    - Use the collection's copy of a ROM only when its SHA-256 matches the Shootout's.
-2. **Tests.** Read the test list once and keep it as a table in the runner, regenerated when the pinned
-   commit changes, like `SCREENSHOT_TESTS`. Don't run the Shootout's Python. For each test:
-   - **ID:** `shootout/<name>`, so it can't clash with the tests that already run.
+   - The test ROM cache in CI (`.github/actions/test-roms`) covers them through `shootout.sha256`.
+3. **Tests.** Read the test list of the pinned `main` commit once and keep it as a table in the runner,
+   regenerated when the pin moves, like `SCREENSHOT_TESTS`. Don't run the Shootout's Python. For each
+   test:
+   - **ID:** `shootout/<name as the Shootout writes it>`, for example
+     `shootout/mealybug-tearoom-tests/ppu/m3_scy_change.gb (CGB RevD)`. It can't clash with the tests
+     that already run, and it matches the scoreboard's names.
    - **Model:** `DMG` runs on `Model::Dmg` and `CGB` on `Model::CgbE`, the models the harness class
-     starts. `SGB` tests are skipped, since Nubo has no Super Game Boy commands.
+     starts. `SGB` tests are skipped, as in the Shootout, where they count as not run.
    - **Check:** pass on the first frame that matches a pass image under the Shootout's rule (grayscale,
      no pixel more than 50 off). Fail on a frame that matches a `.fail.png`, or at the deadline.
-   - **Deadline:** the test's `runtime` plus a margin of a few seconds, counted from power-on, since
-     the Shootout's `runtime` includes the boot ROM.
-   - Tests with no reference image only report information; leave them out.
-   - **Already covered:** daid's and CasualPokePlayer's tests already run this way, so don't add them
-     twice.
-3. **Results.** List the passing ones in `passing.txt` as usual. In `FAILING_TESTS.md`, explain the
-   failing ones in groups: tests of one hardware revision run on another model, Bully on DMG (which
-   real DMGs fail too), and real Nubo bugs.
+   - **Deadline:** the test's `runtime` plus a margin of 2 seconds, counted from power-on, since the
+     Shootout's `runtime` includes the boot ROM.
+   - Tests with no reference image only report information. Leave them out.
+   - **Already covered:** daid's and CasualPokePlayer's tests already run this way. Move them under
+     the `shootout/` IDs instead of running them twice, with their entries in `passing.txt`.
+4. **Results.** List the passing ones in `passing.txt` as usual, so CI fails when one stops passing. In
+   `FAILING_TESTS.md`, explain the failing ones in groups:
+   - tests of one hardware revision run on another model
+   - Bully on DMG, which real DMGs fail too
+   - real Nubo bugs, each with what to try
+5. **The summary line.** After the per-suite lines, the runner prints one line the nightly can read,
+   counted on the published tests only:
+
+   ```
+     shootout  259/264  rank 1  leader DocBoy 255  published 2026-06-04
+   ```
+
+   Nubo's rank is one more than the number of emulators that pass more published tests than it does.
+   A tie counts as sharing the rank.
+6. **The nightly metrics.** Nothing new runs at night: `cargo test-roms --verify-boot` in the
+   `verify-boot` job already runs the Shootout's tests.
+   - **Reading the result:** next to the step that counts the passing tests, read the `shootout` line
+     into job outputs. In "Write tonight's metrics", add them to `night.json`:
+
+     ```json
+     "shootout": {"passed": 259, "total": 264, "rank": 1, "leader": "DocBoy", "leader_passed": 255}
+     ```
+
+   - **On the wiki page:** in `cargo xtask metrics report` (`xtask/src/metrics.rs`), put a line at the
+     top of the "Nightly metrics" page, such as "GB Emulator Shootout: 259 of 264, would rank 1st
+     (leader: DocBoy, 255; published 2026-06-04)". Add a "Shootout" column to `HISTORY_COLUMNS`.
+   - **Threshold:** give `shootout.passed` none, like `test_roms_passed`. A drop already fails CI
+     through `passing.txt`, and the column shows the trend.
+   - **Tests:** cover the new line and column in `xtask/src/metrics/tests.rs`.
+7. **Docs.** In CLAUDE.md:
+   - the Test ROM Runner paragraph: the Shootout tests, the scoreboard and the summary line
+   - the nightly paragraph: the Shootout score in the metrics
+
+   In the README: the test suite list.
 
 **Cost.** Measured on 2026-10-13 in a 4-core cloud container:
 - Nubo ran all 294 Shootout ROMs for 2 emulated seconds on both DMG and CGB-E in 7.0 s with
   `--jobs 4`. That is about 1,180 emulated seconds, or 170 per second of real time.
-- The Shootout's 310 or so tests add up to about 555 emulated seconds of `runtime`; the longest is
-  20 s.
-- With a margin of 2 s per test, that is at most about 1,200 emulated seconds. This is the worst case,
-  in which no test finishes early.
+- The Shootout's roughly 310 tests on `main` add up to about 555 emulated seconds of `runtime`; the
+  longest is 20 s.
+- With the 2-second margin, that is at most about 1,200 emulated seconds. This is the worst case, in
+  which no test finishes early.
 - So the worst case is **about 7 seconds** on 4 cores, and passing tests stop at their first matching
   frame, so it is less in practice.
 - GitHub's Linux runners for public repositories also have 4 cores. On top of today's roughly 30
-  seconds, that is up to about a quarter more.
+  seconds, that is up to about a quarter more. At night, `--verify-boot` also emulates the boot ROM of
+  each of these tests instead of starting from a copy, as it does for every other test.
 - The runner starts the longest tests first, so the 20-second ones overlap with the rest.
 
 Measure it again once it is built, with and without the new tests, and note the result here.
 
-**Done when:** `cargo test-roms` runs the Shootout's tests, `passing.txt` and `FAILING_TESTS.md` list
-them, and the extra time is measured and noted.
-
+**Done when:**
+- `cargo test-roms` runs the Shootout's tests in CI and at night, and prints the summary line.
+- `passing.txt` and `FAILING_TESTS.md` list them.
+- The "Nightly metrics" wiki page shows the score and rank at the top, and a column in its history.
+- The extra time is measured and noted.
