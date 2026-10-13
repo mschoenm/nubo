@@ -118,6 +118,18 @@ before.
    `retro_load_game`, but `CartridgeEffects::load_rtc_state` is only asked at `load_rom`. Add
    `Emulator::rtc_state()` and `Emulator::set_rtc_state(&RtcState)` (or similar), next to
    `set_cartridge_ram`.
+   - **Keep the clock right across clock sources.** `RtcState::base_timestamp` is a time on whichever
+     clock the cartridge follows, and `Mbc3CartridgeMapper::catch_up` subtracts it from the current
+     time on that clock. A clock state from the other source would freeze the game's clock (wall-clock
+     time read as emulated time) or jump it ahead by decades and wrap it (the other way round).
+   - Let the core record in the save state which clock a state's `RtcState` follows (a new field, which
+     older states lack and which then defaults to the wall clock). When a state or a clock state
+     from the other source is loaded, rebase `base_timestamp` to the current time of the clock in use,
+     keeping the clock's registers as they are.
+   - The `.rtc` file, and RetroArch's RTC memory, always hold the wall-clock layout the Nubo app writes.
+     On emulated time the core converts on load and on save.
+   - Test: real time to emulated time and back, through a save state and through the `.rtc` layout,
+     never freezes or jumps the clock.
 3. **Share the `.rtc` file layout.** Move `encode_rtc`/`decode_rtc` (17 bytes, in `battery.rs` of the
    Iced app, `frontends/nubo` after the restructuring's step 1) into nubo-core, for example as
    `RtcState::to_bytes`/`from_bytes`. Battery saves can then
@@ -150,7 +162,20 @@ before.
    - Wrap every entry point in `catch_unwind`. A panic must not cross into C: it fails the call (for
      example `retro_load_game` returns false) instead of aborting RetroArch.
    - Log through `RETRO_ENVIRONMENT_GET_LOG_INTERFACE`, calling its printf-style callback with `"%s"`.
-3. The calls, at minimum:
+3. **Every `retro_*` function, from the start.** RetroArch looks up the whole set when it loads a core
+   (`CORE_SYMBOLS` in its `runloop.c`) and refuses a core that lacks one. So this phase exports all of
+   them, and the ones later phases fill in start as harmless stubs:
+   - `retro_serialize_size` returns 0, which tells RetroArch the core has no save states yet, and
+     `retro_serialize` and `retro_unserialize` return false.
+   - `retro_cheat_reset` and `retro_cheat_set` do nothing.
+   - `retro_get_memory_data` returns null and `retro_get_memory_size` returns 0.
+   - The callback setters (`retro_set_video_refresh`, `retro_set_audio_sample`,
+     `retro_set_audio_sample_batch`, `retro_set_input_poll`, `retro_set_input_state`,
+     `retro_set_environment`) store their callbacks.
+
+   Check the list against `libretro.h` and RetroArch's `CORE_SYMBOLS`, and add a test that the built
+   library exports every name on it.
+4. What the calls do in this phase:
    - **System info:** `retro_api_version`, `retro_get_system_info` (name "Nubo", the version from
      `CARGO_PKG_VERSION`, extensions `gb|gbc`, `need_fullpath = false`), `retro_init` and `retro_deinit`.
    - **Audio and video info:** `retro_get_system_av_info` gives 160×144 at 4194304 / 70224 fps and a
@@ -208,14 +233,16 @@ before.
    - Test: save, run 100 frames, load, run 100 frames, and get identical frames and samples.
 3. **Options** (`RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2`; check whether older RetroArch versions still
    need the older calls):
-   - `nubo_model`: Automatic, or one of the models by name (`Model` and its `FromStr` names). It applies
-     on the next restart or reset; say so in the option's description.
+   - `nubo_model`: Automatic, or one of the models by name (`Model` and its `FromStr` names).
    - `nubo_palette`: the palettes from Phase 1, gray first.
    - `nubo_rtc`: real time (default) or emulated time. On real time, an MBC3 game's clock reads the wall
      clock, so a loaded state can see a different time than the run it was saved from, and netplay
      peers can see different times. Emulated time makes every run repeatable. The option's
      description says to choose it for netplay with games that have a clock.
-   - Read changes with `RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE` at the start of `retro_run`.
+   - Read changes with `RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE` at the start of `retro_run`. `nubo_model`
+     and `nubo_rtc` take effect only on the next reset or game load, which say so in their
+     descriptions. Switching `nubo_rtc` then goes through the rebasing of Phase 1 item 2, so the
+     game's clock neither stops nor jumps.
 4. **Cheats.** `retro_cheat_reset` turns all cheats off. `retro_cheat_set(index, enabled, code)` may get
    several codes joined with `+`: register each one, Game Genie or GameShark depending on which
    validator accepts it, under an id such as `"<index>-<n>"`.

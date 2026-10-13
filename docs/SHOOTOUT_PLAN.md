@@ -334,8 +334,13 @@ counted on the published list, not on everything `main` runs.
      that already run, and it matches the scoreboard's names.
    - **Model:** `DMG` runs on `Model::Dmg` and `CGB` on `Model::CgbE`, the models the harness class
      starts. `SGB` tests are skipped, as in the Shootout, where they count as not run.
-   - **Check:** pass on the first frame that matches a pass image under the Shootout's rule (grayscale,
-     no pixel more than 50 off). Fail on a frame that matches a `.fail.png`, or at the deadline.
+   - **Check:** pass when a pass image matches under the Shootout's rule (grayscale, no pixel more than
+     50 off), fail when a `.fail.png` matches, and fail at the deadline.
+   - **Sampling like the harness:** the harness takes a screenshot only every 0.1 s of real time, which
+     at the harness class's `--speed 4` is every 0.4 emulated seconds. A picture shown for less than
+     that may never be seen. So a match only counts once it has held for 0.1 s × the harness speed of
+     emulated time, whatever frame the harness happens to sample. Keep the harness speed as one
+     constant next to the test list, the same value `emulators/nubo.py` passes.
    - **Deadline:** the test's `runtime` plus a margin of 2 seconds, counted from power-on, since the
      Shootout's `runtime` includes the boot ROM.
    - Tests with no reference image only report information. Leave them out.
