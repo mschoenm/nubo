@@ -5,9 +5,34 @@ emulators and publishes a table of their results. Getting Nubo into it is step 2
 [ACCURACY_PLAN.md](ACCURACY_PLAN.md), and running its harness locally on all emulators also covers much
 of Phase 1 (measuring other emulators on the same tests).
 
-The work has four parts. Parts 1 and 2 can be done in a cloud session. Part 3 needs a Windows PC and is
-done by the maintainer. Part 4 is a pull request to another project's repository, so it only happens
-once the maintainer says to go ahead.
+The work has four parts, plus an optional fifth:
+
+- Parts 1 and 2 can be done in a cloud session.
+- Part 3 needs a Windows PC and is done by the maintainer.
+- Part 4 is a pull request to another project's repository, so it only happens once the maintainer says
+  to go ahead.
+- Part 5 adds the Shootout's checks to `cargo test-roms`.
+
+## Where the code lives
+
+- **In this repository, in the Iced app (`frontends/iced`).** The Shootout downloads the Windows zip of
+  Nubo's latest release and takes screenshots of the real `nubo.exe`, so the options it needs
+  (`--scale`, `--fresh`, `--speed`, Part 1) must be in the app Nubo ships, not in a separate program.
+  - The options are parsed in `main.rs`.
+  - The screen-only window is in the window settings and `views/game.rs`.
+  - The steps of [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md) leave the options in the Iced app. What
+    `--fresh` turns off (storage, battery saves) moves to `nubo-frontend` in its step 4. Do Part 1
+    before step 3 of that plan or after step 6, not in the middle.
+- **In the Shootout's repository (`gbdev/GBEmulatorShootout`).** The harness class
+  `emulators/nubo.py`, its entry in `main.py` and the README line belong to that project and go in
+  through a pull request from the maintainer's fork (Part 4). Until then their draft lives in this
+  document (Part 2), never in the Nubo crates: ACCURACY_PLAN.md keeps harnesses for other emulators
+  out of them.
+- **Optionally, in the test ROM runner (`tools/test_rom_runner` after the restructuring's step 1,
+  `frontends/test_rom_runner` before it).** Part 5 runs the Shootout's tests headless with its
+  reference images and tolerance, so `cargo test-roms` catches a Shootout regression before a release
+  does. It needs no new tool: the runner already runs daid's and CasualPokePlayer's Shootout tests
+  this way (`Check::GrayscaleScreen`).
 
 Everything below about the Shootout was read from its repository,
 [gbdev/GBEmulatorShootout](https://github.com/gbdev/GBEmulatorShootout), at commit `38b926b` (July
@@ -239,3 +264,50 @@ Afterwards, mark Phase 6 step 2 as done in ACCURACY_PLAN.md. Rerun the Shootout 
 that change accuracy, so the published row doesn't fall behind.
 
 **Done when:** Nubo appears in the published table.
+
+## Part 5 (optional): the Shootout's checks in `cargo test-roms`
+
+The test ROM runner already runs most of the Shootout's ROMs, but with its own checks (registers,
+exact screenshots) and on the models each ROM names. This part also runs every Shootout test the way the
+Shootout judges it, so a change that would cost Nubo a row in the published table fails CI.
+
+1. **Files.** Of the Shootout's `testroms/` (32 MB), the ROMs are 31 MB and almost all are already in
+   the c-sp collection the runner downloads (four large Mooneye MBC ROMs alone are most of it). The
+   reference images are 1.3 MB.
+   - Download only the reference images (`.png` and `.fail.png`) and the few ROMs the collection
+     lacks, at the pinned Shootout commit the runner already uses, and add them to `shootout.sha256`.
+   - Use the collection's copy of a ROM only when its SHA-256 matches the Shootout's.
+2. **Tests.** Read the test list once and keep it as a table in the runner, regenerated when the pinned
+   commit changes, like `SCREENSHOT_TESTS`. Don't run the Shootout's Python. For each test:
+   - **ID:** `shootout/<name>`, so it can't clash with the tests that already run.
+   - **Model:** `DMG` runs on `Model::Dmg` and `CGB` on `Model::CgbE`, the models the harness class
+     starts. `SGB` tests are skipped, since Nubo has no Super Game Boy commands.
+   - **Check:** pass on the first frame that matches a pass image under the Shootout's rule (grayscale,
+     no pixel more than 50 off). Fail on a frame that matches a `.fail.png`, or at the deadline.
+   - **Deadline:** the test's `runtime` plus a margin of a few seconds, counted from power-on, since
+     the Shootout's `runtime` includes the boot ROM.
+   - Tests with no reference image only report information; leave them out.
+   - **Already covered:** daid's and CasualPokePlayer's tests already run this way, so don't add them
+     twice.
+3. **Results.** List the passing ones in `passing.txt` as usual. In `FAILING_TESTS.md`, explain the
+   failing ones in groups: tests of one hardware revision run on another model, Bully on DMG (which
+   real DMGs fail too), and real Nubo bugs.
+
+**Cost.** Measured on 2026-10-13 in a 4-core cloud container:
+- Nubo ran all 294 Shootout ROMs for 2 emulated seconds on both DMG and CGB-E in 7.0 s with
+  `--jobs 4`. That is about 1,180 emulated seconds, or 170 per second of real time.
+- The Shootout's 310 or so tests add up to about 555 emulated seconds of `runtime`; the longest is
+  20 s.
+- With a margin of 2 s per test, that is at most about 1,200 emulated seconds. This is the worst case,
+  in which no test finishes early.
+- So the worst case is **about 7 seconds** on 4 cores, and passing tests stop at their first matching
+  frame, so it is less in practice.
+- GitHub's Linux runners for public repositories also have 4 cores. On top of today's roughly 30
+  seconds, that is up to about a quarter more.
+- The runner starts the longest tests first, so the 20-second ones overlap with the rest.
+
+Measure it again once it is built, with and without the new tests, and note the result here.
+
+**Done when:** `cargo test-roms` runs the Shootout's tests, `passing.txt` and `FAILING_TESTS.md` list
+them, and the extra time is measured and noted.
+
