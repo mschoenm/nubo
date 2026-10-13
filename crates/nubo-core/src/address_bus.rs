@@ -267,7 +267,7 @@ pub struct AddressBus {
     deferral_budget: u32,
     /// The time since power-on, in PPU dots, at which `Emulator::run_frame`
     /// stops. Stretches of M-cycles run in one go end there, so the call
-    /// stops at most one instruction past it. `u64::MAX` outside that call.
+    /// stops at most one CPU step past it. `u64::MAX` outside that call.
     dot_limit: u64,
 }
 

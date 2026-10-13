@@ -104,7 +104,11 @@ caller's buffers, and `DOTS_PER_FRAME` is public) and moved the palettes and the
 `nubo-frontend` (item 4, done), so this phase only does what is still left after them.
 
 While the screen is off, the PPU still hands over a frame every 70,224 dots, holding what it last
-drew, so `run_frame` finishes one frame per call either way, as the Nubo app sees too.
+drew, so `run_frame` normally finishes one frame per call either way, as the Nubo app sees too. A
+call can overshoot the boundary by one CPU step (up to about 4,100 dots with a general-purpose VRAM
+DMA), so when turning the screen on or off puts a frame inside that overshoot, one call finishes no
+frame and the next two; the core should then show the last frame again (`retro_video_refresh` with
+`NULL`).
 
 All of these add to the public API without changing what the emulator does.
 `cargo benchmark --compare`, `cargo test-roms` and `cargo save-states` must give the same results as

@@ -3,7 +3,7 @@
 //! test runners rely on to skip the boot ROM, that a loaded save state
 //! restores every field save states are meant to keep, that
 //! battery-backed RAM reaches the frontend once per call, and that
-//! `run_frame` keeps to the frame boundaries.
+//! `run_frame` keeps to the frame boundaries and hands out every sample.
 
 use crate::address_bus::effects::empty_cartridge_effects;
 use crate::{CartridgeEffects, DOTS_PER_FRAME, Emulator, Model};
@@ -377,28 +377,37 @@ fn a_loaded_state_restores_every_field_of_the_cpu_the_address_bus_the_ppu_and_th
     );
 }
 
-/// The most PPU dots one instruction (or an interrupt dispatch) takes: six
-/// M-cycles of four dots.
-const MOST_DOTS_PER_INSTRUCTION: u64 = 24;
+/// The most PPU dots one CPU step takes without VRAM DMA: an instruction of
+/// six M-cycles and an interrupt dispatch of five, at four dots each.
+const MOST_DOTS_PER_STEP: u64 = 44;
+/// The most PPU dots a step that copies 128 blocks of general-purpose VRAM
+/// DMA takes: 32 dots per block, plus the instruction.
+const MOST_DOTS_PER_DMA_STEP: u64 = 128 * 32 + MOST_DOTS_PER_STEP;
 /// How many frames the `run_frame` tests run.
 const FRAMES: usize = 120;
 /// PPU dots per emulated second.
 const DOTS_PER_SECOND: u64 = 4 * 1024 * 1024;
 
-/// A game for `model` that runs `program` from 0x0150.
+/// A game for `model` that runs `program` from 0x0150, with a timer
+/// interrupt handler that only returns.
 fn program_rom(model: Model, program: &[u8]) -> Vec<u8> {
     let cgb_flag = if model.is_cgb() { 0x80 } else { 0x00 };
     let header = header(cgb_flag, 0x00, 0x00, 0x33);
     let mut rom = vec![0; ROM_SIZE];
     rom[HEADER_START..HEADER_START + header.len()].copy_from_slice(&header);
+    rom[TIMER_INTERRUPT_HANDLER] = 0xD9; // RETI
     rom[BUSY_PROGRAM_START..BUSY_PROGRAM_START + program.len()].copy_from_slice(program);
     rom
 }
 
-/// Games that keep the CPU busy, halt it for good, turn the screen off, and
-/// switch to double speed, each running on forever.
+/// Where the CPU goes for a timer interrupt.
+const TIMER_INTERRUPT_HANDLER: usize = 0x0050;
+
+/// Games that keep the CPU busy, halt it for good, turn the screen off,
+/// switch to double speed, take timer interrupts, copy VRAM DMA and play a
+/// tone, each running on forever.
 #[rustfmt::skip]
-const FRAME_PROGRAMS: [(&str, &[u8]); 4] = [
+const FRAME_PROGRAMS: [(&str, &[u8]); 7] = [
     ("busy", &[
         0x04,                   // loop: INC B
         0x18, 0xFD,             // JR loop
@@ -420,11 +429,37 @@ const FRAME_PROGRAMS: [(&str, &[u8]); 4] = [
         0x04,                   // loop: INC B
         0x18, 0xFD,             // JR loop
     ]),
+    ("interrupts", &[
+        0x3E, 0x05, 0xE0, 0x07, // TAC: the timer at 262 kHz
+        0x3E, 0x04, 0xE0, 0xFF, // IE = the timer
+        0xFB,                   // EI
+        0xCD, 0x5E, 0x01,       // loop: CALL return
+        0x18, 0xFB,             // JR loop
+        0xC9,                   // return: RET
+    ]),
+    ("VRAM DMA", &[
+        0x3E, 0x40, 0xE0, 0x51, // loop: HDMA source 0x4000
+        0xAF, 0xE0, 0x52,
+        0xE0, 0x53, 0xE0, 0x54, // HDMA destination 0x8000
+        0x3E, 0x7F, 0xE0, 0x55, // a general-purpose copy of 128 blocks
+        0x18, 0xEF,             // JR loop
+    ]),
+    ("sound", &[
+        0x3E, 0x80, 0xE0, 0x26, // NR52: sound on
+        0x3E, 0x77, 0xE0, 0x24, // NR50: full volume
+        0x3E, 0xFF, 0xE0, 0x25, // NR51: every channel on both sides
+        0x3E, 0xF0, 0xE0, 0x12, // NR12: channel 1 loud, no envelope
+        0x3E, 0x80, 0xE0, 0x11, // NR11: half duty
+        0xAF, 0xE0, 0x13,       // NR13
+        0x3E, 0x87, 0xE0, 0x14, // NR14: trigger channel 1
+        0x04,                   // loop: INC B
+        0x18, 0xFD,             // JR loop
+    ]),
 ];
 
 /// The models the `run_frame` tests run `name`'s program on.
 fn frame_models(name: &str) -> &'static [Model] {
-    if name == "double speed" {
+    if name == "double speed" || name == "VRAM DMA" {
         &[Model::CgbE]
     } else {
         &[Model::Dmg, Model::CgbE]
@@ -458,16 +493,21 @@ fn run_frames(emulator: &mut Emulator, count: usize) -> FrameRun {
 }
 
 #[test]
-fn run_frame_stops_within_one_instruction_past_each_frame_boundary() {
+fn run_frame_stops_within_one_cpu_step_past_each_frame_boundary() {
     for (name, program) in FRAME_PROGRAMS {
         for &model in frame_models(name) {
             let mut emulator = booted(model, &program_rom(model, program));
+            let most_overshoot = if name == "VRAM DMA" {
+                MOST_DOTS_PER_DMA_STEP
+            } else {
+                MOST_DOTS_PER_STEP
+            };
             let mut before = emulator.address_bus().elapsed_dots();
             let run = run_frames(&mut emulator, FRAMES);
             for (call, &after) in run.dots.iter().enumerate() {
                 let boundary = (before / DOTS_PER_FRAME + 1) * DOTS_PER_FRAME;
                 assert!(
-                    (boundary..boundary + MOST_DOTS_PER_INSTRUCTION).contains(&after),
+                    (boundary..boundary + most_overshoot).contains(&after),
                     "{name} on {model:?}: call {call} ended at {after}, boundary {boundary}"
                 );
                 before = after;
@@ -509,6 +549,33 @@ fn run_frame_hands_out_every_sample() {
                     "{name} on {model:?} at {sample_rate} Hz: {samples} samples in {dots} dots, expected {expected}"
                 );
             }
+        }
+    }
+}
+
+#[test]
+fn run_frame_hands_out_the_samples_that_running_by_audio_buffers_does() {
+    for (name, program) in FRAME_PROGRAMS {
+        for &model in frame_models(name) {
+            let rom = program_rom(model, program);
+            let mut by_frames = booted(model, &rom);
+            let frames = run_frames(&mut by_frames, FRAMES / 2);
+
+            let mut by_buffers = booted(model, &rom);
+            let (mut left, mut right) = (Vec::new(), Vec::new());
+            while left.len() < frames.left.len() {
+                let (new_left, new_right) = by_buffers.step_until_next_audio_buffer();
+                left.extend_from_slice(new_left);
+                right.extend_from_slice(new_right);
+            }
+            let count = frames.left.len();
+            if name == "sound" {
+                assert!(frames.left.iter().any(|sample| *sample != 0.0));
+            }
+            assert!(
+                frames.left == left[..count] && frames.right == right[..count],
+                "{name} on {model:?}: the samples differ"
+            );
         }
     }
 }
