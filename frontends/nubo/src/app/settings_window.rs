@@ -3,13 +3,14 @@
 
 use super::{App, GameMessage, LibraryMessage, Message, cycle};
 use crate::controls::{Action, Controls, Device};
-use crate::palettes::DmgPalette;
-use crate::settings::{Appearance, FastForwardSpeed, ModelPreference};
+use crate::settings::{Appearance, FastForwardSpeed};
 use crate::views;
 use crate::views::settings::{SettingsFocus, SettingsRow, SettingsTab};
 use iced::Task;
 use iced::widget;
 use iced::widget::scrollable::RelativeOffset;
+use nubo_frontend::model::ModelPreference;
+use nubo_frontend::palettes::DmgPalette;
 
 /// How much the D-pad changes the volume per press.
 const VOLUME_STEP: f32 = 0.05;

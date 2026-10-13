@@ -20,6 +20,11 @@ const HEADER_END: usize = 0x014E;
 /// Nintendo, which includes the global checksum at 0x014E-0x014F.
 const SGB_HEADER_END: usize = 0x0150;
 
+/// PPU dots (ticks of the 4 MHz clock) in one frame: 154 lines of 456 dots,
+/// about 1/59.73 of a second. [`Emulator::run_frame`] runs to the next
+/// multiple of it since power-on.
+pub const DOTS_PER_FRAME: u64 = crate::gpu::DOTS_PER_FRAME as u64;
+
 /// A Game Boy or Game Boy Color.
 ///
 /// Create one with [`Emulator::new`] for the hardware to emulate, load a game
@@ -170,6 +175,43 @@ impl Emulator {
         self.finish_running();
 
         self.address_bus().audio_samples()
+    }
+
+    /// Runs one frame's worth of time, for a frontend that calls it once per
+    /// frame of the screen it shows on, and adds every audio sample made in
+    /// that time to the end of `left` and `right`.
+    ///
+    /// It runs until the time since power-on reaches the next multiple of
+    /// [`DOTS_PER_FRAME`] PPU dots: it counts time, not frames. A CPU step
+    /// can't stop halfway, so a call may end up to one step past that point
+    /// (an instruction with an interrupt dispatch, usually at most 44 dots,
+    /// or a general-purpose VRAM DMA, up to about 4,100), and the next call
+    /// is that much shorter: calls never drift from the emulated time. The point comes from the time alone, so after loading
+    /// a save state the next call ends where it did in the run the state was
+    /// saved from.
+    ///
+    /// Each call normally finishes one frame, which [`Emulator::take_frame`]
+    /// then returns. While the game has the screen off, the PPU still hands
+    /// over a frame every [`DOTS_PER_FRAME`] dots, holding what it last drew
+    /// (white on a monochrome model in STOP mode), just as frontends that run
+    /// the emulator by audio buffers get. Frames come at the PPU's own phase,
+    /// which turning the screen on or off moves, so when a frame falls within
+    /// a call's overshoot past the boundary, that call finishes none and the
+    /// next one two, of which [`Emulator::take_frame`] returns the latest.
+    pub fn run_frame(&mut self, left: &mut Vec<f32>, right: &mut Vec<f32>) {
+        let frame_end = (self.address_bus().elapsed_dots() / DOTS_PER_FRAME + 1) * DOTS_PER_FRAME;
+        let address_bus = self.address_bus_mut();
+        address_bus.clear_audio_buffers();
+        address_bus.set_dot_limit(frame_end);
+        while self.address_bus().elapsed_dots_including_waiting() < frame_end {
+            self.cpu.step();
+            if self.address_bus().audio_buffers_full() {
+                self.address_bus_mut().take_audio_samples(left, right);
+            }
+        }
+        self.address_bus_mut().set_dot_limit(u64::MAX);
+        self.finish_running();
+        self.address_bus_mut().take_audio_samples(left, right);
     }
 
     /// Runs at most `max_steps` steps and stops early once the audio buffer is

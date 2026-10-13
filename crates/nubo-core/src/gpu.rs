@@ -346,7 +346,8 @@ const VRAM_MODE: u8 = 3;
 pub(super) const NO_OAM_SCAN_ROW: u8 = 0xFF;
 
 const DOTS_PER_LINE: u16 = 456;
-const DOTS_PER_FRAME: u32 = DOTS_PER_LINE as u32 * FRAME_SCANLINE_COUNT as u32;
+/// PPU dots in one frame, including the lines of VBlank.
+pub(crate) const DOTS_PER_FRAME: u32 = DOTS_PER_LINE as u32 * FRAME_SCANLINE_COUNT as u32;
 const FRAME_SCANLINE_COUNT: u8 = 154;
 const VBLANK_START_LINE: u8 = GB_SCREEN_HEIGHT as u8;
 const LAST_VISIBLE_LINE: u8 = VBLANK_START_LINE - 1;

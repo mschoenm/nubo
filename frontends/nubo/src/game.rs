@@ -7,13 +7,13 @@ use crate::cheats::{self, Cheat};
 use crate::controls::Controls;
 use crate::emulation::{Command, Playback, Session};
 use crate::notices::Notices;
-use crate::palettes::DmgPalette;
 use crate::rom::Rom;
 use crate::save_states::{self, SaveState, Slot, SlotInfo};
 use crate::settings::Settings;
 use iced::time::{Duration, Instant};
 use iced::widget::image;
 use nubo_core::{CartridgeHeader, ControllerState, Key, Model};
+use nubo_frontend::palettes::DmgPalette;
 
 /// How long the top bar stays after the mouse stops moving.
 const CONTROLS_TIMEOUT: Duration = Duration::from_millis(2500);

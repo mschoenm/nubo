@@ -8,6 +8,7 @@ rust-version.workspace = true
 
 [dependencies]
 nubo-core.workspace = true
+nubo-frontend.workspace = true
 nubo-logo.workspace = true
 iced = { version = "0.14", features = ["image", "canvas"] }
 rfd = "0.17"

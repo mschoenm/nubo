@@ -5,9 +5,8 @@ use crate::app::{GameMessage, LibraryMessage, Message, SettingsMessage};
 use crate::box_art;
 use crate::controls::{Action, Device};
 use crate::library::{self, Library};
-use crate::palettes::DmgPalette;
 use crate::save_states;
-use crate::settings::{Appearance, FastForwardSpeed, LibraryFolder, ModelPreference, Settings};
+use crate::settings::{Appearance, FastForwardSpeed, LibraryFolder, Settings};
 use crate::ui::icons::{Icon, icon};
 use crate::ui::theme;
 use crate::ui::widgets::{icon_button, secondary_button, section, segmented};
@@ -16,6 +15,8 @@ use iced::widget::{
 };
 use iced::{Alignment, Color, Element, Fill, Theme, widget};
 use nubo_core::Model;
+use nubo_frontend::model::ModelPreference;
+use nubo_frontend::palettes::DmgPalette;
 use std::fmt;
 
 const WIDTH: f32 = 700.0;

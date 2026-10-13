@@ -26,7 +26,8 @@ impl AddressBus {
     /// switch, the PPU dots a register write owes, an APU that has to run
     /// M-cycle by M-cycle, or the APU's frame sequencer, which steps when a DIV
     /// bit changes. The audio buffer may only fill up in the last of them, so
-    /// the emulator stops where it would have.
+    /// the emulator stops where it would have, and they end at the dot limit
+    /// of `Emulator::run_frame`.
     pub(crate) fn bulk_cycles_available(&self) -> u32 {
         let ppu_cycles =
             self.ppu_quiet_dots.saturating_sub(self.ppu_owed_dots) / self.dots_per_cycle();
@@ -49,6 +50,7 @@ impl AddressBus {
             .min(cycles_before_div_apu_edge)
             .min(self.apu.cycles_until_catch_up())
             .min(self.timers.cycles_before_overflow())
+            .min(self.cycles_before_dot_limit())
     }
 
     /// Runs `cycles` M-cycles at once, which `bulk_cycles_available` allows.
@@ -116,7 +118,7 @@ impl AddressBus {
     }
 
     /// PPU dots per M-cycle at the current speed.
-    fn dots_per_cycle(&self) -> u32 {
+    pub(super) fn dots_per_cycle(&self) -> u32 {
         u32::from(dots_per_m_cycle(self.speed_switch.cgb_double_speed()))
     }
 }

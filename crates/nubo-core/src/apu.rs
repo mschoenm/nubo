@@ -1199,6 +1199,16 @@ impl Apu {
         self.audio_buffers_full_in = None;
     }
 
+    /// Moves every sample made so far, including those of the M-cycles that
+    /// already passed, to the end of `left` and `right`, and empties the
+    /// buffers.
+    pub(crate) fn take_samples(&mut self, left: &mut Vec<f32>, right: &mut Vec<f32>) {
+        self.prepare_for_change();
+        left.append(&mut self.left_sample_queue);
+        right.append(&mut self.right_sample_queue);
+        self.audio_buffers_full_in = None;
+    }
+
     /// The queued left samples. They are only complete once the buffers are
     /// full (see `schedule_catch_up`), which is when the emulator hands them
     /// out.

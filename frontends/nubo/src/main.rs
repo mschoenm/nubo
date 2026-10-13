@@ -119,7 +119,6 @@ mod input;
 mod library;
 mod menu_presses;
 mod notices;
-mod palettes;
 mod rom;
 mod save_states;
 mod screenshots;

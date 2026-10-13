@@ -15,7 +15,7 @@ pub use crate::address_bus::cheats::{validate_gamegenie_code, validate_gameshark
 pub use crate::address_bus::{CartridgeEffects, CartridgeHeader, NoSaves, RtcClock, RtcState};
 pub use crate::controller::{ControllerButton, ControllerMapping, ControllerState};
 pub use crate::cpu::{BusActivityEntry, BusActivityKind, Registers};
-pub use crate::emulator::{BUILD_COMMIT, Emulator, SaveStateHeader};
+pub use crate::emulator::{BUILD_COMMIT, DOTS_PER_FRAME, Emulator, SaveStateHeader};
 pub use crate::error::{CheatError, LoadRomError, SaveStateError};
 pub use crate::gpu::DMG_SHADES;
 pub use crate::joypad::Key;

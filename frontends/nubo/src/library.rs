@@ -9,11 +9,11 @@
 //! The browser build has no folders to scan, so its library stays empty.
 
 use crate::background;
-use crate::palettes::DmgPalette;
 use iced::time::SystemTime;
 use iced::widget::image;
 use jobs::Jobs;
 use nubo_core::CartridgeHeader;
+use nubo_frontend::palettes::DmgPalette;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
