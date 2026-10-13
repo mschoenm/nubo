@@ -22,6 +22,9 @@ apu.state.active_channels
 apu.state.channel_1_completed_addend
 apu.state.channel_1_restart_hold
 apu.state.div_event_skip
+apu.state.div_event_skip = Inactive
+apu.state.div_event_skip = Pending
+apu.state.div_event_skip = Skipped
 apu.state.frame_sequencer_step
 apu.state.lfsr_bit_7_before_step
 apu.state.lfsr_stepped_in_narrow
@@ -45,6 +48,9 @@ apu.state.noise.length.remaining
 apu.state.noise.lfsr
 apu.state.noise.narrow
 apu.state.noise_counting
+apu.state.noise_counting = Background
+apu.state.noise_counting = Running
+apu.state.noise_counting = Stopped
 apu.state.noise_started_with_dac_disabled
 apu.state.pending_envelope_tick
 apu.state.powered_on
@@ -122,12 +128,16 @@ cartridge.mapper
 cartridge.mapper.huc1
 cartridge.mapper.huc1.is_ir_light_on
 cartridge.mapper.huc1.mode
+cartridge.mapper.huc1.mode = Infrared
+cartridge.mapper.huc1.mode = Ram
 cartridge.mapper.huc1.ram_bank_number
 cartridge.mapper.huc1.rom_bank_number
 cartridge.mapper.mbc1
 cartridge.mapper.mbc1.bank1
 cartridge.mapper.mbc1.bank2
 cartridge.mapper.mbc1.mode
+cartridge.mapper.mbc1.mode = Ram
+cartridge.mapper.mbc1.mode = Rom
 cartridge.mapper.mbc1.ram_enabled
 cartridge.mapper.mbc2
 cartridge.mapper.mbc2.ram_enabled
@@ -154,7 +164,14 @@ cartridge.mapper.mbc5.rom_bank_number
 cartridge.ram
 cpu
 cpu.ime
+cpu.ime = Off
+cpu.ime = On
+cpu.ime = OnAfterNextInstruction
 cpu.next_instruction
+cpu.next_instruction = HaltBug
+cpu.next_instruction = HaltBugDuringHdma
+cpu.next_instruction = Normal
+cpu.next_instruction = StopOpcodeKept
 cpu.registers
 cpu.registers.a
 cpu.registers.b
@@ -168,9 +185,25 @@ cpu.registers.opcode
 cpu.registers.program_counter
 cpu.registers.stack_pointer
 cpu.run_state
+cpu.run_state = Halted
+cpu.run_state = JustHalted
+cpu.run_state = Running
+cpu.run_state = Stopped
 header.game_checksum
 header.game_title
 header.model
+header.model = AGB
+header.model = CGB-0
+header.model = CGB-A
+header.model = CGB-B
+header.model = CGB-C
+header.model = CGB-D
+header.model = CGB-E
+header.model = DMG
+header.model = DMG-0
+header.model = MGB
+header.model = SGB
+header.model = SGB2
 header.nubo_version
 joypad
 joypad.group_select
@@ -213,13 +246,23 @@ ppu.line
 ppu.line_0_oam_interrupt_blocked
 ppu.line_dot
 ppu.line_state
+ppu.line_state = Drawing
+ppu.line_state = HBlank
+ppu.line_state = OamScan
+ppu.line_state = VBlank
 ppu.ly
 ppu.lyc
 ppu.lyc_flag
 ppu.lyc_source_line
 ppu.mode_0_interrupt_delay
 ppu.next_oam_dma_access
+ppu.next_oam_dma_access = Free
+ppu.next_oam_dma_access = PausedByHalt
+ppu.next_oam_dma_access = Running
 ppu.oam_dma_access
+ppu.oam_dma_access = Free
+ppu.oam_dma_access = PausedByHalt
+ppu.oam_dma_access = Running
 ppu.oam_scan_row
 ppu.oam_scan_x_bus
 ppu.oam_scan_y_bus
@@ -250,6 +293,13 @@ ppu.pipeline.data_for_sel_glitch
 ppu.pipeline.disable_window_pixel_insertion_glitch
 ppu.pipeline.during_object_fetch
 ppu.pipeline.fetcher_state
+ppu.pipeline.fetcher_state = GetTileDataHighT1
+ppu.pipeline.fetcher_state = GetTileDataHighT2
+ppu.pipeline.fetcher_state = GetTileDataLowT1
+ppu.pipeline.fetcher_state = GetTileDataLowT2
+ppu.pipeline.fetcher_state = GetTileT1
+ppu.pipeline.fetcher_state = GetTileT2
+ppu.pipeline.fetcher_state = Push
 ppu.pipeline.insert_bg_pixel
 ppu.pipeline.last_tile_data_address
 ppu.pipeline.last_tile_index_address
@@ -270,6 +320,19 @@ ppu.pipeline.object_flags
 ppu.pipeline.object_tile
 ppu.pipeline.object_tile_data
 ppu.pipeline.phase
+ppu.pipeline.phase = AfterWindowStall
+ppu.pipeline.phase = Done
+ppu.pipeline.phase = ExtraFetcherStep
+ppu.pipeline.phase = LineStart
+ppu.pipeline.phase = ObjectAttributesWait
+ppu.pipeline.phase = ObjectCheck
+ppu.pipeline.phase = ObjectLowWait
+ppu.pipeline.phase = OverlayObject
+ppu.pipeline.phase = ReadObjectAttributes
+ppu.pipeline.phase = ReadObjectHigh
+ppu.pipeline.phase = ReadObjectLow
+ppu.pipeline.phase = Render
+ppu.pipeline.phase = WaitForFetcher
 ppu.pipeline.position_in_line
 ppu.pipeline.visible_object_count
 ppu.pipeline.visible_object_indices
@@ -295,6 +358,9 @@ ppu.stop_blocks.palettes
 ppu.stop_blocks.vram
 ppu.stopped
 ppu.timing
+ppu.timing = Cgb
+ppu.timing = CgbDoubleSpeed
+ppu.timing = Dmg
 ppu.vblank_interrupt
 ppu.video_ram
 ppu.visible_mode
@@ -339,3 +405,5 @@ vram_dma.keep_block_through_halt
 vram_dma.source
 vram_dma.transfer_length
 vram_dma.transfer_mode
+vram_dma.transfer_mode = GeneralPurpose
+vram_dma.transfer_mode = HBlank

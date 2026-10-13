@@ -20,10 +20,11 @@
 //!   values): store it under a new name, so versions on either side leave it
 //!   at its power-on value instead of misreading it.
 //!
-//! `cargo test` and `cargo save-states` fail when the fields a state stores
-//! change, listing them: then keep the stored name of a field only renamed in
-//! the code, or keep a new set of states with `cargo save-states --record`,
-//! which later versions are checked against.
+//! `cargo test` and `cargo save-states` fail when the fields or enum variants
+//! a state can store change ([`stored_layout`]), listing them: then keep the
+//! stored name of a field or variant only renamed in the code, or keep a new
+//! set of states with `cargo save-states --record`, which later versions are
+//! checked against.
 //!
 //! A value that can't be read from its bytes, such as a variant a newer
 //! version added or a field whose size changed under the same name, keeps its
@@ -150,6 +151,27 @@ pub fn write_name(writer: &mut dyn Write, name: &str) -> Result<()> {
     writer.write_all(name.as_bytes())
 }
 
+/// Writes `variant`, one of an enum's `variants` (the stored names of all of
+/// them), by its name. [`stored_layout`] lists all the variants, so a variant
+/// renamed in the code without keeping its stored name shows up even when no
+/// state uses it.
+pub fn write_variant(writer: &mut dyn Write, variant: &str, variants: &[&str]) -> Result<()> {
+    note_variants(variants);
+    write_name(writer, variant)
+}
+
+/// Notes that the value being written is one of `variants`, for
+/// [`stored_layout`]. [`write_variant`] does this; values that store a choice
+/// from a fixed list in another way call it themselves.
+pub fn note_variants(variants: &[&str]) {
+    TRACKING.with_borrow_mut(|tracking| {
+        let path = tracking.path.join(".");
+        if let Some(layout) = &mut tracking.layout {
+            layout.extend(variants.iter().map(|variant| format!("{path} = {variant}")));
+        }
+    });
+}
+
 /// Reads a name written by [`write_name`], or the empty name that ends a
 /// struct's fields.
 pub fn read_name(reader: &mut dyn Read) -> Result<String> {
@@ -219,13 +241,13 @@ fn is_unreadable_value(error: &Error) -> bool {
     }
 }
 
-/// While [`collect_unreadable`] or [`field_paths`] runs: the names of the
+/// While [`collect_unreadable`] or [`stored_layout`] runs: the names of the
 /// fields being read or written, outermost first, and what they found.
 #[derive(Default)]
 struct Tracking {
     path: Vec<String>,
     unreadable: Option<Vec<String>>,
-    written: Option<BTreeSet<String>>,
+    layout: Option<BTreeSet<String>>,
 }
 
 thread_local! {
@@ -233,20 +255,20 @@ thread_local! {
 }
 
 /// Runs `run` inside the field `name`, for the paths [`collect_unreadable`]
-/// and [`field_paths`] report.
+/// and [`stored_layout`] report.
 fn within_field<T>(name: &str, run: impl FnOnce() -> T) -> T {
     // `TRACKING` isn't borrowed while `run` runs, since it enters fields of
     // its own.
-    let tracking = TRACKING
-        .with_borrow(|tracking| tracking.unreadable.is_some() || tracking.written.is_some());
+    let tracking =
+        TRACKING.with_borrow(|tracking| tracking.unreadable.is_some() || tracking.layout.is_some());
     if !tracking {
         return run();
     }
     TRACKING.with_borrow_mut(|tracking| {
         tracking.path.push(name.to_owned());
         let path = tracking.path.join(".");
-        if let Some(written) = &mut tracking.written {
-            written.insert(path);
+        if let Some(layout) = &mut tracking.layout {
+            layout.insert(path);
         }
     });
     let result = run();
@@ -279,18 +301,20 @@ pub fn collect_unreadable(read: impl FnOnce() -> Result<()>) -> Result<Vec<Strin
     result.map(|()| unreadable.unwrap_or_default())
 }
 
-/// Runs `write` and returns the path of every field it wrote, such as
-/// `ppu.lcdc`. A field of the items of a `Vec` appears once.
-pub fn field_paths(write: impl FnOnce() -> Result<()>) -> Result<BTreeSet<String>> {
+/// Runs `write` and returns what it stores: the path of every field it
+/// wrote, such as `ppu.lcdc`, and for each enum value every variant it can be
+/// stored as, such as `cpu.run_state = Halted`. A field of the items of a
+/// `Vec` appears once.
+pub fn stored_layout(write: impl FnOnce() -> Result<()>) -> Result<BTreeSet<String>> {
     TRACKING.with_borrow_mut(|tracking| {
         *tracking = Tracking {
-            written: Some(BTreeSet::new()),
+            layout: Some(BTreeSet::new()),
             ..Tracking::default()
         }
     });
     let result = write();
-    let written = TRACKING.with_borrow_mut(|tracking| std::mem::take(tracking).written);
-    result.map(|()| written.unwrap_or_default())
+    let layout = TRACKING.with_borrow_mut(|tracking| std::mem::take(tracking).layout);
+    result.map(|()| layout.unwrap_or_default())
 }
 
 /// A value that can be written to and read back from a save state.
@@ -691,7 +715,7 @@ mod tests {
     }
 
     #[test]
-    fn field_paths_name_nested_fields_once() {
+    fn the_layout_names_nested_fields_once_and_every_variant() {
         #[derive(Serializable)]
         struct Outer {
             inner: Original,
@@ -701,15 +725,17 @@ mod tests {
             inner: original(),
             items: vec![original(), original()],
         };
-        let paths = field_paths(|| outer.serialize(&mut std::io::sink())).unwrap();
-        assert!(paths.contains("inner.counter"));
-        assert!(paths.contains("items.mode"));
+        let layout = stored_layout(|| outer.serialize(&mut std::io::sink())).unwrap();
+        assert!(layout.contains("inner.counter"));
+        assert!(layout.contains("items.mode"));
+        assert!(layout.contains("inner.mode = Idle"));
+        assert!(layout.contains("inner.mode = Busy"));
         assert_eq!(
-            paths
+            layout
                 .iter()
                 .filter(|path| path.starts_with("items."))
                 .count(),
-            5
+            7
         );
     }
 

@@ -2,12 +2,13 @@
 
 Every later version of Nubo must load these save states, so that an update
 never costs a player their save states. Each folder is a set of states made by
-Nubo on the day it is named after, with `fields.txt`, the list of every field
-that version's save states store. A new set is only made when that list
-changes: `cargo test` and `cargo save-states` (see
-`frontends/save_state_check`) fail when the current version stores other
-fields than the newest set lists, and `cargo save-states --record` then adds a
-set. Never change or remove a set once it is made.
+Nubo on the day it is named after, with `layout.txt`: every field that
+version's save states store, and every variant each enum value can be stored
+as. A new set is only made when that list changes: `cargo test` and `cargo
+save-states` (see `frontends/save_state_check`) fail when the current version
+stores other fields or variants than the newest set lists, and `cargo
+save-states --record` then adds a set. Never change or remove a set once it is
+made.
 
 The states are of the test cartridges `frontends/save_state_check` builds,
 one for each kind of memory bank controller, and of three free homebrew games,

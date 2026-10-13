@@ -20,7 +20,8 @@ use crate::emulator::Emulator;
 use crate::error::SaveStateError;
 use crate::model::Model;
 use crate::serializable::{
-    FieldWriter, Serializable, collect_unreadable, field_paths, read_fields, unreadable_value,
+    FieldWriter, Serializable, collect_unreadable, note_variants, read_fields, stored_layout,
+    unreadable_value,
 };
 use std::io::{self, Read, Write};
 
@@ -73,7 +74,10 @@ impl SaveStateHeader {
     fn write(&self, writer: &mut dyn Write) -> io::Result<()> {
         let mut fields = FieldWriter::new(writer);
         fields.field("nubo_version", &self.nubo_version)?;
-        fields.field("model", &String::from(self.model.name()))?;
+        fields.field_with("model", |writer| {
+            note_variants(&Model::ALL.map(Model::name));
+            String::from(self.model.name()).serialize(writer)
+        })?;
         fields.field("game_title", &self.game_title)?;
         fields.field("game_checksum", &self.game_checksum)?;
         fields.finish()
@@ -238,21 +242,23 @@ impl Emulator {
         }
     }
 
-    /// The path of every value a save state of this emulator stores, such as
-    /// `header.model` or `ppu.lcdc`, sorted, so `cargo save-states` can tell
-    /// when a version stores other fields than the one before.
-    pub fn save_state_field_paths(&self) -> Vec<String> {
-        let header = field_paths(|| SaveStateHeader::of(self).write(&mut io::sink()))
+    /// What a save state of this emulator stores, sorted: the path of every
+    /// value, such as `header.model` or `ppu.lcdc`, and every variant each
+    /// enum value can be stored as, such as `cpu.run_state = Halted`. `cargo
+    /// save-states` compares it with the newest kept set, so a version that
+    /// stores other values or names than the one before can't go unnoticed.
+    pub fn save_state_layout(&self) -> Vec<String> {
+        let header = stored_layout(|| SaveStateHeader::of(self).write(&mut io::sink()))
             .expect("writing to a sink never fails");
-        let state =
-            field_paths(|| self.serialize(&mut io::sink())).expect("writing to a sink never fails");
-        let mut paths: Vec<String> = header
+        let state = stored_layout(|| self.serialize(&mut io::sink()))
+            .expect("writing to a sink never fails");
+        let mut layout: Vec<String> = header
             .into_iter()
-            .map(|path| format!("header.{path}"))
+            .map(|entry| format!("header.{entry}"))
             .chain(state)
             .collect();
-        paths.sort();
-        paths
+        layout.sort();
+        layout
     }
 
     fn serialized_state(&self) -> Vec<u8> {
@@ -373,7 +379,7 @@ mod tests {
 
     #[test]
     fn components_are_stored_under_the_names_of_the_hardware() {
-        let paths = emulator_with_game().save_state_field_paths();
+        let paths = emulator_with_game().save_state_layout();
         let components: std::collections::BTreeSet<&str> = paths
             .iter()
             .map(|path| path.split('.').next().unwrap())
@@ -397,6 +403,8 @@ mod tests {
         );
         for path in [
             "header.model",
+            "header.model = CGB-E",
+            "cpu.run_state = Halted",
             "cpu.registers.program_counter",
             "bus.work_ram",
             "bus.high_ram",

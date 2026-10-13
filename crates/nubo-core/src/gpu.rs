@@ -22,7 +22,7 @@ use crate::gpu::lcdc::{lcd_enabled, objects_enabled, window_enabled};
 use crate::gpu::palettes::{Color, Palettes, WHITE};
 use crate::gpu::pipeline::Pipeline;
 use crate::model::Model;
-use crate::serializable::{Serializable, read_name, unreadable_value, write_name};
+use crate::serializable::{Serializable, read_name, unreadable_value, write_variant};
 use crate::utils::is_bit_set;
 use serializable_derive::Serializable;
 use std::io::{Read, Write};
@@ -136,7 +136,7 @@ impl Serializable for OamDmaAccess {
             OamDmaAccess::Running { destination } => ("Running", destination),
             OamDmaAccess::PausedByHalt => ("PausedByHalt", 0),
         };
-        write_name(writer, variant)?;
+        write_variant(writer, variant, &["Free", "Running", "PausedByHalt"])?;
         destination.serialize(writer)
     }
 

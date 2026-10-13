@@ -4,16 +4,18 @@
 //! `save-states/` in the repository keeps sets of states, each made by Nubo
 //! on the day its folder is named after, of the test cartridges in
 //! `cartridges.rs` and three free homebrew games. A new set is only needed
-//! when the fields save states store change: the check fails when this
-//! version stores other fields than the newest set lists, and `cargo
-//! save-states --record` then adds a set. Every state of every set must load
-//! into this version without a value it can't read, and play on.
+//! when what save states store changes (their layout: every field, and every
+//! variant of every enum value): the check fails when this version's layout
+//! isn't the one the newest set lists, and `cargo save-states --record` then
+//! adds a set. Every state of every set must load into this version without a
+//! value it can't read, and play on.
 //!
 //! `cargo test` checks the test cartridges' states on every platform CI runs
 //! it on, so states made on one platform are shown to load on the others, and
 //! `cargo save-states` checks the games' states too. The test cartridges
-//! cover every field: which fields a state stores depends only on the
-//! cartridge's controller, never on what the game did.
+//! cover the whole layout: which fields a state stores depends only on the
+//! cartridge's controller, never on what the game did, and every variant of
+//! an enum is listed whichever one a state holds.
 //!
 //! The games aren't part of Nubo: `cargo xtask benchmark-roms` downloads them
 //! to `target/benchmark-roms`, where this looks for them. A game whose states
@@ -45,8 +47,8 @@ const GAME_SECONDS: u32 = 20;
 const TEST_CARTRIDGE_SECONDS: u32 = 5;
 /// How long a loaded state plays on to show that it works.
 const CHECK_SECONDS: u32 = 2;
-/// The file in each set that lists the fields its states store.
-const FIELDS_FILE: &str = "fields.txt";
+/// The file in each set that lists its states' layout, one entry a line.
+const LAYOUT_FILE: &str = "layout.txt";
 
 /// Cartridge hooks that start every game without save data and count the
 /// real-time clock in emulated time, so every run is the same.
@@ -59,7 +61,7 @@ const NO_SAVES: NoSaves = NoSaves {
 #[command(name = "nubo-save-state-check")]
 struct Args {
     /// Keep a new set of save states made by this version, because it stores
-    /// other fields than the newest set
+    /// other fields or variants than the newest set
     #[arg(long)]
     record: bool,
 }
@@ -161,31 +163,31 @@ fn make_states(cartridges: &[Cartridge]) -> Result<Vec<MadeState>, String> {
     Ok(states)
 }
 
-/// The fields this version's states of the test cartridges store, which
-/// are every field a state can store.
-fn stored_fields(cartridges: &[Cartridge]) -> Result<BTreeSet<String>, String> {
-    let mut fields = BTreeSet::new();
+/// The layout of this version's states of the test cartridges, which is the
+/// layout of every state.
+fn stored_layout(cartridges: &[Cartridge]) -> Result<BTreeSet<String>, String> {
+    let mut layout = BTreeSet::new();
     for cartridge in cartridges
         .iter()
         .filter(|cartridge| cartridge.is_test_cartridge)
     {
         for &model in cartridge.models {
-            fields.extend(start(model, cartridge)?.save_state_field_paths());
+            layout.extend(start(model, cartridge)?.save_state_layout());
         }
     }
-    Ok(fields)
+    Ok(layout)
 }
 
 /// Keeps the states this version makes as a new set in `sets`, named after
-/// today's date, unless the newest set already stores the same fields.
+/// today's date, unless the newest set already has the same layout.
 fn record(sets: &Path, cartridges: &[Cartridge]) -> Result<(), String> {
     let states = make_states(cartridges)?;
-    let fields = stored_fields(cartridges)?;
+    let layout = stored_layout(cartridges)?;
     if let Some(newest) = kept_sets(sets)?.last()
-        && read_fields(newest)? == fields
+        && read_layout(newest)? == layout
     {
         return Err(format!(
-            "This version stores the same fields as {}, so it needs no new set",
+            "This version stores the same fields and variants as {}, so it needs no new set",
             newest.display()
         ));
     }
@@ -205,8 +207,8 @@ fn record(sets: &Path, cartridges: &[Cartridge]) -> Result<(), String> {
         fs::write(&path, &state.data)
             .map_err(|error| format!("failed to write {}: {error}", path.display()))?;
     }
-    let path = folder.join(FIELDS_FILE);
-    let list: String = fields.iter().map(|field| format!("{field}\n")).collect();
+    let path = folder.join(LAYOUT_FILE);
+    let list: String = layout.iter().map(|entry| format!("{entry}\n")).collect();
     fs::write(&path, list)
         .map_err(|error| format!("failed to write {}: {error}", path.display()))?;
     println!(
@@ -218,7 +220,7 @@ fn record(sets: &Path, cartridges: &[Cartridge]) -> Result<(), String> {
 }
 
 /// Checks that every state of every set in `sets` loads and plays on, and
-/// that this version stores the fields the newest set lists. States of games
+/// that this version has the layout the newest set lists. States of games
 /// that aren't in `cartridges` are left out. Returns how many states it
 /// checked.
 fn check(sets: &Path, cartridges: &[Cartridge]) -> Result<usize, String> {
@@ -260,17 +262,17 @@ fn check(sets: &Path, cartridges: &[Cartridge]) -> Result<usize, String> {
         ));
     }
 
-    let kept_fields = read_fields(newest)?;
-    let fields = stored_fields(cartridges)?;
-    if fields != kept_fields {
-        return Err(fields_changed(newest, &kept_fields, &fields));
+    let kept_layout = read_layout(newest)?;
+    let layout = stored_layout(cartridges)?;
+    if layout != kept_layout {
+        return Err(layout_changed(newest, &kept_layout, &layout));
     }
     let sets = match kept.len() {
         1 => String::from("1 set"),
         count => format!("{count} sets"),
     };
     println!(
-        "{checked} save states from {sets} load and play on, and this version stores the fields of {}",
+        "{checked} save states from {sets} load and play on, and this version has the layout of {}",
         file_name(newest)
     );
     Ok(checked)
@@ -284,23 +286,24 @@ fn is_of_a_game(file: &Path) -> bool {
         .any(|(game, _)| name.starts_with(&format!("{game}-")))
 }
 
-/// Explains which fields changed since the newest set and what to do.
-fn fields_changed(newest: &Path, kept: &BTreeSet<String>, fields: &BTreeSet<String>) -> String {
+/// Explains which fields and variants changed since the newest set and what
+/// to do.
+fn layout_changed(newest: &Path, kept: &BTreeSet<String>, layout: &BTreeSet<String>) -> String {
     let mut message = format!(
-        "This version's save states store other fields than the newest kept set, {}:\n",
+        "This version's save states store other fields or variants than the newest kept set, {}:\n",
         newest.display()
     );
-    for field in fields.difference(kept) {
-        message.push_str(&format!("  added    {field}\n"));
+    for entry in layout.difference(kept) {
+        message.push_str(&format!("  added    {entry}\n"));
     }
-    for field in kept.difference(fields) {
-        message.push_str(&format!("  removed  {field}\n"));
+    for entry in kept.difference(layout) {
+        message.push_str(&format!("  removed  {entry}\n"));
     }
     message.push_str(
-        "If a field was only renamed in the code, keep the name it is stored under with \
-         #[serializable(name = \"...\")] instead (see serializable.rs). Otherwise run \
-         cargo save-states --record and commit the new set, so later versions are checked \
-         against states of this one.",
+        "If a field or variant was only renamed in the code, keep the name it is stored \
+         under with #[serializable(name = \"...\")] instead (see serializable.rs). Otherwise \
+         run cargo save-states --record and commit the new set, so later versions are \
+         checked against states of this one.",
     );
     message
 }
@@ -353,9 +356,9 @@ fn state_files(set: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(files)
 }
 
-/// The fields listed in the `FIELDS_FILE` of `set`.
-fn read_fields(set: &Path) -> Result<BTreeSet<String>, String> {
-    let path = set.join(FIELDS_FILE);
+/// The layout listed in the `LAYOUT_FILE` of `set`.
+fn read_layout(set: &Path) -> Result<BTreeSet<String>, String> {
+    let path = set.join(LAYOUT_FILE);
     let list = fs::read_to_string(&path)
         .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
     Ok(list.lines().map(String::from).collect())
@@ -503,7 +506,7 @@ mod tests {
     /// Runs with `cargo test` on every platform CI tests on, so states made
     /// on one platform must load on all of them.
     #[test]
-    fn kept_states_load_and_the_newest_set_lists_the_stored_fields() {
+    fn kept_states_load_and_the_newest_set_lists_this_versions_layout() {
         let sets = workspace_root().join("save-states");
         let checked = check(&sets, &test_cartridges()).unwrap();
         assert!(checked > 0);
