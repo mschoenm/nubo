@@ -217,8 +217,17 @@ before.
      RetroArch has changed it. Call `set_cartridge_ram`.
    - After the frame, if `save_ram` was called, copy `cartridge_ram()` into the buffer.
    - Do the same for `RETRO_MEMORY_RTC`, using the `.rtc` layout from Phase 1 and `set_rtc_state`.
-   - Test: a buffer filled before the first `retro_run` is what the game reads, and the game's writes
-     reach the buffer.
+   - **After loading a save state** (`retro_unserialize`), and after `retro_reset`, copy the
+     emulator's cartridge RAM and clock state into both buffers and into what the core last copied.
+     A save state holds its own cartridge RAM and clock, and loading one doesn't call `save_ram` or
+     `save_rtc_state`, so without this the buffers would keep the values from before the load. The
+     next `retro_run` would then see nothing to copy either way, and RetroArch could later write the
+     old save to disk.
+   - Tests:
+     - A buffer filled before the first `retro_run` is what the game reads.
+     - The game's writes reach the buffer.
+     - After loading a state whose cartridge RAM and clock differ from the current ones, both buffers
+       hold the state's values, and a later `retro_run` doesn't copy the old ones back.
 2. **Save states.** `retro_serialize_size` must give a size before any state is made, and run-ahead
    and netplay expect it not to change. Nubo's states vary in length, and `load_state` refuses bytes
    left over at the end.
