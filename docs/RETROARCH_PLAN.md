@@ -84,16 +84,21 @@ before.
 1. **Run one frame's worth of time.** RetroArch calls `retro_run` once per frame and expects about
    1/59.7275 s of emulation: 70,224 ticks of the 4 MHz clock (17,556 M-cycles at normal speed, 35,112
    in double speed).
-   - Add something like `Emulator::run_frame()`. It runs to a frame deadline on the PPU's dot count
-     since power-on (the counter `RtcClock::EmulatedTime` uses), and hands back every sample made in
-     that time.
-   - The deadline is kept in the emulator and moves on by exactly 70,224 dots per call, instead of being
-     70,224 dots after wherever the last call stopped. A step can't always stop exactly on the deadline:
-     an instruction takes several M-cycles, and a halted CPU skips ahead in bulk stretches. If each call
-     counted from where the last one stopped, every overshoot would be added again and the game would
-     run fast, most of all while the CPU is halted or the screen is off. With a kept deadline, a call
-     that overshoots makes the next one that much shorter.
-   - Cap the halted CPU's bulk stretches at the deadline, so an overshoot is never more than one
+   - Add something like `Emulator::run_frame()`. It runs until the PPU's dot count since power-on (the
+     counter `RtcClock::EmulatedTime` uses, which save states keep) reaches the next frame boundary,
+     and hands back every sample made in that time. Frame boundaries are the multiples of 70,224 dots
+     since power-on.
+   - A step can't always stop exactly on a boundary: an instruction takes several M-cycles, and a
+     halted CPU skips ahead in bulk stretches. If each call ran 70,224 dots from wherever the last one
+     stopped, every overshoot would be added again and the game would run fast, most of all while the
+     CPU is halted or the screen is off. Running to the next boundary instead means a call that
+     overshoots makes the next one that much shorter.
+   - The boundary comes from the dot count alone, so `run_frame` keeps no state of its own. A loaded
+     save state (rewind, run-ahead, netplay) is followed by a frame that ends at the next boundary
+     after the loaded dot count, exactly as it did in the run the state was saved from. A deadline
+     kept in a field instead would have to be stored in save states, or a load would leave it in the
+     future and the next call would emulate several frames.
+   - Cap the halted CPU's bulk stretches at the boundary, so an overshoot is never more than one
      instruction.
    - It must count time, not frames, because no frames come while the game has the screen off.
    - Calling `step()` in a loop would end the bulk shortcuts on every call (see "Lazy components,
@@ -103,9 +108,12 @@ before.
    - While the screen stays on, each run of 70,224 dots contains exactly one VBlank, so every call
      normally has exactly one new frame. Find out what the completed frame holds while the screen is
      off and match what the Iced app shows.
-   - Test: after N calls the dot count is within one instruction of N × 70,224 past the start and never
-     drifts further, also while the CPU is halted and with the screen off; and samples per emulated
-     second equal the sample rate.
+   - Tests:
+     - After N calls the dot count is within one instruction past the N-th boundary and never drifts
+       further, also while the CPU is halted and with the screen off.
+     - Samples per emulated second equal the sample rate.
+     - Saving a state after some calls, running on, loading it and running the same number of calls
+       again gives the same frames, samples and dot counts.
 2. **Set the clock state after loading.** RetroArch fills in the saved clock only after
    `retro_load_game`, but `CartridgeEffects::load_rtc_state` is only asked at `load_rom`. Add
    `Emulator::rtc_state()` and `Emulator::set_rtc_state(&RtcState)` (or similar), next to
@@ -203,8 +211,10 @@ before.
    - `nubo_model`: Automatic, or one of the models by name (`Model` and its `FromStr` names). It applies
      on the next restart or reset; say so in the option's description.
    - `nubo_palette`: the palettes from Phase 1, gray first.
-   - `nubo_rtc`: real time (default) or emulated time. Emulated time makes runs repeatable, which netplay
-     and run-ahead need for games with a clock.
+   - `nubo_rtc`: real time (default) or emulated time. On real time, an MBC3 game's clock reads the wall
+     clock, so a loaded state can see a different time than the run it was saved from, and netplay
+     peers can see different times. Emulated time makes every run repeatable. The option's
+     description says to choose it for netplay with games that have a clock.
    - Read changes with `RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE` at the start of `retro_run`.
 4. **Cheats.** `retro_cheat_reset` turns all cheats off. `retro_cheat_set(index, enabled, code)` may get
    several codes joined with `+`: register each one, Game Genie or GameShark depending on which
@@ -242,9 +252,11 @@ RetroArch with a test account, and a rumble cartridge game (such as Pokémon Pin
      `systemname`, `systemid = "game_boy"`, `database = "Nintendo - Game Boy|Nintendo - Game Boy Color"`,
      `supported_extensions = "gb|gbc"`.
    - **Licence and firmware:** `license = "GPLv3"`, `firmware_count = 0` (the boot ROMs are built in).
-   - **Features:** `savestate = "true"`, `savestate_features = "deterministic"`, `cheats = "true"`,
+   - **Features:** `savestate = "true"`, `savestate_features = "serialized"`, `cheats = "true"`,
      `input_descriptors = "true"`, `libretro_saves = "true"`, `core_options = "true"`,
      `needs_fullpath = "false"`, `is_experimental = "true"` at first.
+   - Not `"deterministic"`: with the default real-time clock, a loaded state can go on differently in
+     games with a clock (see `nubo_rtc` in Phase 3).
    - A short `description`.
 2. Add `cargo xtask libretro`. It builds the release library for the host and copies it to
    `target/bundle/` with RetroArch's file name, plus the info file and the license files
