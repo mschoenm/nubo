@@ -98,7 +98,7 @@ Esc opens the pause menu, Tab fast forwards while held, F5 and F8 quick save and
 | [cgb-acid-hell](https://github.com/mattcurrie/cgb-acid-hell) | | 1/1 |
 | [Mealybug Tearoom Tests](https://github.com/mattcurrie/mealybug-tearoom-tests) | 24/24 | 69/71 |
 | [SameSuite](https://github.com/LIJI32/SameSuite) | | 82/82 |
-| [Gambatte](https://github.com/pokemon-speedrunning/gambatte-core) | 1864/1873 | 3339/3352 |
+| [Gambatte](https://github.com/pokemon-speedrunning/gambatte-core) | 1865/1873 | 3340/3352 |
 | [GBMicrotest](https://github.com/aappleby/GBMicrotest) | 480/482 | |
 | [AGE](https://github.com/c-sp/age-test-roms) | 12/14 | 102/105 |
 | [rtc3test](https://github.com/aaaaaa123456789/rtc3test) | 3/3 | 3/3 |
