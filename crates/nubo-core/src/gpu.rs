@@ -22,7 +22,7 @@ use crate::gpu::lcdc::{lcd_enabled, objects_enabled, window_enabled};
 use crate::gpu::palettes::{Color, Palettes, WHITE};
 use crate::gpu::pipeline::Pipeline;
 use crate::model::Model;
-use crate::serializable::Serializable;
+use crate::serializable::{Serializable, read_name, unreadable_value, write_name};
 use crate::utils::is_bit_set;
 use serializable_derive::Serializable;
 use std::io::{Read, Write};
@@ -128,31 +128,30 @@ pub(crate) enum OamDmaAccess {
     PausedByHalt,
 }
 
+/// Stored as the variant's name and the destination (0 when there is none), like a derived enum.
 impl Serializable for OamDmaAccess {
     fn serialize(&self, writer: &mut dyn Write) -> std::io::Result<()> {
-        let (kind, destination) = match *self {
-            OamDmaAccess::Free => (0u8, 0u8),
-            OamDmaAccess::Running { destination } => (1, destination),
-            OamDmaAccess::PausedByHalt => (2, 0),
+        let (variant, destination) = match *self {
+            OamDmaAccess::Free => ("Free", 0u8),
+            OamDmaAccess::Running { destination } => ("Running", destination),
+            OamDmaAccess::PausedByHalt => ("PausedByHalt", 0),
         };
-        kind.serialize(writer)?;
+        write_name(writer, variant)?;
         destination.serialize(writer)
     }
 
     fn deserialize(&mut self, reader: &mut dyn Read) -> std::io::Result<()> {
-        let mut kind = 0u8;
+        let variant = read_name(reader)?;
         let mut destination = 0u8;
-        kind.deserialize(reader)?;
         destination.deserialize(reader)?;
-        *self = match kind {
-            0 => OamDmaAccess::Free,
-            1 => OamDmaAccess::Running { destination },
-            2 => OamDmaAccess::PausedByHalt,
+        *self = match variant.as_str() {
+            "Free" => OamDmaAccess::Free,
+            "Running" => OamDmaAccess::Running { destination },
+            "PausedByHalt" => OamDmaAccess::PausedByHalt,
             _ => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "unknown OAM DMA access state",
-                ));
+                return Err(unreadable_value(format!(
+                    "unknown OAM DMA access state {variant}"
+                )));
             }
         };
         Ok(())

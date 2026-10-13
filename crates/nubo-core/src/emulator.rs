@@ -7,7 +7,6 @@ use crate::error::{CheatError, LoadRomError};
 use crate::joypad::Key;
 use crate::model::Model;
 use crate::rom_archive;
-use serializable_derive::Serializable;
 use std::ops::Range;
 
 /// Where the cartridge header starts: the entry point the boot ROM jumps to.
@@ -30,7 +29,7 @@ const SGB_HEADER_END: usize = 0x0150;
 /// `--verify-boot`). Keep it that way: a hand-written `Debug` that leaves
 /// fields out, or state kept in a collection with an unpredictable order such
 /// as a `HashMap`, would make those checks miss differences.
-#[derive(Debug, Serializable)]
+#[derive(Debug)]
 pub struct Emulator {
     cpu: Cpu,
 }
@@ -317,5 +316,6 @@ impl Emulator {
 }
 
 mod save_state;
+pub use save_state::SaveStateHeader;
 #[cfg(test)]
 mod tests;

@@ -47,7 +47,9 @@ impl Error for LoadRomError {}
 pub enum SaveStateError {
     /// The data is not a Nubo save state, or it is damaged or cut off.
     InvalidFormat,
-    /// The save state was made by a version of Nubo that stores its data differently.
+    /// The save state is in another save state format: an older one, from
+    /// before values were stored with their names, or a newer one this
+    /// version can't read.
     IncompatibleVersion {
         /// The format version of the save state.
         found: u8,
@@ -76,10 +78,17 @@ impl fmt::Display for SaveStateError {
             Self::InvalidFormat => {
                 write!(f, "The provided save state file is in an invalid format.")
             }
+            Self::IncompatibleVersion { found, expected } if found > expected => write!(
+                f,
+                "The save state was made by a newer version of Nubo, which stores save states \
+                 in a format this version can't read. Update Nubo to load it. Save state \
+                 format: {found}, this version's format: {expected}."
+            ),
             Self::IncompatibleVersion { found, expected } => write!(
                 f,
-                "The save state was made by an incompatible version of Nubo. \
-                 Save state version: {found}, current version: {expected}."
+                "The save state was made by an early version of Nubo, whose save states \
+                 later versions can't read. Save state format: {found}, this version's \
+                 format: {expected}."
             ),
             Self::DifferentGame { found, expected } => write!(
                 f,

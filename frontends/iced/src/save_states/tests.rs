@@ -15,36 +15,36 @@ fn temporary_folder(name: &str) -> PathBuf {
     folder
 }
 
-fn state(model: Model, data: &[u8]) -> SaveState {
+/// A real save state of `model`, made after `steps` instructions so states
+/// made with different numbers differ.
+fn state(model: Model, steps: u32) -> SaveState {
+    let mut emulator = nubo_core::Emulator::new(model);
+    for _ in 0..steps {
+        emulator.step();
+    }
     SaveState {
         model,
-        data: data.to_vec(),
+        data: emulator.save_state(),
     }
 }
 
 #[test]
 fn a_saved_state_loads_with_its_model() {
     let directory = temporary_folder("round-trip");
-    let rom = Path::new("roms/Zelda.gbc");
+    let rom = Path::new("roms/Other.gbc");
+    let saved = state(Model::CgbE, 10);
 
-    save_in(
-        &directory,
-        rom,
-        Slot::Quick,
-        &state(Model::CgbE, b"\nstate\n"),
-        None,
-    )
-    .unwrap();
+    save_in(&directory, rom, Slot::Quick, &saved, None).unwrap();
     let loaded = load_in(&directory, rom, Slot::Quick).unwrap().unwrap();
 
     assert_eq!(loaded.model, Model::CgbE);
-    assert_eq!(loaded.data, b"\nstate\n");
+    assert_eq!(loaded.data, saved.data);
 }
 
 #[test]
 fn empty_slots_load_nothing() {
     let directory = temporary_folder("empty");
-    let rom = Path::new("roms/Tetris.gb");
+    let rom = Path::new("roms/Example.gb");
 
     assert!(
         load_in(&directory, rom, Slot::Numbered(2))
@@ -61,42 +61,42 @@ fn empty_slots_load_nothing() {
 #[test]
 fn slots_and_games_are_kept_apart() {
     let directory = temporary_folder("apart");
-    let tetris = Path::new("Tetris.gb");
-    let zelda = Path::new("Zelda.gb");
+    let example = Path::new("Example.gb");
+    let other = Path::new("Other.gb");
 
     save_in(
         &directory,
-        tetris,
+        example,
         Slot::Numbered(1),
-        &state(Model::Dmg, b"one"),
+        &state(Model::Dmg, 1),
         None,
     )
     .unwrap();
     save_in(
         &directory,
-        tetris,
+        example,
         Slot::Numbered(2),
-        &state(Model::Mgb, b"two"),
+        &state(Model::Mgb, 2),
         None,
     )
     .unwrap();
 
     assert_eq!(
-        load_in(&directory, tetris, Slot::Numbered(1))
+        load_in(&directory, example, Slot::Numbered(1))
             .unwrap()
             .unwrap()
-            .data,
-        b"one"
+            .model,
+        Model::Dmg
     );
     assert_eq!(
-        load_in(&directory, tetris, Slot::Numbered(2))
+        load_in(&directory, example, Slot::Numbered(2))
             .unwrap()
             .unwrap()
             .data,
-        b"two"
+        state(Model::Mgb, 2).data
     );
     assert!(
-        load_in(&directory, zelda, Slot::Numbered(1))
+        load_in(&directory, other, Slot::Numbered(1))
             .unwrap()
             .is_none()
     );
@@ -105,14 +105,14 @@ fn slots_and_games_are_kept_apart() {
 #[test]
 fn a_slot_with_a_picture_reports_it() {
     let directory = temporary_folder("picture");
-    let rom = Path::new("Tetris.gb");
+    let rom = Path::new("Example.gb");
     let pixels = vec![0xFF; 160 * 144 * 4];
 
     save_in(
         &directory,
         rom,
         Slot::Resume,
-        &state(Model::Dmg, b"x"),
+        &state(Model::Dmg, 0),
         Some(&pixels),
     )
     .unwrap();
@@ -125,54 +125,62 @@ fn a_slot_with_a_picture_reports_it() {
 #[test]
 fn other_files_are_rejected() {
     let directory = temporary_folder("invalid");
-    let rom = Path::new("Tetris.gb");
-    save_in(&directory, rom, Slot::Quick, &state(Model::Dmg, b"x"), None).unwrap();
-    let path = directory.join("Tetris.gb").join("quick.state");
-    fs::write(path, b"not a state").unwrap();
+    let rom = Path::new("Example.gb");
+    save_in(&directory, rom, Slot::Quick, &state(Model::Dmg, 0), None).unwrap();
+    let path = directory.join("Example.gb").join("quick.state");
+    fs::write(&path, b"not a state").unwrap();
+    assert_eq!(
+        load_in(&directory, rom, Slot::Quick).unwrap_err(),
+        "the file isn't a Nubo save state"
+    );
 
-    assert!(load_in(&directory, rom, Slot::Quick).is_err());
+    fs::write(&path, b"Nubo state DMG\nHEADER\x1b").unwrap();
+    assert!(
+        load_in(&directory, rom, Slot::Quick)
+            .unwrap_err()
+            .contains("Nubo 0.3.0 or earlier")
+    );
+}
+
+#[test]
+fn a_state_file_is_the_cores_save_state_as_it_is() {
+    let directory = temporary_folder("plain");
+    let rom = Path::new("Example.gb");
+    let saved = state(Model::CgbE, 3);
+    save_in(&directory, rom, Slot::Quick, &saved, None).unwrap();
+    assert_eq!(
+        fs::read(directory.join("Example.gb").join("quick.state")).unwrap(),
+        saved.data
+    );
 }
 
 #[test]
 fn a_state_kept_aside_survives_the_next_save_to_its_slot() {
     let directory = temporary_folder("kept");
-    let rom = Path::new("roms/Tetris.gb");
-    let folder = directory.join("Tetris.gb");
+    let rom = Path::new("roms/Example.gb");
+    let folder = directory.join("Example.gb");
     let pixels = vec![0; 160 * 144 * 4];
-    save_in(
-        &directory,
-        rom,
-        Slot::Resume,
-        &state(Model::Dmg, b"old"),
-        Some(&pixels),
-    )
-    .unwrap();
+    let (old, new) = (state(Model::Dmg, 1), state(Model::Dmg, 2));
+    save_in(&directory, rom, Slot::Resume, &old, Some(&pixels)).unwrap();
 
     let kept = keep_aside_in(&directory, rom, Slot::Resume).unwrap();
     assert_eq!(kept, folder.join("resume.kept-1.state"));
     assert!(folder.join("resume.kept-1.png").exists());
     assert!(load_in(&directory, rom, Slot::Resume).unwrap().is_none());
 
-    save_in(
-        &directory,
-        rom,
-        Slot::Resume,
-        &state(Model::Dmg, b"new"),
-        None,
-    )
-    .unwrap();
-    assert!(fs::read(&kept).unwrap().ends_with(b"old"));
+    save_in(&directory, rom, Slot::Resume, &new, None).unwrap();
+    assert_eq!(fs::read(&kept).unwrap(), old.data);
 
     let kept_again = keep_aside_in(&directory, rom, Slot::Resume).unwrap();
     assert_eq!(kept_again, folder.join("resume.kept-2.state"));
-    assert!(fs::read(&kept).unwrap().ends_with(b"old"));
-    assert!(fs::read(&kept_again).unwrap().ends_with(b"new"));
+    assert_eq!(fs::read(&kept).unwrap(), old.data);
+    assert_eq!(fs::read(&kept_again).unwrap(), new.data);
 }
 
 #[test]
 fn keeping_an_empty_slot_aside_fails() {
     let directory = temporary_folder("kept-empty");
-    assert!(keep_aside_in(&directory, Path::new("Tetris.gb"), Slot::Quick).is_err());
+    assert!(keep_aside_in(&directory, Path::new("Example.gb"), Slot::Quick).is_err());
 }
 
 #[test]

@@ -6,7 +6,7 @@
 //! per channel). The CPU reaches palette RAM through an index register (BCPS/OCPS) and a data
 //! register (BCPD/OCPD).
 
-use crate::serializable::Serializable;
+use crate::serializable::{FieldWriter, Serializable, read_fields};
 use crate::utils::is_bit_set;
 use std::io::{Read, Write};
 
@@ -136,25 +136,35 @@ impl Default for Palettes {
     }
 }
 
+/// Save states keep the palette registers and memory; the colors made from them are worked out
+/// again after loading.
 impl Serializable for Palettes {
     fn serialize(&self, writer: &mut dyn Write) -> std::io::Result<()> {
-        self.bgp.serialize(writer)?;
-        self.obp0.serialize(writer)?;
-        self.obp1.serialize(writer)?;
-        self.bg_palette_ram.serialize(writer)?;
-        self.object_palette_ram.serialize(writer)?;
-        self.cgb_bcps.serialize(writer)?;
-        self.cgb_ocps.serialize(writer)
+        let mut fields = FieldWriter::new(writer);
+        fields.field("bgp", &self.bgp)?;
+        fields.field("obp0", &self.obp0)?;
+        fields.field("obp1", &self.obp1)?;
+        fields.field("bg_palette_ram", &self.bg_palette_ram)?;
+        fields.field("object_palette_ram", &self.object_palette_ram)?;
+        fields.field("cgb_bcps", &self.cgb_bcps)?;
+        fields.field("cgb_ocps", &self.cgb_ocps)?;
+        fields.finish()
     }
 
     fn deserialize(&mut self, reader: &mut dyn Read) -> std::io::Result<()> {
-        self.bgp.deserialize(reader)?;
-        self.obp0.deserialize(reader)?;
-        self.obp1.deserialize(reader)?;
-        self.bg_palette_ram.deserialize(reader)?;
-        self.object_palette_ram.deserialize(reader)?;
-        self.cgb_bcps.deserialize(reader)?;
-        self.cgb_ocps.deserialize(reader)?;
+        read_fields(reader, |name, bytes| {
+            match name {
+                "bgp" => self.bgp.deserialize(bytes)?,
+                "obp0" => self.obp0.deserialize(bytes)?,
+                "obp1" => self.obp1.deserialize(bytes)?,
+                "bg_palette_ram" => self.bg_palette_ram.deserialize(bytes)?,
+                "object_palette_ram" => self.object_palette_ram.deserialize(bytes)?,
+                "cgb_bcps" => self.cgb_bcps.deserialize(bytes)?,
+                "cgb_ocps" => self.cgb_ocps.deserialize(bytes)?,
+                _ => return Ok(false),
+            }
+            Ok(true)
+        })?;
         self.bg_colors = rgba_colors(&self.bg_palette_ram);
         self.object_colors = rgba_colors(&self.object_palette_ram);
         Ok(())

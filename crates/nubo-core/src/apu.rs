@@ -95,7 +95,7 @@ use crate::apu::envelope::{Envelope, dac_enabled, envelope_period};
 use crate::apu::length::LengthCounter;
 use crate::clock::SYSTEM_COUNTER_TICKS_PER_M_CYCLE;
 use crate::model::Model;
-use crate::serializable::Serializable;
+use crate::serializable::{FieldWriter, Serializable, read_fields};
 use crate::utils::{is_bit_set, t_cycles_per_m_cycle};
 use serializable_derive::Serializable;
 use std::io::{self, Read, Write};
@@ -1475,48 +1475,50 @@ impl Serializable for Apu {
         if self.pending_cycles > 0 {
             return self.caught_up().serialize(writer);
         }
-        self.registers.serialize(writer)?;
-        self.state.serialize(writer)?;
-        self.cgb_double_speed.serialize(writer)?;
-        self.system_counter.serialize(writer)?;
-        self.late_div_events.serialize(writer)?;
-        self.pending_div_event.serialize(writer)?;
-        self.bus_address.serialize(writer)?;
-        self.sample_clock.serialize(writer)?;
-        for output in self
-            .previous_left_outputs
-            .iter()
-            .chain(&self.previous_right_outputs)
-        {
-            output.serialize(writer)?;
-        }
-        self.blep_left.serialize(writer)?;
-        self.blep_right.serialize(writer)?;
-        self.highpass_left_charge.serialize(writer)?;
-        self.highpass_right_charge.serialize(writer)
+        let mut fields = FieldWriter::new(writer);
+        fields.field("registers", &self.registers)?;
+        fields.field("state", &self.state)?;
+        fields.field("cgb_double_speed", &self.cgb_double_speed)?;
+        fields.field("system_counter", &self.system_counter)?;
+        fields.field("late_div_events", &self.late_div_events)?;
+        fields.field("pending_div_event", &self.pending_div_event)?;
+        fields.field("bus_address", &self.bus_address)?;
+        fields.field("sample_clock", &self.sample_clock)?;
+        fields.field_with("previous_left_outputs", |writer| {
+            write_levels(&self.previous_left_outputs, writer)
+        })?;
+        fields.field_with("previous_right_outputs", |writer| {
+            write_levels(&self.previous_right_outputs, writer)
+        })?;
+        fields.field("blep_left", &self.blep_left)?;
+        fields.field("blep_right", &self.blep_right)?;
+        fields.field("highpass_left_charge", &self.highpass_left_charge)?;
+        fields.field("highpass_right_charge", &self.highpass_right_charge)?;
+        fields.finish()
     }
 
     fn deserialize(&mut self, reader: &mut dyn Read) -> io::Result<()> {
         self.prepare_for_change();
-        self.registers.deserialize(reader)?;
-        self.state.deserialize(reader)?;
-        self.cgb_double_speed.deserialize(reader)?;
-        self.system_counter.deserialize(reader)?;
-        self.late_div_events.deserialize(reader)?;
-        self.pending_div_event.deserialize(reader)?;
-        self.bus_address.deserialize(reader)?;
-        self.sample_clock.deserialize(reader)?;
-        for output in self
-            .previous_left_outputs
-            .iter_mut()
-            .chain(&mut self.previous_right_outputs)
-        {
-            output.deserialize(reader)?;
-        }
-        self.blep_left.deserialize(reader)?;
-        self.blep_right.deserialize(reader)?;
-        self.highpass_left_charge.deserialize(reader)?;
-        self.highpass_right_charge.deserialize(reader)?;
+        read_fields(reader, |name, bytes| {
+            match name {
+                "registers" => self.registers.deserialize(bytes)?,
+                "state" => self.state.deserialize(bytes)?,
+                "cgb_double_speed" => self.cgb_double_speed.deserialize(bytes)?,
+                "system_counter" => self.system_counter.deserialize(bytes)?,
+                "late_div_events" => self.late_div_events.deserialize(bytes)?,
+                "pending_div_event" => self.pending_div_event.deserialize(bytes)?,
+                "bus_address" => self.bus_address.deserialize(bytes)?,
+                "sample_clock" => self.sample_clock.deserialize(bytes)?,
+                "previous_left_outputs" => read_levels(&mut self.previous_left_outputs, bytes)?,
+                "previous_right_outputs" => read_levels(&mut self.previous_right_outputs, bytes)?,
+                "blep_left" => self.blep_left.deserialize(bytes)?,
+                "blep_right" => self.blep_right.deserialize(bytes)?,
+                "highpass_left_charge" => self.highpass_left_charge.deserialize(bytes)?,
+                "highpass_right_charge" => self.highpass_right_charge.deserialize(bytes)?,
+                _ => return Ok(false),
+            }
+            Ok(true)
+        })?;
 
         self.state.validate()?;
         let levels_plausible = self
@@ -1539,6 +1541,18 @@ impl Serializable for Apu {
         self.previous_output_inputs = None;
         Ok(())
     }
+}
+
+/// Writes each channel's last mixed level.
+fn write_levels(levels: &[f32; CHANNEL_COUNT], writer: &mut dyn Write) -> io::Result<()> {
+    levels.iter().try_for_each(|level| level.serialize(writer))
+}
+
+/// Reads the levels `write_levels` wrote.
+fn read_levels(levels: &mut [f32; CHANNEL_COUNT], reader: &mut dyn Read) -> io::Result<()> {
+    levels
+        .iter_mut()
+        .try_for_each(|level| level.deserialize(reader))
 }
 
 #[cfg(test)]

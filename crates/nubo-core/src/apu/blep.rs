@@ -8,7 +8,7 @@
 //! buffer that spans the next `BLEP_WIDTH` output samples, and reading the
 //! buffer adds those impulses up into the output level.
 
-use crate::serializable::Serializable;
+use crate::serializable::{FieldWriter, Serializable, read_fields};
 use std::f64::consts::PI;
 use std::io::{self, Read, Write};
 use std::sync::LazyLock;
@@ -131,21 +131,34 @@ impl BlepBuffer {
 /// been.
 impl Serializable for BlepBuffer {
     fn serialize(&self, writer: &mut dyn Write) -> io::Result<()> {
-        for level in &self.buffer {
-            level.serialize(writer)?;
-        }
-        u8::try_from(self.position)
-            .expect("the position is below BLEP_WIDTH")
-            .serialize(writer)?;
-        self.accumulator.serialize(writer)
+        let mut fields = FieldWriter::new(writer);
+        fields.field_with("buffer", |writer| {
+            self.buffer
+                .iter()
+                .try_for_each(|level| level.serialize(writer))
+        })?;
+        fields.field(
+            "position",
+            &u8::try_from(self.position).expect("the position is below BLEP_WIDTH"),
+        )?;
+        fields.field("accumulator", &self.accumulator)?;
+        fields.finish()
     }
 
     fn deserialize(&mut self, reader: &mut dyn Read) -> io::Result<()> {
-        for level in &mut self.buffer {
-            level.deserialize(reader)?;
-        }
-        let mut position = 0u8;
-        position.deserialize(reader)?;
+        let mut position = u8::try_from(self.position).unwrap_or(u8::MAX);
+        read_fields(reader, |name, bytes| {
+            match name {
+                "buffer" => self
+                    .buffer
+                    .iter_mut()
+                    .try_for_each(|level| level.deserialize(bytes))?,
+                "position" => position.deserialize(bytes)?,
+                "accumulator" => self.accumulator.deserialize(bytes)?,
+                _ => return Ok(false),
+            }
+            Ok(true)
+        })?;
         if usize::from(position) >= BLEP_WIDTH {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -153,7 +166,6 @@ impl Serializable for BlepBuffer {
             ));
         }
         self.position = usize::from(position);
-        self.accumulator.deserialize(reader)?;
         let plausible = |level: &f32| level.abs() <= MAX_PLAUSIBLE_LEVEL;
         if self.buffer.iter().all(plausible) && plausible(&self.accumulator) {
             Ok(())
