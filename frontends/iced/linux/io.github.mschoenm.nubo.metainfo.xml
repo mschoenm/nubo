@@ -32,6 +32,9 @@
     </p>
   </description>
 
+  <!-- Linked by its address on main, so it only loads while the repository is
+       public. It shows a CC BY 4.0 homebrew game, credited in the description
+       above and in the README. -->
   <screenshots>
     <screenshot type="default">
       <image>https://raw.githubusercontent.com/mschoenm/nubo/main/images/flatpak/tobu-tobu-girl-deluxe.png</image>

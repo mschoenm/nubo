@@ -43,7 +43,8 @@ pub struct Serial {
     last_system_counter: u16,
     /// The internal serial clock. It toggles on each falling edge of the system counter bit
     /// selected by the clock speed and shifts a bit each time it falls, so a bit takes two of
-    /// those edges. Writing SC pulls it low.
+    /// those edges. Writing SC pulls it low. Because it is a flip-flop of its own rather than a
+    /// counter bit read directly, a transfer keeps its phase across DIV and SC writes.
     clock_high: bool,
     /// Set when a transfer completes, to request the serial interrupt.
     #[getset(get_copy = "pub(super)", set = "pub(super)")]

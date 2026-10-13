@@ -354,6 +354,11 @@ pub fn stored_layout(write: impl FnOnce() -> Result<()>) -> Result<BTreeSet<Stri
 /// module docs for what that allows).
 /// `deserialize` overwrites `self` in place, so a component keeps parts of its
 /// state that are not saved, such as the loaded ROM.
+///
+/// Fields that don't belong in a save state, such as caches and values that
+/// are always zero between `Emulator` calls, are marked
+/// `#[serializable(skip)]`, or left out of a hand-written implementation with
+/// a comment saying why.
 pub trait Serializable {
     /// Appends this value's bytes to `writer`.
     fn serialize(&self, writer: &mut dyn Write) -> Result<()>;

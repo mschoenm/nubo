@@ -133,7 +133,9 @@ fn bus_activity_difference(
 
 /// Runs one test: sets up the registers and memory, runs one instruction and
 /// compares the registers, the memory and the memory accesses with the
-/// expected ones.
+/// expected ones. The emulator runs in its CPU test mode
+/// (`Emulator::for_cpu_tests`), where the whole 64 KiB address space is
+/// plain RAM.
 fn run_cpu_test(test: &CpuTest) -> Result<(), String> {
     let mut emulator = Emulator::for_cpu_tests();
     let initial = &test.initial;

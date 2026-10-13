@@ -319,6 +319,9 @@ fn cpu_and_bus_fields(emulator: &mut Emulator) -> Vec<(String, String)> {
 /// loading one: the address bus's budgets for running ahead (see its
 /// `Serializable` implementation), the PPU's hand-over of the finished frame
 /// to the frontend, and the samples the APU already made for the frontend.
+/// The buttons the player holds and the sample rate are left out on purpose
+/// too (they belong to the player and the sound card, not the console), but
+/// both emulators here have the same ones, so they aren't listed.
 const FIELDS_NOT_IN_SAVE_STATES: [&str; 5] = [
     "address_bus.ppu_quiet_dots",
     "address_bus.deferral_budget",

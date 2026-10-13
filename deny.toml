@@ -12,7 +12,7 @@ unmaintained = "workspace"
 
 [licenses]
 # Licenses compatible with GPL-3.0-or-later, which Nubo is distributed under.
-# Never add GPL-2.0-only: Nubo can't take in code under it (see CLAUDE.md).
+# Never add GPL-2.0-only: Nubo can't take in code under it (see AGENTS.md).
 allow = [
     "0BSD",
     "Apache-2.0",

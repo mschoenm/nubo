@@ -2,9 +2,10 @@
 //!
 //! The boot ROM is the small program built into the console that shows the
 //! logo and then hands over to the cartridge. The emulator ships one custom
-//! boot ROM per family (Bootix for DMG models, a SameBoy-based one for CGB
-//! models), so when it finishes, these values make the CPU look as if the
-//! model's own boot ROM had run (checked by Mooneye's boot_regs tests).
+//! boot ROM per family (one based on Bootix for DMG models, one based on
+//! SameBoy's for CGB models), so when it finishes, these values make the CPU
+//! look as if the model's own boot ROM had run (checked by Mooneye's
+//! boot_regs tests).
 
 use crate::cpu::{CARRY_FLAG, Cpu, HALF_CARRY_FLAG, ZERO_FLAG};
 use crate::model::Model;

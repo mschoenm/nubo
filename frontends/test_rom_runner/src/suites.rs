@@ -691,7 +691,8 @@ fn acid() -> Vec<TestCase> {
 }
 
 /// Mealybug Tearoom's PPU (picture processing unit) tests, on every model
-/// that has a reference screenshot. CGB-E uses the CGB-D screenshots.
+/// that has a reference screenshot: DMG uses the DMG-blob screenshots, and
+/// CGB-E uses the CGB-D screenshots.
 fn mealybug_ppu(root: &Path) -> Vec<TestCase> {
     let screens = [
         (Model::Dmg, "dmg_blob"),

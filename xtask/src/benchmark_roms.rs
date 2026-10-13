@@ -19,6 +19,10 @@ struct BenchmarkRom {
 
 /// The games, chosen to load the emulator in different ways and licensed so
 /// anyone may use them.
+///
+/// `cargo save-states` keeps save states of these games, and a state only
+/// loads into the version of the game it was made with, so a game whose
+/// states are kept must stay here at the same version.
 const ROMS: [BenchmarkRom; 3] = [
     // Tobu Tobu Girl Deluxe by Tangram Games (MIT, assets CC BY 4.0): a
     // platformer that runs on both the Game Boy and the Game Boy Color.

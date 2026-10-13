@@ -136,7 +136,7 @@ Nubo doesn't emulate Super Game Boy commands, borders or palettes, so the class 
 
 ## Part 1: command-line options in the desktop app
 
-One pull request in this repository, following CLAUDE.md (doc comments, clippy, both clippy runs,
+One pull request in this repository, following AGENTS.md (doc comments, clippy, both clippy runs,
 `cargo test -p nubo`). All three options are desktop-only: the browser build must still compile and
 must ignore or leave them out.
 
@@ -163,15 +163,15 @@ must ignore or leave them out.
    - Report problems on stderr instead of in toasts.
 3. **`--speed <n>`**: start with fast forward on at `n`×, using the existing fast forward path. Check
    which speeds `FastForwardSpeed` allows.
-4. Document the options. Update the doc comment at the top of `main.rs`, the Iced paragraph and Build
-   Commands block in CLAUDE.md, and the README if it lists command-line options.
+4. Document the options. Update the doc comment at the top of `main.rs`, the commands in
+   `frontends/iced/AGENTS.md`, and the README if it lists command-line options.
 5. Add unit tests for `parse_args` (new options, missing or invalid values) and for the window size.
 
 A cloud session has no display, so the window itself can only be checked on a real desktop. Ask the
 maintainer to try `nubo.exe <rom> --scale 1 --fresh --speed 4` on Windows at 100% and 150% display
 scaling, and to take a screenshot of the window to confirm it is exactly 160×144.
 
-Then a release (see "Making a Release" in CLAUDE.md), because the harness downloads the latest one.
+Then a release (the `release` skill), because the harness downloads the latest one.
 Before releasing, Part 3 can use a locally built `nubo.exe` put in `emu/nubo/Nubo/` by hand.
 
 **Done when:** the three options are merged and documented, and a screenshot taken by hand shows a
@@ -379,9 +379,9 @@ counted on the published list, not on everything `main` runs.
    - **Threshold:** give `shootout.passed` none, like `test_roms_passed`. A drop already fails CI
      through `passing.txt`, and the column shows the trend.
    - **Tests:** cover the new line and column in `xtask/src/metrics/tests.rs`.
-7. **Docs.** In CLAUDE.md:
-   - the Test ROM Runner paragraph: the Shootout tests, the scoreboard and the summary line
-   - the nightly paragraph: the Shootout score in the metrics
+7. **Docs.**
+   - `frontends/test_rom_runner/AGENTS.md` and the runner's module docs: the Shootout tests, the scoreboard and the summary line
+   - `docs/CI.md`: the Shootout score in the metrics
 
    In the README: the test suite list.
 

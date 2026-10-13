@@ -6,7 +6,10 @@
 //! model and set of those bytes and starts the other ROMs that share them
 //! from a copy ([`Emulator::clone_with_rom`]). With `--verify-boot` every
 //! test runs the real boot ROM instead and checks that the copy would have
-//! been identical.
+//! been identical, which makes the whole run take about two and a half
+//! minutes instead of about 30 seconds. The core test
+//! `clone_with_rom_matches_a_real_boot` checks the same for every model, with
+//! ROMs that differ everywhere outside the header bytes the boot ROM reads.
 
 use crate::runner::{Progress, STALL_LIMIT};
 use crate::suites::Model;

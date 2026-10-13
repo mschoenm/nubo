@@ -5,6 +5,13 @@
 //! jumps to the game at 0x0100, after which it is unmapped. Nintendo's own
 //! boot ROMs are copyrighted, so Nubo ships free replacements that behave
 //! the same way.
+//!
+//! Their sources are in `boot_roms/` (`nubo_dmg.asm` and `nubo_cgb.asm`),
+//! built with RGBDS by `boot_roms/build.sh`, which writes the bytes into this
+//! file (see `boot_roms/README.md`). Both show the Nubo cloud and name, and
+//! both keep the timing and end state of the boot ROMs they replaced to the
+//! cycle, because the state the emulator is put in when the boot ROM hands
+//! over is calibrated against them.
 
 // Based on Bootix: https://github.com/Hacktix/Bootix, released into the public domain under
 // CC0-1.0. Built from boot_roms/nubo_dmg.asm (see boot_roms/README.md).

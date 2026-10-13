@@ -99,10 +99,12 @@ pub struct Settings {
     pub library_folders: Vec<LibraryFolder>,
     /// Whether to download box art for the library and show it on the
     /// cards. On until the player turns it off; the Settings page says
-    /// that it sends the games' names to the libretro servers.
+    /// that it sends the games' names to the libretro servers. It is on the
+    /// Library tab of the settings.
     pub download_box_art: bool,
     /// Whether leaving a game saves its state, so it continues there the
-    /// next time it starts. Off until the player turns it on.
+    /// next time it starts. Off until the player turns it on, in the
+    /// Playing section of the settings' General tab.
     pub resume_games: bool,
     pub fast_forward_speed: FastForwardSpeed,
     /// How loud to play, from 0 (silent) to 1 (as loud as the game).

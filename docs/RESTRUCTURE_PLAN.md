@@ -151,7 +151,7 @@ pacing can use too. A new frame is announced through a callback the app passes i
 `nubo-core`, `nubo-frontend` and the Iced app keep `unsafe_code = "forbid"`. The only exception this
 plan expects is the RetroArch core's exported C functions. They go in `frontends/nubo-libretro/src/ffi.rs`,
 with the crate's own lint table and the `unsafe` in as few places as possible (see the RetroArch plan).
-CLAUDE.md's style rule will say exactly that. Any later crate that binds Nubo to another language
+AGENTS.md's style rule will say exactly that. Any later crate that binds Nubo to another language
 follows the same rule.
 
 ## Options kept open
@@ -210,7 +210,7 @@ the Iced app's tests. The emulator doesn't change in any of them except step 2's
      `json_test_runner/src/download.rs` and `save_state_check/src/main.rs`.
    - **Anything else** a search for `frontends/` and the old folder names turns up.
    - **Docs:** `save-states/README.md`, the README (links to `passing.txt` and `FAILING_TESTS.md`),
-     CLAUDE.md, and the plans in `docs/`.
+     AGENTS.md, and the plans in `docs/`.
 5. **Nightly review:** its rotation remembers review dates by file path. Give `cargo xtask review-units`
    a way to carry dates over to renamed paths. For example, when it finds a path in the state that no
    longer exists, it looks it up with `git diff --name-status -M <last_commit> HEAD` and moves the
@@ -291,9 +291,9 @@ must not add wake-ups, buffers or frames.
 
 ### Step 7: finish the docs
 
-Each step keeps CLAUDE.md true as it goes. This step checks the whole picture:
+Each step keeps AGENTS.md true as it goes. This step checks the whole picture:
 
-- **CLAUDE.md:** the layout, `nubo-frontend`'s modules and features, the pacing, and the `unsafe` rule
+- **AGENTS.md:** the layout, `nubo-frontend`'s modules and features, the pacing, and the `unsafe` rule
   with its one exception.
 - **README:** where the app and tools live.
 - **`docs/NIGHTLY_REVIEW.md`:** any paths it names.

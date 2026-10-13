@@ -1,0 +1,29 @@
+# CI and nightly runs
+
+What runs where, and why. The checks to run yourself before pushing are listed in the root `AGENTS.md`.
+
+## Pull requests and main
+
+- CI (`.github/workflows/ci.yml`) runs `cargo test-roms`, together with `cargo cpu-tests` and `cargo save-states` (with the games cached), on every pull request and push to main, next to `cargo fmt --check`, both clippy runs (`--workspace --all-targets` and `-p nubo --target wasm32-unknown-unknown`) and `cargo doc` with warnings as errors, `cargo deny check licenses bans sources` (`deny.toml` allows only GPLv3-compatible licenses), `cargo test --workspace` on Linux and `cargo xtask build-web --quick`.
+- Pull requests should get their answer in a minute or two, so every CI job is meant to take about a minute, and anything slower goes in the nightly workflow, which every release runs too: a problem may reach main, but never a release.
+- `.github/workflows/platforms.yml` runs `cargo test --workspace` on macOS and Windows on every pull request next to CI, but "CI passed" doesn't wait for it, so it never holds up a merge: a failure shows on the pull request, and GitHub notifies whoever started the run.
+- A push to main that passes CI is built with the optimized `wasm-release` profile and published to GitHub Pages (`.github/workflows/deploy.yml`, a workflow of its own so pull requests don't list a deploy job that is always skipped for them).
+- Branch protection only requires the "CI passed" job, which needs all the others.
+
+## Nightly
+
+- The slow checks run nightly (`.github/workflows/nightly.yml`, at 22:17 UTC), together with CI itself, so whatever a new release of Rust or another dependency breaks shows up that night: `cargo test --workspace` on macOS and Windows (`platforms.yml`), `cargo test-roms --verify-boot`, `cargo benchmark --check-save-states` and the lazy-against-`eager` fingerprint comparison on all test ROMs (both split over several machines with `--shard`, from one build of the benchmark), `cargo deny check advisories`, the Flatpak build for x86_64 and ARM (`.github/workflows/flatpak.yml`, which plays a game in the installed Flatpak with `--measure-efficiency`, since the Flatpak is what Linux users get and nothing else runs it, and runs the newest Flathub linter on the AppStream file, unpinned so a nightly run fails as soon as Nubo couldn't be published on Flathub) and the Windows installer and zip (`.github/workflows/windows.yml`, which plays a game from the unpacked zip and from an installed Nubo, and uninstalls it again), both of which also run on pull requests that change how they are built or `Cargo.lock`, without holding them up.
+- Its `metrics` job starts once every other job has finished, so nothing else of the run is busy while it measures and every night is measured alike (only the checks are split over machines). It measures speed on the homebrew games of `cargo xtask benchmark-roms`, instructions per emulated second under cachegrind (steadier than time on shared machines), the efficiency harness and the build sizes, and writes them with every job's result to the repository's wiki (`metrics.jsonl` and the "Nightly metrics" page) together with the part the nightly review reads tonight.
+- Only scheduled runs write to the wiki, since the rotation counts the changes since the last run that did: a run started by hand would hide the day's changes from the review. Pushing to the wiki needs the `WIKI_TOKEN` secret; runs that don't push keep the files as their artifact.
+- At 02:07 Amsterdam time a Claude cloud routine follows `docs/NIGHTLY_REVIEW.md`: it reviews the day's changes and that part, fixes what is clearly better as long as every fingerprint stays the same, and opens a `claude/nightly-<date>` pull request, or an issue when something regressed.
+- Releases run the nightly workflow, CI included (see the `release` skill, `.claude/skills/release/SKILL.md`).
+
+## Nightly builds
+
+When a scheduled or hand-started nightly run passes and `main` has changed since the last one, `.github/workflows/nightly-build.yml` publishes its Flatpaks and Windows installer and zip as the `nightly` pre-release (named like `Nubo-nightly-<date>-linux-x86_64.flatpak` and `Nubo-nightly-<date>-windows-x64-setup.exe`), replacing the one before; it is the same app as the releases, so installing it with `--reinstall` replaces the installed version.
+
+## Toolchain and dependency updates
+
+Rust (the `stable` channel), crates, GitHub Actions (pinned to commits, which Dependabot moves to each release), and tools such as cargo-deny and Flathub's linter all follow their newest stable release, and never a pre-release unless nothing else works. When an update breaks something, the nightly run fails, and that is where it gets fixed. The exception is what others build from Nubo's source: the Flatpak is built with exactly what Flathub would build it with (Flathub's newest freedesktop runtime, its SDK's Rust and `Cargo.lock`), and its build fails when either moves on. Test data (the test ROMs, the benchmark games and the emulators compared against) stays pinned, since results and kept save states depend on its exact content.
+
+Rust follows the stable channel (`rust-toolchain.toml`), and Dependabot proposes new crates and actions (pinned to commits) every day. The Flatpak is built with the freedesktop SDK's Rust instead, as Flathub builds it, which can lag behind, so `rust-version` in the root `Cargo.toml` is that version for the crates the app is built from: clippy then rejects newer standard library items in pull requests. The Flatpak build prints the SDK's Rust and fails when it isn't `rust-version`, and fails when Flathub has a newer freedesktop runtime than `RUNTIME_VERSION` in `xtask/src/flatpak.rs`; both are then raised by hand.

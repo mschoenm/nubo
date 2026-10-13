@@ -43,7 +43,8 @@ fn display_name(path: &Path) -> String {
 }
 
 /// Opens the file picker and reads the chosen ROM, or returns `None` if the
-/// user cancels.
+/// user cancels. In the browser this is rfd's browser file picker, which
+/// hands over the file's bytes, since a web page can't open files by path.
 pub async fn pick() -> Option<Rom> {
     let file = rfd::AsyncFileDialog::new()
         .add_filter("Game Boy ROMs", &EXTENSIONS)

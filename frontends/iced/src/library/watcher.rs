@@ -1,6 +1,7 @@
 //! Watches the library folders, so games added to them (or removed from
 //! them) show up right away (desktop build). It uses the operating system's
-//! own change notifications, so it costs nothing while nothing changes.
+//! own change notifications, through `notify-debouncer-mini`, so it costs
+//! nothing while nothing changes.
 
 use super::WatchEvent;
 use crate::settings::LibraryFolder;

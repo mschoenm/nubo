@@ -21,6 +21,8 @@ pub const AVAILABLE: bool = cfg!(not(target_arch = "wasm32"));
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Slot {
     /// Written when the player leaves a game, and read when it starts again.
+    /// Only used while "Continue games where you left off" is on (see
+    /// `Settings::resume_games`).
     Resume,
     /// The slot the quick save and quick load keys use.
     Quick,

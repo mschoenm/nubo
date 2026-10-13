@@ -24,7 +24,7 @@ only has to:
    - The new crate doesn't use `[lints] workspace = true`. It copies the workspace's lint table, with
      `unsafe_code = "deny"`.
    - All `unsafe` stays in one module (`ffi.rs`) under `#[expect(unsafe_code, reason = "...")]`.
-   - The "No `unsafe` code" rule in CLAUDE.md names this one exception.
+   - The "No `unsafe`" rule in AGENTS.md names this one exception.
 
    A crate of libretro bindings wouldn't avoid this, because the exported functions are still
    `no_mangle`.
@@ -41,11 +41,11 @@ only has to:
   (`include/libretro.h`, MIT license) is the interface. Write the bindings by hand: the functions,
   structs and constants this core uses, in `ffi.rs`. No bindgen (it needs libclang) and no new
   dependency. Credit `libretro.h` at the top of the file, in `NOTICE` and in the README's Credits, as
-  CLAUDE.md asks for ported definitions.
+  AGENTS.md asks for ported definitions.
 - SameBoy's libretro core (`libretro/libretro.c` in [LIJI32/SameBoy](https://github.com/LIJI32/SameBoy),
   Expat license, already credited) is the closest example: a cycle-accurate Game Boy core with save RAM,
   RTC, memory maps for achievements and model options. Read it for how things are done, not to port.
-  Gambatte's libretro core is GPL-2.0-only: only look at what it does, never copy from it (CLAUDE.md).
+  Gambatte's libretro core is GPL-2.0-only: only look at what it does, never copy from it (AGENTS.md).
 - [rcheevos](https://github.com/RetroAchievements/rcheevos) `src/rc_libretro.c` and `rc_consoles.c`
   show how RetroAchievements finds Game Boy memory.
 - The [libretro docs](https://docs.libretro.com/development/cores/developing-cores/) cover the call
@@ -88,7 +88,7 @@ The plan was merged before those rounds ran out.
 4. Fix what Codex finds, push, and ask again. Repeat until a review comes back without findings and
    you agree with the plan too. A finding you disagree with gets an answer on its thread instead of a
    change.
-5. Merge it the usual way (CLAUDE.md, "Merging Pull Requests"). Phase 1 starts after that.
+5. Merge it the usual way (the `merge` skill). Phase 1 starts after that.
 
 **Done when:** a Codex review of the plan comes back clean, the maintainer has read the result, and it
 is merged.
@@ -127,7 +127,7 @@ before.
      instruction.
    - It must count time, not frames, because no frames come while the game has the screen off.
    - Calling `step()` in a loop would end the bulk shortcuts on every call (see "Lazy components,
-     exact results" in CLAUDE.md), so it has to be one call.
+     exact results" in AGENTS.md), so it has to be one call.
    - Today's audio queue is filled up to `MAX_AUDIO_BUFFER_SIZE` (512) samples. At 48 kHz one frame is
      about 804 samples, so check that nothing is dropped.
    - While the screen stays on, each run of 70,224 dots contains exactly one VBlank, so every call
@@ -340,8 +340,8 @@ RetroArch with a test account, and a rumble cartridge game (such as Pokémon Pin
 5. Document it:
    - In the README: how to install the core by hand (copy the library to RetroArch's `cores` folder and
      the info file to its `info` folder), and what it does and doesn't support.
-   - In CLAUDE.md: the crate in the Frontends list, `cargo xtask libretro` in Build Commands, and the
-     `unsafe` exception in Style Guidelines.
+   - In AGENTS.md: the crate in Where Things Are, `cargo xtask libretro` in `xtask/AGENTS.md`, and the
+     `unsafe` exception in Rules.
    - Add the release notes entry when the next version ships.
 
 **Done when:** a release has the core zips, and installing one by hand on Windows, Linux and macOS

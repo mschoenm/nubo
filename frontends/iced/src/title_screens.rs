@@ -1,6 +1,7 @@
 //! Pictures of each game's title screen for the library, made by running
-//! the game for a few seconds with no window or sound. No download or
-//! matching is needed, so every ROM gets one, even homebrew.
+//! the game for a few seconds with no window or sound, which takes about
+//! half a second per game. No download or matching is needed, so every ROM
+//! gets one, even homebrew.
 //!
 //! Games show logos and blank screens before their title, so a few moments
 //! are tried and the frame with the most detail is kept.

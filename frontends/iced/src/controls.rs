@@ -1,7 +1,8 @@
 //! The controls the player can change: which keyboard key and which
 //! controller button press each Game Boy button or app shortcut. Each action
 //! has at most one key and one controller button, and each key or button
-//! does at most one thing.
+//! does at most one thing. The controls are saved with the other settings
+//! in `settings.toml` (see `settings.rs`).
 
 use iced::keyboard::key::Code;
 use nubo_core::{ControllerButton, ControllerMapping, Key};

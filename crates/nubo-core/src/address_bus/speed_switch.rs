@@ -11,6 +11,13 @@
 //! Time here is counted in CPU clock units, four per M-cycle at either
 //! speed. A unit is one PPU dot at normal speed and half a dot at double
 //! speed.
+//!
+//! The switch follows SameBoy. DIV resets after STOP reads its second byte
+//! (`AddressBus::reset_divider_for_speed_switch`), double speed starts six
+//! units later, the PPU and OAM DMA freeze for a few units, and the CPU halts
+//! for 0x20008 units. The freeze lengths, and TIMA's jump ahead at the fast
+//! TAC speeds when DIV resets (`TimerRegisters::reset_divider_for_speed_switch`),
+//! are fitted to Gambatte's and AGE's hardware tests instead.
 
 use crate::address_bus::AddressBus;
 use crate::clock::dots_per_m_cycle;

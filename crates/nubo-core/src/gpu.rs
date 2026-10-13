@@ -12,6 +12,11 @@
 //! DMA and STOP affect the PPU (`access.rs`), the shortcuts that run many dots at once
 //! (`steady.rs`), save states (`save_state.rs`), and the renderer that produces the pixels in
 //! mode 3 (`pipeline.rs`).
+//!
+//! Which timing rules apply depends on the model and speed (`TimingVariant`). The start of each
+//! line (when STAT shows each mode, LY=LYC, the mode 0 and mode 2 interrupt sources, line 153)
+//! and the window's WY checks follow Gambatte's timing at both speeds, measured by comparing the
+//! CPU's register reads and writes and the interrupt requests in both emulators.
 
 pub use crate::gpu::palettes::DMG_SHADES;
 
@@ -29,8 +34,8 @@ use std::io::{Read, Write};
 
 /// Which part of the line the PPU is working on. The mode the CPU reads from STAT can differ
 /// from it for a few dots, so that is tracked separately in `Gpu::visible_mode`. Save states
-/// store a variant as its position in this list (`OamScan` is 0, `VBlank` 3), which isn't the
-/// mode number STAT shows for it.
+/// store a variant by its name. The order of the variants isn't the order of the mode numbers
+/// STAT shows for them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serializable)]
 enum LineState {
     OamScan,
@@ -301,7 +306,9 @@ pub struct Gpu {
 
     countdowns: Countdowns,
 
-    /// The last finished frame, copied from `frame_buffer` at the start of vblank.
+    /// The last finished frame, copied from `frame_buffer` at the start of vblank. Frontends pull
+    /// it when they are ready: `Emulator::frame_buffer` returns the latest frame, and
+    /// `Emulator::take_frame` returns it only once per new frame (see `frame_ready`).
     completed_frame: Vec<u8>,
 
     /// Set when `completed_frame` holds a frame the frontend hasn't taken yet.

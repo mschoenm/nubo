@@ -13,6 +13,12 @@ use std::str::FromStr;
 ///
 /// For the Super Game Boys only the differences in the Game Boy hardware are
 /// emulated, not their screen borders and color palettes.
+///
+/// The model is chosen when the emulator is made (`Emulator::new`). Each one
+/// leaves the boot ROM in its own state: the CPU registers in
+/// `cpu/post_boot.rs`, and the DIV phase, the PPU's place in the frame and
+/// the phase of the boot sound in `address_bus/boot_rom.rs`. Work RAM powers
+/// on with each model's own pattern (`power_on_work_ram` in `address_bus.rs`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Model {
     /// The first Game Boy CPU revision, found only in early Japanese units.

@@ -4,6 +4,18 @@
 //! register at 0xFF0F). If the same bit is set in IE (the interrupt enable
 //! register at 0xFFFF) and IME (the CPU's interrupt master enable) is on, the
 //! CPU pushes the program counter and jumps to that interrupt's handler.
+//!
+//! When the CPU looks for a pending interrupt:
+//!
+//! - While running, after it prefetches the next opcode
+//!   (`dispatch_interrupt_if_pending`).
+//! - HALT first spends one more M-cycle fetching the next opcode and only
+//!   then checks, which is also when the HALT bug can happen (`halt` in
+//!   `opcodes.rs`).
+//! - While halted, once per M-cycle like SameBoy: before the M-cycle on the
+//!   CGB and on the first halted M-cycle, halfway through it on the DMG. The
+//!   CPU finishes that M-cycle before it wakes up or jumps to the handler
+//!   (`halted_step`).
 
 use crate::clock::dots_per_m_cycle;
 use crate::cpu::{Cpu, InterruptMasterEnable, NextInstruction, RunState};

@@ -6,6 +6,10 @@
 //! [`Emulator::step_until_next_audio_buffer`] in a loop, play the returned
 //! audio, and draw [`Emulator::take_frame`] on screen. Player input goes in
 //! through [`Emulator::press_key`] and [`Emulator::set_controller_state`].
+//!
+//! The modules themselves are private: everything frontends need is
+//! re-exported here, from the crate root (`nubo_core::Emulator`,
+//! `nubo_core::Model`, ...).
 
 pub use crate::address_bus::cheats::{validate_gamegenie_code, validate_gameshark_code};
 pub use crate::address_bus::{CartridgeEffects, CartridgeHeader, NoSaves, RtcClock, RtcState};

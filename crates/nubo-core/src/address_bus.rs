@@ -36,6 +36,11 @@
 //! PPU and APU never left behind; `cargo benchmark --compare` between an eager
 //! and a normal build of the same commit shows whether the shortcuts change
 //! anything.
+//!
+//! Other components keep copies of the hardware's modes: CGB mode, double
+//! speed and the system counter behind DIV. Only the address bus's setters
+//! change them (such as `set_model`, `set_cgb_double_speed` and
+//! `reset_divider`), so every copy stays in step.
 
 use crate::address_bus::bank_utils::banked_read;
 use crate::address_bus::cartridge::{Cartridge, empty_cartridge};
@@ -235,7 +240,10 @@ pub struct AddressBus {
     /// Dots that have passed but that the PPU hasn't run yet. Running the PPU in
     /// one go is much faster than dot by dot, so it is left behind while nothing
     /// it does can be seen (what `Gpu::run_dots` returns), and catches up before
-    /// anything looks at it or changes it.
+    /// anything looks at it or changes it: CPU accesses that reach it
+    /// (`reaches_ppu`), OAM DMA, speed switches, entering and leaving STOP mode
+    /// and the boot ROM's exit. In STOP mode itself it is left behind like in
+    /// any other M-cycle (see `sync_stopped`).
     ppu_owed_dots: u32,
     /// How many dots the PPU may be owed before it could request an interrupt,
     /// deliver a frame or signal HBlank DMA, counted from where it last caught
@@ -915,7 +923,7 @@ impl AddressBus {
     /// read does around that (`cpu_read_byte`): M-cycles waiting to run and
     /// the PPU's owed dots aren't caught up first, and OAM DMA's bus conflicts
     /// don't apply. So callers must have caught the PPU up before peeking at
-    /// anything that reaches it (`reaches_ppu`).
+    /// anything that reaches it (`reaches_ppu`), which debug builds check.
     pub(crate) fn peek(&self, address: u16) -> u8 {
         debug_assert!(
             self.ppu_owed_dots == 0 || !reaches_ppu(address),
@@ -946,7 +954,7 @@ impl AddressBus {
     /// CPU write does around that (`cpu_write_cycle`): no M-cycle runs, the
     /// write lands on no particular dot and OAM DMA's bus conflicts don't
     /// apply. Like `peek`, it needs the PPU caught up for anything that
-    /// reaches it.
+    /// reaches it, which debug builds check.
     pub(crate) fn poke(&mut self, address: u16, value: u8) {
         debug_assert!(
             self.ppu_owed_dots == 0 || !reaches_ppu(address),

@@ -11,8 +11,8 @@
 //! - While the CPU runs, the M-cycles in which it only reads ROM or reads and
 //!   writes work RAM and HRAM are only counted (`AddressBus::sync`). They run
 //!   before the CPU touches anything else, before any M-cycle that needs more
-//!   than a plain step, and at the end of each call into the emulator, so
-//!   nothing outside the address bus sees them pending.
+//!   than a plain step (HALT and STOP among them), and at the end of each call
+//!   into the emulator, so nothing outside the address bus sees them pending.
 
 use crate::address_bus::AddressBus;
 use crate::clock::{SYSTEM_COUNTER_TICKS_PER_M_CYCLE, dots_per_m_cycle};
@@ -56,6 +56,11 @@ impl AddressBus {
     /// samples interrupts halfway through each M-cycle (a halted DMG), where the
     /// timers only run in the second half, so the serial port sees the system
     /// counter as it was before each M-cycle.
+    ///
+    /// The timers and the serial clock count the edges of their system
+    /// counter bits over the whole stretch, and the APU moves on with
+    /// `Apu::advance_cycles`, since no DIV-APU edge (the system counter bit
+    /// that clocks its frame sequencer) falls inside it.
     pub(crate) fn run_bulk_cycles(&mut self, cycles: u32, sampled_mid_cycle: bool) {
         if cycles == 0 {
             return;
