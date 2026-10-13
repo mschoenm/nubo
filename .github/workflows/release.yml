@@ -4,7 +4,7 @@ name: Release
 # included, builds the Flatpaks and the Windows installer and publishes a
 # GitHub release with them. Nothing is published unless every check passes;
 # the notes are read over in the release's pull request, before the tag.
-# "Making a release" in CLAUDE.md lists the steps.
+# The release skill (.claude/skills/release/SKILL.md) lists the steps.
 on:
   push:
     tags: ["v*"]
