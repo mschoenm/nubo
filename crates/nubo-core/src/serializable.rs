@@ -26,7 +26,7 @@
 //! variant only renamed in the code, store a field whose type changed under a
 //! new name, or keep a new set of states with `cargo save-states --record`,
 //! which later versions are checked against. (The check is in the
-//! save_state_check crate, which a plain `cargo test` doesn't build.)
+//! nubo-save-state-check crate, which a plain `cargo test` doesn't build.)
 //!
 //! A value that can't be read from its bytes, such as a variant a newer
 //! version added or a field whose size changed under the same name, keeps its
@@ -351,7 +351,7 @@ pub fn stored_layout(write: impl FnOnce() -> Result<()>) -> Result<BTreeSet<Stri
 /// A value that can be written to and read back from a save state.
 ///
 /// Most types get this with `#[derive(Serializable)]` from the
-/// `serializable_derive` crate, which stores each field with its name (see the
+/// `nubo-serializable-derive` crate, which stores each field with its name (see the
 /// module docs for what that allows).
 /// `deserialize` overwrites `self` in place, so a component keeps parts of its
 /// state that are not saved, such as the loaded ROM.
@@ -546,7 +546,7 @@ impl<T: Serializable + Default> Serializable for Option<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serializable_derive::Serializable;
+    use nubo_serializable_derive::Serializable;
 
     #[derive(Debug, Default, PartialEq, Serializable)]
     enum Mode {

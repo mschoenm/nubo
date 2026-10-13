@@ -30,7 +30,7 @@ cargo xtask metrics report metrics.jsonl   # Write the Nightly metrics wiki page
 
 - `wasm-bindgen` and `wasm-bindgen-cli-support` are pinned to the same exact version in the root `Cargo.toml`; upgrade them together.
 - The Flatpak is built with the freedesktop SDK's Rust and Flathub's newest runtime, as Flathub would build it; when either moves on, `rust-version` in the root `Cargo.toml` and `RUNTIME_VERSION` in `flatpak.rs` are raised by hand (see `docs/CI.md`).
-- `APP_ID` (`io.github.mschoenm.nubo`) names the Linux files, the macOS bundle and the window; the Windows installer's `AppId` in `frontends/iced/windows/nubo.iss` must never change.
+- `APP_ID` (`io.github.mschoenm.nubo`) names the Linux files, the macOS bundle and the window; the Windows installer's `AppId` in `frontends/nubo/windows/nubo.iss` must never change.
 - Every package carries `LICENSE`, `LICENSE-APACHE`, `NOTICE` and `THIRD_PARTY_LICENSES.txt`; the licenses task fails when a crate has no license text it can use.
 - The other emulators of `compare-emulators` are only built and run locally, never distributed or ported from (Gambatte is GPL-2.0-only).
 - Releases: the `release` skill. CI and nightly runs: `docs/CI.md`.

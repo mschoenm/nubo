@@ -5,7 +5,7 @@ description: Prepare and publish a new Nubo release - bump the version, write th
 
 # Making a release
 
-Release notes are written once, in the `<releases>` list of `frontends/iced/linux/io.github.mschoenm.nubo.metainfo.xml`, which Linux software centers and Flathub show; CI checks that its newest entry is the version in the root `Cargo.toml`.
+Release notes are written once, in the `<releases>` list of `frontends/nubo/linux/io.github.mschoenm.nubo.metainfo.xml`, which Linux software centers and Flathub show; CI checks that its newest entry is the version in the root `Cargo.toml`.
 
 1. **Open the release pull request.** Set `version` under `[workspace.package]` in the root `Cargo.toml` (every crate shares it; run `cargo build` to update `Cargo.lock`) and add a `<release version="..." date="YYYY-MM-DD">` with a `<description>` at the top of `<releases>`, dated the day of the release. Put the output of `cargo xtask release-notes v<version>` in the pull request's description: it shows the notes exactly as the GitHub release will, and the pull request is where they are read over, since the release is published without a draft.
 2. **Wait for the maintainer's go.** Show the maintainer the whole output of `cargo xtask release-notes` in the conversation, the Install section included, not only the AppStream entry, and wait until they have read it and said to go ahead.

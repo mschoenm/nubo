@@ -2,7 +2,7 @@
 //! installs Nubo for the current user (no administrator rights needed), with
 //! a Start menu entry, an uninstaller and optionally "Open with Nubo" for
 //! ROM files, and a zip of the same files to run without installing. The
-//! installer script is `frontends/iced/windows/nubo.iss`.
+//! installer script is `frontends/nubo/windows/nubo.iss`.
 
 use super::{Result, cargo, licenses, run, target_dir, workspace_root};
 use std::env;
@@ -12,7 +12,7 @@ use std::process::Command;
 
 const APP_NAME: &str = "Nubo";
 const EXECUTABLE: &str = "nubo";
-const INSTALLER_SCRIPT: &str = "frontends/iced/windows/nubo.iss";
+const INSTALLER_SCRIPT: &str = "frontends/nubo/windows/nubo.iss";
 /// Where Inno Setup's command line compiler is when it was installed with
 /// its own setup program.
 const INNO_SETUP_FOLDER: &str = "Inno Setup 6";

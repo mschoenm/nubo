@@ -56,11 +56,11 @@
       "type": "lldb",
       "request": "launch",
       "cargo": {
-        "args": ["build", "--package=json_test_runner", "--bin=json_test_runner"],
-        "filter": { "name": "json_test_runner", "kind": "bin" }
+        "args": ["build", "--package=nubo-json-test-runner", "--bin=nubo-json-test-runner"],
+        "filter": { "name": "nubo-json-test-runner", "kind": "bin" }
       },
       "args": [],
-      "cwd": "${workspaceFolder}/frontends/json_test_runner"
+      "cwd": "${workspaceFolder}/tools/nubo-json-test-runner"
     },
     {
       "name": "Web (Chrome)",

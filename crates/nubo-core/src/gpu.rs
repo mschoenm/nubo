@@ -29,7 +29,7 @@ use crate::gpu::pipeline::Pipeline;
 use crate::model::Model;
 use crate::serializable::{Serializable, read_name, unreadable_value, write_variant};
 use crate::utils::is_bit_set;
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 use std::io::{Read, Write};
 
 /// Which part of the line the PPU is working on. The mode the CPU reads from STAT can differ

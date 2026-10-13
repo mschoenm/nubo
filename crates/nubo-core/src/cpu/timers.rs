@@ -10,7 +10,7 @@ use crate::address_bus::MemoryMapped;
 use crate::clock::SYSTEM_COUNTER_TICKS_PER_M_CYCLE;
 use crate::model::Model;
 use crate::utils::falling_edges;
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 
 const TIMER_ENABLE_BIT: u8 = 0x04;
 const UNUSED_CONTROL_BITS: u8 = 0xF8;

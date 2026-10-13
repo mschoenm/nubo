@@ -19,7 +19,7 @@ use crate::address_bus::MemoryMapped;
 use crate::clock::SYSTEM_COUNTER_TICKS_PER_M_CYCLE;
 use crate::utils::{falling_edges, is_bit_set};
 use getset::{CopyGetters, Setters};
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 
 /// The serial port's state.
 #[derive(Debug, Clone, Default, Serializable, CopyGetters, Setters)]

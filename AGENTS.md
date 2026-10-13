@@ -11,7 +11,7 @@ You need the newest stable Rust, as `rust-toolchain.toml` asks (`rustup update`)
 ```bash
 cargo build / cargo test      # The core crates only (the workspace's default members)
 cargo test --workspace        # Every crate, frontends and xtask included
-cargo test-roms [filter]      # The test ROM suites, compared with frontends/test_rom_runner/passing.txt (about 30 s)
+cargo test-roms [filter]      # The test ROM suites, compared with tools/nubo-test-rom-runner/passing.txt (about 30 s)
 cargo cpu-tests               # Every CPU opcode, checked cycle by cycle
 cargo save-states             # The kept save states still load, and the stored layout is unchanged
 cargo play [rom] [--cgb | --model cgb-c]   # Run the desktop app (models: dmg-0, dmg, mgb, sgb, sgb2, cgb-0 to cgb-e, agb)
@@ -28,11 +28,11 @@ Run what CI runs, so a pull request is green the first time:
 3. `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items` (broken links in private docs fail CI too)
 4. `cargo test --workspace`
 5. If the Iced app changed: `cargo xtask build-web --quick`, as CI does; `cargo xtask web` serves it to look at in a browser.
-6. If emulation may have changed: `cargo test-roms`. When results change on purpose, run `cargo test-roms --update` and commit `passing.txt`; when a test in `frontends/test_rom_runner/FAILING_TESTS.md` starts passing, update that file too.
+6. If emulation may have changed: `cargo test-roms`. When results change on purpose, run `cargo test-roms --update` and commit `passing.txt`; when a test in `tools/nubo-test-rom-runner/FAILING_TESTS.md` starts passing, update that file too.
 7. If the CPU changed: `cargo cpu-tests`.
 8. If what save states store changed: `cargo save-states` (it needs the benchmark games: `cargo xtask benchmark-roms` once), and keep a new set with `cargo save-states --record` in the same pull request.
 9. If dependencies changed: `cargo deny check licenses bans sources`.
-10. If the change must not alter output (an optimization, a refactor): record fingerprints on a build without it (`git stash -u`, so new files go too), then compare with it. Do this on the benchmark games (`cargo xtask benchmark-roms`, then `cargo benchmark target/benchmark-roms --record before.txt` and later `--compare before.txt`) and on the test ROMs (`cargo benchmark target/test-roms/v7.0 --seconds 4 --jobs <cores>` with the same flags). For a change to the lazy components, also compare a normal build with an `eager` one (`frontends/benchmark/AGENTS.md`).
+10. If the change must not alter output (an optimization, a refactor): record fingerprints on a build without it (`git stash -u`, so new files go too), then compare with it. Do this on the benchmark games (`cargo xtask benchmark-roms`, then `cargo benchmark target/benchmark-roms --record before.txt` and later `--compare before.txt`) and on the test ROMs (`cargo benchmark target/test-roms/v7.0 --seconds 4 --jobs <cores>` with the same flags). For a change to the lazy components, also compare a normal build with an `eager` one (`tools/nubo-benchmark/AGENTS.md`).
 
 The slow checks run nightly. What runs where: `docs/CI.md`.
 
@@ -61,17 +61,17 @@ These keep Nubo exact, and players' saves safe. Never break them.
 
 ## Where Things Are
 
-The root `Cargo.toml` is a virtual workspace whose default members are `nubo-core` and `serializable_derive`, so `cargo build` and `cargo test` don't build the frontends or xtask.
+The root `Cargo.toml` is a virtual workspace whose default members are `nubo-core` and `nubo-serializable-derive`, so `cargo build` and `cargo test` don't build the apps, the tools or xtask. Libraries are in `crates/`, apps players use in `frontends/`, developer programs in `tools/`. Every package's name starts with `nubo` (except `xtask`), and every crate's folder is named after its package.
 
 - `crates/nubo-core/` (`AGENTS.md`): the emulator, a plain library with no platform dependencies. `Emulator` in `emulator.rs` is its API.
-- `crates/serializable_derive/`: the derive macro behind save states.
+- `crates/nubo-serializable-derive/`: the derive macro behind save states.
 - `crates/nubo-logo/`: the logo, drawn from rounded rectangles, for the app's icons.
-- `frontends/iced/` (`AGENTS.md`): the app, desktop and browser.
-- `frontends/test_rom_runner/` (`AGENTS.md`): `cargo test-roms`.
-- `frontends/json_test_runner/`: `cargo cpu-tests`.
-- `frontends/save_state_check/` (`AGENTS.md`): `cargo save-states`, and the kept sets in `save-states/`.
-- `frontends/benchmark/` (`AGENTS.md`): `cargo benchmark`.
-- `frontends/headless/`: `cargo screenshot`.
+- `frontends/nubo/` (`AGENTS.md`): the app, desktop and browser.
+- `tools/nubo-test-rom-runner/` (`AGENTS.md`): `cargo test-roms`.
+- `tools/nubo-json-test-runner/`: `cargo cpu-tests`.
+- `tools/nubo-save-state-check/` (`AGENTS.md`): `cargo save-states`, and the kept sets in `save-states/`.
+- `tools/nubo-benchmark/` (`AGENTS.md`): `cargo benchmark`.
+- `tools/nubo-headless/`: `cargo screenshot`.
 - `xtask/` (`AGENTS.md`): the web build, packaging, licenses, the emulator comparison and the nightly review's tools.
 
 ## Agent Instructions
@@ -80,7 +80,7 @@ Claude Code and Codex both read these `AGENTS.md` files; keep them the only inst
 
 ## More Documentation
 
-- `frontends/test_rom_runner/FAILING_TESTS.md`: every test that still fails, what was tried and what to try next.
+- `tools/nubo-test-rom-runner/FAILING_TESTS.md`: every test that still fails, what was tried and what to try next.
 - `docs/ACCURACY_PLAN.md`: the plan towards the most accurate emulator; update it when a phase moves on.
 - `docs/SHOOTOUT_PLAN.md`, `docs/RETROARCH_PLAN.md` and `docs/RESTRUCTURE_PLAN.md` (a shared `nubo-frontend` crate and a `tools/` folder, signed off, with the order of the work): plans for work not done yet; update them as their parts get done.
 - `docs/CI.md`: CI, the nightly run, nightly builds, toolchain updates.

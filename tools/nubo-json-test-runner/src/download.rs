@@ -72,7 +72,7 @@ fn work_dir() -> PathBuf {
     let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
         .nth(2)
-        .expect("the runner lives in frontends/json_test_runner");
+        .expect("the runner lives in tools/nubo-json-test-runner");
     let target_dir = env::var_os("CARGO_TARGET_DIR")
         .map_or_else(|| workspace_root.join("target"), PathBuf::from);
     target_dir.join("json-cpu-tests")

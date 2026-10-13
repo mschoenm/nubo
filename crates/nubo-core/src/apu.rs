@@ -97,7 +97,7 @@ use crate::clock::SYSTEM_COUNTER_TICKS_PER_M_CYCLE;
 use crate::model::Model;
 use crate::serializable::{FieldWriter, Serializable, array_encoding, read_fields};
 use crate::utils::{is_bit_set, t_cycles_per_m_cycle};
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 use std::io::{self, Read, Write};
 
 const CHANNEL_COUNT: usize = 4;

@@ -14,7 +14,7 @@
 
 use crate::apu::{Apu, Channel, triggers};
 use crate::model::Model;
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 
 /// One channel's length counter. All four channels use this same type; only
 /// their full length differs.

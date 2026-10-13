@@ -156,7 +156,7 @@ before.
    - Test: real time to emulated time and back, through a save state and through the `.rtc` layout,
      never freezes or jumps the clock.
 3. **Share the `.rtc` file layout.** Move `encode_rtc`/`decode_rtc` (17 bytes, in `battery.rs` of the
-   Iced app, `frontends/nubo` after the restructuring's step 1) into nubo-core, for example as
+   Iced app, `frontends/nubo`) into nubo-core, for example as
    `RtcState::to_bytes`/`from_bytes`. Battery saves can then
    move between the Nubo app and RetroArch: `.sav` and `.srm` are both the raw cartridge RAM.
 4. **Share the model rule and the palettes.** Done by step 2 of the restructuring plan:
@@ -232,7 +232,7 @@ before.
   sound and controls.
 - The `Core` unit tests pass (frame timing, samples per second, pixel conversion, input).
 - An FFI smoke test passes: an integration test calls the exported functions in RetroArch's order, with
-  test callbacks, on a test cartridge (see `frontends/save_state_check/src/cartridges.rs`), and checks
+  test callbacks, on a test cartridge (see `tools/nubo-save-state-check/src/cartridges.rs`), and checks
   that every `retro_run` sends one 160×144 frame and the right number of samples.
 
 ## Phase 3: saves, save states, options and cheats (one pull request)

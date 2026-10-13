@@ -7,7 +7,7 @@ The emulator itself: a plain Rust library with no platform dependencies and no C
 | Part | Files | Notes |
 |---|---|---|
 | Public API | `emulator.rs`, `error.rs` | `Emulator` owns the CPU, which owns the address bus and through it everything else |
-| Save states | `emulator/save_state.rs`, `serializable.rs`, `crates/serializable_derive/` | See Save States below |
+| Save states | `emulator/save_state.rs`, `serializable.rs`, `crates/nubo-serializable-derive/` | See Save States below |
 | Hardware models | `model.rs`, `cpu/post_boot.rs`, `address_bus/boot_rom.rs` | DMG-0 to AGB, ordered like SameBoy's model numbers |
 | Time | `clock.rs` | How M-cycles, PPU dots and the system counter behind DIV relate, at both speeds |
 | CPU | `cpu.rs`, `cpu/` | Instructions, interrupts, HALT, STOP, timers |
@@ -42,7 +42,7 @@ Players must never lose a save state to an update. The format is in `emulator/sa
   - The PPU (`gpu/save_state.rs`): its macro stores each field under its Rust name, so renaming a stored PPU field changes its stored name. Don't, unless you first teach the macro to keep the old one (for example, let the `saved:` list take `field as "stored_name"` and write that text instead of `stringify!`). `cargo test --workspace` and `cargo save-states` catch the changed layout either way.
 - Values are fixed-size and little-endian, never `usize`, and floats are stored as their IEEE 754 bits, so a state loads on every platform.
 - Caches, and values that are always zero between `Emulator` calls, are left out with `#[serializable(skip)]` (or with a comment in a hand-written implementation).
-- When what save states store changes, `cargo test --workspace` and `cargo save-states` fail and list what was added and removed (the check is in `frontends/save_state_check`, which a plain `cargo test` doesn't build); keep a new set with `cargo save-states --record` in the same pull request (see `frontends/save_state_check/AGENTS.md`).
+- When what save states store changes, `cargo test --workspace` and `cargo save-states` fail and list what was added and removed (the check is in `tools/nubo-save-state-check`, which a plain `cargo test` doesn't build); keep a new set with `cargo save-states --record` in the same pull request (see `tools/nubo-save-state-check/AGENTS.md`).
 - A loaded state must go on exactly like the run it was saved from. `a_loaded_state_restores_every_field_of_the_cpu_the_address_bus_the_ppu_and_the_apu` (in `emulator/tests.rs`, with the fields left out on purpose) and `cargo benchmark --check-save-states` catch a field that is missed.
 - The PPU and APU check every loaded value a damaged state could index or overflow with, and a failed load leaves the emulator untouched: input from players never makes the core panic.
 

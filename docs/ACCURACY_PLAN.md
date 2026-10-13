@@ -5,7 +5,7 @@ it would take to claim that honestly: what the claim has to mean, where Nubo sta
 in the order it should happen. Update it as phases finish.
 
 Status on 2026-10-13: `cargo test-roms` passes 6526 of 6557 tests on 12 hardware models, and
-[FAILING_TESTS.md](../frontends/test_rom_runner/FAILING_TESTS.md) explains the other 31. That makes Nubo
+[FAILING_TESTS.md](../tools/nubo-test-rom-runner/FAILING_TESTS.md) explains the other 31. That makes Nubo
 one of the strongest emulators on public test ROMs, but nobody can verify a "most accurate" claim yet:
 other emulators haven't been run on the same tests, nothing has been checked on a real console, and some
 hardware isn't emulated at all.
@@ -90,7 +90,7 @@ suite where another emulator beats Nubo goes into Phase 2.
 
 ## Phase 2: fix the remaining failures
 
-From [FAILING_TESTS.md](../frontends/test_rom_runner/FAILING_TESTS.md), in order of how likely a fix is
+From [FAILING_TESTS.md](../tools/nubo-test-rom-runner/FAILING_TESTS.md), in order of how likely a fix is
 without hardware:
 
 | Tests | Group | Next step |

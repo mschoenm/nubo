@@ -7,7 +7,7 @@
 use crate::address_bus::{AddressBus, MemoryMapped};
 use crate::utils::is_bit_set;
 use getset::{CopyGetters, Setters};
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 
 /// How a VRAM DMA transfer is paced.
 #[derive(Serializable, Debug, Clone, Copy, PartialEq, Eq)]

@@ -7,7 +7,7 @@ use crate::address_bus::constants::{
     CART_TYPE_MBC5_RAM, CART_TYPE_MBC5_RAM_BATTERY, CART_TYPE_MBC5_RUMBLE,
     CART_TYPE_MBC5_RUMBLE_RAM, CART_TYPE_MBC5_RUMBLE_RAM_BATTERY, RAM_BANK_SIZE,
 };
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 
 /// The registers of an MBC5, with or without RAM and rumble.
 #[derive(Debug, Serializable)]

@@ -21,7 +21,7 @@ const MINIMUM_SIZE: (f32, f32) = (480.0, 420.0);
 const WINDOW_ICON_SIZE: u32 = 256;
 /// The name Linux desktops match the window to the app's menu entry by. GNOME
 /// on Wayland ignores the window icon and shows the entry's icon instead. The
-/// Flatpak's menu entry (`frontends/iced/linux/`) is named after the same id.
+/// Flatpak's menu entry (`frontends/nubo/linux/`) is named after the same id.
 #[cfg(target_os = "linux")]
 const APPLICATION_ID: &str = "io.github.mschoenm.nubo";
 

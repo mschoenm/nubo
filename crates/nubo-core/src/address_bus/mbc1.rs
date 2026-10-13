@@ -8,7 +8,7 @@ use crate::address_bus::bank_utils::{banked_read, banked_write};
 use crate::address_bus::constants::{
     CART_TYPE_MBC1_RAM, CART_TYPE_MBC1_RAM_BATTERY, RAM_BANK_SIZE,
 };
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 
 /// What BANK2 is used for, chosen by writing to 0x6000-0x7FFF.
 #[derive(Debug, PartialEq, Serializable)]

@@ -1,6 +1,6 @@
 # Plan: restructuring the repository
 
-**Status: signed off by the maintainer on 2026-10-13. No step has been done yet.**
+**Status: signed off by the maintainer on 2026-10-13. Step 1 is done.**
 
 ## What is planned and what is only kept possible
 
@@ -186,6 +186,8 @@ Each step is one pull request. Each must pass the full CI and leave every finger
 the Iced app's tests. The emulator doesn't change in any of them except step 2's added method.
 
 ### Step 1: tools to `tools/`, the `nubo` prefix and folders named after packages
+
+**Done.**
 
 1. Move `benchmark`, `headless`, `json_test_runner`, `save_state_check` and `test_rom_runner` from
    `frontends/` to `tools/`, each in a folder named after its package (see the table above).
