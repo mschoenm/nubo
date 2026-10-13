@@ -3,10 +3,15 @@ description: >-
   Restores the test ROMs and JSON CPU tests the runners download. They are
   pinned and checksummed, so the cache only changes when the pins do. Every
   workflow uses this one key, so the nightly runs reuse what CI downloaded.
+outputs:
+  cache-hit:
+    description: Whether the cache had the test ROMs
+    value: ${{ steps.cache.outputs.cache-hit }}
 runs:
   using: composite
   steps:
     - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      id: cache
       with:
         path: |
           target/test-roms/v*

@@ -154,6 +154,9 @@ fn manifest_contents() -> Value {
                 },
             },
             "build-commands": [
+                // The SDK's Rust, not the one rust-toolchain.toml pins, builds
+                // the app; `rust-version` in Cargo.toml must not be newer.
+                "rustc --version",
                 format!("cargo build --release --locked --package {EXECUTABLE}"),
                 format!("install -D --mode 755 target/release/{EXECUTABLE} /app/bin/{EXECUTABLE}"),
                 format!(

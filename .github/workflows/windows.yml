@@ -2,12 +2,15 @@ name: Windows
 
 # Builds the Windows installer and zip with `cargo xtask windows` (Inno Setup
 # comes with GitHub's Windows runners). Runs on pull requests that change
-# how they are built, every night, and for releases, which attach the files
-# it makes.
+# how they are built, the crates or the Rust version they are built with
+# (Dependabot's updates), every night, and for releases, which attach the
+# files it makes. It isn't one of the checks that pull requests wait for.
 on:
   pull_request:
     paths:
       - .github/workflows/windows.yml
+      - Cargo.lock
+      - rust-toolchain.toml
       - xtask/src/windows.rs
       - xtask/src/licenses.rs
       - frontends/iced/windows/**

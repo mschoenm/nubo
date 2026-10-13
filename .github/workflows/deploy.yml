@@ -1,8 +1,9 @@
 name: Deploy
 
-# Publishes the web version CI built, once CI has passed for a push to main.
-# A workflow of its own so pull requests don't list a deploy job that is
-# always skipped for them.
+# Builds the web version with the optimized wasm-release profile and
+# publishes it to GitHub Pages, once CI has passed for a push to main. CI
+# itself only checks a quick build, so it stays fast; a workflow of its own
+# so pull requests don't list a deploy job that is always skipped for them.
 on:
   workflow_run:
     workflows: [CI]
@@ -12,34 +13,51 @@ on:
 permissions:
   contents: read
 
+# One deployment at a time, in the order main changed: a push that comes in
+# while one deploys waits, and only the newest waiting one goes on.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
+  build:
+    name: Build the web version
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Install Rust
+        run: rustup toolchain install && rustup target add wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: web-release
+
+      - name: Build the web version
+        run: cargo xtask build-web
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: target/web
+
   deploy:
     name: Deploy to GitHub Pages
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      actions: read
       pages: write
       id-token: write
-    concurrency:
-      group: pages
-      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Download the web version from the CI run
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: web
-          path: web
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ github.token }}
-
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: web
-
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

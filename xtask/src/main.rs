@@ -12,7 +12,12 @@ use std::process::{Command, ExitCode};
 use wasm_bindgen_cli_support::Bindgen;
 
 const WASM_TARGET: &str = "wasm32-unknown-unknown";
+/// The profile the published web version is built with: optimized across all
+/// crates, which makes it smaller and faster but takes a while.
 const WASM_PROFILE: &str = "wasm-release";
+/// The profile `--quick` builds the web version with, a fraction of the time
+/// of `WASM_PROFILE`; CI uses it to check that the browser build works.
+const QUICK_WASM_PROFILE: &str = "release";
 const ICED_PACKAGE: &str = "nubo";
 const ICED_ARTIFACT: &str = "nubo.wasm";
 const WEB_ADDRESS: &str = "127.0.0.1:8080";
@@ -28,8 +33,10 @@ const USAGE: &str = "\
 Usage: cargo xtask <command>
 
 Commands:
-  web           Build the Iced frontend for the browser and serve it at http://127.0.0.1:8080
-  build-web     Build the Iced frontend for the browser into target/web, ready to publish
+  web [--quick] Build the Iced frontend for the browser and serve it at http://127.0.0.1:8080
+  build-web [--quick]
+                Build the Iced frontend for the browser into target/web, ready to publish;
+                --quick builds it much faster, but bigger and slower to run
   bundle        Build Nubo.app, the macOS app with its icon, into target/bundle (macOS only)
   flatpak       Build the desktop app as a Flatpak, install it for this user and write it into
                 target/bundle as a .flatpak file to share (Linux with flatpak-builder only)
@@ -147,15 +154,16 @@ fn ensure_wasm_target() -> Result {
     }
 }
 
-/// Builds `package` for WebAssembly and returns the path of the `.wasm` file.
-fn build_wasm_package(package: &str, artifact: &str) -> Result<PathBuf> {
+/// Builds `package` for WebAssembly with the cargo profile `profile` and
+/// returns the path of the `.wasm` file.
+fn build_wasm_package(package: &str, artifact: &str, profile: &str) -> Result<PathBuf> {
     ensure_wasm_target()?;
 
     run(cargo()
         .args([
             "build",
             "--profile",
-            WASM_PROFILE,
+            profile,
             "--package",
             package,
             "--target",
@@ -163,16 +171,19 @@ fn build_wasm_package(package: &str, artifact: &str) -> Result<PathBuf> {
         ])
         .current_dir(workspace_root()))?;
 
-    Ok(target_dir()
-        .join(WASM_TARGET)
-        .join(WASM_PROFILE)
-        .join(artifact))
+    Ok(target_dir().join(WASM_TARGET).join(profile).join(artifact))
 }
 
 /// Builds the Iced frontend for WebAssembly next to its `index.html` and the
-/// license files, and returns the directory to serve.
-fn build_iced_web() -> Result<PathBuf> {
-    let input = build_wasm_package(ICED_PACKAGE, ICED_ARTIFACT)?;
+/// license files, and returns the directory to serve. `options` are the
+/// command's arguments: `--quick` builds with `QUICK_WASM_PROFILE`.
+fn build_iced_web(options: &[String]) -> Result<PathBuf> {
+    let profile = match options {
+        [] => WASM_PROFILE,
+        [quick] if quick == "--quick" => QUICK_WASM_PROFILE,
+        _ => return Err(format!("unknown options {}\n\n{USAGE}", options.join(" "))),
+    };
+    let input = build_wasm_package(ICED_PACKAGE, ICED_ARTIFACT, profile)?;
     let output_dir = target_dir().join("web");
     // Start from an empty folder, so files from older builds aren't published.
     if output_dir.exists() {
@@ -273,10 +284,11 @@ fn content_type(path: &Path) -> &'static str {
 
 fn main() -> ExitCode {
     let command = env::args().nth(1);
+    let options: Vec<String> = env::args().skip(2).collect();
 
     let result = match command.as_deref() {
-        Some("web") => build_iced_web().and_then(|root| serve(&root)),
-        Some("build-web") => build_iced_web().map(|root| {
+        Some("web") => build_iced_web(&options).and_then(|root| serve(&root)),
+        Some("build-web") => build_iced_web(&options).map(|root| {
             println!("Built the web version in {}", root.display());
         }),
         Some("bundle") => bundle::build_app_bundle().map(|app| {
@@ -317,11 +329,9 @@ fn main() -> ExitCode {
         Some("benchmark-roms") => benchmark_roms::ensure_benchmark_roms().map(|folder| {
             println!("The benchmark games are in {}", folder.display());
         }),
-        Some("compare-emulators") => {
-            compare_emulators::run_comparison(&env::args().skip(2).collect::<Vec<_>>())
-        }
-        Some("review-units") => review_units::run(&env::args().skip(2).collect::<Vec<_>>()),
-        Some("metrics") => metrics::run(&env::args().skip(2).collect::<Vec<_>>()),
+        Some("compare-emulators") => compare_emulators::run_comparison(&options),
+        Some("review-units") => review_units::run(&options),
+        Some("metrics") => metrics::run(&options),
         Some("help") | None => {
             println!("{USAGE}");
             Ok(())
