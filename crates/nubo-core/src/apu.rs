@@ -95,7 +95,7 @@ use crate::apu::envelope::{Envelope, dac_enabled, envelope_period};
 use crate::apu::length::LengthCounter;
 use crate::clock::SYSTEM_COUNTER_TICKS_PER_M_CYCLE;
 use crate::model::Model;
-use crate::serializable::{FieldWriter, Serializable, read_fields};
+use crate::serializable::{FieldWriter, Serializable, array_encoding, read_fields};
 use crate::utils::{is_bit_set, t_cycles_per_m_cycle};
 use serializable_derive::Serializable;
 use std::io::{self, Read, Write};
@@ -1484,10 +1484,10 @@ impl Serializable for Apu {
         fields.field("pending_div_event", &self.pending_div_event)?;
         fields.field("bus_address", &self.bus_address)?;
         fields.field("sample_clock", &self.sample_clock)?;
-        fields.field_with("previous_left_outputs", |writer| {
+        fields.field_with("previous_left_outputs", levels_encoding, |writer| {
             write_levels(&self.previous_left_outputs, writer)
         })?;
-        fields.field_with("previous_right_outputs", |writer| {
+        fields.field_with("previous_right_outputs", levels_encoding, |writer| {
             write_levels(&self.previous_right_outputs, writer)
         })?;
         fields.field("blep_left", &self.blep_left)?;
@@ -1546,6 +1546,11 @@ impl Serializable for Apu {
 /// Writes each channel's last mixed level.
 fn write_levels(levels: &[f32; CHANNEL_COUNT], writer: &mut dyn Write) -> io::Result<()> {
     levels.iter().try_for_each(|level| level.serialize(writer))
+}
+
+/// How `write_levels` stores the levels.
+fn levels_encoding() -> String {
+    array_encoding::<f32>(CHANNEL_COUNT)
 }
 
 /// Reads the levels `write_levels` wrote.

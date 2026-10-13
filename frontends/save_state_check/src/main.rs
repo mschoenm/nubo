@@ -4,8 +4,8 @@
 //! `save-states/` in the repository keeps sets of states, each made by Nubo
 //! on the day its folder is named after, of the test cartridges in
 //! `cartridges.rs` and three free homebrew games. A new set is only needed
-//! when what save states store changes (their layout: every field, and every
-//! variant of every enum value): the check fails when this version's layout
+//! when what save states store changes (their layout: every field with how
+//! its value is stored, and every variant of every enum value): the check fails when this version's layout
 //! isn't the one the newest set lists, and `cargo save-states --record` then
 //! adds a set. Every state of every set must load into this version without a
 //! value it can't read, and play on.
@@ -302,9 +302,10 @@ fn layout_changed(newest: &Path, kept: &BTreeSet<String>, layout: &BTreeSet<Stri
     }
     message.push_str(
         "If a field or variant was only renamed in the code, keep the name it is stored \
-         under with #[serializable(name = \"...\")] instead (see serializable.rs). Otherwise \
-         run cargo save-states --record and commit the new set, so later versions are \
-         checked against states of this one.",
+         under with #[serializable(name = \"...\")] instead, and store a field whose type \
+         changed under a new name (see serializable.rs). Otherwise run cargo save-states \
+         --record and commit the new set, so later versions are checked against states of \
+         this one.",
     );
     message
 }

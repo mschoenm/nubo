@@ -156,6 +156,10 @@ impl Serializable for OamDmaAccess {
         };
         Ok(())
     }
+
+    fn encoding() -> String {
+        String::from("variant and u8")
+    }
 }
 
 /// The PPU: its registers, VRAM, OAM, palettes, the line timeline and the frame buffers.

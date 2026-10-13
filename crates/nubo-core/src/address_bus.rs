@@ -1050,19 +1050,23 @@ impl AddressBus {
             "only set during a block copy"
         );
         debug_assert!(!self.ppu_eager, "only set during a write's M-cycle");
-        fields.field_with("bus", |writer| {
-            let mut bus = FieldWriter::new(writer);
-            bus.field("in_boot_rom", &self.in_boot_rom)?;
-            bus.field("work_ram", &*self.working_ram)?;
-            bus.field("high_ram", &self.zero_page_ram)?;
-            bus.field("svbk", &self.svbk)?;
-            bus.field("interrupt_enable", &self.interrupt_enable)?;
-            bus.field("undocumented_registers", &self.undocumented_registers)?;
-            bus.field("extra_oam", &self.extra_oam)?;
-            bus.field("elapsed_dots", &self.elapsed_dots)?;
-            bus.field("ppu_dot_debt", &self.ppu_dot_debt)?;
-            bus.finish()
-        })?;
+        fields.field_with(
+            "bus",
+            || String::from("fields"),
+            |writer| {
+                let mut bus = FieldWriter::new(writer);
+                bus.field("in_boot_rom", &self.in_boot_rom)?;
+                bus.field("work_ram", &*self.working_ram)?;
+                bus.field("high_ram", &self.zero_page_ram)?;
+                bus.field("svbk", &self.svbk)?;
+                bus.field("interrupt_enable", &self.interrupt_enable)?;
+                bus.field("undocumented_registers", &self.undocumented_registers)?;
+                bus.field("extra_oam", &self.extra_oam)?;
+                bus.field("elapsed_dots", &self.elapsed_dots)?;
+                bus.field("ppu_dot_debt", &self.ppu_dot_debt)?;
+                bus.finish()
+            },
+        )?;
         fields.field("cartridge", &self.cartridge)?;
         fields.field("timers", &self.timers)?;
         if self.ppu_owed_dots > 0 {

@@ -8,7 +8,7 @@
 //! buffer that spans the next `BLEP_WIDTH` output samples, and reading the
 //! buffer adds those impulses up into the output level.
 
-use crate::serializable::{FieldWriter, Serializable, read_fields};
+use crate::serializable::{FieldWriter, Serializable, array_encoding, read_fields};
 use std::f64::consts::PI;
 use std::io::{self, Read, Write};
 use std::sync::LazyLock;
@@ -132,7 +132,8 @@ impl BlepBuffer {
 impl Serializable for BlepBuffer {
     fn serialize(&self, writer: &mut dyn Write) -> io::Result<()> {
         let mut fields = FieldWriter::new(writer);
-        fields.field_with("buffer", |writer| {
+        let buffer_encoding = || array_encoding::<f32>(self.buffer.len());
+        fields.field_with("buffer", buffer_encoding, |writer| {
             self.buffer
                 .iter()
                 .try_for_each(|level| level.serialize(writer))

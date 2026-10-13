@@ -717,7 +717,7 @@ mod tests {
         assert_eq!(mbc5.rom_banks(), [0, 1]);
 
         let layout = crate::serializable::stored_layout(|| mbc1.serialize(&mut std::io::sink()));
-        assert!(layout.unwrap().contains("mapper.mbc1.bank1"));
+        assert!(layout.unwrap().contains("mapper.mbc1.bank1: u8"));
     }
 
     /// Cartridge effects that load `ram` as the game's save.

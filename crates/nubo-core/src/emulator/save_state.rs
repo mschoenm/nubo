@@ -74,7 +74,7 @@ impl SaveStateHeader {
     fn write(&self, writer: &mut dyn Write) -> io::Result<()> {
         let mut fields = FieldWriter::new(writer);
         fields.field("nubo_version", &self.nubo_version)?;
-        fields.field_with("model", |writer| {
+        fields.field_with("model", String::encoding, |writer| {
             note_variants(&Model::ALL.map(Model::name));
             String::from(self.model.name()).serialize(writer)
         })?;
@@ -382,7 +382,7 @@ mod tests {
         let paths = emulator_with_game().save_state_layout();
         let components: std::collections::BTreeSet<&str> = paths
             .iter()
-            .map(|path| path.split('.').next().unwrap())
+            .map(|entry| entry.split(['.', ':', ' ']).next().unwrap())
             .collect();
         assert_eq!(
             components.into_iter().collect::<Vec<_>>(),
@@ -402,14 +402,17 @@ mod tests {
             ]
         );
         for path in [
-            "header.model",
+            "header.model: text",
             "header.model = CGB-E",
+            "cpu: fields",
+            "cpu.run_state: variant",
             "cpu.run_state = Halted",
-            "cpu.registers.program_counter",
-            "bus.work_ram",
-            "bus.high_ram",
-            "ppu.lcdc",
-            "apu.state.square1.period",
+            "cpu.registers.program_counter: u16",
+            "bus.work_ram: 32768 bytes",
+            "bus.high_ram: 128 bytes",
+            "ppu.lcdc: u8",
+            "apu.state.square1.period: u16",
+            "apu.previous_left_outputs: 4 × f32",
         ] {
             assert!(paths.iter().any(|stored| stored == path), "{path}");
         }

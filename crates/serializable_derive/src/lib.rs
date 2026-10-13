@@ -167,6 +167,10 @@ fn enum_impl(name: &Ident, generics: &Generics, data: &DataEnum) -> syn::Result<
                 };
                 Ok(())
             }
+
+            fn encoding() -> String {
+                String::from("variant")
+            }
         }
     })
 }
