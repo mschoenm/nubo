@@ -71,3 +71,16 @@ On a shared cloud machine (4 cores of an Intel Xeon at 2.1 GHz) on 2026-10-13, w
 | µCity CGB | 75.7x | 8.7x | 13.9x | 228.1x | 108.3x | 75.3x | 43.6x |
 
 Nubo ran 2.7 to 6.2 times as fast as SameBoy, all of it from its lazy shortcuts: running every M-cycle on its own (Nubo eager), it is about 0.6 times as fast. Gambatte was 3 to 4.3 times as fast as Nubo, mGBA 1 to 1.7 times, binjgb 0.8 to 2 times and Gearboy 0.6 to 1.4 times.
+
+With `--instructions`, in millions of instructions per emulated second over 10 s:
+
+| Instructions | Nubo | Nubo eager | SameBoy | Gambatte | mGBA | binjgb | Gearboy |
+|---|---|---|---|---|---|---|---|
+| Geometrix DMG | 194 | 1,192 | 734 | 70 | 121 | 158 | 203 |
+| Geometrix CGB | 239 | 1,016 | 618 | 92 | 126 | 164 | 205 |
+| Tobu Tobu Girl DMG | 138 | 1,185 | 690 | 58 | 109 | 174 | 241 |
+| Tobu Tobu Girl CGB | 206 | 985 | 550 | 82 | 115 | 177 | 227 |
+| µCity DMG | 125 | 1,178 | 644 | 54 | 92 | 155 | 202 |
+| µCity CGB | 213 | 1,492 | 905 | 84 | 126 | 215 | 288 |
+
+Nubo ran 2.6 to 5.2 times fewer instructions than SameBoy, about as much as its lead in time, though its skip-ahead code costs more time per instruction.
