@@ -58,6 +58,11 @@ use std::fmt;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
+pub use crate::address_bus::cartridge::CartridgeHeader;
+pub(crate) use crate::address_bus::cartridge::read_header;
+pub use crate::address_bus::effects::{CartridgeEffects, NoSaves, RtcClock};
+pub use crate::address_bus::mbc3::RtcState;
+
 /// A component the address bus reads and writes registers or memory of, such
 /// as the PPU or the timer. The address bus itself has `peek` and `poke` for
 /// the raw view of the memory map, and `cpu_read_byte` and `cpu_write_cycle`
@@ -66,11 +71,6 @@ pub(crate) trait MemoryMapped {
     fn read_byte(&self, address: u16) -> u8;
     fn write_byte(&mut self, address: u16, value: u8);
 }
-
-pub use crate::address_bus::cartridge::CartridgeHeader;
-pub(crate) use crate::address_bus::cartridge::read_header;
-pub use crate::address_bus::effects::{CartridgeEffects, NoSaves, RtcClock};
-pub use crate::address_bus::mbc3::RtcState;
 
 /// How many dots (ticks of the 4 MHz PPU clock) before the end of an M-cycle
 /// a mid-cycle sample is taken: half an M-cycle. Only a DMG samples there
@@ -219,11 +219,12 @@ pub struct AddressBus {
     /// in its last M-cycle can end a step. Save states keep it.
     ppu_dot_debt: i16,
 
-    /// The source address and byte of the VRAM DMA (HDMA) copy in progress, which OAM DMA takes
-    /// over while both run.
+    /// The source address and byte of the VRAM DMA (HDMA) copy in progress,
+    /// which OAM DMA takes over while both run.
     vram_dma_bus: Option<(u16, u8)>,
-    /// Set while the CPU is halted by a speed switch and copies an HBlank DMA block: OAM DMA
-    /// stands still from the end of the block's first M-cycle, as after any halt.
+    /// Set while the CPU is halted by a speed switch and copies an HBlank DMA
+    /// block: OAM DMA stands still from the end of the block's first M-cycle,
+    /// as after any halt.
     pause_oam_dma_after_cycle: bool,
 
     /// PPU dots (ticks of the 4 MHz clock at normal speed) since power-on,
@@ -423,13 +424,11 @@ impl AddressBus {
 
     /// The index into `working_ram` for a work RAM or echo RAM address.
     fn working_ram_index(&self, address: u16) -> usize {
-        let localized_index = address & 0x1FFF;
-        if localized_index <= 0xFFF {
-            localized_index as usize
+        let offset = usize::from(address & 0x1FFF);
+        if offset <= 0xFFF {
+            offset
         } else {
-            let bank_number = self.working_ram_bank();
-            let index = (u16::from(bank_number) * 0x1000) + (address & 0x0FFF);
-            index as usize
+            usize::from(self.working_ram_bank()) * 0x1000 + (offset & 0x0FFF)
         }
     }
 
@@ -789,16 +788,23 @@ impl AddressBus {
         self.serial.step(self.timers.system_counter());
     }
 
+    /// Corrupts OAM as a CPU write, or a 16-bit increment or decrement of a
+    /// register pointing into OAM, does during OAM scan on monochrome models
+    /// (the "OAM bug", see `gpu/oam_bug.rs`).
     pub(super) fn trigger_oam_bug_write(&mut self) {
         self.catch_up_ppu_before_change();
         self.gpu.trigger_oam_bug_write();
     }
 
+    /// Corrupts OAM as a CPU read during OAM scan does (the "OAM bug").
     pub(super) fn trigger_oam_bug_read(&mut self) {
         self.catch_up_ppu_before_change();
         self.gpu.trigger_oam_bug_read();
     }
 
+    /// Corrupts OAM as an instruction that reads through a register pointing
+    /// into OAM and increments or decrements it in the same M-cycle, such as
+    /// `LD A, (HL+)`, does during OAM scan (the "OAM bug").
     pub(super) fn trigger_oam_bug_mixed(&mut self) {
         self.catch_up_ppu_before_change();
         self.gpu.trigger_oam_bug_mixed();
@@ -890,6 +896,9 @@ impl AddressBus {
         }
     }
 
+    /// Writes the unusable area after OAM (0xFEA0-0xFEFF), which only older
+    /// CGB revisions store (see `extra_oam_index`). Blocked whenever OAM
+    /// writes are.
     fn write_unusable_oam(&mut self, address: u16, value: u8) {
         if self.gpu.oam_write_blocked() || self.dma.in_progress() {
             return;

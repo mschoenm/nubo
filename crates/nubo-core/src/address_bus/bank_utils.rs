@@ -4,6 +4,9 @@
 //! one bank (a fixed-size slice) at a time. Bank numbers beyond the end of the
 //! memory wrap around, like the unused high address lines on real cartridges.
 
+/// Where the byte at `address` within `bank` is in `memory`, which must not be
+/// empty. Only the address bits inside one bank (`bank_size`, a power of two)
+/// count.
 fn banked_index(memory: &[u8], bank_size: usize, address: u16, bank: u16) -> usize {
     let bank_start = usize::from(bank) * bank_size;
     let offset = usize::from(address) & (bank_size - 1);

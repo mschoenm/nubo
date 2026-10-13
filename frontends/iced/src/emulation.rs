@@ -1,9 +1,8 @@
 //! Runs the emulator for the window. On the desktop it runs on a thread of
 //! its own that the sound card paces (`emulation/thread.rs`); in the
 //! browser, which gives WebAssembly a single thread, it runs the frames due
-//! on each frame tick (`emulation/web.rs`). Both kinds
-//! of session take the same [`Command`]s, which [`Machine::handle`] carries
-//! out.
+//! on each frame tick (`emulation/web.rs`). Both kinds of session take the
+//! same [`Command`]s, which [`Machine::handle`] carries out.
 
 use crate::audio::AudioOutput;
 use crate::battery::{BatteryCartridgeEffects, BatterySaves};
