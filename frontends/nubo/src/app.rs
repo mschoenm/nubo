@@ -8,6 +8,7 @@
 //! the window itself (`app/window_events.rs`), and keys and controller
 //! buttons (`app/player_input.rs`).
 
+use crate::background;
 use crate::box_art::GameList;
 use crate::controllers::ControllerEvent;
 use crate::controls::{Action, Device};
@@ -17,6 +18,7 @@ use crate::library::Library;
 use crate::menu_presses::MenuPresses;
 use crate::notices::Notices;
 use crate::rom::Rom;
+use crate::save_states;
 use crate::settings::Settings;
 use crate::subscriptions;
 use crate::ui::theme;
@@ -227,7 +229,23 @@ impl App {
 
         self.apply_to_game();
         self.show_notices();
-        task
+        Task::batch([task, self.load_slot_thumbnails()])
+    }
+
+    /// Reads the pictures of the save state slots a pause menu page that
+    /// just opened lists, on a background thread.
+    fn load_slot_thumbnails(&mut self) -> Task<Message> {
+        let Some((rom_path, slots)) = self.game.as_mut().and_then(Game::thumbnails_to_load) else {
+            return Task::none();
+        };
+        let reading_path = rom_path.clone();
+        Task::perform(
+            background::run(move || save_states::thumbnails(&reading_path, &slots)),
+            move |thumbnails| {
+                GameMessage::ThumbnailsLoaded(rom_path.clone(), thumbnails.unwrap_or_default())
+                    .into()
+            },
+        )
     }
 
     /// The current screen with the settings, drop target and notifications

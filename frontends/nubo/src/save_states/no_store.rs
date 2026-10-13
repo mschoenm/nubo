@@ -1,6 +1,7 @@
 //! The browser build has no save states yet.
 
 use super::{SaveState, Slot, SlotInfo};
+use nubo_frontend::picture::Picture;
 use std::path::{Path, PathBuf};
 
 pub fn save(
@@ -27,4 +28,8 @@ pub fn slot_info(_rom_path: &Path, slot: Slot) -> SlotInfo {
         saved_at: None,
         thumbnail: None,
     }
+}
+
+pub fn thumbnail(_rom_path: &Path, _slot: Slot) -> Option<Picture> {
+    None
 }

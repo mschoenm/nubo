@@ -16,6 +16,7 @@ use nubo_core::{CartridgeHeader, ControllerState, Key, Model};
 use nubo_frontend::palettes::DmgPalette;
 use nubo_frontend::picture::Picture;
 use nubo_frontend::time::{Duration, Instant};
+use std::path::{Path, PathBuf};
 
 /// How long the top bar stays after the mouse stops moving.
 const CONTROLS_TIMEOUT: Duration = Duration::from_millis(2500);
@@ -43,6 +44,8 @@ pub struct Game {
     menu: Option<PauseMenu>,
     /// The slots listed on the menu's save or load page.
     slots: Vec<SlotInfo>,
+    /// Whether the pictures of `slots` were asked for since the page opened.
+    thumbnails_requested: bool,
     /// The highlighted row of the pause menu, moved with the D-pad.
     menu_selection: usize,
     cheats: Vec<Cheat>,
@@ -81,6 +84,7 @@ impl Game {
             screen: Screen::new(!model.is_cgb()),
             menu: None,
             slots: Vec::new(),
+            thumbnails_requested: false,
             menu_selection: 0,
             cheats: Vec::new(),
             cheat_form: CheatForm::default(),
@@ -145,10 +149,41 @@ impl Game {
             Some(PauseMenu::Load) => save_states::slot_infos(&self.rom.path, &Slot::LOADABLE),
             _ => Vec::new(),
         };
+        self.thumbnails_requested = false;
         if page != self.menu {
             self.menu_selection = 0;
         }
         self.menu = page;
+    }
+
+    /// The ROM and the saved slots whose pictures the open page still needs,
+    /// once per opening of the page. Decoding them is slow work, so the app
+    /// reads them with `save_states::thumbnails` on a background thread and
+    /// hands them to [`Game::set_thumbnails`].
+    pub fn thumbnails_to_load(&mut self) -> Option<(PathBuf, Vec<Slot>)> {
+        if std::mem::replace(&mut self.thumbnails_requested, true) {
+            return None;
+        }
+        let slots: Vec<Slot> = self
+            .slots
+            .iter()
+            .filter(|info| info.saved_at.is_some())
+            .map(|info| info.slot)
+            .collect();
+        (!slots.is_empty()).then(|| (self.rom.path.clone(), slots))
+    }
+
+    /// Shows the pictures `save_states::thumbnails` read for the game at
+    /// `rom_path`, if its page is still open.
+    pub fn set_thumbnails(&mut self, rom_path: &Path, thumbnails: Vec<(Slot, Option<Picture>)>) {
+        if rom_path != self.rom.path {
+            return;
+        }
+        for (slot, thumbnail) in thumbnails {
+            if let Some(info) = self.slots.iter_mut().find(|info| info.slot == slot) {
+                info.thumbnail = thumbnail;
+            }
+        }
     }
 
     pub fn menu_selection(&self) -> usize {

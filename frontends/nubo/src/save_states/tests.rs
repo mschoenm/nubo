@@ -1,7 +1,7 @@
 //! Tests for save state files. They write real files in the temporary
 //! directory, so they only run in the native build.
 
-use super::store::{keep_aside_in, load_in, save_in, slot_info_in};
+use super::store::{keep_aside_in, load_in, save_in, slot_info_in, thumbnail_in};
 use super::*;
 use nubo_frontend::time::Duration;
 use std::fs;
@@ -119,7 +119,7 @@ fn a_slot_with_a_picture_reports_it() {
     let info = slot_info_in(&directory, rom, Slot::Resume);
 
     assert!(info.saved_at.is_some());
-    let thumbnail = info.thumbnail.unwrap();
+    let thumbnail = thumbnail_in(&directory, rom, Slot::Resume).unwrap();
     assert_eq!((thumbnail.width(), thumbnail.height()), (160, 144));
     assert_eq!(thumbnail.pixels(), &pixels[..]);
 }
