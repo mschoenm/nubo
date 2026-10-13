@@ -11,6 +11,11 @@
 //! The transfer occupies the memory bus its source is on, so while it runs
 //! the CPU can't use that bus normally: its reads see the byte the DMA just
 //! copied, and its writes go astray in ways that differ between models.
+//!
+//! While it copies, the transfer also holds OAM from the PPU, as in SameBoy:
+//! OAM scan re-checks the last Y and X it read, mode 3's object reads see the
+//! bytes being copied, and STAT shows mode 0 instead of mode 2 (see
+//! `ppu_oam_dma_access`).
 
 use crate::address_bus::{AddressBus, MemoryMapped, reaches_ppu, reads_plain_memory};
 use crate::apu::Apu;
@@ -248,7 +253,9 @@ impl AddressBus {
 
     /// Reads a byte for the CPU, which during OAM DMA may see the byte the
     /// transfer is copying instead. On the CGB, a read that collides with a
-    /// transfer from video RAM also clears the OAM byte just copied.
+    /// transfer from video RAM also clears the OAM byte just copied. Before
+    /// reading anything but plain memory, it runs the M-cycles waiting to run
+    /// and catches the PPU and the APU up where the address reaches them.
     #[inline]
     pub(crate) fn cpu_read_byte(&mut self, address: u16) -> u8 {
         // The read's M-cycle has already run, so only a transfer in progress can collide with it;

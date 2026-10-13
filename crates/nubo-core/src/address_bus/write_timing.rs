@@ -122,7 +122,10 @@ impl AddressBus {
     }
 
     /// Runs one M-cycle in which the CPU writes `value` to `address`, with the
-    /// write landing at the dot the hardware would.
+    /// write landing at the dot the hardware would. Before writing anything
+    /// but plain memory, it runs the M-cycles waiting to run and catches the
+    /// PPU up where the address reaches it; collisions with OAM DMA go
+    /// through `cpu_write_byte`.
     #[inline]
     pub(crate) fn cpu_write_cycle(&mut self, address: u16, value: u8) {
         // Unlike a read (see `cpu_read_byte`), the write's own M-cycle runs here, before the write

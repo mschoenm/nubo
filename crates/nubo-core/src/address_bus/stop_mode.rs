@@ -7,7 +7,9 @@
 //! is held. The CPU, the timers, OAM DMA, HBlank DMA and the serial port
 //! stand still until a button press pulls a joypad line low. Monochrome
 //! models stop the PPU and show a white screen; the CGB's PPU keeps running
-//! but loses access to some memory (`Gpu::enter_stop_mode`).
+//! but is cut off from whatever the CPU could access when STOP started, so
+//! the screen turns black unless STOP came during mode 3
+//! (`Gpu::enter_stop_mode`).
 
 use crate::address_bus::AddressBus;
 use crate::clock::dots_per_m_cycle;

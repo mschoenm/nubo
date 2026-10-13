@@ -61,6 +61,7 @@ pub(super) struct Mbc3CartridgeMapper {
     /// What 0xA000-0xBFFF shows: the four lower bits written to 0x4000-0x5FFF.
     /// Bit 3 selects a clock register (0x08-0x0C, while 0x0D-0x0F read 0xFF)
     /// on a cartridge with the clock, and bits 0-2 the RAM bank otherwise.
+    /// On an MBC3 with the clock (but not an MBC30), RAM banks 4-7 read 0xFF.
     ram_bank_or_rtc_register: u8,
     /// The clock, which keeps counting.
     rtc: RtcState,
