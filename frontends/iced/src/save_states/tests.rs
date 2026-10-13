@@ -1,7 +1,7 @@
 //! Tests for save state files. They write real files in the temporary
 //! directory, so they only run in the native build.
 
-use super::store::{load_in, save_in, slot_info_in};
+use super::store::{keep_aside_in, load_in, save_in, slot_info_in};
 use super::*;
 use iced::time::Duration;
 use std::fs;
@@ -131,6 +131,48 @@ fn other_files_are_rejected() {
     fs::write(path, b"not a state").unwrap();
 
     assert!(load_in(&directory, rom, Slot::Quick).is_err());
+}
+
+#[test]
+fn a_state_kept_aside_survives_the_next_save_to_its_slot() {
+    let directory = temporary_folder("kept");
+    let rom = Path::new("roms/Tetris.gb");
+    let folder = directory.join("Tetris.gb");
+    let pixels = vec![0; 160 * 144 * 4];
+    save_in(
+        &directory,
+        rom,
+        Slot::Resume,
+        &state(Model::Dmg, b"old"),
+        Some(&pixels),
+    )
+    .unwrap();
+
+    let kept = keep_aside_in(&directory, rom, Slot::Resume).unwrap();
+    assert_eq!(kept, folder.join("resume.kept-1.state"));
+    assert!(folder.join("resume.kept-1.png").exists());
+    assert!(load_in(&directory, rom, Slot::Resume).unwrap().is_none());
+
+    save_in(
+        &directory,
+        rom,
+        Slot::Resume,
+        &state(Model::Dmg, b"new"),
+        None,
+    )
+    .unwrap();
+    assert!(fs::read(&kept).unwrap().ends_with(b"old"));
+
+    let kept_again = keep_aside_in(&directory, rom, Slot::Resume).unwrap();
+    assert_eq!(kept_again, folder.join("resume.kept-2.state"));
+    assert!(fs::read(&kept).unwrap().ends_with(b"old"));
+    assert!(fs::read(&kept_again).unwrap().ends_with(b"new"));
+}
+
+#[test]
+fn keeping_an_empty_slot_aside_fails() {
+    let directory = temporary_folder("kept-empty");
+    assert!(keep_aside_in(&directory, Path::new("Tetris.gb"), Slot::Quick).is_err());
 }
 
 #[test]

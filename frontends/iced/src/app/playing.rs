@@ -11,7 +11,7 @@ use crate::screenshots;
 use crate::views;
 use iced::Task;
 use nubo_core::{CartridgeHeader, Emulator, Model};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// What the player can do with games: open one, and control the one that
 /// runs.
@@ -159,7 +159,7 @@ impl App {
 
         let resume_state = if resume && self.settings.resume_games {
             save_states::load(&rom.path, Slot::Resume).unwrap_or_else(|error| {
-                self.toasts.error(error);
+                self.keep_unloadable_state(&rom.path, Slot::Resume, error);
                 None
             })
         } else {
@@ -176,9 +176,11 @@ impl App {
                 if let Some(state) = resume_state {
                     match game.load(state.data) {
                         Ok(()) => self.toasts.info("Continuing where you left off"),
-                        Err(error) => self
-                            .toasts
-                            .error(format!("Couldn't continue where you left off: {error}")),
+                        Err(error) => self.keep_unloadable_state(
+                            &path,
+                            Slot::Resume,
+                            format!("Couldn't continue where you left off: {error}"),
+                        ),
                     }
                 }
 
@@ -267,14 +269,15 @@ impl App {
             return;
         };
 
-        let state = match save_states::load(&game.rom().path, slot) {
+        let rom_path = game.rom().path.clone();
+        let state = match save_states::load(&rom_path, slot) {
             Ok(Some(state)) => state,
             Ok(None) => {
                 self.toasts.info(format!("{slot} is empty"));
                 return;
             }
             Err(error) => {
-                self.toasts.error(error);
+                self.keep_unloadable_state(&rom_path, slot, error);
                 return;
             }
         };
@@ -303,7 +306,28 @@ impl App {
                 game.show_menu(None);
                 self.toasts.info(format!("Loaded {slot}"));
             }
-            Err(error) => self.toasts.error(format!("Couldn't load {slot}: {error}")),
+            Err(error) => {
+                self.keep_unloadable_state(
+                    &rom_path,
+                    slot,
+                    format!("Couldn't load {slot}: {error}"),
+                );
+            }
+        }
+    }
+
+    /// Reports `message` about the state in `slot` that couldn't be loaded,
+    /// and moves the state aside so the next save to the slot (when the game
+    /// stops, for where the player left off) can't overwrite it.
+    fn keep_unloadable_state(&mut self, rom_path: &Path, slot: Slot, message: String) {
+        match save_states::keep_aside(rom_path, slot) {
+            Ok(kept) => self
+                .toasts
+                .error(format!("{message}. The state was kept as {kept}")),
+            Err(error) => {
+                self.toasts.error(message);
+                self.toasts.error(error);
+            }
         }
     }
 

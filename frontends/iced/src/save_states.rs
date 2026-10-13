@@ -4,7 +4,9 @@
 //!
 //! The desktop build keeps them in `states/<rom file name>/` in the user's
 //! data folder: `<slot>.state` holds the snapshot and `<slot>.png` the screen
-//! at that moment. The browser build has no save states yet.
+//! at that moment. A state that can't be loaded is renamed to
+//! `<slot>.kept-<number>.state`, so saving to the slot again can't overwrite
+//! it. The browser build has no save states yet.
 
 use iced::time::SystemTime;
 use iced::widget::image;
@@ -87,6 +89,21 @@ pub fn save(
 /// is empty.
 pub fn load(rom_path: &Path, slot: Slot) -> Result<Option<SaveState>, String> {
     store::load(rom_path, slot).map_err(|error| format!("Couldn't read the save state: {error}"))
+}
+
+/// Moves the state in `slot` of the game at `rom_path`, and its picture, to a
+/// name of its own, so a state that couldn't be loaded isn't overwritten by
+/// the next save to the slot. A newer Nubo, or the one it was made with, may
+/// still load it. Returns the state's new file name.
+pub fn keep_aside(rom_path: &Path, slot: Slot) -> Result<String, String> {
+    store::keep_aside(rom_path, slot)
+        .map(|path| {
+            path.file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .map_err(|error| format!("Couldn't keep the save state that didn't load: {error}"))
 }
 
 /// Describes each of `slots` of the game at `rom_path`.
