@@ -2,8 +2,6 @@
 //! group of settings.
 
 use crate::app::{GameMessage, LibraryMessage, Message, SettingsMessage};
-use crate::box_art;
-use crate::library::{self, Library};
 use crate::settings::{Appearance, Settings};
 use crate::ui::icons::{Icon, icon};
 use crate::ui::theme;
@@ -14,6 +12,7 @@ use iced::widget::{
 use iced::{Alignment, Color, Element, Fill, Theme, widget};
 use nubo_core::Model;
 use nubo_frontend::controls::{Action, Device};
+use nubo_frontend::library::{self, Library, box_art};
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::palettes::DmgPalette;
 use nubo_frontend::save_states;

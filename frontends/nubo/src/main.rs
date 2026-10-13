@@ -105,20 +105,17 @@ fn main() -> iced::Result {
 
 mod app;
 mod audio;
-mod box_art;
 mod controllers;
 #[cfg(not(target_arch = "wasm32"))]
 mod efficiency;
 mod emulation;
 mod game;
 mod input;
-mod library;
 mod menu_presses;
 mod rom_picker;
 mod settings;
 mod subscriptions;
 #[cfg(not(target_arch = "wasm32"))]
 mod ticks;
-mod title_screens;
 mod ui;
 mod views;

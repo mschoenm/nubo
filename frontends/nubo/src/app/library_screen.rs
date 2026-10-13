@@ -3,15 +3,17 @@
 
 use super::playing::read_rom;
 use super::{App, Message};
-use crate::box_art::{self, GameList};
-use crate::library::{self, DownloadedArt, FileCheck, LoadedPicture, ScanResult, WatchEvent};
-use crate::title_screens;
+use crate::rom_picker;
 use crate::views;
 use iced::Task;
 use iced::widget;
 use iced::widget::scrollable::AbsoluteOffset;
 use nubo_frontend::background;
 use nubo_frontend::controls::Action;
+use nubo_frontend::library::box_art::{self, GameList};
+use nubo_frontend::library::{
+    self, DownloadedArt, FileCheck, LoadedPicture, ScanResult, WatchEvent,
+};
 use nubo_frontend::settings::LibraryFolder;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -69,7 +71,7 @@ impl App {
             }
             LibraryMessage::Scrolled(offset, height) => self.library_scroll = (offset, height),
             LibraryMessage::AddFolder => {
-                return Task::perform(library::pick_folder(), |path| {
+                return Task::perform(rom_picker::pick_folder(), |path| {
                     LibraryMessage::FolderPicked(path).into()
                 });
             }
@@ -232,14 +234,9 @@ impl App {
     fn capture_title_screens(&mut self) -> Task<Message> {
         Task::batch(self.library.next_captures().into_iter().map(|path| {
             let rom_path = path.clone();
+            let cache = self.library.cache().clone();
             Task::perform(
-                background::run(move || {
-                    if let Some(saved) = library::saved_title_screen(&rom_path) {
-                        return Some(saved);
-                    }
-                    let rom = std::fs::read(&rom_path).ok()?;
-                    title_screens::capture(&rom)
-                }),
+                background::run(move || cache.title_screen(&rom_path)),
                 move |pixels| {
                     LibraryMessage::TitleScreenCaptured(path, pixels.ok().flatten()).into()
                 },
@@ -278,14 +275,9 @@ impl App {
                 .map(|(path, supports_cgb)| {
                     let list = list.clone();
                     let rom_path = path.clone();
+                    let cache = self.library.cache().clone();
                     Task::perform(
-                        background::run(move || {
-                            if let Some(saved) = library::saved_box_art(&rom_path) {
-                                return Ok(Some(saved));
-                            }
-                            box_art::find(&rom_path, supports_cgb, &list)
-                                .map(|png| png.and_then(DownloadedArt::decode))
-                        }),
+                        background::run(move || cache.box_art(&rom_path, supports_cgb, &list)),
                         move |result| {
                             LibraryMessage::BoxArtDownloaded(path, result.flatten()).into()
                         },

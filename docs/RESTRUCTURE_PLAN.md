@@ -1,6 +1,6 @@
 # Plan: restructuring the repository
 
-**Status: signed off by the maintainer on 2026-10-13. Steps 1 to 4 are done.**
+**Status: signed off by the maintainer on 2026-10-13. Steps 1 to 5 are done.**
 
 ## What is planned and what is only kept possible
 
@@ -295,6 +295,35 @@ settings stay with the Iced app but in the same file.
 with the new build. Test this by hand on the desktop and in the browser.
 
 ### Step 5: move the library
+
+**Done.** What was decided along the way:
+
+- **Where:** `title_screens` and `box_art` (with `box_art/download`) are submodules of
+  `nubo_frontend::library`, as the module table has it. The folder picker (`pick_folder`, with rfd)
+  stayed in the Iced crate's `rom_picker.rs`, next to the ROM picker, since picking a folder is the
+  app's UI; the library's messages and tasks stay in `app/library_screen.rs`.
+- **`desktop`** now also brings `crc32fast`, `notify-debouncer-mini` and `ureq` (moved from the Iced
+  crate, which no longer names them or `image`). The library's files, the watcher and box art
+  downloads are behind it; without it the library keeps nothing, `library::AVAILABLE` and
+  `box_art::AVAILABLE` are false, and title screens can still be captured (they only need the core).
+- **`Cache`:** where the library keeps `library.toml` and its pictures. `Library::load()` uses the
+  player's data folder as before; `Library::load_from(Cache::in_folder(...))` keeps a library in
+  another folder, for tests, and every save goes there too. The work the app runs in the background
+  for a game's title screen or box art (the saved picture if it is still current, else capture or
+  download it) moved with it as `Cache::title_screen` and `Cache::box_art`.
+- **Watcher:** `library::watch(folders, report)` calls `report` on the watcher's thread with each
+  `WatchEvent` and returns a `Watcher` that watches until it is dropped (or `None`, after reporting
+  why, if watching can't start). `subscriptions::library_changes` keeps its `Subscription::run_with`
+  on the folders, sends each event into the stream's channel and holds the `Watcher` while the
+  subscription runs.
+- **`LibraryEntry::example`**, which the Iced crate's library screen tests use, is public now, since
+  `cfg(test)` doesn't reach another crate.
+- **An existing library:** `tests/existing_data_folder/data/` now also has a `library.toml`, two
+  thumbnails, two title screens and a box art, written by the step 4 build through the library's own
+  functions. The tests read them back, write them again byte for byte, check that only the game never
+  looked at is queued for a title screen and box art, and that a scan keeps the cached entries of
+  files whose size and time didn't change instead of reading them again. The hand test on the desktop
+  is still to do.
 
 Move `library` (scan, cache, watcher, jobs), `title_screens` and `box_art` into `nubo-frontend`. The
 watcher reports through a callback, and the Iced crate wraps it in a subscription.

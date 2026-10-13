@@ -4,37 +4,49 @@
 //! What the library knows is kept in `library.toml` in the user's data
 //! folder, so it shows up instantly when the app starts, and a scan in the
 //! background brings it up to date. Each game also gets a picture of its
-//! title screen (see `title_screens.rs`) and of the last screen played,
-//! PNG files in the `title_screens` and `thumbnails` folders next to it.
-//! The browser build has no folders to scan, so its library stays empty.
+//! title screen (see [`title_screens`]) and of the last screen played,
+//! PNG files in the `title_screens` and `thumbnails` folders next to it,
+//! and, if the player wants it, box art (see [`box_art`]) in `box_art`.
+//! [`Cache`] says where those files are.
+//!
+//! Only the desktop build (the `desktop` feature) keeps a library: the
+//! browser has no folders to scan, so its library stays empty. The folder
+//! watcher (`watch`) is desktop only too.
 
-use crate::app::{SCREEN_HEIGHT, SCREEN_WIDTH};
+use crate::background;
+use crate::palettes::DmgPalette;
+use crate::picture::{Picture, SCREEN_HEIGHT, SCREEN_WIDTH};
+use crate::settings::LibraryFolder;
+use crate::time::SystemTime;
+use box_art::GameList;
 use jobs::Jobs;
 use nubo_core::CartridgeHeader;
-use nubo_frontend::background;
-use nubo_frontend::palettes::DmgPalette;
-use nubo_frontend::picture::Picture;
-use nubo_frontend::time::SystemTime;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 pub use scan::{FileCheck, ScanResult};
+#[cfg(feature = "desktop")]
+pub use watcher::{Watcher, watch};
 
 /// How many title screens are captured at the same time.
 const MAX_CAPTURES: usize = 2;
 /// How many games have their box art looked up at the same time.
 const MAX_DOWNLOADS: usize = 4;
 
-/// The library is only available where the app can read folders.
-pub const AVAILABLE: bool = cfg!(not(target_arch = "wasm32"));
+/// Whether this build keeps a library: only the desktop build, which can
+/// read folders, does.
+pub const AVAILABLE: bool = cfg!(feature = "desktop");
 
 /// A game the library knows about.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LibraryEntry {
+    /// Where the ROM file is.
     pub path: PathBuf,
     /// The title from the cartridge header.
     pub title: String,
+    /// Whether the game runs on a Game Boy Color (the cartridge header says
+    /// so).
     pub supports_cgb: bool,
     /// Whether the file is in one of the library folders. Games opened from
     /// elsewhere are only listed as recently played.
@@ -66,9 +78,8 @@ impl LibraryEntry {
             .into_owned()
     }
 
-    /// A game at `path` in a library folder, for tests of the library
-    /// screen.
-    #[cfg(test)]
+    /// A game at `path` in a library folder that nothing is known about
+    /// yet, for tests of an app's library screen.
     pub fn example(path: &str) -> LibraryEntry {
         LibraryEntry {
             path: PathBuf::from(path),
@@ -91,9 +102,93 @@ impl LibraryEntry {
     }
 }
 
-/// The games and their thumbnails.
+/// Where the library keeps what it knows between runs: `library.toml` and
+/// the `thumbnails`, `title_screens` and `box_art` folders of pictures, all
+/// in one data folder (see `storage::files`). Builds without the `desktop`
+/// feature keep nothing, and neither does a cache without a folder, such as
+/// [`Cache::default`].
+#[derive(Debug, Clone, Default)]
+pub struct Cache {
+    /// The data folder, or `None` when the system has none for us.
+    #[cfg(feature = "desktop")]
+    data_folder: Option<PathBuf>,
+}
+
+impl Cache {
+    /// The player's own data folder, where the app keeps its library.
+    pub fn for_user() -> Cache {
+        Cache {
+            #[cfg(feature = "desktop")]
+            data_folder: crate::storage::files::project_directories()
+                .map(|directories| directories.data_dir().to_path_buf()),
+        }
+    }
+
+    /// The library's files in `data_folder` instead of the player's data
+    /// folder, for tests and measurements that mustn't touch the player's
+    /// data.
+    #[cfg(feature = "desktop")]
+    pub fn in_folder(data_folder: PathBuf) -> Cache {
+        Cache {
+            data_folder: Some(data_folder),
+        }
+    }
+
+    /// The title screen of the game at `rom_path` as RGBA pixels: the one
+    /// saved for it if it was made after the ROM file last changed (for
+    /// example when a folder is added back to the library), else one
+    /// captured by running the game (see [`title_screens::capture`]).
+    /// `None` if the game showed nothing worth a picture. This is slow, so
+    /// run it with [`background::run`] and hand the result to
+    /// [`Library::finish_capture`].
+    pub fn title_screen(&self, rom_path: &Path) -> Option<Vec<u8>> {
+        if let Some(saved) = self.saved_title_screen(rom_path) {
+            return Some(saved);
+        }
+        let rom = std::fs::read(rom_path).ok()?;
+        title_screens::capture(&rom)
+    }
+
+    /// The box art of the game at `rom_path`: the one saved for it if it
+    /// was saved after the ROM file last changed, else the one looked up in
+    /// `games` and downloaded (see [`box_art::find`]). `None` if the
+    /// collection has none. This is slow, so run it with
+    /// [`background::run`] and hand the result to
+    /// [`Library::finish_download`].
+    pub fn box_art(
+        &self,
+        rom_path: &Path,
+        supports_cgb: bool,
+        games: &GameList,
+    ) -> Result<Option<DownloadedArt>, String> {
+        if let Some(saved) = self.saved_box_art(rom_path) {
+            return Ok(Some(saved));
+        }
+        box_art::find(rom_path, supports_cgb, games).map(|png| png.and_then(DownloadedArt::decode))
+    }
+
+    /// The title screen saved for the game at `rom_path` as RGBA pixels, if
+    /// it was made after the ROM file last changed, so it needn't be
+    /// captured again.
+    fn saved_title_screen(&self, rom_path: &Path) -> Option<Vec<u8>> {
+        let png = store::current_picture(self, PictureKind::TitleScreen, rom_path)?;
+        let (width, height, pixels) = store::decode_png(&png)?;
+        (width == SCREEN_WIDTH && height == SCREEN_HEIGHT).then_some(pixels)
+    }
+
+    /// The box art saved for the game at `rom_path`, if it was saved after
+    /// the ROM file last changed, so it needn't be downloaded again.
+    fn saved_box_art(&self, rom_path: &Path) -> Option<DownloadedArt> {
+        DownloadedArt::decode(store::current_picture(self, PictureKind::BoxArt, rom_path)?)
+    }
+}
+
+/// The games and their thumbnails. [`Library::default`] keeps nothing
+/// between runs; [`Library::load`] keeps the player's library.
 #[derive(Debug, Default)]
 pub struct Library {
+    /// Where the library is kept between runs.
+    cache: Cache,
     /// Every known game, sorted by name.
     entries: Vec<LibraryEntry>,
     thumbnails: HashMap<PathBuf, Picture>,
@@ -122,10 +217,18 @@ pub struct Library {
 }
 
 impl Library {
-    /// Reads what the library knew when the app last ran. If that can't be
-    /// read, the library starts empty and the reason is returned too.
+    /// Reads what the library knew when the app last ran, from the player's
+    /// data folder. If that can't be read, the library starts empty and the
+    /// reason is returned too.
     pub fn load() -> (Library, Option<String>) {
-        let (entries, error) = match store::load_entries() {
+        Library::load_from(Cache::for_user())
+    }
+
+    /// Reads what the library knew from `cache`, and keeps the library
+    /// there from now on. If that can't be read, the library starts empty
+    /// and the reason is returned too.
+    pub fn load_from(cache: Cache) -> (Library, Option<String>) {
+        let (entries, error) = match store::load_entries(&cache) {
             Ok(entries) => (entries, None),
             Err(error) => (
                 Vec::new(),
@@ -133,9 +236,19 @@ impl Library {
             ),
         };
 
-        let mut library = Library::default();
+        let mut library = Library {
+            cache,
+            ..Library::default()
+        };
         library.replace_entries(entries);
         (library, error)
+    }
+
+    /// Where the library is kept between runs, for the slow work that
+    /// reads its pictures on another thread ([`Cache::title_screen`] and
+    /// [`Cache::box_art`]).
+    pub fn cache(&self) -> &Cache {
+        &self.cache
     }
 
     /// The games in the library folders that match `search`, by name.
@@ -157,14 +270,18 @@ impl Library {
         played
     }
 
+    /// The picture of the last screen played of the game at `path`, if it
+    /// was read.
     pub fn thumbnail(&self, path: &Path) -> Option<&Picture> {
         self.thumbnails.get(path)
     }
 
+    /// The title screen of the game at `path`, if it was read or captured.
     pub fn title_screen(&self, path: &Path) -> Option<&Picture> {
         self.title_screens.get(path)
     }
 
+    /// The box art of the game at `path`, if it was read or downloaded.
     pub fn box_art(&self, path: &Path) -> Option<&Picture> {
         self.box_art.get(path)
     }
@@ -229,7 +346,7 @@ impl Library {
             entry.box_art_checked = true;
 
             if let Some(art) = picture {
-                saved = store::save_box_art(path, &art.png);
+                saved = store::save_box_art(&self.cache, path, &art.png);
                 self.box_art.insert(path.to_path_buf(), art.picture);
             }
         }
@@ -258,7 +375,7 @@ impl Library {
             entry.title_screen_checked = true;
 
             if let Some(mut pixels) = pixels {
-                saved = store::save_title_screen(path, &pixels);
+                saved = store::save_title_screen(&self.cache, path, &pixels);
                 if !entry.supports_cgb {
                     palette.recolor(&mut pixels);
                 }
@@ -298,11 +415,12 @@ impl Library {
             .filter(|entry| !missing_only || !self.has_picture(&entry.path))
             .cloned()
             .collect();
+        let cache = self.cache.clone();
 
         background::run(move || {
             games
                 .into_iter()
-                .filter_map(|entry| best_picture(&entry, palette, show_box_art))
+                .filter_map(|entry| best_picture(&cache, &entry, palette, show_box_art))
                 .collect()
         })
     }
@@ -334,10 +452,13 @@ impl Library {
             || self.thumbnails.contains_key(path)
     }
 
+    /// Whether a scan of the library folders is running.
     pub fn is_scanning(&self) -> bool {
         self.scanning
     }
 
+    /// Whether the library `folder` couldn't be found during the last
+    /// scan.
     pub fn is_missing(&self, folder: &Path) -> bool {
         self.missing_folders.iter().any(|missing| missing == folder)
     }
@@ -349,7 +470,7 @@ impl Library {
     /// result to [`Library::finish_scan`].
     pub fn start_scan(
         &mut self,
-        folders: Vec<nubo_frontend::settings::LibraryFolder>,
+        folders: Vec<LibraryFolder>,
     ) -> Option<impl Future<Output = ScanResult> + use<>> {
         if self.scanning {
             self.rescan_wanted = true;
@@ -401,7 +522,7 @@ impl Library {
     /// after it catches up.
     pub fn start_check(
         &self,
-        folders: Vec<nubo_frontend::settings::LibraryFolder>,
+        folders: Vec<LibraryFolder>,
     ) -> impl Future<Output = FileCheck> + use<> {
         let entries = self.entries.clone();
         let finished_scans = self.finished_scans;
@@ -454,7 +575,7 @@ impl Library {
 
     /// Keeps `pixels`, the last frame of the game at `path`, as its thumbnail.
     pub fn set_thumbnail(&mut self, path: &Path, pixels: Vec<u8>) -> Result<(), String> {
-        let saved = store::save_thumbnail(path, &pixels);
+        let saved = store::save_thumbnail(&self.cache, path, &pixels);
         self.thumbnails
             .insert(path.to_path_buf(), screen_picture(pixels));
         saved
@@ -467,45 +588,18 @@ impl Library {
     }
 
     fn save(&self) -> Result<(), String> {
-        store::save_entries(&self.entries)
+        store::save_entries(&self.cache, &self.entries)
             .map_err(|error| format!("The game library couldn't be saved: {error}"))
     }
 }
 
-/// News from watching the library folders.
+/// News from watching the library folders (see `watch`).
 #[derive(Debug, Clone)]
-#[cfg_attr(
-    target_arch = "wasm32",
-    expect(dead_code, reason = "the browser build watches no folders")
-)]
 pub enum WatchEvent {
     /// A ROM or folder in a library folder was added, removed or changed.
     Changed,
     /// The folders can't be watched, for this reason.
     Failed(String),
-}
-
-/// Watches the library folders for games being added or removed, and sends
-/// what changed to `output` until the returned future is dropped. The
-/// browser build has no folders to watch, so it has no watcher.
-#[cfg(not(target_arch = "wasm32"))]
-pub use watcher::watch;
-
-/// Opens the folder picker, returning the chosen folder or `None` if the
-/// user cancels.
-#[cfg(not(target_arch = "wasm32"))]
-pub async fn pick_folder() -> Option<PathBuf> {
-    let folder = rfd::AsyncFileDialog::new()
-        .set_title("Add a ROM folder")
-        .pick_folder()
-        .await?;
-    Some(folder.path().to_path_buf())
-}
-
-/// Browsers have no folder picker, so the library has no folders.
-#[cfg(target_arch = "wasm32")]
-pub async fn pick_folder() -> Option<PathBuf> {
-    None
 }
 
 /// Combines a scan's `scanned` games with the library's `current` ones.
@@ -540,7 +634,10 @@ fn merge_scan(
 /// Which of a game's pictures something is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PictureKind {
+    /// The game's box art, downloaded (see [`box_art`]).
     BoxArt,
+    /// The game's title screen, captured by running it (see
+    /// [`title_screens`]).
     TitleScreen,
     /// The last screen played.
     LastScreen,
@@ -574,24 +671,10 @@ impl DownloadedArt {
     }
 }
 
-/// The title screen saved for the game at `rom_path` as RGBA pixels, if it
-/// was made after the ROM file last changed, so it needn't be captured
-/// again (for example when a folder is added back to the library).
-pub fn saved_title_screen(rom_path: &Path) -> Option<Vec<u8>> {
-    let png = store::current_picture(PictureKind::TitleScreen, rom_path)?;
-    let (width, height, pixels) = store::decode_png(&png)?;
-    (width == SCREEN_WIDTH && height == SCREEN_HEIGHT).then_some(pixels)
-}
-
-/// The box art saved for the game at `rom_path`, if it was saved after the
-/// ROM file last changed, so it needn't be downloaded again.
-pub fn saved_box_art(rom_path: &Path) -> Option<DownloadedArt> {
-    DownloadedArt::decode(store::current_picture(PictureKind::BoxArt, rom_path)?)
-}
-
 /// Reads and decodes the picture a game's card shows; see
 /// [`Library::load_pictures`].
 fn best_picture(
+    cache: &Cache,
     entry: &LibraryEntry,
     palette: DmgPalette,
     show_box_art: bool,
@@ -602,12 +685,14 @@ fn best_picture(
         picture: Picture::new(width, height, pixels),
     };
 
-    if show_box_art && let Some(picture) = store::read_picture(PictureKind::BoxArt, &entry.path) {
+    if show_box_art
+        && let Some(picture) = store::read_picture(cache, PictureKind::BoxArt, &entry.path)
+    {
         return Some(loaded(PictureKind::BoxArt, picture));
     }
 
     if let Some((width, height, mut pixels)) =
-        store::read_picture(PictureKind::TitleScreen, &entry.path)
+        store::read_picture(cache, PictureKind::TitleScreen, &entry.path)
     {
         if !entry.supports_cgb {
             palette.recolor(&mut pixels);
@@ -615,7 +700,7 @@ fn best_picture(
         return Some(loaded(PictureKind::TitleScreen, (width, height, pixels)));
     }
 
-    store::read_picture(PictureKind::LastScreen, &entry.path)
+    store::read_picture(cache, PictureKind::LastScreen, &entry.path)
         .map(|picture| loaded(PictureKind::LastScreen, picture))
 }
 
@@ -630,12 +715,14 @@ fn seconds_since_epoch(time: SystemTime) -> u64 {
         .map_or(0, |duration| duration.as_secs())
 }
 
+pub mod box_art;
 mod jobs;
 mod scan;
-#[cfg_attr(target_arch = "wasm32", path = "library/no_store.rs")]
-#[cfg_attr(not(target_arch = "wasm32"), path = "library/file_store.rs")]
+#[cfg_attr(not(feature = "desktop"), path = "library/no_store.rs")]
+#[cfg_attr(feature = "desktop", path = "library/file_store.rs")]
 mod store;
-#[cfg(all(test, not(target_arch = "wasm32")))]
+#[cfg(test)]
 mod tests;
-#[cfg(not(target_arch = "wasm32"))]
+pub mod title_screens;
+#[cfg(feature = "desktop")]
 mod watcher;
