@@ -3,8 +3,10 @@
     briefly expose an intermediate value. These offsets follow SameBoy's access conflict tables
     (https://github.com/LIJI32/SameBoy, Expat License, see the notice in apu.rs); which STAT bit the
     CGB changes late is fitted to Gambatte's m2enable tests instead, SCY in double speed lands
-    early like SCX (Gambatte's scy_during_m3_ds tests), and the DMG's fine scroll bits of SCX land
-    a dot after the coarse ones (Gambatte's scx_m3_extend and scx_0761c0 tests).
+    early like SCX (Gambatte's scy_during_m3_ds tests), setting LCDC's tile data area bit in double
+    speed lands a dot before the other bits (Gambatte's bgtiledata_spx08_ds tests), and the DMG's
+    fine scroll bits of SCX land a dot after the coarse ones (Gambatte's scx_m3_extend and
+    scx_0761c0 tests).
 */
 
 //! When CPU writes to PPU registers take effect, measured in dots (a dot is
@@ -313,15 +315,27 @@ impl AddressBus {
             }
             WriteTiming::CgbDoubleSpeedLcdc => {
                 let old_value = self.gpu.lcdc();
-                self.sync_with_ppu_lead(1);
+                // Setting the tile data area bit lands a dot before the other bits. Gambatte
+                // applies it half a dot before them, which shows when the fetcher works out a tile
+                // data address in the dot they land in (Gambatte's bgtiledata_spx08_ds_4 test, on
+                // line 0).
+                if value & !old_value & LCDC_TILE_SELECT != 0 {
+                    self.sync_with_ppu_lead(2);
+                    self.gpu
+                        .write_byte(LCDC_ADDRESS, old_value | LCDC_TILE_SELECT);
+                    self.advance_ppu(1);
+                } else {
+                    self.sync_with_ppu_lead(1);
+                }
                 // Setting the window enable bit lands with the late bits, a dot after clearing
                 // it would (Gambatte's window late_enable and late_reenable _ds tests), as on DMG.
                 let kept_bits =
                     LCDC_BG_ENABLE | LCDC_ENABLE | (value & !old_value & LCDC_WINDOW_ENABLE);
                 self.gpu
                     .write_byte(LCDC_ADDRESS, (value & !kept_bits) | (old_value & kept_bits));
+                // Only clearing the tile data area bit glitches the next read, as at normal speed.
                 self.gpu
-                    .set_tile_sel_glitch((value ^ old_value) & LCDC_TILE_SELECT != 0);
+                    .set_tile_sel_glitch(!value & old_value & LCDC_TILE_SELECT != 0);
                 self.advance_ppu(1);
                 self.gpu.set_tile_sel_glitch(false);
                 self.gpu.write_byte(LCDC_ADDRESS, value);

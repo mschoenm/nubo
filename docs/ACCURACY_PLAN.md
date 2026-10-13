@@ -4,8 +4,8 @@ Nubo's goal is to be the most accurate Game Boy and Game Boy Color emulator ther
 it would take to claim that honestly: what the claim has to mean, where Nubo stands, and the work left,
 in the order it should happen. Update it as phases finish.
 
-Status on 2026-10-13: `cargo test-roms` passes 6524 of 6557 tests on 12 hardware models, and
-[FAILING_TESTS.md](../frontends/test_rom_runner/FAILING_TESTS.md) explains the other 33. That makes Nubo
+Status on 2026-10-13: `cargo test-roms` passes 6526 of 6557 tests on 12 hardware models, and
+[FAILING_TESTS.md](../frontends/test_rom_runner/FAILING_TESTS.md) explains the other 31. That makes Nubo
 one of the strongest emulators on public test ROMs, but nobody can verify a "most accurate" claim yet:
 other emulators haven't been run on the same tests, nothing has been checked on a real console, and some
 hardware isn't emulated at all.
@@ -32,7 +32,7 @@ the README or a release says "most accurate".
 
 What is strong:
 
-- 6524 of 6557 test ROMs from 20 suites pass, on DMG-0, DMG, MGB, SGB, SGB2, CGB-0 to CGB-E and AGB. The
+- 6526 of 6557 test ROMs from 20 suites pass, on DMG-0, DMG, MGB, SGB, SGB2, CGB-0 to CGB-E and AGB. The
   JSON CPU tests pass on every opcode, M-cycle by M-cycle.
 - Each model leaves the boot ROM in its own state (registers, DIV phase, frame position, the boot
   sound's phase), calibrated against Mooneye's, GBMicrotest's and Gambatte's tests.
@@ -97,8 +97,6 @@ without hardware:
 |---|---|---|
 | 9 | Channel 1 duty timing across CGB speed switches | Realign the APU's tick parity at STOP and DIV resets (lead 5.1 in the toolkit's HANDOFF.md) |
 | 2 | Mealybug's tile data switch glitch on CGB-C | Find where CGB-C's glitched fetch takes its data from, using SameBoy traces |
-| 1 | Tile data switch at line 0 in double speed | Line 0 only; the CPU writes already match Gambatte, so look at the line 0 fetcher start |
-| 1 | Window toggled at WX 166 | The window line counter is one line ahead; trace the window's state across the line |
 | 3 | AGE spsw-interrupts | No reference emulator passes it; needs a CGB (Phase 3) |
 | 2 | Mooneye's MGB madness | MGB only and unexplained by its author; needs an MGB (Phase 3) |
 | 9 | DMG palette writes during mode 3 | Mealybug's DMG-blob references and AGE disagree; settle on hardware (Phase 3) |
