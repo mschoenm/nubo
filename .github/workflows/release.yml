@@ -1,9 +1,10 @@
 name: Release
 
 # Pushing a version tag such as v0.2.0 runs every check, the nightly ones
-# included, builds the Flatpaks and the Windows installer and makes a draft
-# GitHub release with them to read over and publish. "Making a release" in
-# CLAUDE.md lists the steps.
+# included, builds the Flatpaks and the Windows installer and publishes a
+# GitHub release with them. Nothing is published unless every check passes;
+# the notes are read over in the release's pull request, before the tag.
+# "Making a release" in CLAUDE.md lists the steps.
 on:
   push:
     tags: ["v*"]
@@ -48,7 +49,7 @@ jobs:
     uses: ./.github/workflows/nightly.yml
 
   release:
-    name: Draft the release
+    name: Publish the release
     needs: [ci, nightly]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -70,10 +71,12 @@ jobs:
           cp artifacts/windows-x64/*-setup.exe upload/Nubo-windows-x64-setup.exe
           cp artifacts/windows-x64/*.zip upload/Nubo-windows-x64.zip
 
-      - name: Make a draft release with the downloads
+      # gh uploads the files to a draft and publishes it once they are all
+      # there, so the release never shows without its downloads.
+      - name: Publish the release with the downloads
         run: >-
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY"
-          --draft --verify-tag --title "Nubo ${GITHUB_REF_NAME#v}"
+          --verify-tag --title "Nubo ${GITHUB_REF_NAME#v}"
           --notes-file artifacts/release-notes/notes.md
           upload/*
         env:
