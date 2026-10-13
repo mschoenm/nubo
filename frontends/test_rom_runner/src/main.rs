@@ -1,8 +1,9 @@
 //! Runs the Game Boy test ROM suites (Blargg, Mooneye, SameSuite, the acid
 //! tests, Mealybug Tearoom, Gambatte, GBMicrotest, AGE, rtc3test, Bully,
 //! Strikethrough, and daid's and CasualPokePlayer's tests from the GB
-//! Emulator Shootout) and compares the results with `passing.txt`, so both
-//! regressions and newly passing tests are noticed.
+//! Emulator Shootout) and compares the results with `passing.txt`, so
+//! regressions, newly passing tests and listed tests that no longer run are
+//! noticed.
 
 use clap::Parser;
 use runner::Outcome;
@@ -86,13 +87,22 @@ fn run(args: &Args) -> Result<bool, String> {
         .map(|(test, _)| test.id())
         .collect();
     let expected = expectations::load()?;
+    // Only an unfiltered run sees every test, so only there does a listed test
+    // that didn't run mean a stale entry rather than one the filter left out.
+    let unfiltered = args.filter.is_none();
+    let listed_but_not_run: BTreeSet<String> = expected.difference(&run_ids).cloned().collect();
 
     if args.update {
-        let updated: BTreeSet<String> = expected
-            .difference(&run_ids)
-            .cloned()
-            .chain(passing)
-            .collect();
+        let kept = if unfiltered {
+            print_ids(
+                "Removed from the list, since they weren't run:",
+                &listed_but_not_run,
+            );
+            BTreeSet::new()
+        } else {
+            listed_but_not_run
+        };
+        let updated: BTreeSet<String> = kept.into_iter().chain(passing).collect();
         expectations::save(&updated)?;
         println!("\nUpdated {}", expectations::path().display());
         return Ok(true);
@@ -110,12 +120,19 @@ fn run(args: &Args) -> Result<bool, String> {
             }
         }
     }
-    if !improvements.is_empty() {
-        println!("\nNewly passing (run with --update to record them):");
-        for id in &improvements {
-            println!("  {id}");
-        }
-    }
+    print_ids(
+        "Newly passing (run with --update to record them):",
+        improvements.iter().copied(),
+    );
+    let not_run = if unfiltered {
+        listed_but_not_run
+    } else {
+        BTreeSet::new()
+    };
+    print_ids(
+        "Listed but not run (find out why, then run with --update to remove them):",
+        &not_run,
+    );
     if failures_dir.exists() {
         println!(
             "\nScreens of failing screenshot tests are in {}",
@@ -123,7 +140,18 @@ fn run(args: &Args) -> Result<bool, String> {
         );
     }
 
-    Ok(regressions.is_empty() && improvements.is_empty())
+    Ok(regressions.is_empty() && improvements.is_empty() && not_run.is_empty())
+}
+
+/// Prints the given test IDs under a heading, or nothing when there are none.
+fn print_ids<'a>(heading: &str, ids: impl IntoIterator<Item = &'a String>) {
+    let mut ids = ids.into_iter().peekable();
+    if ids.peek().is_some() {
+        println!("\n{heading}");
+        for id in ids {
+            println!("  {id}");
+        }
+    }
 }
 
 /// Prints how many tests passed per suite and model, and in total.

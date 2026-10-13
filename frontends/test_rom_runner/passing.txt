@@ -82,9 +82,7 @@ cgb mealybug-tearoom-tests/ppu/m2_win_en_toggle.gb
 cgb mealybug-tearoom-tests/ppu/m3_bgp_change.gb
 cgb mealybug-tearoom-tests/ppu/m3_bgp_change_sprites.gb
 cgb mealybug-tearoom-tests/ppu/m3_lcdc_bg_en_change.gb
-cgb mealybug-tearoom-tests/ppu/m3_lcdc_bg_en_change2.gb
 cgb mealybug-tearoom-tests/ppu/m3_lcdc_bg_map_change.gb
-cgb mealybug-tearoom-tests/ppu/m3_lcdc_bg_map_change2.gb
 cgb mealybug-tearoom-tests/ppu/m3_lcdc_obj_en_change.gb
 cgb mealybug-tearoom-tests/ppu/m3_lcdc_obj_en_change_variant.gb
 cgb mealybug-tearoom-tests/ppu/m3_lcdc_obj_size_change.gb
@@ -93,10 +91,8 @@ cgb mealybug-tearoom-tests/ppu/m3_lcdc_tile_sel_change.gb
 cgb mealybug-tearoom-tests/ppu/m3_lcdc_tile_sel_win_change.gb
 cgb mealybug-tearoom-tests/ppu/m3_lcdc_win_en_change_multiple.gb
 cgb mealybug-tearoom-tests/ppu/m3_lcdc_win_map_change.gb
-cgb mealybug-tearoom-tests/ppu/m3_lcdc_win_map_change2.gb
 cgb mealybug-tearoom-tests/ppu/m3_obp0_change.gb
 cgb mealybug-tearoom-tests/ppu/m3_scx_high_5_bits.gb
-cgb mealybug-tearoom-tests/ppu/m3_scx_high_5_bits_change2.gb
 cgb mealybug-tearoom-tests/ppu/m3_scx_low_3_bits.gb
 cgb mealybug-tearoom-tests/ppu/m3_scy_change.gb
 cgb mealybug-tearoom-tests/ppu/m3_window_timing.gb
