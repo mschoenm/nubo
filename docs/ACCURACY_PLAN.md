@@ -95,8 +95,8 @@ without hardware:
 
 | Tests | Group | Next step |
 |---|---|---|
-| 9 | Channel 1 duty timing across CGB speed switches | Realign the APU's tick parity at STOP and DIV resets (lead 5.1 in the toolkit's HANDOFF.md) |
 | 2 | Mealybug's tile data switch glitch on CGB-C | Find where CGB-C's glitched fetch takes its data from, using SameBoy traces |
+| 9 | Channel 1 duty timing across CGB speed switches | Realigning the tick parity at STOP and DIV resets was tried and can't fix them. 7 need the sound clock's position within a 2 MHz tick modelled across switches without breaking SameSuite's PCM12 tests; 2 conflict with SameSuite on CGB-C and need a CGB-C (Phase 3) |
 | 3 | AGE spsw-interrupts | No reference emulator passes it; needs a CGB (Phase 3) |
 | 2 | Mooneye's MGB madness | MGB only and unexplained by its author; needs an MGB (Phase 3) |
 | 9 | DMG palette writes during mode 3 | Mealybug's DMG-blob references and AGE disagree; settle on hardware (Phase 3) |
