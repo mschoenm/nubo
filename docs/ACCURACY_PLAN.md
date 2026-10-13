@@ -177,7 +177,7 @@ need them run.
 
 1. Publish the Phase 1 table in the README with its method, versions and date, and rerun it for each
    release.
-2. Add Nubo to the GB Emulator Shootout.
+2. Add Nubo to the GB Emulator Shootout ([SHOOTOUT_PLAN.md](SHOOTOUT_PLAN.md)).
 3. Report wrong expectations to test suite authors, and publish Nubo's own hardware-verified test ROMs
    (Phase 3) for other emulators to use.
 4. Keep `cargo test-roms` and `cargo cpu-tests` running in CI on every pull request (and
