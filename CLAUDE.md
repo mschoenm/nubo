@@ -6,7 +6,7 @@ Folders with their own `CLAUDE.md` (listed under Where Things Are) explain their
 
 ## Setup and Commands
 
-Only a Rust toolchain is needed: the newest stable, as `rust-toolchain.toml` asks (`rustup update`). Linux also needs `libasound2-dev`, `libudev-dev` and `pkg-config`. The `cargo` aliases below are defined in `.cargo/config.toml`; packaging, the web build and the other project tasks are in `xtask/CLAUDE.md`.
+Only a Rust toolchain is needed: the newest stable, as `rust-toolchain.toml` asks (`rustup update`). Linux also needs `libasound2-dev`, `libudev-dev` and `pkg-config`, and the browser build's lint needs `rustup target add wasm32-unknown-unknown`. The `cargo` aliases below are defined in `.cargo/config.toml`; packaging, the web build and the other project tasks are in `xtask/CLAUDE.md`.
 
 ```bash
 cargo build / cargo test      # The core crates only (the workspace's default members)
@@ -29,7 +29,7 @@ Run what CI runs, so a pull request is green the first time:
 4. If emulation may have changed: `cargo test-roms`. When results change on purpose, run `cargo test-roms --update` and commit `passing.txt`; when a test in `frontends/test_rom_runner/FAILING_TESTS.md` starts passing, update that file too.
 5. If the CPU changed: `cargo cpu-tests`.
 6. If what save states store changed: `cargo save-states`, and keep a new set with `cargo save-states --record` in the same pull request.
-7. If the change must not alter output (an optimization, a refactor): record fingerprints before the change and compare after, on the benchmark games (`cargo xtask benchmark-roms`, then `cargo benchmark target/benchmark-roms --record before.txt`) and on the test ROMs (`cargo benchmark target/test-roms/v7.0 --seconds 4 --jobs <cores> --record before-tests.txt`).
+7. If the change must not alter output (an optimization, a refactor): record fingerprints on a build without it (`git stash`), then compare with it. Do this on the benchmark games (`cargo xtask benchmark-roms`, then `cargo benchmark target/benchmark-roms --record before.txt` and later `--compare before.txt`) and on the test ROMs (`cargo benchmark target/test-roms/v7.0 --seconds 4 --jobs <cores>` with the same flags). For a change to the lazy components, also compare against the `eager` build (`frontends/benchmark/CLAUDE.md`).
 
 CI also runs `cargo doc` with warnings as errors, `cargo deny check licenses bans sources` and `cargo xtask build-web --quick`; the slow checks run nightly. What runs where: `docs/CI.md`.
 
@@ -53,6 +53,7 @@ These keep Nubo exact, and players' saves safe. Never break them.
 - **Few inline comments.** Let names and structure explain the code; use `//` only for what the code can't say, such as hardware quirks or the reference something was ported from.
 - **Whole words, not abbreviations.** Acronyms are words in type names (`RtcState`, `Mbc1CartridgeMapper`), getters have no `get_` prefix, and Pan Docs register names (`lcdc`, `nr52`, `svbk`) are fine.
 - **Modules are declared at the bottom of the file.**
+- **Docs move with the code.** Facts about a file live in its doc comments, and how files work together in the folder's `CLAUDE.md`; update whatever your change makes wrong, in the same commit.
 - **Clippy stays clean.** The workspace enables the default lints and a curated set of pedantic ones (root `Cargo.toml`); every crate opts in with `[lints] workspace = true`. To silence a lint, put `#[expect(clippy::..., reason = "...")]` on the smallest item possible.
 
 ## Where Things Are
