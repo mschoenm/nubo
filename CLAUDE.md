@@ -174,6 +174,10 @@ For a ROM outside the suites, the headless frontend runs it and saves a screensh
 cargo screenshot path/to/test_rom.gb 10
 ```
 
+## Merging Pull Requests
+
+Codex reviews every pull request when it is opened. Its summary comment ("Codex Review Summary") shows the review as running and then as completed, and its findings arrive as review comments. When the maintainer asks Claude to merge a pull request, Claude waits until CI is green and Codex's review has completed. It then handles Codex's findings like any other review comments (fix and push, or answer why not, then resolve the thread) before it merges. A push after Codex's review doesn't start a new one; a comment saying `@codex review` does.
+
 ## Making a Release
 
 Release notes are written once, in the `<releases>` list of `frontends/iced/linux/io.github.mschoenm.nubo.metainfo.xml`, which Linux software centers and Flathub show; CI checks that its newest entry is the version in the root `Cargo.toml`.
