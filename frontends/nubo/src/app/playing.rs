@@ -38,9 +38,9 @@ pub enum GameMessage {
     AddCheat,
     CheatToggled(usize, bool),
     RemoveCheat(usize),
-    /// The pictures of the save state slots of the game at this path were
-    /// read (see `Game::thumbnails_to_load`).
-    ThumbnailsLoaded(PathBuf, Vec<(Slot, Option<Picture>)>),
+    /// The pictures of the save state slots a pause menu page lists were
+    /// read, for this opening of the page (see `Game::thumbnails_to_load`).
+    ThumbnailsLoaded(u64, Vec<(Slot, Option<Picture>)>),
 }
 
 impl From<GameMessage> for Message {
@@ -81,9 +81,9 @@ impl App {
                     game.show_menu(Some(page));
                 }
             }
-            GameMessage::ThumbnailsLoaded(rom_path, thumbnails) => {
+            GameMessage::ThumbnailsLoaded(slot_listing, thumbnails) => {
                 if let Some(game) = &mut self.game {
-                    game.set_thumbnails(&rom_path, thumbnails);
+                    game.set_thumbnails(slot_listing, thumbnails);
                 }
             }
             GameMessage::SaveState(slot) => self.save_state(slot),

@@ -235,15 +235,15 @@ impl App {
     /// Reads the pictures of the save state slots a pause menu page that
     /// just opened lists, on a background thread.
     fn load_slot_thumbnails(&mut self) -> Task<Message> {
-        let Some((rom_path, slots)) = self.game.as_mut().and_then(Game::thumbnails_to_load) else {
+        let Some((slot_listing, rom_path, slots)) =
+            self.game.as_mut().and_then(Game::thumbnails_to_load)
+        else {
             return Task::none();
         };
-        let reading_path = rom_path.clone();
         Task::perform(
-            background::run(move || save_states::thumbnails(&reading_path, &slots)),
+            background::run(move || save_states::thumbnails(&rom_path, &slots)),
             move |thumbnails| {
-                GameMessage::ThumbnailsLoaded(rom_path.clone(), thumbnails.unwrap_or_default())
-                    .into()
+                GameMessage::ThumbnailsLoaded(slot_listing, thumbnails.unwrap_or_default()).into()
             },
         )
     }
