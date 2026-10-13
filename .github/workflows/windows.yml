@@ -54,15 +54,29 @@ jobs:
         run: |
           cargo xtask benchmark-roms
           $rom = (Resolve-Path target/benchmark-roms/tobudx.gb).Path
+
+          # Runs a program, waits for it and returns its exit code. Nubo is a
+          # windowed program, which PowerShell doesn't wait for when called
+          # directly, and the process's exit code is only kept once its
+          # handle was read.
+          function Invoke-Program($path, $arguments, $output) {
+            $options = @{ FilePath = $path; ArgumentList = $arguments; NoNewWindow = $true; PassThru = $true }
+            if ($output) { $options.RedirectStandardOutput = $output }
+            $process = Start-Process @options
+            $null = $process.Handle
+            $process.WaitForExit()
+            $process.ExitCode
+          }
+
           function Test-Nubo($folder) {
             foreach ($file in "LICENSE.txt", "LICENSE-APACHE.txt", "NOTICE.txt", "THIRD_PARTY_LICENSES.txt") {
               if (-not (Test-Path (Join-Path $folder $file))) { throw "$file is missing from $folder" }
             }
-            # Capturing its output makes PowerShell wait for it, though it is
-            # a windowed program.
-            $json = & (Join-Path $folder "nubo.exe") --measure-efficiency $rom
+            $output = Join-Path $env:RUNNER_TEMP "efficiency.json"
+            $exitCode = Invoke-Program (Join-Path $folder "nubo.exe") @("--measure-efficiency", "`"$rom`"") $output
+            $json = Get-Content $output -Raw
             $json
-            if ($LASTEXITCODE -ne 0) { throw "nubo.exe in $folder exited with $LASTEXITCODE" }
+            if ($exitCode -ne 0) { throw "nubo.exe in $folder exited with $exitCode" }
             $playing = ($json | ConvertFrom-Json).playing
             if ($playing.buffers_per_second -le 0 -or $playing.frames_per_second -le 0) {
               throw "nubo.exe in $folder didn't play the game"
@@ -73,15 +87,15 @@ jobs:
           Expand-Archive -Path (Get-Item target/bundle/*-windows-x64.zip).FullName -DestinationPath $unpacked
           Test-Nubo (Join-Path $unpacked "Nubo")
 
-          # Piping a program's output makes PowerShell wait for it.
-          $silent = "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"
-          & (Get-Item target/bundle/*-windows-x64-setup.exe).FullName $silent | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw "The installer exited with $LASTEXITCODE" }
+          $silent = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART")
+          $exitCode = Invoke-Program (Get-Item target/bundle/*-windows-x64-setup.exe).FullName $silent
+          if ($exitCode -ne 0) { throw "The installer exited with $exitCode" }
           $installed = Join-Path $env:LOCALAPPDATA "Programs\Nubo"
           Test-Nubo $installed
 
           # The uninstaller hands over to a copy of itself and returns at once.
-          & (Join-Path $installed "unins000.exe") $silent | Out-Null
+          $exitCode = Invoke-Program (Join-Path $installed "unins000.exe") $silent
+          if ($exitCode -ne 0) { throw "The uninstaller exited with $exitCode" }
           for ($second = 0; (Test-Path (Join-Path $installed "nubo.exe")) -and $second -lt 60; $second++) {
             Start-Sleep -Seconds 1
           }
