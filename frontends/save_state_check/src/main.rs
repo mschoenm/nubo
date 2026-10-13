@@ -10,13 +10,13 @@
 //! adds a set. Every state of every set must load into this version without a
 //! value it can't read, and play on.
 //!
-//! `cargo test` checks the test cartridges' states on every platform CI runs
-//! it on, so states made on one platform are shown to load on the others, and
-//! `cargo save-states` checks the games' states too. The test cartridges
-//! cover the whole layout: which fields a state stores depends only on the
-//! cartridge's controller, never on what the game did, and every variant of
-//! an enum is listed whichever one a state holds, as are the fields of an
-//! empty `Vec`'s items and of a `None`.
+//! `cargo test --workspace` checks the test cartridges' states on every
+//! platform CI runs it on, so states made on one platform are shown to load on
+//! the others, and `cargo save-states` checks the games' states too. The test
+//! cartridges cover the whole layout: which fields a state stores depends only
+//! on the cartridge's controller, never on what the game did, and every
+//! variant of an enum is listed whichever one a state holds, as are the fields
+//! of an empty `Vec`'s items and of a `None`.
 //!
 //! The games aren't part of Nubo: `cargo xtask benchmark-roms` downloads them
 //! to `target/benchmark-roms`, where this looks for them. A game whose states
@@ -507,8 +507,8 @@ fn date_of_day(days: u64) -> String {
 mod tests {
     use super::*;
 
-    /// Runs with `cargo test` on every platform CI tests on, so states made
-    /// on one platform must load on all of them.
+    /// Runs with `cargo test --workspace` on every platform CI tests on, so
+    /// states made on one platform must load on all of them.
     #[test]
     fn kept_states_load_and_the_newest_set_lists_this_versions_layout() {
         let sets = workspace_root().join("save-states");

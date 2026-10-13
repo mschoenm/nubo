@@ -12,4 +12,4 @@ cargo save-states --record    # Keep a new set when the layout changed, named af
 - Kept sets are never changed or removed.
 - The test cartridges (`cartridges.rs`) never change, since a state only loads into the cartridge it was made with; `the_cartridges_never_change` pins them.
 - The benchmark games whose states are kept stay at the same version in `xtask/src/benchmark_roms.rs`, for the same reason.
-- `cargo test` checks the test cartridges' states too (without the games), on Linux, macOS and Windows, so states are shown to load on every platform.
+- `cargo test --workspace` (not a plain `cargo test`, since this crate isn't a default member) checks the test cartridges' states too (without the games), on Linux, macOS and Windows, so states are shown to load on every platform.
