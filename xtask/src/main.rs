@@ -43,6 +43,14 @@ Commands:
   release-notes [tag]
                 Check that the newest release in the AppStream file is the version in Cargo.toml
                 (and that the tag, such as v1.2.3, names it) and print its notes as Markdown
+  benchmark-roms
+                Download the free homebrew games the nightly CI benchmarks into
+                target/benchmark-roms and check their checksums
+  review-units [next --state <rotation.json> --date <YYYY-MM-DD> --commit <sha>]
+                List the parts the nightly review splits the code into, or pick tonight's part
+                and record it in the rotation's state
+  metrics append <metrics.jsonl> <night.json> | metrics report <metrics.jsonl>
+                Add a night to the nightly metrics log, or write the Nightly metrics wiki page
   help          Show this message";
 
 /// Every task reports failures as a message for the user.
@@ -270,6 +278,11 @@ fn main() -> ExitCode {
         Some("release-notes") => {
             release::release_notes(env::args().nth(2).as_deref()).map(|notes| print!("{notes}"))
         }
+        Some("benchmark-roms") => benchmark_roms::ensure_benchmark_roms().map(|folder| {
+            println!("The benchmark games are in {}", folder.display());
+        }),
+        Some("review-units") => review_units::run(&env::args().skip(2).collect::<Vec<_>>()),
+        Some("metrics") => metrics::run(&env::args().skip(2).collect::<Vec<_>>()),
         Some("help") | None => {
             println!("{USAGE}");
             Ok(())
@@ -286,8 +299,11 @@ fn main() -> ExitCode {
     }
 }
 
+mod benchmark_roms;
 mod bundle;
 mod flatpak;
 mod licenses;
+mod metrics;
 mod release;
+mod review_units;
 mod windows;

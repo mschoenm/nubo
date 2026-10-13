@@ -93,8 +93,9 @@ impl BatterySaves {
         )
     }
 
-    /// The saves for the ROM at `rom_path`, kept in `directory`, for tests.
-    #[cfg(all(test, not(target_arch = "wasm32")))]
+    /// The saves for the ROM at `rom_path`, kept in `directory`, for tests
+    /// and measurements that mustn't touch the player's saves.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn in_directory(directory: &Path, rom_path: &Path) -> Arc<BatterySaves> {
         Self::new(
             SaveSlot::in_directory(Some(directory), rom_path, "sav"),

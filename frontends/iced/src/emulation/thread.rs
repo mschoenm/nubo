@@ -5,6 +5,7 @@
 //! from a shared buffer, after the thread tells it a new one is there.
 
 use super::{Command, Machine, Playback, ask, stopped_error};
+use crate::battery::BatterySaves;
 use crate::notices::Notices;
 use crate::rom::Rom;
 use iced::Subscription;
@@ -77,7 +78,30 @@ pub struct Session {
     commands: Sender<Command>,
     frame: Arc<Mutex<SharedFrame>>,
     running: Arc<AtomicBool>,
+    activity: Arc<Activity>,
     thread: Option<JoinHandle<()>>,
+}
+
+/// Counts what the emulator thread does, to measure how often it wakes the
+/// processor (see `efficiency.rs`). Every wake-up keeps a laptop's processor
+/// from resting, so fewer of them save battery.
+#[derive(Debug, Default)]
+pub struct Activity {
+    /// How often the thread went to sleep, and so woke up again.
+    wakeups: AtomicU64,
+    /// Audio buffers emulated, played or skipped.
+    buffers: AtomicU64,
+}
+
+/// What the emulator thread had done at one moment (see
+/// [`Session::activity`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ActivityCount {
+    pub wakeups: u64,
+    pub buffers: u64,
+    /// Frames handed to the window, which skips frames exactly like the one
+    /// before.
+    pub frames: u64,
 }
 
 impl Session {
@@ -91,21 +115,35 @@ impl Session {
         playback: Playback,
         notices: &Notices,
     ) -> Result<Session, String> {
+        let saves = BatterySaves::for_rom(&rom.path, notices.clone());
+        Session::start_with_saves(rom, saves, model, playback, notices)
+    }
+
+    /// Like [`Session::start`], with the battery saves kept in `saves`.
+    pub fn start_with_saves(
+        rom: &Rom,
+        saves: Arc<BatterySaves>,
+        model: Model,
+        playback: Playback,
+        notices: &Notices,
+    ) -> Result<Session, String> {
         let (commands, command_receiver) = mpsc::channel();
         let (loaded_sender, loaded_receiver) = mpsc::channel();
         let frame = Arc::new(Mutex::new(SharedFrame::default()));
         let running = Arc::new(AtomicBool::new(true));
+        let activity = Arc::new(Activity::default());
 
         let thread = {
             let rom = rom.clone();
             let frame = frame.clone();
             let running = running.clone();
+            let activity = activity.clone();
             let notices = notices.clone();
 
             thread::Builder::new()
                 .name(String::from("emulator"))
-                .spawn(
-                    move || match Machine::start(&rom, model, playback, &notices) {
+                .spawn(move || {
+                    match Machine::start_with_saves(&rom, saves, model, playback, &notices) {
                         Ok(machine) => {
                             machine.audio.wake_when_low(thread::current());
                             let _ = loaded_sender.send(Ok(()));
@@ -114,6 +152,7 @@ impl Session {
                                 commands: command_receiver,
                                 frame,
                                 running,
+                                activity,
                                 fast_forward: FastForward::new(),
                             }
                             .run();
@@ -121,8 +160,8 @@ impl Session {
                         Err(error) => {
                             let _ = loaded_sender.send(Err(error));
                         }
-                    },
-                )
+                    }
+                })
                 .map_err(|error| error.to_string())?
         };
 
@@ -132,6 +171,7 @@ impl Session {
                 commands,
                 frame,
                 running,
+                activity,
                 thread: Some(thread),
             }),
             Ok(Err(error)) => {
@@ -185,6 +225,15 @@ impl Session {
         let frame = self.frame.lock().ok()?;
         (frame.sequence != sequence).then(|| (frame.sequence, frame.pixels.clone()))
     }
+
+    /// What the emulator thread has done since the session started.
+    pub fn activity(&self) -> ActivityCount {
+        ActivityCount {
+            wakeups: self.activity.wakeups.load(Ordering::Relaxed),
+            buffers: self.activity.buffers.load(Ordering::Relaxed),
+            frames: self.frame.lock().map_or(0, |frame| frame.sequence),
+        }
+    }
 }
 
 impl Drop for Session {
@@ -204,6 +253,7 @@ struct EmulatorThread {
     frame: Arc<Mutex<SharedFrame>>,
     /// Cleared when the session ends.
     running: Arc<AtomicBool>,
+    activity: Arc<Activity>,
     fast_forward: FastForward,
 }
 
@@ -240,6 +290,7 @@ impl EmulatorThread {
         // the game is paused, so only a command or the end of the session
         // can give the thread something to do.
         if !self.machine.playback.running {
+            self.count_wakeup();
             thread::park();
             return;
         }
@@ -251,6 +302,7 @@ impl EmulatorThread {
                 self.skip_buffer();
             }
 
+            self.activity.buffers.fetch_add(1, Ordering::Relaxed);
             let (playing_time, pixels) = self.machine.play_buffer();
             if let Some(pixels) = pixels {
                 publish_frame(&self.frame, pixels);
@@ -261,15 +313,24 @@ impl EmulatorThread {
             if wait.is_zero() && self.fast_forward.take_buffer() {
                 self.skip_buffer();
             } else {
+                self.count_wakeup();
                 thread::park_timeout(wait);
             }
         } else {
+            self.count_wakeup();
             self.machine.audio.wait_until_samples_needed(LONGEST_SLEEP);
         }
     }
 
+    /// Counts a sleep the thread is about to go into, and so the wake-up
+    /// after it.
+    fn count_wakeup(&self) {
+        self.activity.wakeups.fetch_add(1, Ordering::Relaxed);
+    }
+
     /// Emulates one audio buffer without playing it, for fast forward.
     fn skip_buffer(&mut self) {
+        self.activity.buffers.fetch_add(1, Ordering::Relaxed);
         if let Some(pixels) = self.machine.skip_buffer().1 {
             publish_frame(&self.frame, pixels);
         }

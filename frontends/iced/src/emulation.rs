@@ -17,7 +17,7 @@ use std::sync::Arc;
 use std::sync::mpsc::{self, Sender};
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use thread::Session;
+pub use thread::{ActivityCount, Session};
 #[cfg(target_arch = "wasm32")]
 pub use web::Session;
 
@@ -72,6 +72,7 @@ impl Machine {
     /// `playback` says from the start, so a muted player hears nothing.
     /// Problems while it runs, such as a missing sound device, go to
     /// `notices`.
+    #[cfg(target_arch = "wasm32")]
     fn start(
         rom: &Rom,
         model: Model,
@@ -79,6 +80,20 @@ impl Machine {
         notices: &Notices,
     ) -> Result<Machine, String> {
         let saves = BatterySaves::for_rom(&rom.path, notices.clone());
+        Machine::start_with_saves(rom, saves, model, playback, notices)
+    }
+
+    /// Opens the sound output and loads `rom` on `model` with its battery
+    /// saves kept in `saves`, returning the load error if it couldn't. It
+    /// plays as `playback` says from the start. Problems while it runs go to
+    /// `notices`.
+    fn start_with_saves(
+        rom: &Rom,
+        saves: Arc<BatterySaves>,
+        model: Model,
+        playback: Playback,
+        notices: &Notices,
+    ) -> Result<Machine, String> {
         let audio = AudioOutput::open(notices);
         Machine::new(&rom.bytes, saves, audio, model, playback)
     }
