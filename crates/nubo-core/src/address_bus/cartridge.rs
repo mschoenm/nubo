@@ -23,7 +23,7 @@ use crate::address_bus::mbc2::{MBC2_RAM_SIZE, Mbc2CartridgeMapper};
 use crate::address_bus::mbc3::{Mbc3CartridgeMapper, rtc_time};
 use crate::address_bus::mbc5::Mbc5CartridgeMapper;
 use crate::error::LoadRomError;
-use crate::serializable::Serializable;
+use crate::serializable::{FieldWriter, Serializable, read_fields};
 use serializable_derive::Serializable;
 use std::io::{Read, Write};
 use std::sync::Arc;
@@ -238,30 +238,38 @@ impl CartridgeMapper {
     }
 }
 
-/// Save states keep only the controller's registers, not which controller it
-/// is: the ROM decides that, and a save state only loads into the game it was
-/// made with.
+/// Save states keep the controller's registers as one field named after the
+/// kind of controller (`mbc1`, `mbc3`, ...), with nothing for a cartridge
+/// without one. Which controller it is comes from the ROM, since a save state
+/// only loads into the game it was made with; the name makes sure that if a
+/// later version picks another controller for a cartridge type, it starts
+/// that one at power-on instead of reading the other's registers.
 impl Serializable for CartridgeMapper {
     fn serialize(&self, writer: &mut dyn Write) -> std::io::Result<()> {
+        let mut fields = FieldWriter::new(writer);
         match self {
-            Self::RomOnly => Ok(()),
-            Self::Mbc1(mbc1) => mbc1.serialize(writer),
-            Self::Mbc2(mbc2) => mbc2.serialize(writer),
-            Self::Mbc3(mbc3) => mbc3.serialize(writer),
-            Self::Mbc5(mbc5) => mbc5.serialize(writer),
-            Self::Huc1(huc1) => huc1.serialize(writer),
+            Self::RomOnly => {}
+            Self::Mbc1(mbc1) => fields.field("mbc1", mbc1)?,
+            Self::Mbc2(mbc2) => fields.field("mbc2", mbc2)?,
+            Self::Mbc3(mbc3) => fields.field("mbc3", mbc3)?,
+            Self::Mbc5(mbc5) => fields.field("mbc5", mbc5)?,
+            Self::Huc1(huc1) => fields.field("huc1", huc1)?,
         }
+        fields.finish()
     }
 
     fn deserialize(&mut self, reader: &mut dyn Read) -> std::io::Result<()> {
-        match self {
-            Self::RomOnly => Ok(()),
-            Self::Mbc1(mbc1) => mbc1.deserialize(reader),
-            Self::Mbc2(mbc2) => mbc2.deserialize(reader),
-            Self::Mbc3(mbc3) => mbc3.deserialize(reader),
-            Self::Mbc5(mbc5) => mbc5.deserialize(reader),
-            Self::Huc1(huc1) => huc1.deserialize(reader),
-        }
+        read_fields(reader, |name, bytes| {
+            match (name, &mut *self) {
+                ("mbc1", Self::Mbc1(mbc1)) => mbc1.deserialize(bytes)?,
+                ("mbc2", Self::Mbc2(mbc2)) => mbc2.deserialize(bytes)?,
+                ("mbc3", Self::Mbc3(mbc3)) => mbc3.deserialize(bytes)?,
+                ("mbc5", Self::Mbc5(mbc5)) => mbc5.deserialize(bytes)?,
+                ("huc1", Self::Huc1(huc1)) => huc1.deserialize(bytes)?,
+                _ => return Ok(false),
+            }
+            Ok(true)
+        })
     }
 }
 
@@ -684,6 +692,32 @@ mod tests {
             cartridge.deserialize(&mut state.as_slice()).unwrap();
             exercise(&mut cartridge);
         }
+    }
+
+    #[test]
+    fn a_controller_keeps_its_power_on_registers_in_a_state_of_another_controller() {
+        let mut mbc1 = load_cartridge(
+            build_rom(CART_TYPE_MBC1_RAM_BATTERY, 0x05, 0x03),
+            empty_cartridge_effects(),
+        )
+        .unwrap();
+        mbc1.write_rom(0x2000, 0x05);
+        let mut state = Vec::new();
+        mbc1.serialize(&mut state).unwrap();
+
+        let mut mbc5 = load_cartridge(
+            build_rom(CART_TYPE_MBC5_RAM_BATTERY, 0x05, 0x03),
+            empty_cartridge_effects(),
+        )
+        .unwrap();
+        let unreadable =
+            crate::serializable::collect_unreadable(|| mbc5.deserialize(&mut state.as_slice()))
+                .unwrap();
+        assert!(unreadable.is_empty());
+        assert_eq!(mbc5.rom_banks(), [0, 1]);
+
+        let paths = crate::serializable::field_paths(|| mbc1.serialize(&mut std::io::sink()));
+        assert!(paths.unwrap().contains("mapper.mbc1.bank1"));
     }
 
     /// Cartridge effects that load `ram` as the game's save.
