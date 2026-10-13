@@ -59,6 +59,19 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.5.0" date="2026-10-13">
+      <description>
+        <p>Games on MBC3 cartridges, such as Pokémon Gold, Silver and Crystal, now switch banks and read their clock as real cartridges do, and two picture glitches are fixed.</p>
+        <ul>
+          <li>The Japanese Pokémon Crystal and other games with a large MBC3 cartridge (the MBC30) now run</li>
+          <li>The cartridge clock in MBC3 games reads back the way the real chip does: a time written to the clock shows after the next latch, and any write to the latch register latches it</li>
+          <li>Switching to a bank number the cartridge doesn't have now gives what the real cartridge gives, instead of the previous bank</li>
+          <li>The window, a layer games use for menus and status bars, no longer starts a line too far down when a game turns it on at the right edge of the screen</li>
+          <li>Changing where background tiles come from at the top of the screen in Game Boy Color double speed mode no longer draws a mixed-up tile</li>
+          <li>Save states made by Nubo 0.4.0 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-10-13">
       <description>
         <p>Save states now keep working when Nubo is updated.</p>
