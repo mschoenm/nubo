@@ -37,12 +37,26 @@ const FORMAT_VERSION: u8 = 28;
 /// and which don't load.
 const UNNAMED_FORMAT_MAGIC: &[u8] = b"HEADER";
 
+/// The commit of Nubo's source code this build was made from, such as
+/// `7c44d3955370fa02045672a5774f923007919876`, followed by `-dirty` when the
+/// source had changes that weren't committed. `cargo xtask` sets it through
+/// `NUBO_COMMIT` for everything it builds (every release and nightly build);
+/// it is empty for a plain `cargo build`. Save states store it so a state
+/// tells exactly which build made it.
+pub const BUILD_COMMIT: &str = match option_env!("NUBO_COMMIT") {
+    Some(commit) => commit,
+    None => "",
+};
+
 /// What a save state says about itself, read without loading the state, so a
 /// frontend knows which model to emulate before it loads one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SaveStateHeader {
     /// The version of Nubo that made the state, such as `0.4.0`.
     pub nubo_version: String,
+    /// The commit the build that made the state was made from
+    /// ([`BUILD_COMMIT`]), empty when it isn't known.
+    pub nubo_commit: String,
     /// The hardware the state was made on, the only one it loads into.
     pub model: Model,
     /// The title in the game's cartridge header. A state only loads into a
@@ -65,6 +79,7 @@ impl SaveStateHeader {
         let checksum = cartridge.rom().get(0x14E..0x150).unwrap_or_default();
         SaveStateHeader {
             nubo_version: String::from(env!("CARGO_PKG_VERSION")),
+            nubo_commit: String::from(BUILD_COMMIT),
             model: emulator.model(),
             game_title: cartridge.title().to_owned(),
             game_checksum: checksum.try_into().map_or(0, u16::from_be_bytes),
@@ -74,6 +89,7 @@ impl SaveStateHeader {
     fn write(&self, writer: &mut dyn Write) -> io::Result<()> {
         let mut fields = FieldWriter::new(writer);
         fields.field("nubo_version", &self.nubo_version)?;
+        fields.field("nubo_commit", &self.nubo_commit)?;
         fields.field_with("model", String::encoding, |writer| {
             note_variants(&Model::ALL.map(Model::name));
             String::from(self.model.name()).serialize(writer)
@@ -104,12 +120,14 @@ fn split(data: &[u8]) -> Result<(SaveStateHeader, &[u8]), SaveStateError> {
     }
 
     let mut nubo_version = String::new();
+    let mut nubo_commit = String::new();
     let mut model = None;
     let mut game_title = None;
     let mut game_checksum = 0;
     read_fields(&mut rest, |name, bytes| {
         match name {
             "nubo_version" => nubo_version.deserialize(bytes)?,
+            "nubo_commit" => nubo_commit.deserialize(bytes)?,
             "model" => {
                 let mut name = String::new();
                 name.deserialize(bytes)?;
@@ -133,6 +151,7 @@ fn split(data: &[u8]) -> Result<(SaveStateHeader, &[u8]), SaveStateError> {
     // Without them a state can't be checked against the emulator it loads into.
     let header = SaveStateHeader {
         nubo_version,
+        nubo_commit,
         model: model.ok_or(SaveStateError::InvalidFormat)?,
         game_title: game_title.ok_or(SaveStateError::InvalidFormat)?,
         game_checksum,
@@ -366,6 +385,7 @@ mod tests {
         let emulator = emulator_with_game();
         let header = SaveStateHeader::read(&emulator.save_state()).unwrap();
         assert_eq!(header.nubo_version, env!("CARGO_PKG_VERSION"));
+        assert_eq!(header.nubo_commit, BUILD_COMMIT);
         assert_eq!(header.model, Model::Dmg);
         assert_eq!(
             header.game_title,

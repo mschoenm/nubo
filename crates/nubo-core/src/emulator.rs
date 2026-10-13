@@ -316,6 +316,6 @@ impl Emulator {
 }
 
 mod save_state;
-pub use save_state::SaveStateHeader;
+pub use save_state::{BUILD_COMMIT, SaveStateHeader};
 #[cfg(test)]
 mod tests;
