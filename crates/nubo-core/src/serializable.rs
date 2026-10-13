@@ -20,6 +20,13 @@
 //!   values): store it under a new name, so versions on either side leave it
 //!   at its power-on value instead of misreading it.
 //!
+//! `cargo test` and `cargo save-states` fail when the fields, their types or
+//! the enum variants a state can store change ([`stored_layout`]), listing
+//! them: then keep the stored name of a field or variant only renamed in the
+//! code, store a field whose type changed under a new name, or keep a new set
+//! of states with `cargo save-states --record`, which later versions are
+//! checked against.
+//!
 //! A value that can't be read from its bytes, such as a variant a newer
 //! version added or a field whose size changed under the same name, keeps its
 //! power-on value and the rest of the state still loads ([`collect_unreadable`]
@@ -58,20 +65,26 @@ impl<'a> FieldWriter<'a> {
     }
 
     /// Writes `value` as the field `name`.
-    pub fn field(&mut self, name: &str, value: &dyn Serializable) -> Result<()> {
-        self.field_with(name, |writer| value.serialize(writer))
+    pub fn field<T: Serializable>(&mut self, name: &str, value: &T) -> Result<()> {
+        self.field_with(name, T::encoding, |writer| value.serialize(writer))
     }
 
     /// Writes the field `name` with the bytes `write` writes, for a value that
     /// isn't one `Serializable` value, such as the items of an array.
+    /// `encoding` says how they are stored, as [`Serializable::encoding`]
+    /// does for a value (see [`array_encoding`]).
     pub fn field_with(
         &mut self,
         name: &str,
+        encoding: impl FnOnce() -> String,
         write: impl FnOnce(&mut dyn Write) -> Result<()>,
     ) -> Result<()> {
         debug_assert!(!name.is_empty(), "an empty name ends the fields");
         self.value.clear();
-        within_field(name, || write(&mut self.value))?;
+        within_field(name, || {
+            note_field(encoding);
+            write(&mut self.value)
+        })?;
         let length = u32::try_from(self.value.len())
             .map_err(|_| Error::new(ErrorKind::InvalidInput, "a field is too long to save"))?;
         write_name(self.writer, name)?;
@@ -145,6 +158,33 @@ pub fn write_name(writer: &mut dyn Write, name: &str) -> Result<()> {
     writer.write_all(name.as_bytes())
 }
 
+/// How `count` values of type `T` stored one after another are stored, such
+/// as `4 × f32`, for [`FieldWriter::field_with`].
+pub fn array_encoding<T: Serializable>(count: usize) -> String {
+    format!("{count} × {}", T::encoding())
+}
+
+/// Writes `variant`, one of an enum's `variants` (the stored names of all of
+/// them), by its name. [`stored_layout`] lists all the variants, so a variant
+/// renamed in the code without keeping its stored name shows up even when no
+/// state uses it.
+pub fn write_variant(writer: &mut dyn Write, variant: &str, variants: &[&str]) -> Result<()> {
+    note_variants(variants);
+    write_name(writer, variant)
+}
+
+/// Notes that the value being written is one of `variants`, for
+/// [`stored_layout`]. [`write_variant`] does this; values that store a choice
+/// from a fixed list in another way call it themselves.
+pub fn note_variants(variants: &[&str]) {
+    TRACKING.with_borrow_mut(|tracking| {
+        let path = tracking.path.join(".");
+        if let Some(layout) = &mut tracking.layout {
+            layout.extend(variants.iter().map(|variant| format!("{path} = {variant}")));
+        }
+    });
+}
+
 /// Reads a name written by [`write_name`], or the empty name that ends a
 /// struct's fields.
 pub fn read_name(reader: &mut dyn Read) -> Result<String> {
@@ -214,13 +254,13 @@ fn is_unreadable_value(error: &Error) -> bool {
     }
 }
 
-/// While [`collect_unreadable`] or [`field_paths`] runs: the names of the
+/// While [`collect_unreadable`] or [`stored_layout`] runs: the names of the
 /// fields being read or written, outermost first, and what they found.
 #[derive(Default)]
 struct Tracking {
     path: Vec<String>,
     unreadable: Option<Vec<String>>,
-    written: Option<BTreeSet<String>>,
+    layout: Option<BTreeSet<String>>,
 }
 
 thread_local! {
@@ -228,25 +268,40 @@ thread_local! {
 }
 
 /// Runs `run` inside the field `name`, for the paths [`collect_unreadable`]
-/// and [`field_paths`] report.
+/// and [`stored_layout`] report.
 fn within_field<T>(name: &str, run: impl FnOnce() -> T) -> T {
     // `TRACKING` isn't borrowed while `run` runs, since it enters fields of
     // its own.
-    let tracking = TRACKING
-        .with_borrow(|tracking| tracking.unreadable.is_some() || tracking.written.is_some());
+    let tracking =
+        TRACKING.with_borrow(|tracking| tracking.unreadable.is_some() || tracking.layout.is_some());
     if !tracking {
         return run();
     }
-    TRACKING.with_borrow_mut(|tracking| {
-        tracking.path.push(name.to_owned());
-        let path = tracking.path.join(".");
-        if let Some(written) = &mut tracking.written {
-            written.insert(path);
-        }
-    });
+    TRACKING.with_borrow_mut(|tracking| tracking.path.push(name.to_owned()));
     let result = run();
     TRACKING.with_borrow_mut(|tracking| tracking.path.pop());
     result
+}
+
+/// Notes the field being written and how its value is stored, such as
+/// `ppu.lcdc: u8`, for [`stored_layout`].
+fn note_field(encoding: impl FnOnce() -> String) {
+    TRACKING.with_borrow_mut(|tracking| {
+        let path = tracking.path.join(".");
+        if let Some(layout) = &mut tracking.layout {
+            layout.insert(format!("{path}: {}", encoding()));
+        }
+    });
+}
+
+/// While [`stored_layout`] runs, lists what a `T` stores for a value that
+/// holds none right now (an empty `Vec`, a `None`), so the layout has its
+/// fields whatever the value is.
+fn note_layout_of<T: Serializable + Default>() -> Result<()> {
+    if TRACKING.with_borrow(|tracking| tracking.layout.is_some()) {
+        T::default().serialize(&mut std::io::sink())?;
+    }
+    Ok(())
 }
 
 /// Notes the field being read as unreadable, for [`collect_unreadable`].
@@ -274,18 +329,22 @@ pub fn collect_unreadable(read: impl FnOnce() -> Result<()>) -> Result<Vec<Strin
     result.map(|()| unreadable.unwrap_or_default())
 }
 
-/// Runs `write` and returns the path of every field it wrote, such as
-/// `ppu.lcdc`. A field of the items of a `Vec` appears once.
-pub fn field_paths(write: impl FnOnce() -> Result<()>) -> Result<BTreeSet<String>> {
+/// Runs `write` and returns what it stores: the path of every field it
+/// wrote with how its value is stored ([`Serializable::encoding`]), such as
+/// `ppu.lcdc: u8`, and for each enum value every variant it can be stored
+/// as, such as `cpu.run_state = Halted`. A field of the items of a `Vec`
+/// appears once, and the fields of an empty `Vec`'s items or of a `None` are
+/// listed too.
+pub fn stored_layout(write: impl FnOnce() -> Result<()>) -> Result<BTreeSet<String>> {
     TRACKING.with_borrow_mut(|tracking| {
         *tracking = Tracking {
-            written: Some(BTreeSet::new()),
+            layout: Some(BTreeSet::new()),
             ..Tracking::default()
         }
     });
     let result = write();
-    let written = TRACKING.with_borrow_mut(|tracking| std::mem::take(tracking).written);
-    result.map(|()| written.unwrap_or_default())
+    let layout = TRACKING.with_borrow_mut(|tracking| std::mem::take(tracking).layout);
+    result.map(|()| layout.unwrap_or_default())
 }
 
 /// A value that can be written to and read back from a save state.
@@ -302,6 +361,18 @@ pub trait Serializable {
     /// Replaces this value with one read from `reader`. Fails when the data
     /// ends early or holds a value this type can't have.
     fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()>;
+
+    /// How the value is stored, as [`stored_layout`] lists it next to its
+    /// field: `u8`, `bool`, `text`, `16 bytes`, `list of u16`, `optional
+    /// fields`, `variant` for an enum (whose variants are listed apart) and
+    /// `fields` for a struct (whose fields are). A field whose type changes
+    /// is stored another way, so the layout shows the change.
+    fn encoding() -> String
+    where
+        Self: Sized,
+    {
+        String::from("fields")
+    }
 }
 
 /// Implements `Serializable` for number types by storing their little-endian bytes.
@@ -318,6 +389,10 @@ macro_rules! impl_serializable_for_numbers {
                     reader.read_exact(&mut bytes)?;
                     *self = <$number>::from_le_bytes(bytes);
                     Ok(())
+                }
+
+                fn encoding() -> String {
+                    String::from(stringify!($number))
                 }
             }
         )*
@@ -338,6 +413,10 @@ impl Serializable for bool {
         *self = value != 0;
         Ok(())
     }
+
+    fn encoding() -> String {
+        String::from("bool")
+    }
 }
 
 /// A byte array is stored as its bytes, without a length.
@@ -353,6 +432,10 @@ impl<const N: usize> Serializable for [u8; N] {
         reader.read_exact(&mut bytes)?;
         self.copy_from_slice(&bytes);
         Ok(())
+    }
+
+    fn encoding() -> String {
+        format!("{N} bytes")
     }
 }
 
@@ -377,6 +460,10 @@ impl Serializable for String {
         *self = String::from_utf8(bytes).map_err(|_| unreadable_value("a string isn't UTF-8"))?;
         Ok(())
     }
+
+    fn encoding() -> String {
+        String::from("text")
+    }
 }
 
 /// A `Vec` is stored as its length (a `u32`) followed by its items.
@@ -385,6 +472,9 @@ impl<T: Serializable + Default> Serializable for Vec<T> {
         let length = u32::try_from(self.len())
             .map_err(|_| Error::new(ErrorKind::InvalidInput, "Vec is too long to save"))?;
         length.serialize(writer)?;
+        if self.is_empty() {
+            note_layout_of::<T>()?;
+        }
         for item in self {
             item.serialize(writer)?;
         }
@@ -405,6 +495,10 @@ impl<T: Serializable + Default> Serializable for Vec<T> {
         *self = items;
         Ok(())
     }
+
+    fn encoding() -> String {
+        format!("list of {}", T::encoding())
+    }
 }
 
 /// An `Option` is stored as a 0 byte for `None`, or a 1 byte followed by the value.
@@ -415,7 +509,10 @@ impl<T: Serializable + Default> Serializable for Option<T> {
                 1u8.serialize(writer)?;
                 value.serialize(writer)
             }
-            None => 0u8.serialize(writer),
+            None => {
+                note_layout_of::<T>()?;
+                0u8.serialize(writer)
+            }
         }
     }
 
@@ -433,6 +530,10 @@ impl<T: Serializable + Default> Serializable for Option<T> {
             _ => return Err(unreadable_value("an Option's tag isn't 0 or 1")),
         }
         Ok(())
+    }
+
+    fn encoding() -> String {
+        format!("optional {}", T::encoding())
     }
 }
 
@@ -686,7 +787,25 @@ mod tests {
     }
 
     #[test]
-    fn field_paths_name_nested_fields_once() {
+    fn the_layout_lists_the_fields_of_values_that_are_not_there() {
+        #[derive(Serializable)]
+        struct Outer {
+            maybe: Option<Original>,
+            items: Vec<Original>,
+        }
+        let outer = Outer {
+            maybe: None,
+            items: Vec::new(),
+        };
+        let layout = stored_layout(|| outer.serialize(&mut std::io::sink())).unwrap();
+        assert!(layout.contains("maybe: optional fields"));
+        assert!(layout.contains("maybe.counter: u16"));
+        assert!(layout.contains("items: list of fields"));
+        assert!(layout.contains("items.mode = Busy"));
+    }
+
+    #[test]
+    fn the_layout_names_nested_fields_once_and_every_variant() {
         #[derive(Serializable)]
         struct Outer {
             inner: Original,
@@ -696,16 +815,39 @@ mod tests {
             inner: original(),
             items: vec![original(), original()],
         };
-        let paths = field_paths(|| outer.serialize(&mut std::io::sink())).unwrap();
-        assert!(paths.contains("inner.counter"));
-        assert!(paths.contains("items.mode"));
+        let layout = stored_layout(|| outer.serialize(&mut std::io::sink())).unwrap();
+        assert!(layout.contains("inner: fields"));
+        assert!(layout.contains("inner.counter: u16"));
+        assert!(layout.contains("inner.bytes: 4 bytes"));
+        assert!(layout.contains("items.mode: variant"));
+        assert!(layout.contains("inner.mode = Idle"));
+        assert!(layout.contains("inner.mode = Busy"));
         assert_eq!(
-            paths
+            layout
                 .iter()
                 .filter(|path| path.starts_with("items."))
                 .count(),
-            5
+            7
         );
+    }
+
+    #[test]
+    fn the_layout_shows_a_field_whose_type_changed() {
+        #[derive(Serializable)]
+        struct Narrow {
+            value: u8,
+        }
+        #[derive(Serializable)]
+        struct Wide {
+            value: u16,
+        }
+        let layout_of = |value: &dyn Fn(&mut dyn Write) -> Result<()>| {
+            stored_layout(|| value(&mut std::io::sink())).unwrap()
+        };
+        let narrow = layout_of(&|writer| Narrow { value: 1 }.serialize(writer));
+        let wide = layout_of(&|writer| Wide { value: 1 }.serialize(writer));
+        assert!(narrow.contains("value: u8"));
+        assert!(wide.contains("value: u16"));
     }
 
     #[derive(Debug, PartialEq, Serializable)]

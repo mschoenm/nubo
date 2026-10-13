@@ -5,7 +5,8 @@
 //! `#[serializable(skip)]`, which reading leaves as they are. Reading matches
 //! fields by name and skips ones the struct doesn't have, so fields can be
 //! added, removed and reordered without breaking save states of other
-//! versions. Enums without data store the variant's name. The stored name is
+//! versions. Enums without data store the variant's name, and tell the stored
+//! layout (`stored_layout`) the names of all their variants. The stored name is
 //! the field's or variant's name in the code, or the one given with
 //! `#[serializable(name = "stored_name")]`, which keeps it when the code is
 //! renamed. The generated code names the trait by its full path in
@@ -117,8 +118,9 @@ fn struct_impl(name: &Ident, generics: &Generics, data: &DataStruct) -> syn::Res
     })
 }
 
-/// Builds an impl that stores the variant's stored name and reports an unknown
-/// one as an unreadable value, which leaves the field as it was.
+/// Builds an impl that stores the variant's stored name, telling the layout
+/// every variant's, and reports an unknown one as an unreadable value, which
+/// leaves the field as it was.
 fn enum_impl(name: &Ident, generics: &Generics, data: &DataEnum) -> syn::Result<TokenStream2> {
     let mut variant_idents = Vec::new();
     let mut variant_names = Vec::new();
@@ -149,7 +151,7 @@ fn enum_impl(name: &Ident, generics: &Generics, data: &DataEnum) -> syn::Result<
                 let variant = match self {
                     #(#name::#variant_idents => #variant_names,)*
                 };
-                crate::serializable::write_name(writer, variant)
+                crate::serializable::write_variant(writer, variant, &[#(#variant_names),*])
             }
 
             fn deserialize(&mut self, reader: &mut dyn std::io::Read) -> std::io::Result<()> {
@@ -164,6 +166,10 @@ fn enum_impl(name: &Ident, generics: &Generics, data: &DataEnum) -> syn::Result<
                     }
                 };
                 Ok(())
+            }
+
+            fn encoding() -> String {
+                String::from("variant")
             }
         }
     })

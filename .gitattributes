@@ -1,0 +1,2 @@
+# Kept save states are binary: never change their line endings.
+save-states/**/*.state binary

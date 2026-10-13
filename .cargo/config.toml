@@ -5,3 +5,4 @@ screenshot = "run --release --package nubo-headless -- --screenshot --screenshot
 test-roms = "run --release --package test_rom_runner --"
 cpu-tests = "run --release --package json_test_runner --"
 benchmark = "run --release --package nubo-benchmark --"
+save-states = "run --release --package nubo-save-state-check --"

@@ -30,7 +30,7 @@ use crate::gpu::lcdc::{
 use crate::gpu::palettes::{BLACK, Color, WHITE};
 use crate::gpu::{Gpu, LAST_VISIBLE_LINE, OamDmaAccess, TimingVariant};
 use crate::model::Model;
-use crate::serializable::{FieldWriter, Serializable, read_fields};
+use crate::serializable::{FieldWriter, Serializable, array_encoding, read_fields};
 use crate::utils::is_bit_set;
 use serializable_derive::Serializable;
 use std::io::{self, Read, Write};
@@ -196,7 +196,9 @@ impl Serializable for BackgroundFifo {
         fields.field("upper", &self.upper)?;
         fields.field("palette", &self.palette)?;
         fields.field("bg_priority", &self.bg_priority)?;
-        fields.field_with("size", |writer| write_fifo_index(self.size, writer))?;
+        fields.field_with("size", u8::encoding, |writer| {
+            write_fifo_index(self.size, writer)
+        })?;
         fields.finish()
     }
 
@@ -254,13 +256,18 @@ struct Fifo {
 impl Serializable for Fifo {
     fn serialize(&self, writer: &mut dyn Write) -> io::Result<()> {
         let mut fields = FieldWriter::new(writer);
-        fields.field_with("items", |writer| {
+        let items_encoding = || array_encoding::<FifoItem>(self.items.len());
+        fields.field_with("items", items_encoding, |writer| {
             self.items
                 .iter()
                 .try_for_each(|item| item.serialize(writer))
         })?;
-        fields.field_with("head", |writer| write_fifo_index(self.head, writer))?;
-        fields.field_with("size", |writer| write_fifo_index(self.size, writer))?;
+        fields.field_with("head", u8::encoding, |writer| {
+            write_fifo_index(self.head, writer)
+        })?;
+        fields.field_with("size", u8::encoding, |writer| {
+            write_fifo_index(self.size, writer)
+        })?;
         fields.finish()
     }
 
