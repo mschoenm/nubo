@@ -1,7 +1,7 @@
 //! The browser build has no save states yet.
 
 use super::{SaveState, Slot, SlotInfo};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub fn save(
     _rom_path: &Path,
@@ -15,6 +15,10 @@ pub fn save(
 #[expect(clippy::unnecessary_wraps, reason = "matches the file store")]
 pub fn load(_rom_path: &Path, _slot: Slot) -> Result<Option<SaveState>, String> {
     Ok(None)
+}
+
+pub fn keep_aside(_rom_path: &Path, _slot: Slot) -> Result<PathBuf, String> {
+    Err(String::from("save states aren't available in the browser"))
 }
 
 pub fn slot_info(_rom_path: &Path, slot: Slot) -> SlotInfo {
