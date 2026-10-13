@@ -18,7 +18,8 @@ The work has five parts:
 
 ## Where the code lives
 
-- **In this repository, in the Iced app (`frontends/iced`).** The Shootout downloads the Windows zip of
+- **In this repository, in the Iced app (`frontends/iced`, which becomes `frontends/nubo` in step 1 of
+  [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md)).** The Shootout downloads the Windows zip of
   Nubo's latest release and takes screenshots of the real `nubo.exe`, so the options it needs
   (`--scale`, `--fresh`, `--speed`, Part 1) must be in the app Nubo ships, not in a separate program.
   - The options are parsed in `main.rs`.
@@ -31,7 +32,7 @@ The work has five parts:
   through a pull request from the maintainer's fork (Part 4). Until then their draft lives in this
   document (Part 2), never in the Nubo crates: ACCURACY_PLAN.md keeps harnesses for other emulators
   out of them.
-- **In the test ROM runner (`tools/test_rom_runner` after the restructuring's step 1,
+- **In the test ROM runner (`tools/nubo-test-rom-runner` after the restructuring's step 1,
   `frontends/test_rom_runner` before it), the nightly workflow and `cargo xtask metrics`.** Part 5 runs
   the Shootout's tests headless with its reference images and tolerance, and compares the result with
   the published table. It needs no new tool: the runner already runs daid's and CasualPokePlayer's
@@ -78,6 +79,9 @@ Everything below about the Shootout was read from its repository,
   files into the HTML table.
 
 ## Where Nubo stands
+
+Paths below are as they were when this plan was written. After step 1 of the restructuring,
+`frontends/iced` is `frontends/nubo`.
 
 What already works:
 

@@ -107,8 +107,9 @@ before.
    `retro_load_game`, but `CartridgeEffects::load_rtc_state` is only asked at `load_rom`. Add
    `Emulator::rtc_state()` and `Emulator::set_rtc_state(&RtcState)` (or similar), next to
    `set_cartridge_ram`.
-3. **Share the `.rtc` file layout.** Move `encode_rtc`/`decode_rtc` (`frontends/iced/src/battery.rs`,
-   17 bytes) into nubo-core, for example as `RtcState::to_bytes`/`from_bytes`. Battery saves can then
+3. **Share the `.rtc` file layout.** Move `encode_rtc`/`decode_rtc` (17 bytes, in `battery.rs` of the
+   Iced app, `frontends/nubo` after the restructuring's step 1) into nubo-core, for example as
+   `RtcState::to_bytes`/`from_bytes`. Battery saves can then
    move between the Nubo app and RetroArch: `.sav` and `.srm` are both the raw cartridge RAM.
 4. **Share the model rule and the palettes.** Done by step 2 of the restructuring plan:
    `nubo-frontend`'s `model` module has `ModelPreference::Automatic`'s rule (`supports_cgb` →
@@ -123,7 +124,7 @@ before.
 
 ## Phase 2: a playable core (one pull request)
 
-1. Create the crate `frontends/libretro`, package `nubo-libretro`, with
+1. Create the crate `frontends/nubo-libretro`, package `nubo-libretro`, with
    `[lib] name = "nubo_libretro", crate-type = ["cdylib", "rlib"]` (the `rlib` is for tests).
    - Make it a workspace member but not a default member, like the other frontends.
    - It depends only on `nubo-core` and `nubo-frontend` (without default features). Write the C types
@@ -232,7 +233,7 @@ RetroArch with a test account, and a rumble cartridge game (such as Pokémon Pin
 
 ## Phase 5: packaging and Nubo's own releases (one pull request)
 
-1. Write `frontends/libretro/nubo_libretro.info`, based on the info files of Gambatte and SameBoy in
+1. Write `frontends/nubo-libretro/nubo_libretro.info`, based on the info files of Gambatte and SameBoy in
    [libretro/libretro-core-info](https://github.com/libretro/libretro-core-info).
    - **Names:** `display_name = "Nintendo - Game Boy / Color (Nubo)"`, `corename = "Nubo"`,
      `systemname`, `systemid = "game_boy"`, `database = "Nintendo - Game Boy|Nintendo - Game Boy Color"`,

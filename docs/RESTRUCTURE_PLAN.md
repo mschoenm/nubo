@@ -23,8 +23,10 @@ palettes and the model rule from there. A later app would only have to draw and 
 2. `nubo-frontend` doesn't depend on Iced or any other UI toolkit. How a game is paced is something the
    app plugs in.
 3. Apps players use live in `frontends/`. Developer programs live in `tools/`.
-4. Every package's name starts with `nubo`. Folder names stay short (`frontends/iced`,
-   `tools/test_rom_runner`). `xtask` keeps its name, as the `cargo xtask` convention expects.
+4. Every package's name starts with `nubo`, and every crate's folder is named after its package
+   (`frontends/nubo`, `tools/nubo-test-rom-runner`), so a package is always found in the folder of its
+   name. `xtask` keeps its name, as the `cargo xtask` convention expects. Commands such as
+   `cargo test-roms` or `cargo xtask web` don't change: the cargo aliases name packages, not folders.
 5. Nothing changes for players:
    - **Files:** the same files in the same places and formats (`settings.toml`, `library.toml`,
      `cheats/*.toml`, `.sav`, `.rtc`, `.state` and the pictures), in the folders
@@ -45,16 +47,16 @@ behaves, or building a new app.
 |---|---|---|
 | `crates/nubo-core` | `nubo-core` | Unchanged |
 | `crates/nubo-logo` | `nubo-logo` | Unchanged |
-| `crates/serializable_derive` | `serializable_derive` | Package renamed `nubo-serializable-derive` |
-| `frontends/iced` | `nubo` | Unchanged (it is the main app, and the name gives the program `nubo`) |
-| `frontends/benchmark` | `nubo-benchmark` | Moves to `tools/benchmark` |
-| `frontends/headless` | `nubo-headless` | Moves to `tools/headless` |
-| `frontends/json_test_runner` | `json_test_runner` | Moves to `tools/json_test_runner`, package renamed `nubo-json-test-runner` |
-| `frontends/save_state_check` | `nubo-save-state-check` | Moves to `tools/save_state_check` |
-| `frontends/test_rom_runner` | `test_rom_runner` | Moves to `tools/test_rom_runner`, package renamed `nubo-test-rom-runner` |
+| `crates/serializable_derive` | `serializable_derive` | `crates/nubo-serializable-derive`, package renamed `nubo-serializable-derive` |
+| `frontends/iced` | `nubo` | `frontends/nubo`; the package stays `nubo` (it is the main app, and the name gives the program `nubo`) |
+| `frontends/benchmark` | `nubo-benchmark` | `tools/nubo-benchmark` |
+| `frontends/headless` | `nubo-headless` | `tools/nubo-headless` |
+| `frontends/json_test_runner` | `json_test_runner` | `tools/nubo-json-test-runner`, package renamed `nubo-json-test-runner` |
+| `frontends/save_state_check` | `nubo-save-state-check` | `tools/nubo-save-state-check` |
+| `frontends/test_rom_runner` | `test_rom_runner` | `tools/nubo-test-rom-runner`, package renamed `nubo-test-rom-runner` |
 | `xtask` | `xtask` | Unchanged |
 | (new) `crates/nubo-frontend` | `nubo-frontend` | Step 2 |
-| (new) `frontends/libretro` | `nubo-libretro` | The RetroArch plan |
+| (new) `frontends/nubo-libretro` | `nubo-libretro` | The RetroArch plan |
 
 ### The Iced crate
 
@@ -87,15 +89,16 @@ Counted per file in `frontends/iced/src` (about 13,000 lines with tests):
 
 ```
 crates/
-  nubo-core/            the emulator (unchanged)
-  nubo-frontend/        everything an app needs that isn't drawing (new)
+  nubo-core/                  the emulator (unchanged)
+  nubo-frontend/              everything an app needs that isn't drawing (new)
   nubo-logo/
-  serializable_derive/  package nubo-serializable-derive
-frontends/              apps players use
-  iced/                 package nubo: the main app (views, theme, Iced input and subscriptions)
-  libretro/             package nubo-libretro: the RetroArch core (RETROARCH_PLAN.md)
-tools/                  developer programs
-  benchmark/  headless/  json_test_runner/  save_state_check/  test_rom_runner/
+  nubo-serializable-derive/   the save state derive macro
+frontends/                    apps players use
+  nubo/                       the main app, built with Iced (views, theme, Iced input and subscriptions)
+  nubo-libretro/              the RetroArch core (RETROARCH_PLAN.md)
+tools/                        developer programs
+  nubo-benchmark/  nubo-headless/  nubo-json-test-runner/
+  nubo-save-state-check/  nubo-test-rom-runner/
 xtask/
 ```
 
@@ -146,7 +149,7 @@ pacing can use too. A new frame is announced through a callback the app passes i
 ### The `unsafe` rule
 
 `nubo-core`, `nubo-frontend` and the Iced app keep `unsafe_code = "forbid"`. The only exception this
-plan expects is the RetroArch core's exported C functions. They go in `frontends/libretro/src/ffi.rs`,
+plan expects is the RetroArch core's exported C functions. They go in `frontends/nubo-libretro/src/ffi.rs`,
 with the crate's own lint table and the `unsafe` in as few places as possible (see the RetroArch plan).
 CLAUDE.md's style rule will say exactly that. Any later crate that binds Nubo to another language
 follows the same rule.
@@ -182,28 +185,33 @@ Each step is one pull request. Each must pass the full CI and leave every finger
 `cargo benchmark --compare` on the games and test ROMs, `cargo test-roms`, `cargo save-states`, and
 the Iced app's tests. The emulator doesn't change in any of them except step 2's added method.
 
-### Step 1: tools to `tools/`, and the `nubo` prefix
+### Step 1: tools to `tools/`, the `nubo` prefix and folders named after packages
 
 1. Move `benchmark`, `headless`, `json_test_runner`, `save_state_check` and `test_rom_runner` from
-   `frontends/` to `tools/`.
-2. Rename the packages that don't start with `nubo`:
+   `frontends/` to `tools/`, each in a folder named after its package (see the table above).
+2. Rename `frontends/iced` to `frontends/nubo` and `crates/serializable_derive` to
+   `crates/nubo-serializable-derive`.
+3. Rename the packages that don't start with `nubo`:
    - `json_test_runner` becomes `nubo-json-test-runner`
    - `test_rom_runner` becomes `nubo-test-rom-runner`
    - `serializable_derive` becomes `nubo-serializable-derive`. Its `use serializable_derive::...` lines
      in nubo-core become `nubo_serializable_derive`. The derive writes field and variant names, not
      its own crate name, so save states don't change. `cargo save-states` checks that.
-3. Update everything that names the old paths or packages:
+4. Update everything that names the old paths or packages:
    - **Workspace:** the root `Cargo.toml` (members, default members, `[workspace.dependencies]`) and
      the cargo aliases in `.cargo/config.toml` (`cargo test-roms`, `cargo cpu-tests`). The commands
      themselves stay the same.
-   - **CI:** `.github/actions/test-roms/action.yml` (the cache key's `hashFiles` paths), and any
-     `--package` in the workflows.
-   - **xtask:** `xtask/src/review_units.rs` (`CRATE_FOLDERS` gets `"tools"`).
+   - **CI:** `.github/actions/test-roms/action.yml` (the cache key's `hashFiles` paths), the path
+     triggers and the metainfo path in `flatpak.yml` and `windows.yml` (`frontends/iced/linux/**`,
+     `frontends/iced/windows/**`, `frontends/iced/build.rs`), and any `--package` in the workflows.
+   - **xtask:** `xtask/src/review_units.rs` (`CRATE_FOLDERS` gets `"tools"`), and the Iced app's paths
+     in `main.rs` (`LINUX_FILES`, the web `index.html`) and `windows.rs` (`INSTALLER_SCRIPT`).
    - **The tools' own messages:** in `test_rom_runner/src/download.rs`,
      `json_test_runner/src/download.rs` and `save_state_check/src/main.rs`.
+   - **Anything else** a search for `frontends/` and the old folder names turns up.
    - **Docs:** `save-states/README.md`, the README (links to `passing.txt` and `FAILING_TESTS.md`),
      CLAUDE.md, and the plans in `docs/`.
-4. **Nightly review:** its rotation remembers review dates by file path. Give `cargo xtask review-units`
+5. **Nightly review:** its rotation remembers review dates by file path. Give `cargo xtask review-units`
    a way to carry dates over to renamed paths. For example, when it finds a path in the state that no
    longer exists, it looks it up with `git diff --name-status -M <last_commit> HEAD` and moves the
    date to the new path. That way moved files keep their place in the rotation, and later moves are
@@ -211,7 +219,9 @@ the Iced app's tests. The emulator doesn't change in any of them except step 2's
 
 **Done when:**
 - CI passes.
-- `cargo test-roms`, `cargo cpu-tests`, `cargo save-states` and `cargo benchmark` work as before.
+- `cargo test-roms`, `cargo cpu-tests`, `cargo save-states`, `cargo benchmark` and `cargo play` work as
+  before.
+- The Flatpak and Windows workflows still run on changes to the app's packaging files, and build.
 - The test ROM cache key still hits.
 - `cargo xtask review-units next` keeps the review dates of the moved files.
 
@@ -301,10 +311,10 @@ Each step keeps CLAUDE.md true as it goes. This step checks the whole picture:
 
   Shootout Part 5 goes before steps 3 to 6 because it only touches the test ROM runner, the nightly
   workflow and `cargo xtask metrics`, none of which those steps move. It needs step 1, so it is built
-  straight into `tools/test_rom_runner`.
+  straight into `tools/nubo-test-rom-runner`.
 - **RetroArch:**
   - Steps 1 and 2 come first. Step 2 is what the RetroArch core needs.
-  - The RetroArch plan's Phases 2 to 6 only touch `frontends/libretro`, so they can run alongside
+  - The RetroArch plan's Phases 2 to 6 only touch `frontends/nubo-libretro`, so they can run alongside
     steps 3 to 6.
 - **Steps 3 to 6** must go in order. Nothing else should change the Iced app's non-UI modules meanwhile,
   or the moves will conflict.
@@ -318,7 +328,8 @@ Each step keeps CLAUDE.md true as it goes. This step checks the whole picture:
 - The layout and steps are signed off (2026-10-13).
 - The Iced app stays the main app. Its package and program stay `nubo`.
 - The RetroArch core is planned next. iOS, GTK and a React web UI are only kept possible.
-- Every package starts with `nubo`. Folder names stay as they are. `xtask` keeps its name.
+- Every package starts with `nubo`, and every crate's folder is named after its package
+  (`frontends/iced` becomes `frontends/nubo`). `xtask` keeps its name.
 - Developer programs go in a `tools/` folder, each its own crate.
 - All steps are scheduled, in the order under "Order and dependencies", with Shootout Part 5 between
   steps 2 and 3.
