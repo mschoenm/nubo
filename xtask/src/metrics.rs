@@ -8,6 +8,12 @@
 //! {"verify_boot": "success", ...}, "test_roms_passed": 2412, "speed":
 //! {"tobudx-dmg": 118.1, ...}, ...}`: every number in it, however deep, is
 //! a metric named by its path, such as `speed.tobudx-dmg`.
+//!
+//! Its `shootout` holds Nubo's score on the GB Emulator Shootout's published
+//! tests and the rank it would have there, with the publication it was
+//! counted against: `{"passed": 258, "total": 264, "rank": 1, "leader":
+//! "DocBoy", "leader_passed": 255, "published": "2026-06-04",
+//! "published_commit": "72fd745"}`. The page's first lines show it.
 
 use crate::Result;
 use serde_json::Value;
@@ -20,8 +26,9 @@ const MEDIAN_NIGHTS: [usize; 3] = [14, 90, 365];
 /// How many nights the history table shows.
 const HISTORY_NIGHTS: usize = 30;
 /// The metrics the history table shows, if a night has them.
-const HISTORY_COLUMNS: [(&str, &str); 6] = [
+const HISTORY_COLUMNS: [(&str, &str); 7] = [
     ("test_roms_passed", "Test ROMs passed"),
+    ("shootout.passed", "Shootout"),
     ("speed.tobudx-dmg", "Speed DMG"),
     ("speed.tobudx-cgb", "Speed CGB"),
     (
@@ -43,7 +50,9 @@ enum Threshold {
     None,
 }
 
-/// The threshold for the metric named `key`.
+/// The threshold for the metric named `key`. The test ROM counts, the
+/// Shootout's among them, have none: a test that stops passing already fails
+/// CI, and the history shows the trend.
 fn threshold(key: &str) -> Threshold {
     if key.starts_with("speed.") {
         // Shared cloud machines vary by 10% from night to night.
@@ -129,6 +138,9 @@ fn report(nights: &[Value]) -> String {
         text(latest, "date"),
         text(latest, "commit"),
     );
+    if let Some(line) = shootout_line(latest) {
+        let _ = writeln!(page, "{line}\n");
+    }
 
     let regressions = regressions(latest, earlier);
     page.push_str("## Regressions\n\n");
@@ -194,6 +206,35 @@ fn report(nights: &[Value]) -> String {
         page.push('\n');
     }
     page
+}
+
+/// Nubo's standing in the GB Emulator Shootout on `night`, such as "GB
+/// Emulator Shootout: 258 of 264, would rank 1st (leader: DocBoy, 255;
+/// published 2026-06-04).", or `None` if the night has none.
+fn shootout_line(night: &Value) -> Option<String> {
+    let shootout = night.get("shootout")?;
+    let count = |key: &str| shootout.get(key).and_then(Value::as_u64);
+    Some(format!(
+        "GB Emulator Shootout: {} of {}, would rank {} (leader: {}, {}; published {}).",
+        count("passed")?,
+        count("total")?,
+        ordinal(count("rank")?),
+        text(shootout, "leader"),
+        count("leader_passed")?,
+        text(shootout, "published"),
+    ))
+}
+
+/// `number` as an English ordinal, such as "1st", "2nd", "11th" or "23rd".
+fn ordinal(number: u64) -> String {
+    let suffix = match (number % 10, number % 100) {
+        (_, 11..=13) => "th",
+        (1, _) => "st",
+        (2, _) => "nd",
+        (3, _) => "rd",
+        _ => "th",
+    };
+    format!("{number}{suffix}")
 }
 
 /// What regressed in `latest` against the nights before it, as sentences.

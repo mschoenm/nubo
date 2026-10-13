@@ -57,6 +57,13 @@ jobs:
     outputs:
       passed: ${{ steps.count.outputs.passed }}
       total: ${{ steps.count.outputs.total }}
+      shootout_passed: ${{ steps.count.outputs.shootout_passed }}
+      shootout_total: ${{ steps.count.outputs.shootout_total }}
+      shootout_rank: ${{ steps.count.outputs.shootout_rank }}
+      shootout_leader: ${{ steps.count.outputs.shootout_leader }}
+      shootout_leader_passed: ${{ steps.count.outputs.shootout_leader_passed }}
+      shootout_published: ${{ steps.count.outputs.shootout_published }}
+      shootout_commit: ${{ steps.count.outputs.shootout_commit }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -78,14 +85,31 @@ jobs:
         shell: bash
         run: cargo test-roms --verify-boot | tee "$RUNNER_TEMP/test-roms.txt"
 
-      # The runner's last line counts every test: "  total   2412/2630".
+      # The runner counts every test in "  total   2412/2630", then Nubo's
+      # score on the GB Emulator Shootout's published tests in "  shootout
+      # 258/264  rank 1  leader DocBoy 255  published 2026-06-04 72fd745" (the
+      # leader's name can have spaces, such as "Beaten Dying Moon").
       - name: Count the passing tests
         id: count
         if: always()
+        shell: bash
         run: |
           counts=$(awk '$1 == "total" { print $2 }' "$RUNNER_TEMP/test-roms.txt" | tail -n 1)
           echo "passed=${counts%/*}" >> "$GITHUB_OUTPUT"
           echo "total=${counts#*/}" >> "$GITHUB_OUTPUT"
+          shootout=$(grep -E '^  shootout +[0-9]+/[0-9]+ +rank ' "$RUNNER_TEMP/test-roms.txt" | tail -n 1 || true)
+          pattern='^  shootout +([0-9]+)/([0-9]+) +rank ([0-9]+) +leader (.+) ([0-9]+) +published ([0-9-]+) ([0-9a-f]+)$'
+          if [[ $shootout =~ $pattern ]]; then
+            {
+              echo "shootout_passed=${BASH_REMATCH[1]}"
+              echo "shootout_total=${BASH_REMATCH[2]}"
+              echo "shootout_rank=${BASH_REMATCH[3]}"
+              echo "shootout_leader=${BASH_REMATCH[4]}"
+              echo "shootout_leader_passed=${BASH_REMATCH[5]}"
+              echo "shootout_published=${BASH_REMATCH[6]}"
+              echo "shootout_commit=${BASH_REMATCH[7]}"
+            } >> "$GITHUB_OUTPUT"
+          fi
 
       # Named apart from CI's, which runs in the same run.
       - name: Upload screens of failing tests
@@ -290,6 +314,13 @@ jobs:
           EAGER: ${{ needs.eager.result }}
           PASSED: ${{ needs.verify-boot.outputs.passed }}
           TOTAL: ${{ needs.verify-boot.outputs.total }}
+          SHOOTOUT_PASSED: ${{ needs.verify-boot.outputs.shootout_passed }}
+          SHOOTOUT_TOTAL: ${{ needs.verify-boot.outputs.shootout_total }}
+          SHOOTOUT_RANK: ${{ needs.verify-boot.outputs.shootout_rank }}
+          SHOOTOUT_LEADER: ${{ needs.verify-boot.outputs.shootout_leader }}
+          SHOOTOUT_LEADER_PASSED: ${{ needs.verify-boot.outputs.shootout_leader_passed }}
+          SHOOTOUT_PUBLISHED: ${{ needs.verify-boot.outputs.shootout_published }}
+          SHOOTOUT_COMMIT: ${{ needs.verify-boot.outputs.shootout_commit }}
         run: |
           # "tobudx [CGB-E]   108.2x ..." becomes {"tobudx-cgb": 108.2}.
           speed=$(awk '$2 ~ /^\[/ && $3 ~ /x$/ {
@@ -304,6 +335,10 @@ jobs:
             --arg ci "$CI" --arg advisories "$ADVISORIES" --arg tests "$TESTS" --arg verify_boot "$VERIFY_BOOT" \
             --arg save_states "$SAVE_STATES" --arg eager "$EAGER" \
             --arg passed "$PASSED" --arg total "$TOTAL" \
+            --arg shootout_passed "$SHOOTOUT_PASSED" --arg shootout_total "$SHOOTOUT_TOTAL" \
+            --arg shootout_rank "$SHOOTOUT_RANK" --arg shootout_leader "$SHOOTOUT_LEADER" \
+            --arg shootout_leader_passed "$SHOOTOUT_LEADER_PASSED" \
+            --arg shootout_published "$SHOOTOUT_PUBLISHED" --arg shootout_commit "$SHOOTOUT_COMMIT" \
             --argjson speed "$speed" \
             --argjson instructions "$instructions" \
             --slurpfile efficiency "$RUNNER_TEMP/efficiency.json" \
@@ -314,6 +349,11 @@ jobs:
                       save_states: $save_states, eager: $eager},
               test_roms_passed: ($passed | tonumber? // null),
               test_roms_total: ($total | tonumber? // null),
+              shootout: (if $shootout_passed == "" then null else
+                {passed: ($shootout_passed | tonumber), total: ($shootout_total | tonumber),
+                 rank: ($shootout_rank | tonumber), leader: $shootout_leader,
+                 leader_passed: ($shootout_leader_passed | tonumber),
+                 published: $shootout_published, published_commit: $shootout_commit} end),
               speed: $speed,
               instructions_per_emulated_second: $instructions,
               efficiency: $efficiency[0],

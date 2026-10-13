@@ -1,6 +1,6 @@
 # Failing test ROMs
 
-`cargo test-roms` passes 6526 of the 6557 tests it runs. This file explains the 31 that fail: what each
+`cargo test-roms` passes 6773 of the 6804 tests it runs. This file explains the 31 that fail: what each
 test checks, what Nubo does instead, and why it isn't fixed yet or can't be. `cargo test-roms --verbose`
 prints the same list with each test's symptom, and failing screenshot tests leave the emulator's
 screen and a diff in `target/test-roms/failures/<model>/`.
@@ -19,6 +19,9 @@ ported.
 | [Mealybug's tile data switch glitch on CGB-C](#tile-data-switch-glitch-on-cgb-c) | 2 | Open |
 | [Mooneye's MGB madness test](#mooneyes-mgb-madness-test) | 2 | Open, unexplained by its author |
 | [AGE oam-write on DMG-C](#age-oam-write-on-dmg-c) | 1 | Depends on state its author flags as unexplained |
+
+All 258 of the GB Emulator Shootout's tests that the runner runs pass; [the GB Emulator
+Shootout](#the-gb-emulator-shootout) explains the six published tests it doesn't count.
 
 Tests are named as the runner prints them: the hardware model, then the ROM's path under
 `target/test-roms/v7.0/`.
@@ -280,3 +283,27 @@ differ are the third row of each SCX block, which the source marks with (*): "DM
 to depend on when the LCD was last switched off. When the test is expanded to cover more than 2
 frames, the complete line looks different. [...] TODO: we should look into this." Until the hardware
 behaviour behind those rows is known, there is nothing to model.
+
+## The GB Emulator Shootout
+
+The runner runs 258 of the 264 tests of the Shootout's published table (`shootout/...` in
+`passing.txt`), judged the way its harness judges them (`src/shootout.rs`), and all of them pass:
+258 of 264, where the leader, DocBoy, has 255. The other six can't pass in the Shootout either:
+
+- `samesuite/sgb/command_mlt_req.gb`, `samesuite/sgb/command_mlt_req_1_incrementing.gb` and
+  `cpp/sgb-ext-test.gb` run on the Super Game Boy, whose commands Nubo doesn't emulate. The harness
+  class doesn't start Nubo for them, and the Shootout counts them as not run.
+- `acid/which.gb (DMG)`, `acid/which.gb (GBC)` and `daid/rom_and_ram.gb` have no reference
+  screenshot: they only report which model or cartridge setup they see, and count as information.
+
+The groups `docs/SHOOTOUT_PLAN.md` expected to fail are empty:
+
+- **Tests of one hardware revision run on another model.** The Shootout's list at the pinned commit
+  leaves them out (they are commented out in its `mooneye.py` and `samesuite.py`), so none run.
+- **Bully on DMG.** The Shootout's build of Bully isn't the collection's, and Nubo passes it on the
+  DMG. The collection's Bully still runs on the CGB only, since real DMGs fail it.
+- **Real Nubo bugs.** None. With the plan's first deadline, two seconds after the Shootout's
+  `runtime`, 100 tests failed only because they ran out of time: the boot ROM takes 3.1 seconds on
+  the CGB, and some tests need up to 8.5 seconds more than their `runtime` on Nubo (`rtc3test-3`,
+  `cpu_instrs/11`, `oam_bug/8`). The runner now gives each test the harness's own deadline instead,
+  the `runtime` plus 24 emulated seconds at the harness's speed, as the real harness would.

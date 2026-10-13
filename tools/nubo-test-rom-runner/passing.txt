@@ -66,12 +66,6 @@ cgb blargg/mem_timing/mem_timing.gb
 cgb bully/bully.gb
 cgb cgb-acid-hell/cgb-acid-hell.gbc
 cgb cgb-acid2/cgb-acid2.gbc
-cgb daid/ppu_scanline_bgp.gb
-cgb daid/speed_switch_timing_div.gbc
-cgb daid/speed_switch_timing_ly.gbc
-cgb daid/speed_switch_timing_stat.gbc
-cgb daid/stop_instr.gb
-cgb daid/stop_instr_gbc_mode3.gb
 cgb dmg-acid2/dmg-acid2.gb
 cgb little-things-gb/firstwhite.gb
 cgb little-things-gb/tellinglys.gb
@@ -3846,11 +3840,6 @@ dmg blargg/instr_timing/instr_timing.gb
 dmg blargg/mem_timing-2/mem_timing.gb
 dmg blargg/mem_timing/mem_timing.gb
 dmg blargg/oam_bug/oam_bug.gb
-dmg cpp/latch-rtc-test.gb
-dmg cpp/ramg-mbc3-test.gb
-dmg cpp/rtc-invalid-banks-test.gb
-dmg daid/ppu_scanline_bgp.gb
-dmg daid/stop_instr.gb
 dmg dmg-acid2/dmg-acid2.gb
 dmg gambatte/bgtiledata/bgtiledata_spx08_1.gbc
 dmg gambatte/bgtiledata/bgtiledata_spx08_2.gbc
@@ -6525,3 +6514,261 @@ sgb2 mooneye-test-suite/acceptance/ppu/intr_1_2_timing-GS.gb
 sgb2 mooneye-test-suite/acceptance/ppu/lcdon_timing-GS.gb
 sgb2 mooneye-test-suite/acceptance/ppu/lcdon_write_timing-GS.gb
 sgb2 mooneye-test-suite/acceptance/ppu/vblank_stat_intr-GS.gb
+shootout/acid/cgb-acid-hell.gbc
+shootout/acid/cgb-acid2.gbc
+shootout/acid/dmg-acid2.gb
+shootout/ashiepaws/bully.gb (DMG)
+shootout/ashiepaws/bully.gb (GBC)
+shootout/ashiepaws/strikethrough.gb
+shootout/ax6/rtc3test-1.gb
+shootout/ax6/rtc3test-2.gb
+shootout/ax6/rtc3test-3.gb
+shootout/blargg/cgb_sound/01-registers.gb
+shootout/blargg/cgb_sound/02-len_ctr.gb
+shootout/blargg/cgb_sound/03-trigger.gb
+shootout/blargg/cgb_sound/04-sweep.gb
+shootout/blargg/cgb_sound/05-sweep_details.gb
+shootout/blargg/cgb_sound/06-overflow_on_trigger.gb
+shootout/blargg/cgb_sound/07-len_sweep_period_sync.gb
+shootout/blargg/cgb_sound/08-len_ctr_during_power.gb
+shootout/blargg/cgb_sound/09-wave_read_while_on.gb
+shootout/blargg/cgb_sound/10-wave_trigger_while_on.gb
+shootout/blargg/cgb_sound/11-regs_after_power.gb
+shootout/blargg/cgb_sound/12-wave.gb
+shootout/blargg/cpu_instrs/01-special.gb
+shootout/blargg/cpu_instrs/02-interrupts.gb
+shootout/blargg/cpu_instrs/03-op_sp,hl.gb
+shootout/blargg/cpu_instrs/04-op_r,imm.gb
+shootout/blargg/cpu_instrs/05-op_rp.gb
+shootout/blargg/cpu_instrs/06-ld_r,r.gb
+shootout/blargg/cpu_instrs/07-jr,jp,call,ret,rst.gb
+shootout/blargg/cpu_instrs/08-misc_instrs.gb
+shootout/blargg/cpu_instrs/09-op_r,r.gb
+shootout/blargg/cpu_instrs/10-bit_ops.gb
+shootout/blargg/cpu_instrs/11-op_a,(hl).gb
+shootout/blargg/dmg_sound/01-registers.gb
+shootout/blargg/dmg_sound/02-len_ctr.gb
+shootout/blargg/dmg_sound/03-trigger.gb
+shootout/blargg/dmg_sound/04-sweep.gb
+shootout/blargg/dmg_sound/05-sweep_details.gb
+shootout/blargg/dmg_sound/06-overflow_on_trigger.gb
+shootout/blargg/dmg_sound/07-len_sweep_period_sync.gb
+shootout/blargg/dmg_sound/08-len_ctr_during_power.gb
+shootout/blargg/dmg_sound/09-wave_read_while_on.gb
+shootout/blargg/dmg_sound/10-wave_trigger_while_on.gb
+shootout/blargg/dmg_sound/11-regs_after_power.gb
+shootout/blargg/dmg_sound/12-wave_write_while_on.gb
+shootout/blargg/halt_bug.gb
+shootout/blargg/instr_timing.gb
+shootout/blargg/interrupt_time.gb
+shootout/blargg/mem_timing-2/01-read_timing.gb
+shootout/blargg/mem_timing-2/02-write_timing.gb
+shootout/blargg/mem_timing-2/03-modify_timing.gb
+shootout/blargg/mem_timing/01-read_timing.gb
+shootout/blargg/mem_timing/02-write_timing.gb
+shootout/blargg/mem_timing/03-modify_timing.gb
+shootout/blargg/oam_bug/1-lcd_sync.gb
+shootout/blargg/oam_bug/2-causes.gb
+shootout/blargg/oam_bug/3-non_causes.gb
+shootout/blargg/oam_bug/4-scanline_timing.gb
+shootout/blargg/oam_bug/5-timing_bug.gb
+shootout/blargg/oam_bug/6-timing_no_bug.gb
+shootout/blargg/oam_bug/8-instr_effect.gb
+shootout/cpp/latch-rtc-test.gb
+shootout/cpp/ramg-mbc3-test.gb
+shootout/cpp/rtc-invalid-banks-test.gb
+shootout/daid/ppu_scanline_bgp.gb (DMG)
+shootout/daid/ppu_scanline_bgp.gb (GBC)
+shootout/daid/speed_switch_timing_div.gbc
+shootout/daid/speed_switch_timing_ly.gbc
+shootout/daid/speed_switch_timing_stat.gbc
+shootout/daid/stop_instr.gb (DMG)
+shootout/daid/stop_instr.gb (GBC)
+shootout/daid/stop_instr_gbc_mode3.gb
+shootout/mealybug-tearoom-tests/ppu/m2_win_en_toggle.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_bgp_change.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_bgp_change_sprites.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_lcdc_bg_en_change.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_lcdc_bg_map_change.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_lcdc_obj_en_change.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_lcdc_obj_en_change_variant.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_lcdc_obj_size_change.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_lcdc_obj_size_change_scx.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_lcdc_tile_sel_change.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_lcdc_tile_sel_win_change.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_lcdc_win_en_change_multiple.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_lcdc_win_en_change_multiple_wx.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_lcdc_win_map_change.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_obp0_change.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_scx_high_5_bits.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_scx_low_3_bits.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_scy_change.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_window_timing.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_window_timing_wx_0.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_wx_4_change.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_wx_4_change_sprites.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_wx_5_change.gb (DMG)
+shootout/mealybug-tearoom-tests/ppu/m3_wx_6_change.gb (DMG)
+shootout/mooneye/acceptance/add_sp_e_timing.gb
+shootout/mooneye/acceptance/bits/mem_oam.gb
+shootout/mooneye/acceptance/bits/reg_f.gb
+shootout/mooneye/acceptance/bits/unused_hwio-GS.gb
+shootout/mooneye/acceptance/boot_div-dmgABCmgb.gb
+shootout/mooneye/acceptance/boot_hwio-dmgABCmgb.gb
+shootout/mooneye/acceptance/boot_regs-dmgABC.gb
+shootout/mooneye/acceptance/call_cc_timing.gb
+shootout/mooneye/acceptance/call_cc_timing2.gb
+shootout/mooneye/acceptance/call_timing.gb
+shootout/mooneye/acceptance/call_timing2.gb
+shootout/mooneye/acceptance/di_timing-GS.gb
+shootout/mooneye/acceptance/div_timing.gb
+shootout/mooneye/acceptance/ei_sequence.gb
+shootout/mooneye/acceptance/ei_timing.gb
+shootout/mooneye/acceptance/halt_ime0_ei.gb
+shootout/mooneye/acceptance/halt_ime0_nointr_timing.gb
+shootout/mooneye/acceptance/halt_ime1_timing.gb
+shootout/mooneye/acceptance/halt_ime1_timing2-GS.gb
+shootout/mooneye/acceptance/if_ie_registers.gb
+shootout/mooneye/acceptance/instr/daa.gb
+shootout/mooneye/acceptance/interrupts/ie_push.gb
+shootout/mooneye/acceptance/intr_timing.gb
+shootout/mooneye/acceptance/jp_cc_timing.gb
+shootout/mooneye/acceptance/jp_timing.gb
+shootout/mooneye/acceptance/ld_hl_sp_e_timing.gb
+shootout/mooneye/acceptance/oam_dma/basic.gb
+shootout/mooneye/acceptance/oam_dma/reg_read.gb
+shootout/mooneye/acceptance/oam_dma/sources-GS.gb
+shootout/mooneye/acceptance/oam_dma_restart.gb
+shootout/mooneye/acceptance/oam_dma_start.gb
+shootout/mooneye/acceptance/oam_dma_timing.gb
+shootout/mooneye/acceptance/pop_timing.gb
+shootout/mooneye/acceptance/ppu/hblank_ly_scx_timing-GS.gb
+shootout/mooneye/acceptance/ppu/intr_1_2_timing-GS.gb
+shootout/mooneye/acceptance/ppu/intr_2_0_timing.gb
+shootout/mooneye/acceptance/ppu/intr_2_mode0_timing.gb
+shootout/mooneye/acceptance/ppu/intr_2_mode0_timing_sprites.gb
+shootout/mooneye/acceptance/ppu/intr_2_mode3_timing.gb
+shootout/mooneye/acceptance/ppu/intr_2_oam_ok_timing.gb
+shootout/mooneye/acceptance/ppu/lcdon_timing-GS.gb
+shootout/mooneye/acceptance/ppu/lcdon_write_timing-GS.gb
+shootout/mooneye/acceptance/ppu/stat_irq_blocking.gb
+shootout/mooneye/acceptance/ppu/stat_lyc_onoff.gb
+shootout/mooneye/acceptance/ppu/vblank_stat_intr-GS.gb
+shootout/mooneye/acceptance/push_timing.gb
+shootout/mooneye/acceptance/rapid_di_ei.gb
+shootout/mooneye/acceptance/ret_cc_timing.gb
+shootout/mooneye/acceptance/ret_timing.gb
+shootout/mooneye/acceptance/reti_intr_timing.gb
+shootout/mooneye/acceptance/reti_timing.gb
+shootout/mooneye/acceptance/rst_timing.gb
+shootout/mooneye/acceptance/serial/boot_sclk_align-dmgABCmgb.gb
+shootout/mooneye/acceptance/timer/div_write.gb
+shootout/mooneye/acceptance/timer/rapid_toggle.gb
+shootout/mooneye/acceptance/timer/tim00.gb
+shootout/mooneye/acceptance/timer/tim00_div_trigger.gb
+shootout/mooneye/acceptance/timer/tim01.gb
+shootout/mooneye/acceptance/timer/tim01_div_trigger.gb
+shootout/mooneye/acceptance/timer/tim10.gb
+shootout/mooneye/acceptance/timer/tim10_div_trigger.gb
+shootout/mooneye/acceptance/timer/tim11.gb
+shootout/mooneye/acceptance/timer/tim11_div_trigger.gb
+shootout/mooneye/acceptance/timer/tima_reload.gb
+shootout/mooneye/acceptance/timer/tima_write_reloading.gb
+shootout/mooneye/acceptance/timer/tma_write_reloading.gb
+shootout/mooneye/emulator-only/mbc1/bits_bank1.gb
+shootout/mooneye/emulator-only/mbc1/bits_bank2.gb
+shootout/mooneye/emulator-only/mbc1/bits_mode.gb
+shootout/mooneye/emulator-only/mbc1/bits_ramg.gb
+shootout/mooneye/emulator-only/mbc1/multicart_rom_8Mb.gb
+shootout/mooneye/emulator-only/mbc1/ram_256kb.gb
+shootout/mooneye/emulator-only/mbc1/ram_64kb.gb
+shootout/mooneye/emulator-only/mbc1/rom_16Mb.gb
+shootout/mooneye/emulator-only/mbc1/rom_1Mb.gb
+shootout/mooneye/emulator-only/mbc1/rom_2Mb.gb
+shootout/mooneye/emulator-only/mbc1/rom_4Mb.gb
+shootout/mooneye/emulator-only/mbc1/rom_512kb.gb
+shootout/mooneye/emulator-only/mbc1/rom_8Mb.gb
+shootout/mooneye/emulator-only/mbc2/bits_ramg.gb
+shootout/mooneye/emulator-only/mbc2/bits_romb.gb
+shootout/mooneye/emulator-only/mbc2/bits_unused.gb
+shootout/mooneye/emulator-only/mbc2/ram.gb
+shootout/mooneye/emulator-only/mbc2/rom_1Mb.gb
+shootout/mooneye/emulator-only/mbc2/rom_2Mb.gb
+shootout/mooneye/emulator-only/mbc2/rom_512kb.gb
+shootout/mooneye/emulator-only/mbc5/rom_16Mb.gb
+shootout/mooneye/emulator-only/mbc5/rom_1Mb.gb
+shootout/mooneye/emulator-only/mbc5/rom_2Mb.gb
+shootout/mooneye/emulator-only/mbc5/rom_32Mb.gb
+shootout/mooneye/emulator-only/mbc5/rom_4Mb.gb
+shootout/mooneye/emulator-only/mbc5/rom_512kb.gb
+shootout/mooneye/emulator-only/mbc5/rom_64Mb.gb
+shootout/mooneye/emulator-only/mbc5/rom_8Mb.gb
+shootout/mooneye/manual-only/sprite_priority.gb
+shootout/mooneye/misc/boot_div-cgbABCDE.gb
+shootout/mooneye/misc/boot_regs-cgb.gb
+shootout/samesuite/apu/channel_1/channel_1_align.gb
+shootout/samesuite/apu/channel_1/channel_1_align_cpu.gb
+shootout/samesuite/apu/channel_1/channel_1_delay.gb
+shootout/samesuite/apu/channel_1/channel_1_duty.gb
+shootout/samesuite/apu/channel_1/channel_1_duty_delay.gb
+shootout/samesuite/apu/channel_1/channel_1_freq_change.gb
+shootout/samesuite/apu/channel_1/channel_1_nrx2_glitch.gb
+shootout/samesuite/apu/channel_1/channel_1_nrx2_speed_change.gb
+shootout/samesuite/apu/channel_1/channel_1_restart.gb
+shootout/samesuite/apu/channel_1/channel_1_restart_nrx2_glitch.gb
+shootout/samesuite/apu/channel_1/channel_1_stop_div.gb
+shootout/samesuite/apu/channel_1/channel_1_stop_restart.gb
+shootout/samesuite/apu/channel_1/channel_1_sweep.gb
+shootout/samesuite/apu/channel_1/channel_1_sweep_restart.gb
+shootout/samesuite/apu/channel_1/channel_1_sweep_restart_2.gb
+shootout/samesuite/apu/channel_1/channel_1_volume.gb
+shootout/samesuite/apu/channel_1/channel_1_volume_div.gb
+shootout/samesuite/apu/channel_2/channel_2_align.gb
+shootout/samesuite/apu/channel_2/channel_2_align_cpu.gb
+shootout/samesuite/apu/channel_2/channel_2_delay.gb
+shootout/samesuite/apu/channel_2/channel_2_duty.gb
+shootout/samesuite/apu/channel_2/channel_2_duty_delay.gb
+shootout/samesuite/apu/channel_2/channel_2_freq_change.gb
+shootout/samesuite/apu/channel_2/channel_2_nrx2_glitch.gb
+shootout/samesuite/apu/channel_2/channel_2_nrx2_speed_change.gb
+shootout/samesuite/apu/channel_2/channel_2_restart.gb
+shootout/samesuite/apu/channel_2/channel_2_restart_nrx2_glitch.gb
+shootout/samesuite/apu/channel_2/channel_2_stop_div.gb
+shootout/samesuite/apu/channel_2/channel_2_stop_restart.gb
+shootout/samesuite/apu/channel_2/channel_2_volume.gb
+shootout/samesuite/apu/channel_2/channel_2_volume_div.gb
+shootout/samesuite/apu/channel_3/channel_3_and_glitch.gb
+shootout/samesuite/apu/channel_3/channel_3_delay.gb
+shootout/samesuite/apu/channel_3/channel_3_first_sample.gb
+shootout/samesuite/apu/channel_3/channel_3_freq_change_delay.gb
+shootout/samesuite/apu/channel_3/channel_3_restart_delay.gb
+shootout/samesuite/apu/channel_3/channel_3_restart_during_delay.gb
+shootout/samesuite/apu/channel_3/channel_3_restart_stop_delay.gb
+shootout/samesuite/apu/channel_3/channel_3_shift_delay.gb
+shootout/samesuite/apu/channel_3/channel_3_shift_skip_delay.gb
+shootout/samesuite/apu/channel_3/channel_3_stop_delay.gb
+shootout/samesuite/apu/channel_3/channel_3_stop_div.gb
+shootout/samesuite/apu/channel_3/channel_3_wave_ram_locked_write.gb
+shootout/samesuite/apu/channel_3/channel_3_wave_ram_sync.gb
+shootout/samesuite/apu/channel_4/channel_4_align.gb
+shootout/samesuite/apu/channel_4/channel_4_delay.gb
+shootout/samesuite/apu/channel_4/channel_4_equivalent_frequencies.gb
+shootout/samesuite/apu/channel_4/channel_4_freq_change.gb
+shootout/samesuite/apu/channel_4/channel_4_frequency_alignment.gb
+shootout/samesuite/apu/channel_4/channel_4_lfsr.gb
+shootout/samesuite/apu/channel_4/channel_4_lfsr15.gb
+shootout/samesuite/apu/channel_4/channel_4_lfsr_15_7.gb
+shootout/samesuite/apu/channel_4/channel_4_lfsr_7_15.gb
+shootout/samesuite/apu/channel_4/channel_4_lfsr_restart.gb
+shootout/samesuite/apu/channel_4/channel_4_lfsr_restart_fast.gb
+shootout/samesuite/apu/channel_4/channel_4_volume_div.gb
+shootout/samesuite/apu/div_trigger_volume_10.gb
+shootout/samesuite/apu/div_write_trigger.gb
+shootout/samesuite/apu/div_write_trigger_10.gb
+shootout/samesuite/apu/div_write_trigger_volume.gb
+shootout/samesuite/apu/div_write_trigger_volume_10.gb
+shootout/samesuite/dma/gbc_dma_cont.gb
+shootout/samesuite/dma/gdma_addr_mask.gb
+shootout/samesuite/dma/hdma_lcd_off.gb
+shootout/samesuite/dma/hdma_mode0.gb
+shootout/samesuite/ppu/blocking_bgpi_increase.gb

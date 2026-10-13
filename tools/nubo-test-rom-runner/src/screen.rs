@@ -30,11 +30,7 @@ pub(crate) fn load_reference(path: &Path) -> Result<RgbImage, String> {
 /// Converts an RGBA frame from the emulator into the colors the reference
 /// screenshots use for `model`.
 pub(crate) fn normalize(frame: &[u8], model: Model) -> RgbImage {
-    let channel = if model.is_cgb() {
-        cgb_channel
-    } else {
-        dmg_shade
-    };
+    let channel = channel_mapping(model);
     let pixels = frame
         .as_chunks::<4>()
         .0
@@ -42,6 +38,50 @@ pub(crate) fn normalize(frame: &[u8], model: Model) -> RgbImage {
         .flat_map(|pixel| [channel(pixel[0]), channel(pixel[1]), channel(pixel[2])])
         .collect();
     RgbImage::from_raw(WIDTH, HEIGHT, pixels).expect("the frame buffer is 160x144 RGBA")
+}
+
+/// How [`normalize`] maps each color channel for `model`.
+fn channel_mapping(model: Model) -> fn(u8) -> u8 {
+    if model.is_cgb() {
+        cgb_channel
+    } else {
+        dmg_shade
+    }
+}
+
+/// A reference screenshot's brightness per pixel, for checking many frames
+/// against it quickly in grayscale, as the GB Emulator Shootout compares.
+pub(crate) struct GrayscaleReference {
+    brightness: Vec<u8>,
+}
+
+impl GrayscaleReference {
+    /// The brightness of every pixel of `reference`.
+    pub(crate) fn new(reference: &RgbImage) -> Self {
+        GrayscaleReference {
+            brightness: reference.pixels().map(|pixel| brightness(*pixel)).collect(),
+        }
+    }
+
+    /// Whether every pixel of the emulator's RGBA `frame`, in the colors
+    /// [`normalize`] gives it for `model`, is within `GRAYSCALE_TOLERANCE`
+    /// of the reference's brightness. Stops at the first pixel that isn't.
+    pub(crate) fn matches(&self, frame: &[u8], model: Model) -> bool {
+        let channel = channel_mapping(model);
+        frame
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .zip(&self.brightness)
+            .all(|(pixel, expected)| {
+                let actual = brightness(image::Rgb([
+                    channel(pixel[0]),
+                    channel(pixel[1]),
+                    channel(pixel[2]),
+                ]));
+                actual.abs_diff(*expected) <= GRAYSCALE_TOLERANCE
+            })
+    }
 }
 
 /// Counts the pixels that don't match.
@@ -140,4 +180,34 @@ fn dmg_shade(value: u8) -> u8 {
 fn cgb_channel(value: u8) -> u8 {
     let five_bit = (u32::from(value) * 31 + 127) / 255;
     ((five_bit << 3) | (five_bit >> 2)) as u8
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A white RGBA frame.
+    fn white_frame() -> Vec<u8> {
+        [0xFF; 4].repeat((WIDTH * HEIGHT) as usize)
+    }
+
+    /// A reference screenshot of one gray.
+    fn gray_reference(gray: u8) -> GrayscaleReference {
+        GrayscaleReference::new(&RgbImage::from_pixel(WIDTH, HEIGHT, image::Rgb([gray; 3])))
+    }
+
+    #[test]
+    fn grays_match_within_the_shootouts_tolerance() {
+        let frame = white_frame();
+        assert!(gray_reference(0xFF - 50).matches(&frame, Model::Dmg));
+        assert!(!gray_reference(0xFF - 51).matches(&frame, Model::Dmg));
+    }
+
+    #[test]
+    fn one_differing_pixel_is_enough_to_differ() {
+        let mut frame = white_frame();
+        frame[4 * 1000..4 * 1000 + 3].fill(0);
+        assert!(!gray_reference(0xFF).matches(&frame, Model::CgbE));
+        assert!(gray_reference(0xFF).matches(&white_frame(), Model::CgbE));
+    }
 }

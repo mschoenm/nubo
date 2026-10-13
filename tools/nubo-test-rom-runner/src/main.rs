@@ -1,11 +1,17 @@
 //! Runs the Game Boy test ROM suites (Blargg, Mooneye (Gekkio's and Wilbert
 //! Pol's), SameSuite, the acid tests, Mealybug Tearoom, Gambatte,
 //! GBMicrotest, AGE, rtc3test, Bully, Strikethrough, Scribbltests,
-//! TurtleTests, little-things-gb, the MBC3 Tester, and daid's and
-//! CasualPokePlayer's tests from the GB Emulator Shootout) in parallel and
+//! TurtleTests, little-things-gb, the MBC3 Tester, and the GB Emulator
+//! Shootout's tests, judged the way the Shootout judges them) in parallel and
 //! compares the results with `passing.txt`, so regressions, newly passing
 //! tests and listed tests that no longer run are noticed. The README lists
 //! the tests that aren't run and why.
+//!
+//! After a count per suite and model and the total, a run that includes every
+//! Shootout test prints one more line with Nubo's score on the Shootout's
+//! published tests and the rank it would have there, such as
+//! `  shootout  250/264  rank 4  leader DocBoy 255  published 2026-06-04 72fd745`,
+//! which the nightly run records (see `shootout.rs`).
 
 use clap::Parser;
 use runner::Outcome;
@@ -78,6 +84,17 @@ fn run(args: &Args) -> Result<bool, String> {
 
     print_summary(&tests, &outcomes);
 
+    let run_ids: BTreeSet<String> = tests.iter().map(suites::TestCase::id).collect();
+    let passing: BTreeSet<String> = tests
+        .iter()
+        .zip(&outcomes)
+        .filter(|(_, outcome)| matches!(outcome, Outcome::Pass))
+        .map(|(test, _)| test.id())
+        .collect();
+    if let Some(standing) = shootout::standing(&run_ids, &passing)? {
+        println!("  {standing}");
+    }
+
     if args.verbose {
         println!("\nFailing tests:");
         for (test, outcome) in tests.iter().zip(&outcomes) {
@@ -87,13 +104,6 @@ fn run(args: &Args) -> Result<bool, String> {
         }
     }
 
-    let run_ids: BTreeSet<String> = tests.iter().map(suites::TestCase::id).collect();
-    let passing: BTreeSet<String> = tests
-        .iter()
-        .zip(&outcomes)
-        .filter(|(_, outcome)| matches!(outcome, Outcome::Pass))
-        .map(|(test, _)| test.id())
-        .collect();
     let expected = expectations::load()?;
     // Only an unfiltered run sees every test, so only there does a listed test
     // that didn't run mean a stale entry rather than one the filter left out.
@@ -188,4 +198,5 @@ mod expectations;
 mod gambatte;
 mod runner;
 mod screen;
+mod shootout;
 mod suites;

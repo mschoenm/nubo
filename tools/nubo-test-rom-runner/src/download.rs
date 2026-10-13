@@ -1,7 +1,8 @@
 //! Downloads the test ROMs and checks their SHA-256 checksums: a pinned
-//! release of the c-sp/game-boy-test-roms collection, and the test ROMs of
-//! the GB Emulator Shootout that the collection doesn't include, at a pinned
-//! commit. Each step is skipped when its result is already on disk.
+//! release of the c-sp/game-boy-test-roms collection, and the GB Emulator
+//! Shootout's reference screenshots and the test ROMs the collection doesn't
+//! have in the same version, at a pinned commit of its `main` branch. Each
+//! step is skipped when its result is already on disk.
 
 use crate::suites::Source;
 use sha2::{Digest, Sha256};
@@ -86,10 +87,13 @@ fn ensure_collection() -> Result<PathBuf, String> {
 }
 
 /// Makes sure the shootout files in the manifest are downloaded, and returns
-/// the directory that holds them.
+/// the directory that holds them. The marker of a complete download holds the
+/// manifest's checksum, so files added to the manifest are downloaded too.
 fn ensure_shootout() -> Result<PathBuf, String> {
     let shootout_dir = work_dir().join(format!("gb-emulator-shootout-{}", &SHOOTOUT_COMMIT[..12]));
-    if shootout_dir.join(COMPLETE_MARKER).exists() {
+    let manifest_checksum = sha256_hex(SHOOTOUT_MANIFEST.as_bytes());
+    let marker = shootout_dir.join(COMPLETE_MARKER);
+    if fs::read_to_string(&marker).is_ok_and(|contents| contents == manifest_checksum) {
         return Ok(shootout_dir);
     }
 
@@ -138,7 +142,7 @@ fn ensure_shootout() -> Result<PathBuf, String> {
         ));
     }
 
-    fs::write(shootout_dir.join(COMPLETE_MARKER), SHOOTOUT_COMMIT)
+    fs::write(&marker, manifest_checksum)
         .map_err(|error| format!("failed to write to {}: {error}", shootout_dir.display()))?;
     Ok(shootout_dir)
 }
@@ -148,11 +152,15 @@ fn has_checksum(path: &Path, expected: &str) -> bool {
     let Ok(bytes) = fs::read(path) else {
         return false;
     };
-    let checksum: String = Sha256::digest(&bytes)
+    sha256_hex(&bytes) == expected
+}
+
+/// The SHA-256 checksum of `bytes` in lowercase hexadecimal.
+fn sha256_hex(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
         .iter()
         .map(|byte| format!("{byte:02x}"))
-        .collect();
-    checksum == expected
+        .collect()
 }
 
 /// Downloads each URL to its destination with curl, which ships with

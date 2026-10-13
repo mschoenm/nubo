@@ -8,6 +8,8 @@ fn night(date: &str, speed: f64, instructions: f64, wakeups: f64) -> Value {
         "commit": "abc1234",
         "tests": {"verify_boot": "success", "cpu": "success"},
         "test_roms_passed": 2400,
+        "shootout": {"passed": 258, "total": 264, "rank": 1, "leader": "DocBoy",
+                     "leader_passed": 255, "published": "2026-06-04", "published_commit": "72fd745"},
         "speed": {"tobudx-dmg": speed},
         "instructions_per_emulated_second": {"tobudx-dmg": instructions},
         "efficiency": {"playing": {"wakeups_per_second": wakeups, "frames_per_second": 60.0}},
@@ -76,7 +78,45 @@ fn the_report_lists_the_latest_night_and_its_history() {
     assert!(page.contains("Latest night: 2026-10-15"));
     assert!(page.contains("None against the 14-night medians."));
     assert!(page.contains("| speed.tobudx-dmg | 121.5 | 120 | 120 | 120 |"));
-    assert!(page.contains("| 2026-10-15 | `abc1234` | passed | 2,400 | 121.5 |"));
+    assert!(page.contains("| 2026-10-15 | `abc1234` | passed | 2,400 | 258 | 121.5 |"));
+}
+
+#[test]
+fn the_report_starts_with_the_shootout_standing() {
+    let mut nights = ordinary_nights();
+    nights.push(night("2026-10-15", 121.5, 50_000_000.0, 86.0));
+    nights[14]["shootout"]["rank"] = json!(2);
+    let page = report(&nights);
+    let first_lines: Vec<&str> = page.lines().take(6).collect();
+    assert!(
+        first_lines.contains(
+            &"GB Emulator Shootout: 258 of 264, would rank 2nd (leader: DocBoy, 255; published 2026-06-04)."
+        ),
+        "{page}"
+    );
+    assert!(page.contains("| Date | Commit | Tests | Test ROMs passed | Shootout |"));
+}
+
+#[test]
+fn a_night_without_the_shootout_leaves_its_line_and_column_empty() {
+    let mut latest = night("2026-10-15", 120.0, 50_000_000.0, 86.0);
+    latest.as_object_mut().unwrap().remove("shootout");
+    let page = report(&[latest]);
+    assert!(!page.contains("GB Emulator Shootout"));
+    assert!(page.contains("| 2026-10-15 | `abc1234` | passed | 2,400 |  | 120 |"));
+}
+
+#[test]
+fn ranks_are_ordinals() {
+    assert_eq!(ordinal(1), "1st");
+    assert_eq!(ordinal(2), "2nd");
+    assert_eq!(ordinal(3), "3rd");
+    assert_eq!(ordinal(4), "4th");
+    assert_eq!(ordinal(11), "11th");
+    assert_eq!(ordinal(12), "12th");
+    assert_eq!(ordinal(13), "13th");
+    assert_eq!(ordinal(21), "21st");
+    assert_eq!(ordinal(112), "112th");
 }
 
 #[test]
