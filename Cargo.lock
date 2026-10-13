@@ -2846,6 +2846,7 @@ dependencies = [
  "lucide-icons",
  "notify-debouncer-mini",
  "nubo-core",
+ "nubo-frontend",
  "nubo-logo",
  "rfd",
  "serde",
@@ -2872,6 +2873,14 @@ dependencies = [
  "getset",
  "nubo-serializable-derive",
  "zip",
+]
+
+[[package]]
+name = "nubo-frontend"
+version = "0.5.0"
+dependencies = [
+ "nubo-core",
+ "serde",
 ]
 
 [[package]]

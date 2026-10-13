@@ -3,8 +3,8 @@
 //! browser build), and saved as soon as they change.
 
 use crate::controls::Controls;
-use crate::palettes::DmgPalette;
-use nubo_core::{CartridgeHeader, Model};
+use nubo_frontend::model::ModelPreference;
+use nubo_frontend::palettes::DmgPalette;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;
@@ -32,51 +32,6 @@ impl fmt::Display for Appearance {
             Appearance::Light => "Light",
             Appearance::Dark => "Dark",
         })
-    }
-}
-
-/// Which hardware a game starts on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(into = "String", try_from = "String")]
-pub enum ModelPreference {
-    /// Game Boy Color games start on a Game Boy Color (CGB-E), other games
-    /// on the original Game Boy (DMG).
-    #[default]
-    Automatic,
-    /// Every game starts on this model.
-    Fixed(Model),
-}
-
-impl ModelPreference {
-    /// The model to start the game with this header on.
-    pub fn model_for(self, header: &CartridgeHeader) -> Model {
-        match self {
-            ModelPreference::Automatic if header.supports_cgb => Model::CgbE,
-            ModelPreference::Automatic => Model::Dmg,
-            ModelPreference::Fixed(model) => model,
-        }
-    }
-}
-
-/// Saved as "auto" or as the model's short name, such as "CGB-E".
-impl From<ModelPreference> for String {
-    fn from(preference: ModelPreference) -> String {
-        match preference {
-            ModelPreference::Automatic => String::from("auto"),
-            ModelPreference::Fixed(model) => String::from(model.name()),
-        }
-    }
-}
-
-impl TryFrom<String> for ModelPreference {
-    type Error = String;
-
-    fn try_from(name: String) -> Result<Self, Self::Error> {
-        if name.eq_ignore_ascii_case("auto") {
-            Ok(ModelPreference::Automatic)
-        } else {
-            name.parse().map(ModelPreference::Fixed)
-        }
     }
 }
 

@@ -98,9 +98,13 @@ is merged.
 The RetroArch core comes after the whole restructuring and the Shootout plan's Parts 1 to 3 (see
 "Order and dependencies" in [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md)).
 
-Steps 1 and 2 of [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md) come first. Step 2 adds `run_frame()`
-(item 1 below) and moves the palettes and the model rule into `nubo-frontend` (item 4), so this phase
-only does what is still left after them.
+Steps 1 and 2 of [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md) come first. Step 2 added
+`Emulator::run_frame(&mut left, &mut right)` (item 1 below, done: it appends the samples to the
+caller's buffers, and `DOTS_PER_FRAME` is public) and moved the palettes and the model rule into
+`nubo-frontend` (item 4, done), so this phase only does what is still left after them.
+
+While the screen is off, the PPU still hands over a frame every 70,224 dots, holding what it last
+drew, so `run_frame` finishes one frame per call either way, as the Nubo app sees too.
 
 All of these add to the public API without changing what the emulator does.
 `cargo benchmark --compare`, `cargo test-roms` and `cargo save-states` must give the same results as

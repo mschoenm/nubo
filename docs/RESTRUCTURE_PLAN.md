@@ -1,6 +1,6 @@
 # Plan: restructuring the repository
 
-**Status: signed off by the maintainer on 2026-10-13. Step 1 is done.**
+**Status: signed off by the maintainer on 2026-10-13. Steps 1 and 2 are done.**
 
 ## What is planned and what is only kept possible
 
@@ -228,6 +228,8 @@ the Iced app's tests. The emulator doesn't change in any of them except step 2's
 - `cargo xtask review-units next` keeps the review dates of the moved files.
 
 ### Step 2: what the RetroArch core needs
+
+**Done.**
 
 1. Add `Emulator::run_frame()` to the core, as described in the RetroArch plan.
 2. Create `crates/nubo-frontend` with only `palettes` and `model`, moved from the Iced crate. The Iced

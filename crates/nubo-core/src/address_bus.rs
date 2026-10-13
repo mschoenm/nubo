@@ -259,6 +259,10 @@ pub struct AddressBus {
     deferred_cycles: u32,
     /// How many more plain M-cycles may wait, worked out the last time one ran.
     deferral_budget: u32,
+    /// The time since power-on, in PPU dots, at which `Emulator::run_frame`
+    /// stops. Stretches of M-cycles run in one go end there, so the call
+    /// stops at most one instruction past it. `u64::MAX` outside that call.
+    dot_limit: u64,
 }
 
 impl AddressBus {
@@ -299,6 +303,7 @@ impl AddressBus {
             ppu_eager: false,
             deferred_cycles: 0,
             deferral_budget: 0,
+            dot_limit: u64::MAX,
         }
     }
 
@@ -370,6 +375,11 @@ impl AddressBus {
     /// The left and right audio samples made since the buffers were cleared.
     pub(crate) fn audio_samples(&self) -> (&[f32], &[f32]) {
         (self.apu.left_samples(), self.apu.right_samples())
+    }
+
+    /// Moves every sample made so far to the end of `left` and `right`.
+    pub(crate) fn take_audio_samples(&mut self, left: &mut Vec<f32>, right: &mut Vec<f32>) {
+        self.apu.take_samples(left, right);
     }
 
     /// Empties the audio buffers for the next batch of samples.
@@ -550,6 +560,7 @@ impl AddressBus {
             ppu_eager: self.ppu_eager,
             deferred_cycles: self.deferred_cycles,
             deferral_budget: self.deferral_budget,
+            dot_limit: self.dot_limit,
         })
     }
 
@@ -675,6 +686,26 @@ impl AddressBus {
     /// counting the M-cycles still waiting to run (see `bulk_cycles.rs`).
     pub(crate) fn elapsed_dots(&self) -> u64 {
         self.elapsed_dots
+    }
+
+    /// [`AddressBus::elapsed_dots`] plus the dots of the M-cycles still
+    /// waiting to run.
+    pub(crate) fn elapsed_dots_including_waiting(&self) -> u64 {
+        self.elapsed_dots + u64::from(self.deferred_cycles) * u64::from(self.dots_per_cycle())
+    }
+
+    /// Makes stretches of M-cycles run in one go end at `dot_limit` dots
+    /// since power-on (`u64::MAX` for no limit).
+    pub(crate) fn set_dot_limit(&mut self, dot_limit: u64) {
+        self.dot_limit = dot_limit;
+    }
+
+    /// How many whole M-cycles fit before the dot limit.
+    fn cycles_before_dot_limit(&self) -> u32 {
+        let dots = self
+            .dot_limit
+            .saturating_sub(self.elapsed_dots_including_waiting());
+        u32::try_from(dots / u64::from(self.dots_per_cycle())).unwrap_or(u32::MAX)
     }
 
     /// Adds the dots of an M-cycle to the time since power-on.
@@ -1035,7 +1066,8 @@ fn zeroed_memory<const SIZE: usize>() -> Box<[u8; SIZE]> {
 ///   them out again.
 /// - `deferred_cycles`, `boot_rom_exited`, `vram_dma_bus`,
 ///   `pause_oam_dma_after_cycle` and `ppu_eager` are always zero, `None` or
-///   false between calls into the emulator (checked in debug builds).
+///   false between calls into the emulator, and `dot_limit` is `u64::MAX`
+///   (checked in debug builds).
 impl AddressBus {
     /// Writes the components on the address bus to `fields`, the top level of
     /// a save state next to the CPU, one field each and named after the
@@ -1058,6 +1090,7 @@ impl AddressBus {
             "only set during a block copy"
         );
         debug_assert!(!self.ppu_eager, "only set during a write's M-cycle");
+        debug_assert_eq!(self.dot_limit, u64::MAX, "only set during run_frame");
         fields.field_with(
             "bus",
             || String::from("fields"),

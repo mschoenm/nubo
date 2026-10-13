@@ -1,19 +1,7 @@
 //! Tests for reading and writing settings as TOML.
 
 use super::*;
-
-/// A header for a game that does or doesn't use Game Boy Color features.
-fn header(supports_cgb: bool) -> CartridgeHeader {
-    CartridgeHeader {
-        supports_sgb: false,
-        cartridge_type: 0,
-        rom_bank_count: 2,
-        ram_bank_count: 0,
-        title: String::from("TEST"),
-        has_battery: false,
-        supports_cgb,
-    }
-}
+use nubo_core::Model;
 
 #[test]
 fn settings_survive_a_round_trip() {
@@ -30,7 +18,7 @@ fn settings_survive_a_round_trip() {
         volume: 0.5,
         muted: true,
         controls: crate::controls::Controls::default(),
-        dmg_palette: crate::palettes::DmgPalette::Pocket,
+        dmg_palette: nubo_frontend::palettes::DmgPalette::Pocket,
         integer_scaling: true,
     };
 
@@ -73,20 +61,4 @@ fn only_offered_fast_forward_speeds_are_accepted() {
 #[test]
 fn unknown_models_are_rejected() {
     assert!(toml::from_str::<Settings>("model = \"N64\"").is_err());
-}
-
-#[test]
-fn automatic_picks_the_model_from_the_header() {
-    assert_eq!(
-        ModelPreference::Automatic.model_for(&header(true)),
-        Model::CgbE
-    );
-    assert_eq!(
-        ModelPreference::Automatic.model_for(&header(false)),
-        Model::Dmg
-    );
-    assert_eq!(
-        ModelPreference::Fixed(Model::Mgb).model_for(&header(true)),
-        Model::Mgb
-    );
 }

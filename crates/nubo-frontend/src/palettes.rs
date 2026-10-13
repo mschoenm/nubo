@@ -21,6 +21,7 @@ pub enum DmgPalette {
 }
 
 impl DmgPalette {
+    /// Every palette, in the order the settings show them.
     pub const ALL: [DmgPalette; 3] = [DmgPalette::Gray, DmgPalette::Green, DmgPalette::Pocket];
 
     /// The palette's four colors, lightest first.

@@ -19,7 +19,7 @@ The emulator itself: a plain Rust library with no platform dependencies and no C
 
 ## How Time Moves
 
-The CPU drives everything: each M-cycle (machine cycle, one CPU step) it asks the address bus to move the hardware on. The address bus's module docs list the order of one M-cycle, its variants, and what a new per-cycle component has to join (including `bulk_cycles_available`). `Emulator::step_until_next_audio_buffer` runs until the APU has filled an audio buffer, which is what paces every frontend. At vblank the PPU hands over the finished frame, which frontends pull with `Emulator::frame_buffer` or `Emulator::take_frame`.
+The CPU drives everything: each M-cycle (machine cycle, one CPU step) it asks the address bus to move the hardware on. The address bus's module docs list the order of one M-cycle, its variants, and what a new per-cycle component has to join (including `bulk_cycles_available`). `Emulator::step_until_next_audio_buffer` runs until the APU has filled an audio buffer, which is what paces the Nubo app; `Emulator::run_frame` runs to the next frame boundary (a multiple of 70,224 dots since power-on) instead, for a host that calls it once per frame, and caps the stretches run in one go there (`dot_limit`). At vblank the PPU hands over the finished frame, which frontends pull with `Emulator::frame_buffer` or `Emulator::take_frame`.
 
 ## Lazy Components, Exact Results
 

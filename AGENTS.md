@@ -64,6 +64,7 @@ These keep Nubo exact, and players' saves safe. Never break them.
 The root `Cargo.toml` is a virtual workspace whose default members are `nubo-core` and `nubo-serializable-derive`, so `cargo build` and `cargo test` don't build the apps, the tools or xtask. Libraries are in `crates/`, apps players use in `frontends/`, developer programs in `tools/`. Every package's name starts with `nubo` (except `xtask`), and every crate's folder is named after its package.
 
 - `crates/nubo-core/` (`AGENTS.md`): the emulator, a plain library with no platform dependencies. `Emulator` in `emulator.rs` is its API.
+- `crates/nubo-frontend/`: everything an app needs that isn't drawing, without a UI toolkit; for now the palettes for original Game Boy games and the rule that picks a game's model (the rest moves there in `docs/RESTRUCTURE_PLAN.md`).
 - `crates/nubo-serializable-derive/`: the derive macro behind save states.
 - `crates/nubo-logo/`: the logo, drawn from rounded rectangles, for the app's icons.
 - `frontends/nubo/` (`AGENTS.md`): the app, desktop and browser.
