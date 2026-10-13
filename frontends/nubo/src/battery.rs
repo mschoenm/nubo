@@ -11,8 +11,8 @@
 //! `main.rs`) most likely leaves a whole save on disk, not half of one.
 
 use crate::notices::Notices;
-use iced::time::{Duration, Instant, SystemTime};
 use nubo_core::{CartridgeEffects, RtcState};
+use nubo_frontend::time::{Duration, Instant, SystemTime};
 use slot::SaveSlot;
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};

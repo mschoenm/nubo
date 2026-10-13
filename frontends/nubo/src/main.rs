@@ -124,6 +124,7 @@ mod save_states;
 mod screenshots;
 mod settings;
 mod storage;
+mod subscriptions;
 #[cfg(not(target_arch = "wasm32"))]
 mod ticks;
 mod title_screens;

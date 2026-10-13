@@ -8,8 +8,7 @@ use super::{Command, Machine, Playback, ask, stopped_error};
 use crate::battery::BatterySaves;
 use crate::notices::Notices;
 use crate::rom::Rom;
-use iced::Subscription;
-use iced::futures::channel::mpsc as frame_channel;
+use futures::channel::mpsc as frame_channel;
 use nubo_core::Model;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -31,19 +30,20 @@ struct SharedFrame {
     sequence: u64,
     pixels: Vec<u8>,
     /// Told about every new frame while the UI listens (see
-    /// [`Session::new_frames`]).
+    /// [`FrameListener::listen`]).
     listener: Option<frame_channel::Sender<()>>,
 }
 
 /// Numbers sessions in the order they start (see [`FrameListener`]).
 static NEXT_SESSION_NUMBER: AtomicU64 = AtomicU64::new(0);
 
-/// One session's shared frame, told apart from other sessions' by the
-/// session's number, so that each session's [`Session::new_frames`] is a
-/// subscription of its own. The `Arc`'s address wouldn't do: a game started
-/// right after another stopped can get the same address, and Iced would then
-/// keep the stopped session's subscription.
-struct FrameListener {
+/// Tells the UI about one session's new frames (see
+/// [`Session::frame_listener`]). It hashes as the session's number, so that
+/// a UI that tells its listeners apart by their hash, as Iced's subscriptions
+/// do, gives each session a listener of its own. The `Arc`'s address wouldn't
+/// do: a game started right after another stopped can get the same address,
+/// and Iced would then keep the stopped session's subscription.
+pub struct FrameListener {
     session_number: u64,
     frame: Arc<Mutex<SharedFrame>>,
 }
@@ -59,8 +59,9 @@ impl FrameListener {
     /// earlier one. A channel of 0 still holds one message per sender, so
     /// notices of frames the UI hasn't picked up yet merge into one. One
     /// notice is sent straight away, since frames finished before the UI
-    /// listened were never announced.
-    fn listen(&self) -> frame_channel::Receiver<()> {
+    /// listened were never announced. The UI then picks up the newest frame
+    /// with [`Session::frame_since`] for each notice.
+    pub fn listen(&self) -> frame_channel::Receiver<()> {
         let (mut sender, receiver) = frame_channel::channel(0);
         let _ = sender.try_send(());
         if let Ok(mut frame) = self.frame.lock() {
@@ -207,16 +208,15 @@ impl Session {
         )?
     }
 
-    /// Produces an item whenever the emulator finishes a frame, so the window
-    /// only redraws when there is something new to show: about 60 times a
-    /// second at normal speed, and more when fast forwarding, up to what the
-    /// screen can show.
-    pub fn new_frames(&self) -> Subscription<()> {
-        let listener = FrameListener {
+    /// Something that tells the UI whenever the emulator finishes a new
+    /// frame, so the window only redraws when there is something new to
+    /// show: about 60 times a second at normal speed, and more when fast
+    /// forwarding, up to what the screen can show.
+    pub fn frame_listener(&self) -> FrameListener {
+        FrameListener {
             session_number: self.number,
             frame: self.frame.clone(),
-        };
-        Subscription::run_with(listener, FrameListener::listen)
+        }
     }
 
     /// Returns the newest frame and its sequence number, or `None` if it is

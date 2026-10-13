@@ -1,28 +1,23 @@
 //! The desktop build: a thread waits for the controllers to report
-//! something and sends what changed to the app.
+//! something and sends what changed to the app over a channel.
 
 use super::{ControllerEvent, Reader};
-use iced::Subscription;
-use iced::futures::channel::mpsc::Sender;
-use iced::futures::{SinkExt, executor};
+use futures::channel::mpsc::Sender;
+use futures::{SinkExt, executor};
 use std::time::Duration;
 
 /// The longest the thread waits for controller events before checking
 /// whether the app still listens.
 const LONGEST_WAIT: Duration = Duration::from_secs(1);
 
-pub fn subscription() -> Subscription<ControllerEvent> {
-    Subscription::run(|| {
-        iced::stream::channel(64, async |output| {
-            let started = std::thread::Builder::new()
-                .name(String::from("controllers"))
-                .spawn(move || read_forever(output));
-
-            if started.is_ok() {
-                std::future::pending::<()>().await;
-            }
-        })
-    })
+/// Starts a thread that reads the controllers and sends what happens to
+/// `output` until the app stops listening (drops the channel's receiver).
+/// Returns whether the thread started.
+pub fn read_on_thread(output: Sender<ControllerEvent>) -> bool {
+    std::thread::Builder::new()
+        .name(String::from("controllers"))
+        .spawn(move || read_forever(output))
+        .is_ok()
 }
 
 /// Reads the controllers until the app stops listening.

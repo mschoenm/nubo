@@ -8,9 +8,9 @@
 //! `<slot>.kept-<number>.state`, so saving to the slot again can't overwrite
 //! it. The browser build has no save states yet.
 
-use iced::time::SystemTime;
-use iced::widget::image;
 use nubo_core::Model;
+use nubo_frontend::picture::Picture;
+use nubo_frontend::time::SystemTime;
 use std::fmt;
 use std::path::Path;
 
@@ -72,7 +72,7 @@ pub struct SlotInfo {
     pub slot: Slot,
     /// When the slot was saved, or `None` if it is empty.
     pub saved_at: Option<SystemTime>,
-    pub thumbnail: Option<image::Handle>,
+    pub thumbnail: Option<Picture>,
 }
 
 /// Saves `state` in `slot` of the game at `rom_path`, with `pixels` (the

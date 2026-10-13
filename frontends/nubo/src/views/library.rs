@@ -8,6 +8,7 @@ use crate::library::{self, Library, LibraryEntry};
 use crate::settings::Settings;
 use crate::ui::icons::{self, Icon, icon};
 use crate::ui::logo::logo;
+use crate::ui::pictures;
 use crate::ui::theme;
 use crate::ui::widgets::{
     icon_button, keycap, primary_button, secondary_button, shortcut, top_bar, truncated_text,
@@ -461,31 +462,31 @@ fn notice<'a>(message: &'a str, action: Option<Element<'a, Message>>) -> Element
 }
 
 /// The picture on a game's card.
-#[derive(Clone, Copy)]
-enum Picture<'a> {
+#[derive(Clone)]
+enum CardPicture {
     /// Box art downloaded for the game.
-    BoxArt(&'a image::Handle),
+    BoxArt(image::Handle),
     /// A frame of the Game Boy screen: the title screen or the last screen
     /// played.
-    Screen(&'a image::Handle),
+    Screen(image::Handle),
     /// Nothing yet.
     None,
 }
 
-impl<'a> Picture<'a> {
+impl CardPicture {
     /// The best picture of a game: its box art (if shown), then its title
     /// screen, then the last screen played.
-    fn of(library: &'a Library, entry: &LibraryEntry, show_box_art: bool) -> Picture<'a> {
-        let box_art = library
-            .box_art(&entry.path)
-            .filter(|_| show_box_art)
-            .map(Picture::BoxArt);
-        let screen = library
+    fn of(library: &Library, entry: &LibraryEntry, show_box_art: bool) -> CardPicture {
+        if let Some(box_art) = library.box_art(&entry.path).filter(|_| show_box_art) {
+            return CardPicture::BoxArt(pictures::handle(box_art));
+        }
+
+        library
             .title_screen(&entry.path)
             .or_else(|| library.thumbnail(&entry.path))
-            .map(Picture::Screen);
-
-        box_art.or(screen).unwrap_or(Picture::None)
+            .map_or(CardPicture::None, |screen| {
+                CardPicture::Screen(pictures::handle(screen))
+            })
     }
 }
 
@@ -502,7 +503,7 @@ fn card_grid<'a>(
     grid(games.into_iter().enumerate().map(|(index, entry)| {
         card(
             entry,
-            Picture::of(library, entry, show_box_art),
+            CardPicture::of(library, entry, show_box_art),
             selection == Some(first_index + index),
         )
     }))
@@ -514,16 +515,16 @@ fn card_grid<'a>(
 
 /// A game's card: a picture of the game (or a placeholder), its name and
 /// whether it's a Game Boy or Game Boy Color game. Clicking it starts the game.
-fn card<'a>(entry: &'a LibraryEntry, picture: Picture<'a>, selected: bool) -> Element<'a, Message> {
-    let picture: Element<'a, Message> = match picture {
-        Picture::BoxArt(handle) => image(handle.clone())
+fn card(entry: &LibraryEntry, picture: CardPicture, selected: bool) -> Element<'_, Message> {
+    let picture: Element<'_, Message> = match picture {
+        CardPicture::BoxArt(handle) => image(handle)
             .content_fit(ContentFit::Contain)
             .width(Fill)
             .height(Fill)
             .border_radius(4)
             .into(),
-        Picture::Screen(handle) => screen_picture(handle.clone()),
-        Picture::None => center(icon(Icon::Gamepad2).size(36).style(theme::muted_text))
+        CardPicture::Screen(handle) => screen_picture(handle),
+        CardPicture::None => center(icon(Icon::Gamepad2).size(36).style(theme::muted_text))
             .style(theme::thumbnail_placeholder)
             .into(),
     };

@@ -6,11 +6,11 @@ use super::*;
 fn binding_a_key_takes_it_from_its_old_action() {
     let mut keyboard = default_keyboard();
 
-    keyboard.bind(Action::A, Some(KeyboardKey(Code::KeyX)));
+    keyboard.bind(Action::A, Some(KeyCode::KeyX));
 
-    assert_eq!(keyboard.action(KeyboardKey(Code::KeyX)), Some(Action::A));
+    assert_eq!(keyboard.action(KeyCode::KeyX), Some(Action::A));
     assert_eq!(keyboard.input(Action::B), None);
-    assert_eq!(keyboard.action(KeyboardKey(Code::KeyZ)), None);
+    assert_eq!(keyboard.action(KeyCode::KeyZ), None);
 }
 
 #[test]
@@ -20,15 +20,13 @@ fn clearing_a_binding_leaves_the_action_without_a_key() {
     keyboard.bind(Action::Start, None);
 
     assert_eq!(keyboard.input(Action::Start), None);
-    assert_eq!(keyboard.action(KeyboardKey(Code::Enter)), None);
+    assert_eq!(keyboard.action(KeyCode::Enter), None);
 }
 
 #[test]
 fn controls_survive_a_round_trip_through_toml() {
     let mut controls = Controls::default();
-    controls
-        .keyboard
-        .bind(Action::A, Some(KeyboardKey(Code::Numpad5)));
+    controls.keyboard.bind(Action::A, Some(KeyCode::Numpad5));
     controls.controller.bind(Action::QuickSave, None);
 
     let contents = toml::to_string(&controls).unwrap();
@@ -45,9 +43,43 @@ fn only_known_keys_and_buttons_load() {
 
 #[test]
 fn escape_and_backspace_cant_be_bound() {
-    assert!(KeyboardKey::from_code(Code::Escape).is_none());
-    assert!(KeyboardKey::from_code(Code::Backspace).is_none());
-    assert!(KeyboardKey::from_code(Code::KeyQ).is_some());
+    assert!(KeyCode::try_from(String::from("Escape")).is_err());
+    assert!(KeyCode::try_from(String::from("Backspace")).is_err());
+}
+
+#[test]
+fn every_key_has_a_name_that_loads_back() {
+    for &key in KeyCode::ALL {
+        assert_eq!(KeyCode::try_from(String::from(key)), Ok(key));
+    }
+}
+
+#[test]
+fn keys_are_saved_by_the_names_earlier_versions_used() {
+    let names: Vec<_> = [
+        KeyCode::ArrowUp,
+        KeyCode::KeyZ,
+        KeyCode::Digit0,
+        KeyCode::F12,
+        KeyCode::ShiftLeft,
+        KeyCode::Backquote,
+        KeyCode::NumpadEnter,
+    ]
+    .map(String::from)
+    .into();
+
+    assert_eq!(
+        names,
+        [
+            "ArrowUp",
+            "KeyZ",
+            "Digit0",
+            "F12",
+            "ShiftLeft",
+            "Backquote",
+            "NumpadEnter"
+        ]
+    );
 }
 
 #[test]

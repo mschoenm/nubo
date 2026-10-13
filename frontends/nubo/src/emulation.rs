@@ -10,13 +10,13 @@ use crate::cheats::Cheat;
 use crate::notices::Notices;
 use crate::rom::Rom;
 use crate::settings::FastForwardSpeed;
-use iced::time::Duration;
 use nubo_core::{ControllerMapping, ControllerState, Emulator, Key, Model};
+use nubo_frontend::time::Duration;
 use std::sync::Arc;
 use std::sync::mpsc::{self, Sender};
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use thread::{ActivityCount, Session};
+pub use thread::{ActivityCount, FrameListener, Session};
 #[cfg(target_arch = "wasm32")]
 pub use web::Session;
 

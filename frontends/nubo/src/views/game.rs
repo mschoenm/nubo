@@ -12,6 +12,7 @@ use crate::save_states::{self, Slot, SlotInfo};
 use crate::screenshots;
 use crate::settings::Settings;
 use crate::ui::icons::{Icon, icon};
+use crate::ui::pictures;
 use crate::ui::theme;
 use crate::ui::widgets::{
     bottom_bar, icon_button, icon_button_at, secondary_button, shortcut, toggle_icon_button,
@@ -29,9 +30,9 @@ const SLOT_THUMBNAIL_WIDTH: f32 = 80.0;
 const SLOT_THUMBNAIL_HEIGHT: f32 = 72.0;
 
 pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<'a, Message> {
-    let picture: Element<'a, Message> = match game.screen() {
-        Some(handle) if settings.integer_scaling => whole_step_screen(handle.clone()),
-        Some(handle) => image(handle.clone())
+    let picture: Element<'a, Message> = match game.screen().map(pictures::handle) {
+        Some(handle) if settings.integer_scaling => whole_step_screen(handle),
+        Some(handle) => image(handle)
             .filter_method(image::FilterMethod::Nearest)
             .content_fit(ContentFit::Contain)
             .width(Fill)
@@ -386,8 +387,8 @@ fn slots_page<'a>(
 }
 
 fn slot_row(info: &SlotInfo, saving: bool, selected: bool) -> Element<'_, Message> {
-    let picture: Element<'_, Message> = match &info.thumbnail {
-        Some(handle) => image(handle.clone())
+    let picture: Element<'_, Message> = match info.thumbnail.as_ref().map(pictures::handle) {
+        Some(handle) => image(handle)
             .filter_method(image::FilterMethod::Nearest)
             .width(SLOT_THUMBNAIL_WIDTH)
             .height(SLOT_THUMBNAIL_HEIGHT)

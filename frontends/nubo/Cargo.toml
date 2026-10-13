@@ -11,6 +11,12 @@ nubo-core.workspace = true
 nubo-frontend.workspace = true
 nubo-logo.workspace = true
 iced = { version = "0.14", features = ["image", "canvas"] }
+# Iced's image handles hold their pixels as `Bytes`; ui/pictures.rs shares a
+# picture's pixels with its handle without copying them.
+bytes = "1.12"
+# Channels and `block_on` for the threads that report to the app; Iced's
+# subscriptions read the same channels (it re-exports this crate).
+futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
 rfd = "0.17"
 gilrs = "0.11"
 lucide-icons = "1.55"

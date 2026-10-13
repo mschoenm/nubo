@@ -5,15 +5,17 @@
 use crate::app::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::cheats::{self, Cheat};
 use crate::controls::Controls;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::emulation::FrameListener;
 use crate::emulation::{Command, Playback, Session};
 use crate::notices::Notices;
 use crate::rom::Rom;
 use crate::save_states::{self, SaveState, Slot, SlotInfo};
 use crate::settings::Settings;
-use iced::time::{Duration, Instant};
-use iced::widget::image;
 use nubo_core::{CartridgeHeader, ControllerState, Key, Model};
 use nubo_frontend::palettes::DmgPalette;
+use nubo_frontend::picture::Picture;
+use nubo_frontend::time::{Duration, Instant};
 
 /// How long the top bar stays after the mouse stops moving.
 const CONTROLS_TIMEOUT: Duration = Duration::from_millis(2500);
@@ -106,15 +108,16 @@ impl Game {
         self.rom.name()
     }
 
-    /// Produces an item whenever the emulator finishes a frame (see
-    /// [`Session::new_frames`]).
+    /// Tells whoever listens to it whenever the emulator finishes a new
+    /// frame (see [`Session::frame_listener`]).
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn new_frames(&self) -> iced::Subscription<()> {
-        self.session.new_frames()
+    pub fn frame_listener(&self) -> FrameListener {
+        self.session.frame_listener()
     }
 
-    pub fn screen(&self) -> Option<&image::Handle> {
-        self.screen.handle.as_ref()
+    /// The picture on screen: the newest frame, in the chosen palette.
+    pub fn screen(&self) -> Option<&Picture> {
+        self.screen.picture.as_ref()
     }
 
     /// The pixels on screen, in the chosen palette.
@@ -335,9 +338,9 @@ impl Game {
 struct Screen {
     /// The picture. Its pixels also go into thumbnails, save states and
     /// screenshots.
-    handle: Option<image::Handle>,
+    picture: Option<Picture>,
     /// The newest frame as the emulator drew it, kept to repaint it when the
-    /// palette changes, while the palette repaints it. Otherwise `handle`
+    /// palette changes, while the palette repaints it. Otherwise `picture`
     /// has the same pixels.
     raw: Option<Vec<u8>>,
     /// The colors original Game Boy games are shown in.
@@ -352,7 +355,7 @@ struct Screen {
 impl Screen {
     fn new(repaintable: bool) -> Self {
         Screen {
-            handle: None,
+            picture: None,
             raw: None,
             palette: DmgPalette::default(),
             repaintable,
@@ -361,10 +364,7 @@ impl Screen {
     }
 
     fn pixels(&self) -> Option<&[u8]> {
-        match self.handle.as_ref()? {
-            image::Handle::Rgba { pixels, .. } => Some(&pixels[..]),
-            _ => None,
-        }
+        self.picture.as_ref().map(Picture::pixels)
     }
 
     /// Shows a frame as the emulator drew it, in the chosen palette. Only a
@@ -380,7 +380,7 @@ impl Screen {
             pixels
         };
 
-        self.handle = Some(image::Handle::from_rgba(SCREEN_WIDTH, SCREEN_HEIGHT, shown));
+        self.picture = Some(Picture::new(SCREEN_WIDTH, SCREEN_HEIGHT, shown));
     }
 
     /// Shows original Game Boy games in `palette` from now on, repainting

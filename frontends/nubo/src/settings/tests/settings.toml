@@ -1,0 +1,46 @@
+appearance = "dark"
+model = "CGB-C"
+download_box_art = false
+resume_games = true
+fast_forward_speed = 3
+volume = 0.65
+muted = true
+dmg_palette = "pocket"
+integer_scaling = true
+
+[[library_folders]]
+path = "/home/player/Games/Game Boy"
+include_subfolders = true
+
+[[library_folders]]
+path = "/media/player/USB stick/roms"
+include_subfolders = false
+
+[controls.keyboard]
+up = "KeyW"
+down = "KeyS"
+left = "KeyA"
+right = "KeyD"
+a = "KeyK"
+b = "KeyJ"
+start = "NumpadEnter"
+select = "ShiftRight"
+fast_forward = "Backquote"
+quick_save = "F1"
+quick_load = "Quote"
+fullscreen = "Backslash"
+
+[controls.controller]
+up = "dpad_up"
+down = "dpad_down"
+left = "dpad_left"
+right = "dpad_right"
+a = "south"
+b = "west"
+start = "start"
+select = "select"
+pause_menu = "right_stick"
+fast_forward = "left_shoulder"
+quick_load = "left_trigger"
+fullscreen = "north"
+screenshot = "left_stick"

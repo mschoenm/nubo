@@ -15,7 +15,7 @@
 //! samples are made, never when a frame runs, so the queue's jumps by a
 //! whole sound buffer don't move frames.
 
-use iced::time::Duration;
+use nubo_frontend::time::Duration;
 
 /// How long the Game Boy takes to draw a frame: 70,224 clock ticks at
 /// 4,194,304 Hz, about 59.73 frames a second.

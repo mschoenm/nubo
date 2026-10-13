@@ -6,9 +6,9 @@
 //! keep loading in other versions of Nubo, the same on every platform.
 
 use super::{SaveState, Slot, SlotInfo};
-use crate::storage::files::{encode_png, project_directories, write_atomically};
-use iced::widget::image;
+use crate::storage::files::{decode_png, encode_png, project_directories, write_atomically};
 use nubo_core::{SaveStateError, SaveStateHeader};
+use nubo_frontend::picture::Picture;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -121,11 +121,11 @@ pub fn slot_info_in(directory: &Path, rom_path: &Path, slot: Slot) -> SlotInfo {
     let saved_at = fs::metadata(slot_path(directory, rom_path, slot, "state"))
         .and_then(|metadata| metadata.modified())
         .ok();
-    // Read as bytes so a picture replaced by a new save shows up; a handle
-    // made from a path would keep showing the cached old picture.
+    // Read anew each time, so a picture replaced by a new save shows up.
     let thumbnail = saved_at
         .and_then(|_| fs::read(slot_path(directory, rom_path, slot, "png")).ok())
-        .map(image::Handle::from_bytes);
+        .and_then(|png| decode_png(&png))
+        .map(|(width, height, pixels)| Picture::new(width, height, pixels));
 
     SlotInfo {
         slot,
