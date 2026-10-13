@@ -1,9 +1,11 @@
-//! Runs the Game Boy test ROM suites (Blargg, Mooneye, SameSuite, the acid
-//! tests, Mealybug Tearoom, Gambatte, GBMicrotest, AGE, rtc3test, Bully,
-//! Strikethrough, and daid's and CasualPokePlayer's tests from the GB
-//! Emulator Shootout) and compares the results with `passing.txt`, so
-//! regressions, newly passing tests and listed tests that no longer run are
-//! noticed.
+//! Runs the Game Boy test ROM suites (Blargg, Mooneye (Gekkio's and Wilbert
+//! Pol's), SameSuite, the acid tests, Mealybug Tearoom, Gambatte,
+//! GBMicrotest, AGE, rtc3test, Bully, Strikethrough, Scribbltests,
+//! TurtleTests, little-things-gb, the MBC3 Tester, and daid's and
+//! CasualPokePlayer's tests from the GB Emulator Shootout) in parallel and
+//! compares the results with `passing.txt`, so regressions, newly passing
+//! tests and listed tests that no longer run are noticed. The README lists
+//! the tests that aren't run and why.
 
 use clap::Parser;
 use runner::Outcome;
@@ -46,6 +48,12 @@ fn main() -> ExitCode {
 
 /// Runs the selected tests and reports the results. Returns whether they
 /// match the list of passing tests (always true with `--update`).
+///
+/// An unfiltered run also fails when a listed test wasn't run at all (a
+/// renamed ROM, a changed model rule, a suite that is no longer collected),
+/// listing it under "Listed but not run", and an unfiltered `--update`
+/// removes such entries. A filtered run leaves the entries of tests outside
+/// the filter alone.
 fn run(args: &Args) -> Result<bool, String> {
     let rom_dirs = download::ensure_test_roms()?;
     let failures_dir = download::work_dir().join("failures");

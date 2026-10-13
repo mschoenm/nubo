@@ -3,13 +3,20 @@
 //!
 //! Every ROM runs on each chosen model for a fixed stretch of emulated time
 //! with a scripted sequence of button presses, without a window or sound. The
-//! speed is emulated time divided by the time spent inside the emulator. The
+//! speed is emulated time divided by the time spent inside the emulator; the
+//! target is at least 20 times real time on both DMG and CGB. The
 //! fingerprints are hashes of every frame, every audio sample and the final
 //! save state; `--record` writes them to a file and `--compare` checks a later
-//! run against it. `--check-save-states` also checks that a save state taken
-//! halfway through each run, loaded into a new emulator, goes on exactly like
-//! the run it was taken from. `--shard` runs one of several equal parts of the
-//! ROMs, so the nightly CI can split these checks over several machines.
+//! run against it. Run over the games and all test ROMs, this shows that an
+//! optimization changes nothing at all, far beyond what the test ROMs'
+//! pass/fail results show. Built with the core's `eager` feature, which runs
+//! every M-cycle on its own, it checks the lazy shortcuts against stepping
+//! one M-cycle at a time.
+//!
+//! `--check-save-states` also checks that a save state taken halfway through
+//! each run, loaded into a new emulator, goes on exactly like the run it was
+//! taken from. `--shard` runs one of several equal parts of the ROMs, so the
+//! nightly CI can split these checks over several machines.
 
 use clap::Parser;
 use image::RgbaImage;

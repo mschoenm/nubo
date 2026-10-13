@@ -1,7 +1,12 @@
 //! Project tasks run with `cargo xtask <command>`: building the Iced
 //! frontend for the browser and serving it locally, building the macOS app
-//! bundle, the Flatpak and the Windows installer, writing the license files
-//! that go with them, and checking a release's version and notes.
+//! bundle, the Flatpak and the Windows installer, writing the logo and the
+//! license files that go with them, checking a release's version and notes,
+//! timing Nubo next to other emulators, and the nightly review's tooling.
+//!
+//! The packaging tasks need their platform's tools, and `compare-emulators`
+//! builds other emulators from their C and C++ sources; nothing else needs
+//! more than Rust.
 
 use std::env;
 use std::fs;
@@ -23,7 +28,10 @@ const ICED_ARTIFACT: &str = "nubo.wasm";
 const WEB_ADDRESS: &str = "127.0.0.1:8080";
 /// The app's id: the macOS bundle identifier and the Flatpak's id. Linux
 /// desktops match the app's window to its menu entry by it too (the Iced
-/// frontend sets the same id on its window).
+/// frontend sets the same id on its window), and the menu entry and AppStream
+/// files in `LINUX_FILES` are named after it. This matters because GNOME on
+/// Wayland ignores window icons and shows the icon of the installed menu
+/// entry that matches the window.
 const APP_ID: &str = "io.github.mschoenm.nubo";
 /// The folder with the Linux menu entry and the AppStream description (what
 /// app stores show), which the Flatpak installs.
@@ -84,6 +92,11 @@ fn target_dir() -> PathBuf {
 /// The cargo that runs xtask, so the same toolchain builds everything, with
 /// `NUBO_COMMIT` set to the commit it builds ([`build_commit`]), which save
 /// states store.
+///
+/// The core keeps it in `nubo_core::BUILD_COMMIT`, so the states of every
+/// release and nightly build say exactly which build made them. Every build
+/// xtask runs gets it, the Flatpak's included; a plain `cargo build` leaves
+/// it empty.
 fn cargo() -> Command {
     let mut command = Command::new(env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
     command.env("NUBO_COMMIT", build_commit());
@@ -177,6 +190,13 @@ fn build_wasm_package(package: &str, artifact: &str, profile: &str) -> Result<Pa
 /// Builds the Iced frontend for WebAssembly next to its `index.html` and the
 /// license files, and returns the directory to serve. `options` are the
 /// command's arguments: `--quick` builds with `QUICK_WASM_PROFILE`.
+///
+/// The JavaScript glue is generated with the `wasm-bindgen-cli-support`
+/// library, so neither wasm-pack nor Node.js is needed. It only works with
+/// the exact `wasm-bindgen` version the app is built with, so both are
+/// pinned to the same version in the root `Cargo.toml` and upgraded
+/// together. The result in `target/web` is what `deploy.yml` publishes to
+/// GitHub Pages.
 fn build_iced_web(options: &[String]) -> Result<PathBuf> {
     let profile = match options {
         [] => WASM_PROFILE,

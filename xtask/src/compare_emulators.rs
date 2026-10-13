@@ -10,7 +10,7 @@
 //! the emulator counted. Nubo runs in nubo-benchmark itself, and also built
 //! with the `eager` feature (every M-cycle on its own) to show what its lazy
 //! shortcuts add. The other emulators are only built and run on this machine,
-//! never distributed with Nubo.
+//! never distributed with Nubo or ported from (Gambatte is GPL-2.0-only).
 //!
 //! The runs are timed one at a time, round after round, and the table shows
 //! each one's best round, since a busy machine only ever slows a run down.
@@ -21,7 +21,8 @@
 //! Unlike everything else in the workspace, this needs more than Rust: git, a
 //! C and C++ compiler, make, RGBDS (for SameBoy's free boot ROMs, which
 //! Gambatte and Gearboy run too) and CMake (for mGBA). An emulator whose tools
-//! are missing is left out with a note saying what to install.
+//! are missing is left out with a note saying what to install. It runs on
+//! Linux and macOS; `--instructions` needs Valgrind, which runs on Linux.
 
 use crate::{Result, benchmark_roms, build_commit, target_dir};
 use image::RgbImage;

@@ -20,7 +20,9 @@
 //!
 //! The games aren't part of Nubo: `cargo xtask benchmark-roms` downloads them
 //! to `target/benchmark-roms`, where this looks for them. A game whose states
-//! are kept must stay in that list at the same version.
+//! are kept must stay in that list (`xtask/src/benchmark_roms.rs`) at the same
+//! version, since states of another version of a game don't load. Kept sets
+//! are never changed or removed.
 
 use clap::Parser;
 use nubo_core::{Emulator, Key, Model, NoSaves, RtcClock};

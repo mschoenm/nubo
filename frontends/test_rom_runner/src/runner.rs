@@ -604,8 +604,9 @@ fn step_audio_buffer(
     Ok(())
 }
 
-/// Saves the failing screen as a PNG, and with a reference also a
-/// `.diff.png` that marks differing pixels in red. Errors are ignored
+/// Saves the failing screen as a PNG in `failures_dir/<model>/`, and with a
+/// reference also a `.diff.png` (the reference with the differing pixels
+/// painted red). Errors are ignored
 /// because these images are only a debugging aid.
 fn save_failure_screens(
     actual: &RgbImage,
