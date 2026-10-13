@@ -1,6 +1,6 @@
 # Plan: restructuring the repository
 
-**Status: signed off by the maintainer on 2026-10-13. Steps 1 and 2 are done.**
+**Status: signed off by the maintainer on 2026-10-13. Steps 1 to 3 are done.**
 
 ## What is planned and what is only kept possible
 
@@ -241,6 +241,10 @@ After this step the RetroArch core can be built without waiting for the rest.
 the same models.
 
 ### Step 3: neutral building blocks
+
+**Done.** `time` and `picture` are already in `nubo-frontend`; `KeyCode` is in `controls.rs` and moves
+with it. The channels are `futures` channels, which the Iced crate's `subscriptions.rs` turns into
+subscriptions; new frames still come over a channel (`Session::frame_listener`) until step 6.
 
 Without moving modules yet, take Iced out of the parts that don't draw:
 

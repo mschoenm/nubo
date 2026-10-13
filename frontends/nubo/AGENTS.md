@@ -13,7 +13,8 @@ cargo run --release -p nubo -- --measure-efficiency rom.gb   # Wake-ups, audio b
 ## How It Runs
 
 - **The emulator has a thread of its own** (`emulation/thread.rs`), paced by the sound card: it sleeps until the audio callback says the queue runs low or the UI sends a `Command`, and never polls. `emulation.rs` holds what the desktop and browser builds share (`Machine`, `Command`, `Playback`).
-- **The window only redraws for new pictures.** The emulator thread reports each new, different frame through a subscription (`Session::new_frames`); a still screen draws nothing. What changes with time alone (toasts, the fullscreen bar) is checked by `ticks::every`.
+- **The window only redraws for new pictures.** The emulator thread reports each new, different frame over a channel (`Session::frame_listener`), which `subscriptions.rs` turns into a subscription; a still screen draws nothing. What changes with time alone (toasts, the fullscreen bar) is checked by `ticks::every`.
+- **Only the UI code knows Iced**: `views/`, `ui/`, `app.rs` and `app/`, `main.rs`, `ticks.rs`, `input.rs` and `subscriptions.rs`. The other modules are on their way to `crates/nubo-frontend` (`docs/RESTRUCTURE_PLAN.md`) and use neutral building blocks instead: `futures` channels that `subscriptions.rs` turns into subscriptions, `nubo_frontend::time` for clocks, `nubo_frontend::picture::Picture` for pictures (drawn with one cached image handle each, `ui/pictures.rs`, so a picture is uploaded to the graphics card only once), and `controls::KeyCode` for keys (`input.rs` maps Iced's key codes to it).
 - **Every command wakes the emulator thread**, so `Game::apply` only sends pause, speed and volume when they change. After every message, `app.rs` tells the game whether to run, how fast and how loud.
 - **Slow work never runs on the UI thread or Iced's task pool**: scans, title screen captures, box art downloads and picture decoding go through `background::run`.
 - **Messages come in groups** (`GameMessage`, `LibraryMessage`, `SettingsMessage`, `WindowMessage`), each handled in its own file under `app/`. Screens are in `views/`, styles and themes in `ui/`.
@@ -26,7 +27,7 @@ Settings (`settings.toml`, with the controls) are in the per-user config folder;
 
 - `emulation/web.rs` replaces the emulator thread: it emulates whole frames on each frame tick, and `emulation/pacing.rs` decides how many and keeps the audio queue steady by nudging the sample rate.
 - Settings and battery saves go to localStorage instead of files. The library, save states, cheats, screenshots and box art are desktop only; each of those modules has an `AVAILABLE` flag.
-- Code both builds share takes `Instant`, `SystemTime` and `Duration` from `iced::time` (std's panic on wasm32), and text that sets a font uses `theme::BODY_FONT` or `theme::HEADING_FONT`: the browser has no system fonts, so `Font::DEFAULT` or another font of its own draws nothing there. Plain `text()` without `.font()` is fine, and so are the Lucide icons (`ui/icons.rs`), whose font the app loads itself.
+- Code both builds share takes `Instant`, `SystemTime` and `Duration` from `nubo_frontend::time`, which re-exports the `web-time` crate (std's panic on wasm32; `iced::time` is the same types, for the UI code), and text that sets a font uses `theme::BODY_FONT` or `theme::HEADING_FONT`: the browser has no system fonts, so `Font::DEFAULT` or another font of its own draws nothing there. Plain `text()` without `.font()` is fine, and so are the Lucide icons (`ui/icons.rs`), whose font the app loads itself.
 - `deploy.yml` publishes the browser build to GitHub Pages on every push to main that passes CI.
 
 ## Packaging Files

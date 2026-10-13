@@ -4,7 +4,6 @@
 //! does at most one thing. The controls are saved with the other settings
 //! in `settings.toml` (see `settings.rs`).
 
-use iced::keyboard::key::Code;
 use nubo_core::{ControllerButton, ControllerMapping, Key};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -200,7 +199,7 @@ impl<Input: Copy + PartialEq> Bindings<Input> {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Controls {
-    pub keyboard: Bindings<KeyboardKey>,
+    pub keyboard: Bindings<KeyCode>,
     pub controller: Bindings<PadButton>,
 }
 
@@ -259,21 +258,21 @@ impl Controls {
 }
 
 /// The keys a new user gets.
-pub fn default_keyboard() -> Bindings<KeyboardKey> {
+pub fn default_keyboard() -> Bindings<KeyCode> {
     Bindings::from_pairs(&[
-        (Action::Up, KeyboardKey(Code::ArrowUp)),
-        (Action::Down, KeyboardKey(Code::ArrowDown)),
-        (Action::Left, KeyboardKey(Code::ArrowLeft)),
-        (Action::Right, KeyboardKey(Code::ArrowRight)),
-        (Action::A, KeyboardKey(Code::KeyZ)),
-        (Action::B, KeyboardKey(Code::KeyX)),
-        (Action::Start, KeyboardKey(Code::Enter)),
-        (Action::Select, KeyboardKey(Code::Space)),
-        (Action::FastForward, KeyboardKey(Code::Tab)),
-        (Action::QuickSave, KeyboardKey(Code::F5)),
-        (Action::QuickLoad, KeyboardKey(Code::F8)),
-        (Action::Fullscreen, KeyboardKey(Code::F11)),
-        (Action::Screenshot, KeyboardKey(Code::F12)),
+        (Action::Up, KeyCode::ArrowUp),
+        (Action::Down, KeyCode::ArrowDown),
+        (Action::Left, KeyCode::ArrowLeft),
+        (Action::Right, KeyCode::ArrowRight),
+        (Action::A, KeyCode::KeyZ),
+        (Action::B, KeyCode::KeyX),
+        (Action::Start, KeyCode::Enter),
+        (Action::Select, KeyCode::Space),
+        (Action::FastForward, KeyCode::Tab),
+        (Action::QuickSave, KeyCode::F5),
+        (Action::QuickLoad, KeyCode::F8),
+        (Action::Fullscreen, KeyCode::F11),
+        (Action::Screenshot, KeyCode::F12),
     ])
 }
 
@@ -299,48 +298,26 @@ pub fn default_controller() -> Bindings<PadButton> {
     ])
 }
 
-/// A keyboard key, by its position on the keyboard (so the controls stay
-/// in place on every layout). Saved by its name, such as "KeyZ".
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(try_from = "String", into = "String")]
-pub struct KeyboardKey(Code);
-
-impl KeyboardKey {
-    /// The key at `code`, if it can be bound. Esc and Backspace can't: they
-    /// cancel and clear while picking a key.
-    pub fn from_code(code: Code) -> Option<KeyboardKey> {
-        KEYS.iter()
-            .any(|&(known, _, _)| known == code)
-            .then_some(KeyboardKey(code))
-    }
-
-    fn entry(self) -> (Code, &'static str, &'static str) {
-        *KEYS
-            .iter()
-            .find(|&&(code, _, _)| code == self.0)
-            .unwrap_or(&KEYS[0])
-    }
-}
-
-impl fmt::Display for KeyboardKey {
+impl fmt::Display for KeyCode {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(self.entry().2)
+        formatter.write_str(self.label())
     }
 }
 
-impl From<KeyboardKey> for String {
-    fn from(key: KeyboardKey) -> String {
-        String::from(key.entry().1)
+impl From<KeyCode> for String {
+    fn from(key: KeyCode) -> String {
+        String::from(key.name())
     }
 }
 
-impl TryFrom<String> for KeyboardKey {
+impl TryFrom<String> for KeyCode {
     type Error = String;
 
     fn try_from(name: String) -> Result<Self, Self::Error> {
-        KEYS.iter()
-            .find(|&&(_, known, _)| known == name)
-            .map(|&(code, _, _)| KeyboardKey(code))
+        KeyCode::ALL
+            .iter()
+            .copied()
+            .find(|key| key.name() == name)
             .ok_or_else(|| format!("unknown key {name}"))
     }
 }
@@ -397,15 +374,45 @@ impl TryFrom<String> for PadButton {
     }
 }
 
-/// Defines the table of bindable keys: each key's code, the name it is
-/// saved by (the code's name) and the label the settings show.
-macro_rules! keys {
+/// Defines [`KeyCode`] with every key that can be bound: each key's name,
+/// which is also the name it is saved by, and the label the settings show.
+macro_rules! key_codes {
     ($($code:ident => $label:expr),* $(,)?) => {
-        const KEYS: &[(Code, &str, &str)] = &[$((Code::$code, stringify!($code), $label)),*];
+        /// A keyboard key that can be bound, by its position on the keyboard,
+        /// so the controls stay in place on every layout. The keys are named
+        /// like the web's `KeyboardEvent.code` (and Iced's key codes), such as
+        /// `KeyZ` for the key that has Z on a US keyboard, and saved in
+        /// `settings.toml` by that name. Esc and Backspace aren't among them:
+        /// they cancel and clear while picking a key. The app maps its UI
+        /// toolkit's key codes to these (see `input.rs`).
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+        #[serde(try_from = "String", into = "String")]
+        pub enum KeyCode {
+            $($code),*
+        }
+
+        impl KeyCode {
+            /// Every key that can be bound.
+            pub const ALL: &[KeyCode] = &[$(KeyCode::$code),*];
+
+            /// The name the key is saved by, such as "KeyZ".
+            pub fn name(self) -> &'static str {
+                match self {
+                    $(KeyCode::$code => stringify!($code)),*
+                }
+            }
+
+            /// What the settings call the key, such as "Z".
+            pub fn label(self) -> &'static str {
+                match self {
+                    $(KeyCode::$code => $label),*
+                }
+            }
+        }
     };
 }
 
-keys! {
+key_codes! {
     ArrowUp => "↑", ArrowDown => "↓", ArrowLeft => "←", ArrowRight => "→",
     KeyA => "A", KeyB => "B", KeyC => "C", KeyD => "D", KeyE => "E", KeyF => "F",
     KeyG => "G", KeyH => "H", KeyI => "I", KeyJ => "J", KeyK => "K", KeyL => "L",

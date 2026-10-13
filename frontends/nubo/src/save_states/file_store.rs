@@ -6,9 +6,9 @@
 //! keep loading in other versions of Nubo, the same on every platform.
 
 use super::{SaveState, Slot, SlotInfo};
-use crate::storage::files::{encode_png, project_directories, write_atomically};
-use iced::widget::image;
+use crate::storage::files::{decode_png, encode_png, project_directories, write_atomically};
 use nubo_core::{SaveStateError, SaveStateHeader};
+use nubo_frontend::picture::Picture;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -116,22 +116,30 @@ pub fn keep_aside_in(directory: &Path, rom_path: &Path, slot: Slot) -> Result<Pa
     Ok(kept)
 }
 
-/// Describes a slot in `directory` (the folder for every game's states).
+/// Describes a slot in `directory` (the folder for every game's states),
+/// without its picture, which [`thumbnail_in`] reads.
 pub fn slot_info_in(directory: &Path, rom_path: &Path, slot: Slot) -> SlotInfo {
     let saved_at = fs::metadata(slot_path(directory, rom_path, slot, "state"))
         .and_then(|metadata| metadata.modified())
         .ok();
-    // Read as bytes so a picture replaced by a new save shows up; a handle
-    // made from a path would keep showing the cached old picture.
-    let thumbnail = saved_at
-        .and_then(|_| fs::read(slot_path(directory, rom_path, slot, "png")).ok())
-        .map(image::Handle::from_bytes);
 
     SlotInfo {
         slot,
         saved_at,
-        thumbnail,
+        thumbnail: None,
     }
+}
+
+pub fn thumbnail(rom_path: &Path, slot: Slot) -> Option<Picture> {
+    thumbnail_in(&states_directory().ok()?, rom_path, slot)
+}
+
+/// Reads and decodes the picture of a slot in `directory`, anew each time,
+/// so a picture replaced by a new save shows up.
+pub fn thumbnail_in(directory: &Path, rom_path: &Path, slot: Slot) -> Option<Picture> {
+    let png = fs::read(slot_path(directory, rom_path, slot, "png")).ok()?;
+    let (width, height, pixels) = decode_png(&png)?;
+    Some(Picture::new(width, height, pixels))
 }
 
 /// The file of a slot, in a folder named after the ROM's file name.

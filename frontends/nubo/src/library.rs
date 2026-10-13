@@ -8,12 +8,13 @@
 //! PNG files in the `title_screens` and `thumbnails` folders next to it.
 //! The browser build has no folders to scan, so its library stays empty.
 
+use crate::app::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::background;
-use iced::time::SystemTime;
-use iced::widget::image;
 use jobs::Jobs;
 use nubo_core::CartridgeHeader;
 use nubo_frontend::palettes::DmgPalette;
+use nubo_frontend::picture::Picture;
+use nubo_frontend::time::SystemTime;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -95,12 +96,12 @@ impl LibraryEntry {
 pub struct Library {
     /// Every known game, sorted by name.
     entries: Vec<LibraryEntry>,
-    thumbnails: HashMap<PathBuf, image::Handle>,
+    thumbnails: HashMap<PathBuf, Picture>,
     /// Pictures of the games' title screens, in the chosen DMG palette.
-    title_screens: HashMap<PathBuf, image::Handle>,
+    title_screens: HashMap<PathBuf, Picture>,
     captures: Jobs<MAX_CAPTURES>,
     /// Downloaded box art, for the games the collection has it for.
-    box_art: HashMap<PathBuf, image::Handle>,
+    box_art: HashMap<PathBuf, Picture>,
     downloads: Jobs<MAX_DOWNLOADS>,
     /// Folders that couldn't be found during the last scan.
     missing_folders: Vec<PathBuf>,
@@ -156,15 +157,15 @@ impl Library {
         played
     }
 
-    pub fn thumbnail(&self, path: &Path) -> Option<&image::Handle> {
+    pub fn thumbnail(&self, path: &Path) -> Option<&Picture> {
         self.thumbnails.get(path)
     }
 
-    pub fn title_screen(&self, path: &Path) -> Option<&image::Handle> {
+    pub fn title_screen(&self, path: &Path) -> Option<&Picture> {
         self.title_screens.get(path)
     }
 
-    pub fn box_art(&self, path: &Path) -> Option<&image::Handle> {
+    pub fn box_art(&self, path: &Path) -> Option<&Picture> {
         self.box_art.get(path)
     }
 
@@ -229,7 +230,7 @@ impl Library {
 
             if let Some(art) = picture {
                 saved = store::save_box_art(path, &art.png);
-                self.box_art.insert(path.to_path_buf(), art.handle);
+                self.box_art.insert(path.to_path_buf(), art.picture);
             }
         }
 
@@ -262,7 +263,7 @@ impl Library {
                     palette.recolor(&mut pixels);
                 }
                 self.title_screens
-                    .insert(path.to_path_buf(), screen_handle(pixels));
+                    .insert(path.to_path_buf(), screen_picture(pixels));
             }
         }
 
@@ -323,7 +324,7 @@ impl Library {
                 PictureKind::TitleScreen => &mut self.title_screens,
                 PictureKind::LastScreen => &mut self.thumbnails,
             };
-            pictures.insert(picture.path, picture.handle);
+            pictures.insert(picture.path, picture.picture);
         }
     }
 
@@ -455,7 +456,7 @@ impl Library {
     pub fn set_thumbnail(&mut self, path: &Path, pixels: Vec<u8>) -> Result<(), String> {
         let saved = store::save_thumbnail(path, &pixels);
         self.thumbnails
-            .insert(path.to_path_buf(), screen_handle(pixels));
+            .insert(path.to_path_buf(), screen_picture(pixels));
         saved
     }
 
@@ -484,19 +485,11 @@ pub enum WatchEvent {
     Failed(String),
 }
 
-/// Watches the library folders for games being added or removed. The
-/// browser build has no folders to watch.
-pub fn watch(folders: &[crate::settings::LibraryFolder]) -> iced::Subscription<WatchEvent> {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        watcher::subscription(folders)
-    }
-    #[cfg(target_arch = "wasm32")]
-    {
-        let _ = folders;
-        iced::Subscription::none()
-    }
-}
+/// Watches the library folders for games being added or removed, and sends
+/// what changed to `output` until the returned future is dropped. The
+/// browser build has no folders to watch, so it has no watcher.
+#[cfg(not(target_arch = "wasm32"))]
+pub use watcher::watch;
 
 /// Opens the folder picker, returning the chosen folder or `None` if the
 /// user cancels.
@@ -558,7 +551,7 @@ pub enum PictureKind {
 pub struct LoadedPicture {
     path: PathBuf,
     kind: PictureKind,
-    handle: image::Handle,
+    picture: Picture,
 }
 
 /// Box art just downloaded: the PNG to save, and the picture decoded on the
@@ -566,7 +559,7 @@ pub struct LoadedPicture {
 #[derive(Debug, Clone)]
 pub struct DownloadedArt {
     png: Vec<u8>,
-    handle: image::Handle,
+    picture: Picture,
 }
 
 impl DownloadedArt {
@@ -576,7 +569,7 @@ impl DownloadedArt {
         let (width, height, pixels) = store::decode_png(&png)?;
         Some(DownloadedArt {
             png,
-            handle: image::Handle::from_rgba(width, height, pixels),
+            picture: Picture::new(width, height, pixels),
         })
     }
 }
@@ -587,7 +580,7 @@ impl DownloadedArt {
 pub fn saved_title_screen(rom_path: &Path) -> Option<Vec<u8>> {
     let png = store::current_picture(PictureKind::TitleScreen, rom_path)?;
     let (width, height, pixels) = store::decode_png(&png)?;
-    (width == crate::app::SCREEN_WIDTH && height == crate::app::SCREEN_HEIGHT).then_some(pixels)
+    (width == SCREEN_WIDTH && height == SCREEN_HEIGHT).then_some(pixels)
 }
 
 /// The box art saved for the game at `rom_path`, if it was saved after the
@@ -606,7 +599,7 @@ fn best_picture(
     let loaded = |kind, (width, height, pixels)| LoadedPicture {
         path: entry.path.clone(),
         kind,
-        handle: image::Handle::from_rgba(width, height, pixels),
+        picture: Picture::new(width, height, pixels),
     };
 
     if show_box_art && let Some(picture) = store::read_picture(PictureKind::BoxArt, &entry.path) {
@@ -626,9 +619,9 @@ fn best_picture(
         .map(|picture| loaded(PictureKind::LastScreen, picture))
 }
 
-/// An image of a frame of the Game Boy screen.
-fn screen_handle(pixels: Vec<u8>) -> image::Handle {
-    image::Handle::from_rgba(crate::app::SCREEN_WIDTH, crate::app::SCREEN_HEIGHT, pixels)
+/// A picture of a frame of the Game Boy screen.
+fn screen_picture(pixels: Vec<u8>) -> Picture {
+    Picture::new(SCREEN_WIDTH, SCREEN_HEIGHT, pixels)
 }
 
 /// A time as whole seconds since 1970, or 0 for times before that.

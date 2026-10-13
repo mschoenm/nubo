@@ -1,6 +1,6 @@
 [package]
 name = "nubo-frontend"
-description = "Everything a Nubo app needs that isn't drawing: palettes, the model rule and, later, settings, saves and running a game."
+description = "Everything a Nubo app needs that isn't drawing: palettes, the model rule, clocks, pictures and, later, settings, saves and running a game."
 license.workspace = true
 repository.workspace = true
 version.workspace = true
@@ -10,6 +10,7 @@ rust-version.workspace = true
 [dependencies]
 nubo-core.workspace = true
 serde = { version = "1", features = ["derive"] }
+web-time = "1.1"
 
 [lints]
 workspace = true

@@ -8,9 +8,9 @@
 //! `<slot>.kept-<number>.state`, so saving to the slot again can't overwrite
 //! it. The browser build has no save states yet.
 
-use iced::time::SystemTime;
-use iced::widget::image;
 use nubo_core::Model;
+use nubo_frontend::picture::Picture;
+use nubo_frontend::time::SystemTime;
 use std::fmt;
 use std::path::Path;
 
@@ -72,7 +72,8 @@ pub struct SlotInfo {
     pub slot: Slot,
     /// When the slot was saved, or `None` if it is empty.
     pub saved_at: Option<SystemTime>,
-    pub thumbnail: Option<image::Handle>,
+    /// The screen when the state was saved, once [`thumbnails`] read it.
+    pub thumbnail: Option<Picture>,
 }
 
 /// Saves `state` in `slot` of the game at `rom_path`, with `pixels` (the
@@ -108,11 +109,21 @@ pub fn keep_aside(rom_path: &Path, slot: Slot) -> Result<String, String> {
         .map_err(|error| format!("Couldn't keep the save state that didn't load: {error}"))
 }
 
-/// Describes each of `slots` of the game at `rom_path`.
+/// Describes each of `slots` of the game at `rom_path`, without their
+/// pictures, which [`thumbnails`] reads.
 pub fn slot_infos(rom_path: &Path, slots: &[Slot]) -> Vec<SlotInfo> {
     slots
         .iter()
         .map(|&slot| store::slot_info(rom_path, slot))
+        .collect()
+}
+
+/// Reads and decodes the pictures of `slots` of the game at `rom_path`.
+/// Decoding is slow work, so the app runs it with `background::run`.
+pub fn thumbnails(rom_path: &Path, slots: &[Slot]) -> Vec<(Slot, Option<Picture>)> {
+    slots
+        .iter()
+        .map(|&slot| (slot, store::thumbnail(rom_path, slot)))
         .collect()
 }
 

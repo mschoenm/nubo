@@ -8,16 +8,19 @@
 //! the window itself (`app/window_events.rs`), and keys and controller
 //! buttons (`app/player_input.rs`).
 
+use crate::background;
 use crate::box_art::GameList;
-use crate::controllers::{self, ControllerEvent};
+use crate::controllers::ControllerEvent;
 use crate::controls::{Action, Device};
 use crate::game::{Game, PauseMenu};
 use crate::input::{self, KeyInput};
-use crate::library::{self, Library};
+use crate::library::Library;
 use crate::menu_presses::MenuPresses;
 use crate::notices::Notices;
 use crate::rom::Rom;
+use crate::save_states;
 use crate::settings::Settings;
+use crate::subscriptions;
 use crate::ui::theme;
 use crate::ui::toasts::Toasts;
 use crate::views;
@@ -226,7 +229,23 @@ impl App {
 
         self.apply_to_game();
         self.show_notices();
-        task
+        Task::batch([task, self.load_slot_thumbnails()])
+    }
+
+    /// Reads the pictures of the save state slots a pause menu page that
+    /// just opened lists, on a background thread.
+    fn load_slot_thumbnails(&mut self) -> Task<Message> {
+        let Some((slot_listing, rom_path, slots)) =
+            self.game.as_mut().and_then(Game::thumbnails_to_load)
+        else {
+            return Task::none();
+        };
+        Task::perform(
+            background::run(move || save_states::thumbnails(&rom_path, &slots)),
+            move |thumbnails| {
+                GameMessage::ThumbnailsLoaded(slot_listing, thumbnails.unwrap_or_default()).into()
+            },
+        )
     }
 
     /// The current screen with the settings, drop target and notifications
@@ -286,10 +305,10 @@ impl App {
     pub fn subscription(&self) -> Subscription<Message> {
         let mut subscriptions = vec![
             keyboard::listen().filter_map(|event| input::to_message(&event)),
-            controllers::subscription().map(Message::Controller),
+            subscriptions::controllers().map(Message::Controller),
             event::listen_with(window_events::message_for),
             system::theme_changes().map(|mode| WindowMessage::SystemThemeChanged(mode).into()),
-            library::watch(&self.settings.library_folders)
+            subscriptions::library_changes(&self.settings.library_folders)
                 .map(|event| LibraryMessage::Watch(event).into()),
             window::close_requests().map(|_| WindowMessage::CloseRequested.into()),
         ];
@@ -301,7 +320,7 @@ impl App {
                 .as_ref()
                 .filter(|_| self.is_running() && !self.minimized)
             {
-                subscriptions.push(game.new_frames().map(|()| Message::Tick));
+                subscriptions.push(subscriptions::new_frames(game).map(|()| Message::Tick));
             }
             if let Some(interval) = self.check_interval() {
                 subscriptions.push(crate::ticks::every(interval).map(|()| Message::Tick));

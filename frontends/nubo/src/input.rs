@@ -1,16 +1,19 @@
-//! Keyboard input: turns key events into messages, and finds the fixed app
-//! shortcuts. Which key presses which Game Boy button is up to the player
-//! (see `controls.rs`).
+//! Keyboard input: turns key events into messages, with Iced's key codes
+//! turned into Nubo's own ([`KeyCode`]), and finds the fixed app shortcuts.
+//! Which key presses which Game Boy button is up to the player (see
+//! `controls.rs`).
 
 use crate::app::{GameMessage, Message, SettingsMessage, WindowMessage};
+use crate::controls::KeyCode;
 use iced::keyboard::key::{Code, Named, Physical};
 use iced::keyboard::{self, Event, Modifiers};
 
 /// A key going down or up.
 #[derive(Debug, Clone)]
 pub struct KeyInput {
-    /// The key's position on the keyboard, which the controls go by.
-    pub code: Option<Code>,
+    /// The key's position on the keyboard, which the controls go by, or
+    /// `None` for a key that can't be bound.
+    pub code: Option<KeyCode>,
     /// What the key types, which the app shortcuts go by.
     pub key: keyboard::Key,
     pub modifiers: Modifiers,
@@ -51,11 +54,46 @@ pub fn to_message(event: &Event) -> Option<Message> {
     }
 }
 
-fn code(physical_key: Physical) -> Option<Code> {
+/// Nubo's code for the key at `physical_key`, if it is one that can be
+/// bound.
+fn code(physical_key: Physical) -> Option<KeyCode> {
     match physical_key {
-        Physical::Code(code) => Some(code),
+        Physical::Code(code) => key_code(code),
         Physical::Unidentified(_) => None,
     }
+}
+
+/// Nubo's code for Iced's key code `code`, if the key can be bound.
+fn key_code(code: Code) -> Option<KeyCode> {
+    KEY_CODES
+        .iter()
+        .find(|&&(known, _)| known == code)
+        .map(|&(_, key)| key)
+}
+
+/// Defines the table of Iced's key codes and Nubo's codes for the same keys,
+/// which have the same names.
+macro_rules! key_codes {
+    ($($code:ident),* $(,)?) => {
+        /// Iced's key code of every key that can be bound, with Nubo's code
+        /// for it.
+        const KEY_CODES: &[(Code, KeyCode)] = &[$((Code::$code, KeyCode::$code)),*];
+    };
+}
+
+key_codes! {
+    ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
+    KeyA, KeyB, KeyC, KeyD, KeyE, KeyF, KeyG, KeyH, KeyI, KeyJ, KeyK, KeyL, KeyM,
+    KeyN, KeyO, KeyP, KeyQ, KeyR, KeyS, KeyT, KeyU, KeyV, KeyW, KeyX, KeyY, KeyZ,
+    Digit0, Digit1, Digit2, Digit3, Digit4, Digit5, Digit6, Digit7, Digit8, Digit9,
+    F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12,
+    Enter, Space, Tab, ShiftLeft, ShiftRight, ControlLeft, ControlRight, AltLeft, AltRight,
+    Comma, Period, Slash, Semicolon, Quote, BracketLeft, BracketRight, Backslash, Minus,
+    Equal, Backquote,
+    Insert, Delete, Home, End, PageUp, PageDown,
+    Numpad0, Numpad1, Numpad2, Numpad3, Numpad4, Numpad5, Numpad6, Numpad7, Numpad8,
+    Numpad9, NumpadEnter, NumpadAdd, NumpadSubtract, NumpadMultiply, NumpadDivide,
+    NumpadDecimal,
 }
 
 /// The shortcuts that can't be changed: Esc for the pause menu, and the
@@ -83,3 +121,6 @@ pub fn fixed_shortcut(key: &keyboard::Key, modifiers: Modifiers) -> Option<Messa
         _ => None,
     }
 }
+
+#[cfg(test)]
+mod tests;

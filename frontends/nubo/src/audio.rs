@@ -7,7 +7,7 @@
 use crate::notices::Notices;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, FromSample, SampleFormat, SizedSample, Stream, StreamConfig};
-use iced::time::{Duration, Instant};
+use nubo_frontend::time::{Duration, Instant};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread::Thread;

@@ -40,3 +40,11 @@ pub fn encode_png(pixels: &[u8]) -> Result<Vec<u8>, String> {
         .map_err(|error| error.to_string())?;
     Ok(png)
 }
+
+/// Decodes a PNG to its width, height and RGBA pixels.
+pub fn decode_png(png: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
+    let picture = image::load_from_memory_with_format(png, image::ImageFormat::Png)
+        .ok()?
+        .to_rgba8();
+    Some((picture.width(), picture.height(), picture.into_raw()))
+}

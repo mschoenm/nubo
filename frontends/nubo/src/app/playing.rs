@@ -11,6 +11,7 @@ use crate::screenshots;
 use crate::views;
 use iced::Task;
 use nubo_core::{CartridgeHeader, Emulator, Model};
+use nubo_frontend::picture::Picture;
 use std::path::{Path, PathBuf};
 
 /// What the player can do with games: open one, and control the one that
@@ -37,6 +38,9 @@ pub enum GameMessage {
     AddCheat,
     CheatToggled(usize, bool),
     RemoveCheat(usize),
+    /// The pictures of the save state slots a pause menu page lists were
+    /// read, for this opening of the page (see `Game::thumbnails_to_load`).
+    ThumbnailsLoaded(u64, Vec<(Slot, Option<Picture>)>),
 }
 
 impl From<GameMessage> for Message {
@@ -75,6 +79,11 @@ impl App {
             GameMessage::ShowPauseMenu(page) => {
                 if let Some(game) = &mut self.game {
                     game.show_menu(Some(page));
+                }
+            }
+            GameMessage::ThumbnailsLoaded(slot_listing, thumbnails) => {
+                if let Some(game) = &mut self.game {
+                    game.set_thumbnails(slot_listing, thumbnails);
                 }
             }
             GameMessage::SaveState(slot) => self.save_state(slot),

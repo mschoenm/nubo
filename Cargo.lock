@@ -2836,10 +2836,12 @@ name = "nubo"
 version = "0.5.0"
 dependencies = [
  "base64 0.23.1",
+ "bytes",
  "console_error_panic_hook",
  "cpal",
  "crc32fast",
  "directories",
+ "futures",
  "gilrs",
  "iced",
  "image",
@@ -2881,6 +2883,7 @@ version = "0.5.0"
 dependencies = [
  "nubo-core",
  "serde",
+ "web-time",
 ]
 
 [[package]]

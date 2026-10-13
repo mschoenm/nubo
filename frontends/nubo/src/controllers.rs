@@ -1,11 +1,12 @@
 //! Game controllers, read with gilrs and combined into one controller
-//! state. The app hears about them through a subscription, so controllers
-//! work on every screen: to play, to use shortcuts such as the pause menu,
-//! and to pick buttons in the settings.
+//! state. The app hears about them through a subscription (see
+//! `subscriptions.rs`), so controllers work on every screen: to play, to use
+//! shortcuts such as the pause menu, and to pick buttons in the settings.
 //!
 //! The desktop build reads them on a thread of its own, which sleeps until
-//! a controller has something to report. The browser build has no threads,
-//! so there it reads them on every frame.
+//! a controller has something to report and sends it over a channel
+//! (`read_on_thread`). The browser build has no threads, so there the app
+//! reads them on every frame (`next_event`).
 //!
 //! How much that thread sleeps depends on the system. On Linux (epoll) and
 //! macOS, gilrs blocks until a controller sends something. On Windows its
@@ -17,10 +18,10 @@
 use gilrs::{Axis, Button, Event, EventType, Gamepad, Gilrs, GilrsBuilder};
 
 #[cfg(target_arch = "wasm32")]
-pub use frame::subscription;
+pub use frame::next_event;
 use nubo_core::{ControllerButton, ControllerState};
 #[cfg(not(target_arch = "wasm32"))]
-pub use thread::subscription;
+pub use thread::read_on_thread;
 
 /// How far the stick has to be pushed (from 0 to 1) to count as a D-pad
 /// press. The stick is reported as fully pushed or centered, so small

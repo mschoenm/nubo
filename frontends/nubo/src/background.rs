@@ -17,7 +17,7 @@ where
     T: Send + 'static,
     F: FnOnce() -> T + Send + 'static,
 {
-    let (sender, receiver) = iced::futures::channel::oneshot::channel();
+    let (sender, receiver) = futures::channel::oneshot::channel();
     let start_error = std::thread::Builder::new()
         .name(String::from("background"))
         .spawn(move || {
@@ -49,7 +49,7 @@ where
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::run;
-    use iced::futures::executor::block_on;
+    use futures::executor::block_on;
 
     #[test]
     fn work_runs_on_another_thread_and_returns_its_result() {

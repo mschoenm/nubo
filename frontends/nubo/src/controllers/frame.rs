@@ -2,12 +2,11 @@
 //! thread the page has.
 
 use super::{ControllerEvent, Reader};
-use iced::{Subscription, window};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 
 /// The reader, and the events it found that still have to be reported.
-/// A subscription can only report one event per frame.
+/// The app takes one event per frame.
 struct State {
     reader: Option<Reader>,
     pending: VecDeque<ControllerEvent>,
@@ -24,11 +23,9 @@ thread_local! {
     };
 }
 
-pub fn subscription() -> Subscription<ControllerEvent> {
-    window::frames().filter_map(|_| next_event())
-}
-
-fn next_event() -> Option<ControllerEvent> {
+/// Reads the controllers and returns the oldest event not reported yet, if
+/// any. The app calls it once per frame. The first call starts reading them.
+pub fn next_event() -> Option<ControllerEvent> {
     STATE.with_borrow_mut(|state| {
         if !state.started {
             state.started = true;

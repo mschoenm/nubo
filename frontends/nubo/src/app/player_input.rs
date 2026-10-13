@@ -4,7 +4,7 @@
 use super::window_events::toggle_fullscreen;
 use super::{App, GameMessage, Message};
 use crate::controllers::ControllerEvent;
-use crate::controls::{Action, Device, KeyboardKey, PadButton};
+use crate::controls::{Action, Device, PadButton};
 use crate::input::{self, KeyInput};
 use crate::save_states::Slot;
 use iced::Task;
@@ -25,7 +25,7 @@ impl App {
                     }
                     _ => {
                         if device == Device::Keyboard
-                            && let Some(key) = input.code.and_then(KeyboardKey::from_code)
+                            && let Some(key) = input.code
                         {
                             self.capture = None;
                             self.change_controls(|controls| {
@@ -48,7 +48,6 @@ impl App {
 
         let Some(action) = input
             .code
-            .and_then(KeyboardKey::from_code)
             .and_then(|key| self.settings.controls.keyboard.action(key))
         else {
             return Task::none();
