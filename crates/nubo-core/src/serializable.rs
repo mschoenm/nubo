@@ -1,21 +1,298 @@
 //! The binary format of save states.
 //!
-//! A save state is every component's state written one after another as raw
-//! bytes, with no field names or type tags. Reading it back only works if
-//! every value is read in exactly the order and size it was written, so:
+//! Save states must keep loading after Nubo changes, because players can lose
+//! hours of play otherwise, and as far as possible older versions of Nubo
+//! should load the states of newer ones too. So every struct is stored as its
+//! fields, each with its name and its length in bytes ([`FieldWriter`], read
+//! by [`read_fields`]), and enum variants by name. Reading a state matches
+//! fields by name, which makes most changes safe in both directions without
+//! anything else to do:
 //!
-//! - Never reorder, add or remove fields of a type that derives
-//!   `Serializable`, and never reorder the calls in a manual implementation,
-//!   without bumping the save state format version in `emulator/save_state.rs`.
-//! - Numbers are stored little-endian (lowest byte first), so a save state
-//!   works on every platform.
+//! - **Adding a field**: a state that doesn't have it, from an older version,
+//!   leaves it at its power-on value (`Emulator::load_state` starts from a
+//!   just-started emulator), and an older version skips it.
+//! - **Removing or reordering fields**: fields a struct doesn't know are
+//!   skipped.
+//! - **Renaming a field or a variant in the code**: keep its stored name with
+//!   `#[serializable(name = "stored_name")]`. Stored names are permanent;
+//!   change one only when it would be misleading for what the value means now.
+//! - **Changing a field's type or meaning** (another size, other units, other
+//!   values): store it under a new name, so versions on either side leave it
+//!   at its power-on value instead of misreading it.
+//!
+//! A value that can't be read from its bytes, such as a variant a newer
+//! version added or a field whose size changed under the same name, keeps its
+//! power-on value and the rest of the state still loads ([`collect_unreadable`]
+//! lists them, and the save states kept in `save-states/` must have none).
+//! Only damaged data, whose names and lengths don't add up, and values a
+//! component's own checks reject make a state fail to load.
+//!
+//! Values inside a field are plain bytes, the same on every platform: numbers
+//! little-endian (lowest byte first) in their own fixed size (never `usize`),
+//! floating-point numbers as their IEEE 754 bits, `bool`s as one byte, strings
+//! as UTF-8 after their length, arrays as their items, and `Vec`s and
+//! `Option`s with their length or presence first.
 
+use std::cell::RefCell;
+use std::collections::BTreeSet;
+use std::fmt;
 use std::io::{Error, ErrorKind, Read, Result, Write};
+
+/// Writes the fields of a struct, each with its name and length, so that
+/// other versions of Nubo can find the ones they know and skip the others.
+/// [`read_fields`] reads them back. Derived implementations use it for every
+/// struct, and manual ones should too.
+pub struct FieldWriter<'a> {
+    writer: &'a mut dyn Write,
+    /// The bytes of the field being written, which are only written once
+    /// their length is known.
+    value: Vec<u8>,
+}
+
+impl<'a> FieldWriter<'a> {
+    pub fn new(writer: &'a mut dyn Write) -> Self {
+        FieldWriter {
+            writer,
+            value: Vec::new(),
+        }
+    }
+
+    /// Writes `value` as the field `name`.
+    pub fn field(&mut self, name: &str, value: &dyn Serializable) -> Result<()> {
+        self.field_with(name, |writer| value.serialize(writer))
+    }
+
+    /// Writes the field `name` with the bytes `write` writes, for a value that
+    /// isn't one `Serializable` value, such as the items of an array.
+    pub fn field_with(
+        &mut self,
+        name: &str,
+        write: impl FnOnce(&mut dyn Write) -> Result<()>,
+    ) -> Result<()> {
+        debug_assert!(!name.is_empty(), "an empty name ends the fields");
+        self.value.clear();
+        within_field(name, || write(&mut self.value))?;
+        let length = u32::try_from(self.value.len())
+            .map_err(|_| Error::new(ErrorKind::InvalidInput, "a field is too long to save"))?;
+        write_name(self.writer, name)?;
+        length.serialize(self.writer)?;
+        self.writer.write_all(&self.value)
+    }
+
+    /// Ends the struct's fields.
+    pub fn finish(self) -> Result<()> {
+        0u8.serialize(self.writer)
+    }
+}
+
+/// Reads the fields a [`FieldWriter`] wrote, calling `read_field` with each
+/// field's name and bytes. `read_field` returns whether it knows the field.
+///
+/// The bytes of fields it doesn't know (fields of another version) are
+/// skipped. A known field whose value can't be read from its bytes keeps the
+/// value it had, and one that leaves bytes over keeps what it read from the
+/// start of them; both are noted for [`collect_unreadable`]. Damaged data and
+/// values a component's checks reject fail the whole read.
+pub fn read_fields(
+    reader: &mut dyn Read,
+    mut read_field: impl FnMut(&str, &mut &[u8]) -> Result<bool>,
+) -> Result<()> {
+    let mut value = Vec::new();
+    loop {
+        let name = read_name(reader).map_err(damaged)?;
+        if name.is_empty() {
+            return Ok(());
+        }
+        let mut length = 0u32;
+        length.deserialize(reader).map_err(damaged)?;
+
+        // Read through `take` rather than into a buffer of the stored length,
+        // so a damaged length can't make it allocate gigabytes.
+        value.clear();
+        (&mut *reader)
+            .take(u64::from(length))
+            .read_to_end(&mut value)
+            .map_err(damaged)?;
+        if u32::try_from(value.len()) != Ok(length) {
+            return Err(damaged(Error::new(
+                ErrorKind::UnexpectedEof,
+                format!("the saved {name} ends early"),
+            )));
+        }
+
+        let mut bytes = value.as_slice();
+        within_field(&name, || match read_field(&name, &mut bytes) {
+            Ok(true) if !bytes.is_empty() => {
+                note_unreadable();
+                Ok(())
+            }
+            Ok(_) => Ok(()),
+            Err(error) if is_unreadable_value(&error) => {
+                note_unreadable();
+                Ok(())
+            }
+            Err(error) => Err(error),
+        })?;
+    }
+}
+
+/// Writes a name of 1 to 255 bytes, preceded by its length. Fields and enum
+/// variants are stored by name.
+pub fn write_name(writer: &mut dyn Write, name: &str) -> Result<()> {
+    let length = u8::try_from(name.len())
+        .map_err(|_| Error::new(ErrorKind::InvalidInput, "a name is too long to save"))?;
+    length.serialize(writer)?;
+    writer.write_all(name.as_bytes())
+}
+
+/// Reads a name written by [`write_name`], or the empty name that ends a
+/// struct's fields.
+pub fn read_name(reader: &mut dyn Read) -> Result<String> {
+    let mut length = 0u8;
+    length.deserialize(reader)?;
+    let mut bytes = vec![0; usize::from(length)];
+    reader.read_exact(&mut bytes)?;
+    String::from_utf8(bytes).map_err(|_| unreadable_value("a name isn't text"))
+}
+
+/// The error for a value this version can't read from its bytes, such as an
+/// enum variant it doesn't have. [`read_fields`] leaves such a value as it was
+/// instead of failing.
+pub fn unreadable_value(message: impl Into<String>) -> Error {
+    Error::new(ErrorKind::InvalidData, UnreadableValue(message.into()))
+}
+
+/// What [`unreadable_value`] wraps.
+#[derive(Debug)]
+struct UnreadableValue(String);
+
+impl fmt::Display for UnreadableValue {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for UnreadableValue {}
+
+/// Saved data whose names and lengths don't add up, which no version wrote.
+#[derive(Debug)]
+struct DamagedData(Error);
+
+impl fmt::Display for DamagedData {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "the save state is damaged: {}", self.0)
+    }
+}
+
+impl std::error::Error for DamagedData {}
+
+/// Marks `error`, found while reading the names and lengths of fields, as
+/// damaged data, so the fields around it don't take it for an unreadable
+/// value.
+fn damaged(error: Error) -> Error {
+    if is_damaged(&error) {
+        error
+    } else {
+        Error::new(ErrorKind::InvalidData, DamagedData(error))
+    }
+}
+
+fn is_damaged(error: &Error) -> bool {
+    matches!(error.get_ref(), Some(inner) if inner.is::<DamagedData>())
+}
+
+/// Whether `error` means a value couldn't be read from its bytes, rather than
+/// damaged data or a value a component's checks reject: one of
+/// [`unreadable_value`], or bytes that end before the value does.
+fn is_unreadable_value(error: &Error) -> bool {
+    if is_damaged(error) {
+        return false;
+    }
+    match error.get_ref() {
+        Some(inner) if inner.is::<UnreadableValue>() => true,
+        _ => error.kind() == ErrorKind::UnexpectedEof,
+    }
+}
+
+/// While [`collect_unreadable`] or [`field_paths`] runs: the names of the
+/// fields being read or written, outermost first, and what they found.
+#[derive(Default)]
+struct Tracking {
+    path: Vec<String>,
+    unreadable: Option<Vec<String>>,
+    written: Option<BTreeSet<String>>,
+}
+
+thread_local! {
+    static TRACKING: RefCell<Tracking> = RefCell::default();
+}
+
+/// Runs `run` inside the field `name`, for the paths [`collect_unreadable`]
+/// and [`field_paths`] report.
+fn within_field<T>(name: &str, run: impl FnOnce() -> T) -> T {
+    // `TRACKING` isn't borrowed while `run` runs, since it enters fields of
+    // its own.
+    let tracking = TRACKING
+        .with_borrow(|tracking| tracking.unreadable.is_some() || tracking.written.is_some());
+    if !tracking {
+        return run();
+    }
+    TRACKING.with_borrow_mut(|tracking| {
+        tracking.path.push(name.to_owned());
+        let path = tracking.path.join(".");
+        if let Some(written) = &mut tracking.written {
+            written.insert(path);
+        }
+    });
+    let result = run();
+    TRACKING.with_borrow_mut(|tracking| tracking.path.pop());
+    result
+}
+
+/// Notes the field being read as unreadable, for [`collect_unreadable`].
+fn note_unreadable() {
+    TRACKING.with_borrow_mut(|tracking| {
+        let path = tracking.path.join(".");
+        if let Some(unreadable) = &mut tracking.unreadable {
+            unreadable.push(path);
+        }
+    });
+}
+
+/// Runs `read` and returns the paths of the values it couldn't read from
+/// their bytes and left as they were, such as `ppu.line_state`. A state from
+/// this version, or one whose changes all followed the module docs, has none.
+pub fn collect_unreadable(read: impl FnOnce() -> Result<()>) -> Result<Vec<String>> {
+    TRACKING.with_borrow_mut(|tracking| {
+        *tracking = Tracking {
+            unreadable: Some(Vec::new()),
+            ..Tracking::default()
+        }
+    });
+    let result = read();
+    let unreadable = TRACKING.with_borrow_mut(|tracking| std::mem::take(tracking).unreadable);
+    result.map(|()| unreadable.unwrap_or_default())
+}
+
+/// Runs `write` and returns the path of every field it wrote, such as
+/// `ppu.lcdc`. A field of the items of a `Vec` appears once.
+pub fn field_paths(write: impl FnOnce() -> Result<()>) -> Result<BTreeSet<String>> {
+    TRACKING.with_borrow_mut(|tracking| {
+        *tracking = Tracking {
+            written: Some(BTreeSet::new()),
+            ..Tracking::default()
+        }
+    });
+    let result = write();
+    let written = TRACKING.with_borrow_mut(|tracking| std::mem::take(tracking).written);
+    result.map(|()| written.unwrap_or_default())
+}
 
 /// A value that can be written to and read back from a save state.
 ///
 /// Most types get this with `#[derive(Serializable)]` from the
-/// `serializable_derive` crate, which handles each field in declaration order.
+/// `serializable_derive` crate, which stores each field with its name (see the
+/// module docs for what that allows).
 /// `deserialize` overwrites `self` in place, so a component keeps parts of its
 /// state that are not saved, such as the loaded ROM.
 pub trait Serializable {
@@ -69,8 +346,36 @@ impl<const N: usize> Serializable for [u8; N] {
         writer.write_all(self)
     }
 
+    /// Changes nothing if the bytes run out (on the heap, since some arrays
+    /// are larger than the stack allows in debug builds).
     fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
-        reader.read_exact(self)
+        let mut bytes = vec![0; N];
+        reader.read_exact(&mut bytes)?;
+        self.copy_from_slice(&bytes);
+        Ok(())
+    }
+}
+
+/// A string is stored as its length in bytes (a `u32`) followed by its UTF-8
+/// bytes.
+impl Serializable for String {
+    fn serialize(&self, writer: &mut dyn Write) -> Result<()> {
+        let length = u32::try_from(self.len())
+            .map_err(|_| Error::new(ErrorKind::InvalidInput, "a string is too long to save"))?;
+        length.serialize(writer)?;
+        writer.write_all(self.as_bytes())
+    }
+
+    fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
+        let mut length = 0u32;
+        length.deserialize(reader)?;
+        let mut bytes = Vec::new();
+        reader.take(u64::from(length)).read_to_end(&mut bytes)?;
+        if u32::try_from(bytes.len()) != Ok(length) {
+            return Err(Error::new(ErrorKind::UnexpectedEof, "a string ends early"));
+        }
+        *self = String::from_utf8(bytes).map_err(|_| unreadable_value("a string isn't UTF-8"))?;
+        Ok(())
     }
 }
 
@@ -86,17 +391,18 @@ impl<T: Serializable + Default> Serializable for Vec<T> {
         Ok(())
     }
 
+    /// Changes nothing if an item can't be read.
     fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
         let mut length = 0u32;
         length.deserialize(reader)?;
 
-        self.clear();
-
+        let mut items = Vec::new();
         for _ in 0..length {
             let mut item = T::default();
             item.deserialize(reader)?;
-            self.push(item);
+            items.push(item);
         }
+        *self = items;
         Ok(())
     }
 }
@@ -124,9 +430,7 @@ impl<T: Serializable + Default> Serializable for Option<T> {
                 value.deserialize(reader)?;
                 *self = Some(value);
             }
-            _ => {
-                return Err(Error::new(ErrorKind::InvalidData, "Invalid Option tag"));
-            }
+            _ => return Err(unreadable_value("an Option's tag isn't 0 or 1")),
         }
         Ok(())
     }
@@ -136,81 +440,272 @@ impl<T: Serializable + Default> Serializable for Option<T> {
 mod tests {
     use super::*;
     use serializable_derive::Serializable;
-    use std::io::Cursor;
 
-    #[derive(Debug, PartialEq, Serializable)]
-    enum TestEnum {
-        Test1,
-        Test2,
+    #[derive(Debug, Default, PartialEq, Serializable)]
+    enum Mode {
+        #[default]
+        Idle,
+        Busy,
     }
 
-    #[derive(Debug, PartialEq, Serializable)]
-    struct TestStruct {
-        byte_value: u8,
-        word_value: u16,
-        bool_value: bool,
-        float_value: f32,
-        array_value: [u8; 4],
-        test_enum: TestEnum,
+    #[derive(Debug, Default, PartialEq, Serializable)]
+    struct Original {
+        counter: u16,
+        flag: bool,
+        bytes: [u8; 4],
+        mode: Mode,
+        level: f32,
     }
 
-    #[test]
-    fn test_serialize_to_expected_bytes() {
-        let test_struct = TestStruct {
-            byte_value: 42,
-            word_value: 1337,
-            bool_value: true,
-            float_value: 1.5,
-            array_value: [0xDE, 0xAD, 0xBE, 0xEF],
-            test_enum: TestEnum::Test2,
-        };
+    fn original() -> Original {
+        Original {
+            counter: 1337,
+            flag: true,
+            bytes: [0xDE, 0xAD, 0xBE, 0xEF],
+            mode: Mode::Busy,
+            level: 1.5,
+        }
+    }
 
-        let mut expected = Vec::new();
-        expected.push(42u8); // byte_value
-        expected.extend_from_slice(&1337u16.to_le_bytes()); // word_value
-        expected.push(1u8); // bool_value (true as 1)
-        expected.extend_from_slice(&1.5f32.to_le_bytes()); // float_value
-        expected.extend_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]); // array_value
-        expected.push(1u8); // test_enum (index 1)
-
-        let mut buffer = Vec::new();
-        test_struct.serialize(&mut buffer).unwrap();
-
-        assert_eq!(buffer, expected);
+    fn saved<T: Serializable>(value: &T) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        value.serialize(&mut bytes).unwrap();
+        bytes
     }
 
     #[test]
-    fn test_deserialize_from_bytes() {
-        let mut test_struct = TestStruct {
-            byte_value: 0,
-            word_value: 0,
-            bool_value: false,
-            float_value: 0.0,
-            array_value: [0, 0, 0, 0],
-            test_enum: TestEnum::Test1,
+    fn fields_are_stored_with_their_names_and_lengths() {
+        #[derive(Serializable)]
+        struct Small {
+            a: u8,
+            b: u16,
+        }
+        assert_eq!(
+            saved(&Small { a: 7, b: 0x0102 }),
+            [
+                1, b'a', 1, 0, 0, 0, 7, // a
+                1, b'b', 2, 0, 0, 0, 0x02, 0x01, // b
+                0,    // the end of the fields
+            ]
+        );
+    }
+
+    #[test]
+    fn a_struct_reads_back_what_it_wrote() {
+        let mut read = Original {
+            counter: 0,
+            flag: false,
+            bytes: [0; 4],
+            mode: Mode::Idle,
+            level: 0.0,
         };
+        read.deserialize(&mut saved(&original()).as_slice())
+            .unwrap();
+        assert_eq!(read, original());
+    }
 
-        let mut input = Vec::new();
-        input.push(100u8); // byte_value
-        input.extend_from_slice(&500u16.to_le_bytes()); // word_value
-        input.push(0u8); // bool_value (false as 0)
-        input.extend_from_slice(&2.5f32.to_le_bytes()); // float_value
-        input.extend_from_slice(&[0x01, 0x02, 0x03, 0x04]); // array_value
-        input.push(1u8); // test_enum (index 1)
-
-        let mut cursor = Cursor::new(input);
-        test_struct.deserialize(&mut cursor).unwrap();
-
-        let expected = TestStruct {
-            byte_value: 100,
-            word_value: 500,
-            bool_value: false,
-            float_value: 2.5,
-            array_value: [0x01, 0x02, 0x03, 0x04],
-            test_enum: TestEnum::Test2,
+    #[test]
+    fn a_field_an_older_state_lacks_keeps_its_value() {
+        #[derive(Debug, PartialEq, Serializable)]
+        struct WithNewField {
+            counter: u16,
+            flag: bool,
+            bytes: [u8; 4],
+            mode: Mode,
+            level: f32,
+            added_later: u32,
+        }
+        let mut read = WithNewField {
+            counter: 0,
+            flag: false,
+            bytes: [0; 4],
+            mode: Mode::Idle,
+            level: 0.0,
+            added_later: 99,
         };
+        read.deserialize(&mut saved(&original()).as_slice())
+            .unwrap();
+        assert_eq!(read.counter, 1337);
+        assert_eq!(read.mode, Mode::Busy);
+        assert_eq!(read.added_later, 99);
+    }
 
-        assert_eq!(test_struct, expected);
+    #[test]
+    fn fields_that_are_gone_or_moved_are_skipped() {
+        #[derive(Debug, PartialEq, Serializable)]
+        struct Reordered {
+            level: f32,
+            counter: u16,
+        }
+        let mut read = Reordered {
+            level: 0.0,
+            counter: 0,
+        };
+        read.deserialize(&mut saved(&original()).as_slice())
+            .unwrap();
+        assert_eq!(
+            read,
+            Reordered {
+                level: 1.5,
+                counter: 1337
+            }
+        );
+    }
+
+    #[test]
+    fn a_field_or_variant_renamed_in_the_code_keeps_its_stored_name() {
+        #[derive(Debug, PartialEq, Serializable)]
+        enum RenamedMode {
+            Idle,
+            #[serializable(name = "Busy")]
+            Working,
+        }
+        #[derive(Debug, PartialEq, Serializable)]
+        struct Renamed {
+            #[serializable(name = "counter")]
+            ticks: u16,
+            mode: RenamedMode,
+        }
+        let mut renamed = Renamed {
+            ticks: 0,
+            mode: RenamedMode::Idle,
+        };
+        renamed
+            .deserialize(&mut saved(&original()).as_slice())
+            .unwrap();
+        assert_eq!(
+            renamed,
+            Renamed {
+                ticks: 1337,
+                mode: RenamedMode::Working
+            }
+        );
+
+        let mut read = original();
+        read.counter = 0;
+        read.mode = Mode::Idle;
+        read.deserialize(&mut saved(&renamed).as_slice()).unwrap();
+        assert_eq!(read.counter, 1337);
+        assert_eq!(read.mode, Mode::Busy);
+    }
+
+    #[test]
+    fn a_field_whose_type_changed_under_the_same_name_is_reported() {
+        #[derive(Debug, PartialEq, Serializable)]
+        struct Wider {
+            counter: u32,
+            level: f32,
+        }
+        #[derive(Debug, PartialEq, Serializable)]
+        struct Narrower {
+            counter: u8,
+        }
+        let state = saved(&original());
+
+        let mut wider = Wider {
+            counter: 7,
+            level: 0.0,
+        };
+        let unreadable = collect_unreadable(|| wider.deserialize(&mut state.as_slice())).unwrap();
+        assert_eq!(unreadable, ["counter"]);
+        assert_eq!(
+            wider,
+            Wider {
+                counter: 7,
+                level: 1.5
+            }
+        );
+
+        let mut narrower = Narrower { counter: 0 };
+        let unreadable =
+            collect_unreadable(|| narrower.deserialize(&mut state.as_slice())).unwrap();
+        assert_eq!(unreadable, ["counter"]);
+    }
+
+    #[test]
+    fn an_unknown_variant_leaves_its_field_and_the_rest_still_loads() {
+        #[derive(Debug, PartialEq, Serializable)]
+        enum FewerModes {
+            Idle,
+        }
+        #[derive(Debug, PartialEq, Serializable)]
+        struct Older {
+            counter: u16,
+            mode: FewerModes,
+        }
+        let mut read = Older {
+            counter: 0,
+            mode: FewerModes::Idle,
+        };
+        let unreadable =
+            collect_unreadable(|| read.deserialize(&mut saved(&original()).as_slice())).unwrap();
+        assert_eq!(unreadable, ["mode"]);
+        assert_eq!(
+            read,
+            Older {
+                counter: 1337,
+                mode: FewerModes::Idle
+            }
+        );
+    }
+
+    #[test]
+    fn an_unknown_variant_on_its_own_is_an_unreadable_value() {
+        #[derive(Debug, Serializable)]
+        enum Fewer {
+            Idle,
+        }
+        let mut bytes = Vec::new();
+        Mode::Busy.serialize(&mut bytes).unwrap();
+        let error = Fewer::Idle.deserialize(&mut bytes.as_slice()).unwrap_err();
+        assert!(is_unreadable_value(&error));
+    }
+
+    #[test]
+    fn damaged_data_inside_a_field_fails_the_whole_read() {
+        #[derive(Serializable)]
+        struct Outer {
+            inner: Original,
+        }
+        let mut bytes = saved(&Outer { inner: original() });
+        // The first name inside `inner` now claims more bytes than the field
+        // holds: names and lengths that don't add up, which no version writes.
+        let inner_start = 1 + "inner".len() + 4;
+        bytes[inner_start] = 200;
+        let mut read = Outer { inner: original() };
+        assert!(read.deserialize(&mut bytes.as_slice()).is_err());
+    }
+
+    #[test]
+    fn a_field_cut_short_is_refused_without_reading_past_the_state() {
+        let state = saved(&original());
+        for length in 0..state.len() {
+            let mut read = original();
+            assert!(read.deserialize(&mut &state[..length]).is_err());
+        }
+    }
+
+    #[test]
+    fn field_paths_name_nested_fields_once() {
+        #[derive(Serializable)]
+        struct Outer {
+            inner: Original,
+            items: Vec<Original>,
+        }
+        let outer = Outer {
+            inner: original(),
+            items: vec![original(), original()],
+        };
+        let paths = field_paths(|| outer.serialize(&mut std::io::sink())).unwrap();
+        assert!(paths.contains("inner.counter"));
+        assert!(paths.contains("items.mode"));
+        assert_eq!(
+            paths
+                .iter()
+                .filter(|path| path.starts_with("items."))
+                .count(),
+            5
+        );
     }
 
     #[derive(Debug, PartialEq, Serializable)]
@@ -228,18 +723,15 @@ mod tests {
             cache: 0xBEEF,
             also_saved: true,
         };
-        let mut buffer = Vec::new();
-        original.serialize(&mut buffer).unwrap();
-        assert_eq!(buffer, [7, 1]);
+        let bytes = saved(&original);
+        assert!(!bytes.windows(5).any(|window| window == b"cache"));
 
         let mut restored = WithSkippedField {
             saved: 0,
             cache: 0x1234,
             also_saved: false,
         };
-        let mut reader = Cursor::new(buffer);
-        restored.deserialize(&mut reader).unwrap();
-        assert_eq!(reader.position(), 2);
+        restored.deserialize(&mut bytes.as_slice()).unwrap();
         assert_eq!(
             restored,
             WithSkippedField {
@@ -258,20 +750,15 @@ mod tests {
 
     #[test]
     fn generic_structs_serialize_each_field() {
-        let mut buffer = Vec::new();
-        Pair {
+        let bytes = saved(&Pair {
             first: 0x0102u16,
             second: 0x0304u16,
-        }
-        .serialize(&mut buffer)
-        .unwrap();
-        assert_eq!(buffer, [0x02, 0x01, 0x04, 0x03]);
-
+        });
         let mut pair = Pair {
             first: 0u16,
             second: 0u16,
         };
-        pair.deserialize(&mut Cursor::new(buffer)).unwrap();
+        pair.deserialize(&mut bytes.as_slice()).unwrap();
         assert_eq!(
             pair,
             Pair {

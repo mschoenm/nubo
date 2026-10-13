@@ -74,7 +74,7 @@ impl Model {
     }
 
     /// The short name of the model, such as "CGB-E". Parsing it gives the
-    /// model back.
+    /// model back. Save states store it, so a model's name never changes.
     pub fn name(self) -> &'static str {
         match self {
             Model::Dmg0 => "DMG-0",

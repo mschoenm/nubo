@@ -30,7 +30,7 @@ use crate::gpu::lcdc::{
 use crate::gpu::palettes::{BLACK, Color, WHITE};
 use crate::gpu::{Gpu, LAST_VISIBLE_LINE, OamDmaAccess, TimingVariant};
 use crate::model::Model;
-use crate::serializable::Serializable;
+use crate::serializable::{FieldWriter, Serializable, read_fields};
 use crate::utils::is_bit_set;
 use serializable_derive::Serializable;
 use std::io::{self, Read, Write};
@@ -191,19 +191,27 @@ impl BackgroundFifo {
 
 impl Serializable for BackgroundFifo {
     fn serialize(&self, writer: &mut dyn Write) -> io::Result<()> {
-        self.lower.serialize(writer)?;
-        self.upper.serialize(writer)?;
-        self.palette.serialize(writer)?;
-        self.bg_priority.serialize(writer)?;
-        write_fifo_index(self.size, writer)
+        let mut fields = FieldWriter::new(writer);
+        fields.field("lower", &self.lower)?;
+        fields.field("upper", &self.upper)?;
+        fields.field("palette", &self.palette)?;
+        fields.field("bg_priority", &self.bg_priority)?;
+        fields.field_with("size", |writer| write_fifo_index(self.size, writer))?;
+        fields.finish()
     }
 
     fn deserialize(&mut self, reader: &mut dyn Read) -> io::Result<()> {
-        self.lower.deserialize(reader)?;
-        self.upper.deserialize(reader)?;
-        self.palette.deserialize(reader)?;
-        self.bg_priority.deserialize(reader)?;
-        self.size = read_fifo_index(reader, FIFO_LENGTH)?;
+        read_fields(reader, |name, bytes| {
+            match name {
+                "lower" => self.lower.deserialize(bytes)?,
+                "upper" => self.upper.deserialize(bytes)?,
+                "palette" => self.palette.deserialize(bytes)?,
+                "bg_priority" => self.bg_priority.deserialize(bytes)?,
+                "size" => self.size = read_fifo_index(bytes, FIFO_LENGTH)?,
+                _ => return Ok(false),
+            }
+            Ok(true)
+        })?;
         if usize::from(self.palette) >= CGB_PALETTE_COUNT {
             return Err(invalid_renderer_state());
         }
@@ -245,22 +253,37 @@ struct Fifo {
 
 impl Serializable for Fifo {
     fn serialize(&self, writer: &mut dyn Write) -> io::Result<()> {
-        for item in &self.items {
-            item.serialize(writer)?;
-        }
-        write_fifo_index(self.head, writer)?;
-        write_fifo_index(self.size, writer)
+        let mut fields = FieldWriter::new(writer);
+        fields.field_with("items", |writer| {
+            self.items
+                .iter()
+                .try_for_each(|item| item.serialize(writer))
+        })?;
+        fields.field_with("head", |writer| write_fifo_index(self.head, writer))?;
+        fields.field_with("size", |writer| write_fifo_index(self.size, writer))?;
+        fields.finish()
     }
 
     fn deserialize(&mut self, reader: &mut dyn Read) -> io::Result<()> {
-        for item in &mut self.items {
-            item.deserialize(reader)?;
-            if item.color_id > 0b11 || usize::from(item.palette) >= CGB_PALETTE_COUNT {
-                return Err(invalid_renderer_state());
+        read_fields(reader, |name, bytes| {
+            match name {
+                "items" => self
+                    .items
+                    .iter_mut()
+                    .try_for_each(|item| item.deserialize(bytes))?,
+                "head" => self.head = read_fifo_index(bytes, FIFO_LENGTH - 1)?,
+                "size" => self.size = read_fifo_index(bytes, FIFO_LENGTH)?,
+                _ => return Ok(false),
             }
+            Ok(true)
+        })?;
+        if self
+            .items
+            .iter()
+            .any(|item| item.color_id > 0b11 || usize::from(item.palette) >= CGB_PALETTE_COUNT)
+        {
+            return Err(invalid_renderer_state());
         }
-        self.head = read_fifo_index(reader, FIFO_LENGTH - 1)?;
-        self.size = read_fifo_index(reader, FIFO_LENGTH)?;
         Ok(())
     }
 }

@@ -1,17 +1,21 @@
 //! Save states as files in `states/<rom file name>/` in the per-user data
 //! folder (native build).
 //!
-//! A `.state` file starts with a line naming the format and the model, such
-//! as `Nubo state CGB-E`, followed by the emulator's own save state.
+//! A `.state` file is exactly the core's save state (`Emulator::save_state`),
+//! whose header names the model it was made on, so there is one format to
+//! keep loading in other versions of Nubo, the same on every platform.
 
 use super::{SaveState, Slot, SlotInfo};
 use crate::storage::files::{encode_png, project_directories, write_atomically};
 use iced::widget::image;
+use nubo_core::{SaveStateError, SaveStateHeader};
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-const MAGIC: &str = "Nubo state ";
+/// What `.state` files of Nubo 0.3.0 and earlier started with, before the
+/// core's save states had a format that later versions keep loading.
+const EARLY_STATE_PREFIX: &[u8] = b"Nubo state ";
 
 pub fn save(
     rom_path: &Path,
@@ -46,9 +50,7 @@ pub fn save_in(
     pixels: Option<&[u8]>,
 ) -> Result<(), String> {
     let path = slot_path(directory, rom_path, slot, "state");
-    let mut contents = format!("{MAGIC}{}\n", state.model.name()).into_bytes();
-    contents.extend_from_slice(&state.data);
-    write_atomically(&path, &contents).map_err(|error| error.to_string())?;
+    write_atomically(&path, &state.data).map_err(|error| error.to_string())?;
 
     let picture = slot_path(directory, rom_path, slot, "png");
     match pixels {
@@ -70,20 +72,19 @@ pub fn load_in(directory: &Path, rom_path: &Path, slot: Slot) -> Result<Option<S
         Err(error) => return Err(error.to_string()),
     };
 
-    let invalid = || String::from("the file isn't a Nubo save state");
-    let line_end = contents
-        .iter()
-        .position(|&byte| byte == b'\n')
-        .ok_or_else(invalid)?;
-    let first_line = std::str::from_utf8(&contents[..line_end]).map_err(|_| invalid())?;
-    let model = first_line
-        .strip_prefix(MAGIC)
-        .ok_or_else(invalid)?
-        .parse()?;
-
+    if contents.starts_with(EARLY_STATE_PREFIX) {
+        return Err(String::from(
+            "the state was made by Nubo 0.3.0 or earlier, whose save states later versions \
+             can't read",
+        ));
+    }
+    let header = SaveStateHeader::read(&contents).map_err(|error| match error {
+        SaveStateError::InvalidFormat => String::from("the file isn't a Nubo save state"),
+        error => error.to_string(),
+    })?;
     Ok(Some(SaveState {
-        model,
-        data: contents[line_end + 1..].to_vec(),
+        model: header.model,
+        data: contents,
     }))
 }
 

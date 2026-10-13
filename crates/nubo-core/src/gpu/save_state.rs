@@ -7,14 +7,14 @@ use crate::gpu::{
     DOTS_PER_FRAME, DOTS_PER_LINE, FRAME_SCANLINE_COUNT, Gpu, LAST_LINE, LineState, TimingVariant,
     VBLANK_START_LINE, VRAM_MODE,
 };
-use crate::serializable::Serializable;
+use crate::serializable::{FieldWriter, Serializable, read_fields};
 use std::io::{Read, Write};
 
 /// Implements `Serializable` like `#[derive(Serializable)]` would, for a struct whose loaded values
-/// need checking, which the derive can't do: it writes and reads the fields after `saved` in that
-/// order, leaves out the ones after `skipped` (loading a state leaves them as they are), and then
-/// calls the method after `check`, which rejects values the emulator never produces. The pattern
-/// names every field of the struct, so a new field that is in neither list doesn't compile.
+/// need checking, which the derive can't do: it stores the fields after `saved` with their names,
+/// leaves out the ones after `skipped` (loading a state leaves them as they are), and then calls
+/// the method after `check`, which rejects values the emulator never produces. The pattern names
+/// every field of the struct, so a new field that is in neither list doesn't compile.
 macro_rules! impl_serializable_with_check {
     ($type:ident {
         saved: $($saved:ident),* $(,)?;
@@ -24,13 +24,20 @@ macro_rules! impl_serializable_with_check {
         impl Serializable for $type {
             fn serialize(&self, writer: &mut dyn Write) -> std::io::Result<()> {
                 let $type { $($saved,)* $($skipped: _,)* } = self;
-                $($saved.serialize(writer)?;)*
-                Ok(())
+                let mut fields = FieldWriter::new(writer);
+                $(fields.field(stringify!($saved), $saved)?;)*
+                fields.finish()
             }
 
             fn deserialize(&mut self, reader: &mut dyn Read) -> std::io::Result<()> {
                 let $type { $($saved,)* $($skipped: _,)* } = self;
-                $($saved.deserialize(reader)?;)*
+                read_fields(reader, |name, bytes| {
+                    match name {
+                        $(stringify!($saved) => $saved.deserialize(bytes)?,)*
+                        _ => return Ok(false),
+                    }
+                    Ok(true)
+                })?;
                 self.$check()
             }
         }

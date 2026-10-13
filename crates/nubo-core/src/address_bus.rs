@@ -53,9 +53,9 @@ use crate::gpu::Gpu;
 use crate::joypad::{Joypad, Key};
 use crate::model::Model;
 use crate::serial::Serial;
-use crate::serializable::Serializable;
+use crate::serializable::{FieldWriter, Serializable, read_fields};
 use std::fmt;
-use std::io::{Read, Write};
+
 use std::sync::Arc;
 
 pub use crate::address_bus::cartridge::CartridgeHeader;
@@ -1028,8 +1028,17 @@ fn zeroed_memory<const SIZE: usize>() -> Box<[u8; SIZE]> {
 /// - `deferred_cycles`, `boot_rom_exited`, `vram_dma_bus`,
 ///   `pause_oam_dma_after_cycle` and `ppu_eager` are always zero, `None` or
 ///   false between calls into the emulator (checked in debug builds).
-impl Serializable for AddressBus {
-    fn serialize(&self, writer: &mut dyn Write) -> std::io::Result<()> {
+impl AddressBus {
+    /// Writes the components on the address bus to `fields`, the top level of
+    /// a save state next to the CPU, one field each and named after the
+    /// hardware: `bus` (the address bus's own memory and registers),
+    /// `cartridge`, `timers`, `ppu`, `apu`, `oam_dma`, `vram_dma`, `serial`,
+    /// `speed_switch` and `joypad`. These names are permanent (see
+    /// `serializable.rs`).
+    pub(crate) fn write_save_state_components(
+        &self,
+        fields: &mut FieldWriter,
+    ) -> std::io::Result<()> {
         debug_assert_eq!(
             self.deferred_cycles, 0,
             "the waiting M-cycles run before a call returns"
@@ -1041,61 +1050,84 @@ impl Serializable for AddressBus {
             "only set during a block copy"
         );
         debug_assert!(!self.ppu_eager, "only set during a write's M-cycle");
-        self.in_boot_rom.serialize(writer)?;
-        self.working_ram.serialize(writer)?;
-        self.zero_page_ram.serialize(writer)?;
-        self.svbk.serialize(writer)?;
-        self.cartridge.serialize(writer)?;
-        self.interrupt_enable.serialize(writer)?;
-        self.timers.serialize(writer)?;
+        fields.field_with("bus", |writer| {
+            let mut bus = FieldWriter::new(writer);
+            bus.field("in_boot_rom", &self.in_boot_rom)?;
+            bus.field("work_ram", &*self.working_ram)?;
+            bus.field("high_ram", &self.zero_page_ram)?;
+            bus.field("svbk", &self.svbk)?;
+            bus.field("interrupt_enable", &self.interrupt_enable)?;
+            bus.field("undocumented_registers", &self.undocumented_registers)?;
+            bus.field("extra_oam", &self.extra_oam)?;
+            bus.field("elapsed_dots", &self.elapsed_dots)?;
+            bus.field("ppu_dot_debt", &self.ppu_dot_debt)?;
+            bus.finish()
+        })?;
+        fields.field("cartridge", &self.cartridge)?;
+        fields.field("timers", &self.timers)?;
         if self.ppu_owed_dots > 0 {
             // Save states hold the PPU as it would be if it had kept up. Catching up
             // changes nothing outside it (see `Gpu::run_dots`), not even the HBlank
             // signals VRAM DMA gets, so a copy of VRAM DMA can take them.
             let mut gpu = self.gpu.clone();
             gpu.run_dots(self.ppu_owed_dots, &mut self.hdma.clone(), true);
-            gpu.serialize(writer)?;
+            fields.field("ppu", &gpu)?;
         } else {
-            self.gpu.serialize(writer)?;
+            fields.field("ppu", &self.gpu)?;
         }
-        self.apu.serialize(writer)?;
-        self.dma.serialize(writer)?;
-        self.hdma.serialize(writer)?;
-        self.serial.serialize(writer)?;
-        self.speed_switch.serialize(writer)?;
-        self.undocumented_registers.serialize(writer)?;
-        self.extra_oam.serialize(writer)?;
-        self.elapsed_dots.serialize(writer)?;
-        self.joypad.serialize(writer)?;
-        self.ppu_dot_debt.serialize(writer)?;
-        Ok(())
+        fields.field("apu", &self.apu)?;
+        fields.field("oam_dma", &self.dma)?;
+        fields.field("vram_dma", &self.hdma)?;
+        fields.field("serial", &self.serial)?;
+        fields.field("speed_switch", &self.speed_switch)?;
+        fields.field("joypad", &self.joypad)
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> std::io::Result<()> {
-        self.in_boot_rom.deserialize(reader)?;
-        self.working_ram.deserialize(reader)?;
-        self.zero_page_ram.deserialize(reader)?;
-        self.svbk.deserialize(reader)?;
-        self.cartridge.deserialize(reader)?;
+    /// Reads the component `name` of a save state, one that
+    /// `write_save_state_components` writes, and returns whether it is one.
+    pub(crate) fn read_save_state_component(
+        &mut self,
+        name: &str,
+        bytes: &mut &[u8],
+    ) -> std::io::Result<bool> {
+        match name {
+            "bus" => read_fields(bytes, |name, bytes| {
+                match name {
+                    "in_boot_rom" => self.in_boot_rom.deserialize(bytes)?,
+                    "work_ram" => self.working_ram.deserialize(bytes)?,
+                    "high_ram" => self.zero_page_ram.deserialize(bytes)?,
+                    "svbk" => self.svbk.deserialize(bytes)?,
+                    "interrupt_enable" => self.interrupt_enable.deserialize(bytes)?,
+                    "undocumented_registers" => self.undocumented_registers.deserialize(bytes)?,
+                    "extra_oam" => self.extra_oam.deserialize(bytes)?,
+                    "elapsed_dots" => self.elapsed_dots.deserialize(bytes)?,
+                    "ppu_dot_debt" => self.ppu_dot_debt.deserialize(bytes)?,
+                    _ => return Ok(false),
+                }
+                Ok(true)
+            })?,
+            "cartridge" => self.cartridge.deserialize(bytes)?,
+            "timers" => self.timers.deserialize(bytes)?,
+            "ppu" => self.gpu.deserialize(bytes)?,
+            "apu" => self.apu.deserialize(bytes)?,
+            "oam_dma" => self.dma.deserialize(bytes)?,
+            "vram_dma" => self.hdma.deserialize(bytes)?,
+            "serial" => self.serial.deserialize(bytes)?,
+            "speed_switch" => self.speed_switch.deserialize(bytes)?,
+            "joypad" => self.joypad.deserialize(bytes)?,
+            _ => return Ok(false),
+        }
+        Ok(true)
+    }
+
+    /// Sets up what a loaded save state doesn't hold: the views of the
+    /// cartridge's ROM, and the PPU and M-cycles caught up (see above).
+    pub(crate) fn finish_loading_save_state(&mut self) {
         self.update_rom_view();
-        self.interrupt_enable.deserialize(reader)?;
-        self.timers.deserialize(reader)?;
-        self.gpu.deserialize(reader)?;
         self.ppu_owed_dots = 0;
         self.ppu_quiet_dots = 0;
         self.deferred_cycles = 0;
         self.deferral_budget = 0;
-        self.apu.deserialize(reader)?;
-        self.dma.deserialize(reader)?;
-        self.hdma.deserialize(reader)?;
-        self.serial.deserialize(reader)?;
-        self.speed_switch.deserialize(reader)?;
-        self.undocumented_registers.deserialize(reader)?;
-        self.extra_oam.deserialize(reader)?;
-        self.elapsed_dots.deserialize(reader)?;
-        self.joypad.deserialize(reader)?;
-        self.ppu_dot_debt.deserialize(reader)?;
-        Ok(())
     }
 }
 

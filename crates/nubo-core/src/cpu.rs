@@ -146,7 +146,11 @@ pub struct Cpu {
     /// lands in its M-cycle. Only set in processor test mode.
     #[serializable(skip)]
     instruction_start_dots: u64,
+    /// Save states store the components on the address bus next to the CPU
+    /// rather than inside it (see `Emulator`'s save state), so that the
+    /// stored layout follows the hardware, not which struct owns which.
     #[getset(get = "pub(crate)", get_mut = "pub(crate)")]
+    #[serializable(skip)]
     address_bus: AddressBus,
 }
 
