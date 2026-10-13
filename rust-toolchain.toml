@@ -1,6 +1,8 @@
-# The Rust version CI and local builds use. Pinned so a new Rust release can't
-# turn every pull request red with new clippy lints; Dependabot proposes the
-# next version in a pull request of its own.
+# The newest stable Rust, for CI and local builds alike: like every tool and
+# dependency here, Rust follows its newest stable release, and the nightly CI
+# run is where anything a new release breaks shows up first. The Flatpak
+# builds with the freedesktop SDK's Rust instead, as Flathub does (see
+# `rust-version` in Cargo.toml).
 [toolchain]
-channel = "1.99.0"
+channel = "stable"
 components = ["rustfmt", "clippy"]

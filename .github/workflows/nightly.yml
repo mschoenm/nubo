@@ -22,6 +22,12 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # CI too, so whatever a new stable Rust or another new release breaks
+  # shows up the night it comes out, and releases need only run this.
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
   advisories:
     name: Security advisories
     runs-on: ubuntu-latest
@@ -34,32 +40,28 @@ jobs:
 
       - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
         with:
-          tool: cargo-deny@0.20
+          tool: cargo-deny
 
       - name: Check the RustSec advisories
         run: cargo deny --locked check advisories
 
-  # CI tests on Linux only, to stay fast; this covers macOS and Windows.
+  # CI (above) tests on Linux; this covers macOS and Windows.
   tests:
     name: Tests (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install audio and controller libraries
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev pkg-config
-
       - name: Install Rust
         run: rustup toolchain install
 
-      # Shared with CI's tests on Linux; the scheduled runs keep the macOS
-      # and Windows caches up to date.
+      # The same key as CI's tests on Linux; the scheduled runs keep the
+      # macOS and Windows caches up to date.
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: tests
@@ -67,13 +69,6 @@ jobs:
 
       - name: Run tests
         run: cargo test --workspace --locked
-
-      - uses: ./.github/actions/test-roms
-        if: runner.os == 'Linux'
-
-      - name: Run JSON CPU tests
-        if: runner.os == 'Linux'
-        run: cargo cpu-tests
 
   verify-boot:
     name: Test ROMs with real boots
@@ -112,7 +107,7 @@ jobs:
           echo "passed=${counts%/*}" >> "$GITHUB_OUTPUT"
           echo "total=${counts#*/}" >> "$GITHUB_OUTPUT"
 
-      # Named apart from CI's, since a release runs both in one run.
+      # Named apart from CI's, which runs in the same run.
       - name: Upload screens of failing tests
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -247,7 +242,7 @@ jobs:
   metrics:
     name: Metrics
     if: always() && github.workflow == 'Nightly'
-    needs: [advisories, tests, verify-boot, save-states, eager, flatpak, windows]
+    needs: [ci, advisories, tests, verify-boot, save-states, eager, flatpak, windows]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     # Two runs at once would both push to the wiki.
@@ -307,6 +302,7 @@ jobs:
       - name: Write tonight's metrics
         shell: bash
         env:
+          CI: ${{ needs.ci.result }}
           ADVISORIES: ${{ needs.advisories.result }}
           TESTS: ${{ needs.tests.result }}
           VERIFY_BOOT: ${{ needs.verify-boot.result }}
@@ -325,7 +321,7 @@ jobs:
           jq -n \
             --arg date "$(date -u +%F)" \
             --arg commit "$(git rev-parse --short HEAD)" \
-            --arg advisories "$ADVISORIES" --arg tests "$TESTS" --arg verify_boot "$VERIFY_BOOT" \
+            --arg ci "$CI" --arg advisories "$ADVISORIES" --arg tests "$TESTS" --arg verify_boot "$VERIFY_BOOT" \
             --arg save_states "$SAVE_STATES" --arg eager "$EAGER" \
             --arg passed "$PASSED" --arg total "$TOTAL" \
             --argjson speed "$speed" \
@@ -334,7 +330,7 @@ jobs:
             --argjson desktop "$(stat -c %s target/release/nubo)" \
             --argjson wasm "$(stat -c %s target/web/nubo_bg.wasm)" \
             '{date: $date, commit: $commit,
-              tests: {advisories: $advisories, unit_tests: $tests, verify_boot: $verify_boot,
+              tests: {ci: $ci, advisories: $advisories, unit_tests: $tests, verify_boot: $verify_boot,
                       save_states: $save_states, eager: $eager},
               test_roms_passed: ($passed | tonumber? // null),
               test_roms_total: ($total | tonumber? // null),

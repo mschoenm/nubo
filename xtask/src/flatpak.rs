@@ -22,8 +22,12 @@ use std::process::Command;
 const APP_NAME: &str = "Nubo";
 const EXECUTABLE: &str = "nubo";
 /// The version of the freedesktop runtime (the libraries the app runs on
-/// inside the sandbox) and of its SDK and Rust extension.
+/// inside the sandbox) and of its SDK and Rust extension: the newest on
+/// Flathub, which `build_flatpak` checks, since a Flathub build would use the
+/// same.
 const RUNTIME_VERSION: &str = "26.08";
+/// The runtime's id on Flathub.
+const RUNTIME: &str = "org.freedesktop.Platform";
 const FLATHUB_REPO: &str = "https://dl.flathub.org/repo/flathub.flatpakrepo";
 const CRATES_IO: &str = "registry+https://github.com/rust-lang/crates.io-index";
 /// The folder inside the build that holds the files written here.
@@ -88,7 +92,10 @@ pub fn build_flatpak() -> Result<PathBuf> {
         &Value::Array(cargo_sources()?),
     )?;
     let manifest = format!("{APP_ID}.json");
-    write_json(&work_dir.join(&manifest), &manifest_contents())?;
+    write_json(
+        &work_dir.join(&manifest),
+        &manifest_contents(&rust_version()?),
+    )?;
 
     // flatpak-builder installs the runtime for this user, from a Flathub
     // remote of this user's.
@@ -99,6 +106,7 @@ pub fn build_flatpak() -> Result<PathBuf> {
         "flathub",
         FLATHUB_REPO,
     ]))?;
+    check_runtime_is_newest()?;
     run(Command::new("flatpak-builder")
         .args([
             "--user",
@@ -130,13 +138,99 @@ pub fn build_flatpak() -> Result<PathBuf> {
     Ok(bundle)
 }
 
+/// Fails when Flathub has a newer freedesktop runtime than `RUNTIME_VERSION`,
+/// so the Flatpak moves to each new runtime as soon as it is out, like an app
+/// on Flathub should.
+fn check_runtime_is_newest() -> Result {
+    let output = Command::new("flatpak")
+        .args([
+            "remote-ls",
+            "--user",
+            "--runtime",
+            "--columns=application,branch",
+            "flathub",
+        ])
+        .output()
+        .map_err(|error| format!("failed to run flatpak remote-ls: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "flatpak remote-ls failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    match newest_runtime(&String::from_utf8_lossy(&output.stdout)) {
+        Some(newest) if runtime_release(&newest) > runtime_release(RUNTIME_VERSION) => {
+            Err(format!(
+                "Flathub has the freedesktop runtime {newest}, newer than the \
+                 {RUNTIME_VERSION} the Flatpak is built on: set RUNTIME_VERSION in \
+                 xtask/src/flatpak.rs to {newest}"
+            ))
+        }
+        Some(_) => Ok(()),
+        None => Err(format!("Flathub lists no {RUNTIME} runtime")),
+    }
+}
+
+/// The newest release of the freedesktop runtime in `listing`, the
+/// applications and branches `flatpak remote-ls` printed.
+fn newest_runtime(listing: &str) -> Option<String> {
+    listing
+        .lines()
+        .filter_map(|line| {
+            let mut columns = line.split_whitespace();
+            (columns.next()? == RUNTIME).then_some(columns.next()?)
+        })
+        .filter(|branch| runtime_release(branch).is_some())
+        .max_by_key(|branch| runtime_release(branch))
+        .map(String::from)
+}
+
+/// A runtime branch such as `26.08` as numbers that sort by release, or
+/// `None` for a branch that isn't a release.
+fn runtime_release(branch: &str) -> Option<(u32, u32)> {
+    let (year, month) = branch.split_once('.')?;
+    Some((year.parse().ok()?, month.parse().ok()?))
+}
+
+/// The `rust-version` in the root `Cargo.toml`, such as `1.98`.
+fn rust_version() -> Result<String> {
+    let path = workspace_root().join("Cargo.toml");
+    let manifest: toml::Table = fs::read_to_string(&path)
+        .map_err(|error| format!("failed to read {}: {error}", path.display()))?
+        .parse()
+        .map_err(|error| format!("{} is not valid TOML: {error}", path.display()))?;
+    manifest
+        .get("workspace")
+        .and_then(|workspace| workspace.get("package"))
+        .and_then(|package| package.get("rust-version"))
+        .and_then(toml::Value::as_str)
+        .map(String::from)
+        .ok_or_else(|| format!("{} has no workspace rust-version", path.display()))
+}
+
+/// The build command that prints the SDK's Rust and fails unless its version
+/// is `rust_version` (compared by major and minor version), so
+/// `rust-version` follows the Rust that Flathub builds the app with.
+fn check_rust_version_command(rust_version: &str) -> String {
+    let minor_version: Vec<&str> = rust_version.split('.').take(2).collect();
+    let minor_version = minor_version.join(".");
+    format!(
+        "rustc --version && \
+         [ \"$(rustc --version | cut -d ' ' -f 2 | cut -d . -f 1-2)\" = {minor_version} ] || \
+         {{ echo 'error: the SDK builds with the Rust above, which Flathub builds the app \
+         with too, but rust-version in Cargo.toml is {rust_version}: set it to the Rust \
+         above' >&2; exit 1; }}"
+    )
+}
+
 /// The Flatpak manifest: the runtime, the sandbox's permissions and how to
-/// build and install the app.
-fn manifest_contents() -> Value {
+/// build and install the app with the SDK's Rust, which must be
+/// `rust_version`.
+fn manifest_contents(rust_version: &str) -> Value {
     let linux_files = format!("{LINUX_FILES}/{APP_ID}");
     json!({
         "id": APP_ID,
-        "runtime": "org.freedesktop.Platform",
+        "runtime": RUNTIME,
         "runtime-version": RUNTIME_VERSION,
         "sdk": "org.freedesktop.Sdk",
         "sdk-extensions": ["org.freedesktop.Sdk.Extension.rust-stable"],
@@ -154,9 +248,7 @@ fn manifest_contents() -> Value {
                 },
             },
             "build-commands": [
-                // The SDK's Rust, not the one rust-toolchain.toml pins, builds
-                // the app; `rust-version` in Cargo.toml must not be newer.
-                "rustc --version",
+                check_rust_version_command(rust_version),
                 format!("cargo build --release --locked --package {EXECUTABLE}"),
                 format!("install -D --mode 755 target/release/{EXECUTABLE} /app/bin/{EXECUTABLE}"),
                 format!(
@@ -264,3 +356,6 @@ fn write_json(path: &Path, value: &Value) -> Result {
     fs::write(path, contents)
         .map_err(|error| format!("failed to write {}: {error}", path.display()))
 }
+
+#[cfg(test)]
+mod tests;

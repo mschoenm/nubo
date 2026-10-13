@@ -6,7 +6,7 @@ on:
       - main
   pull_request:
   workflow_dispatch:
-  # The release workflow runs these checks too.
+  # The nightly workflow, which releases run, runs these checks too.
   workflow_call:
 
 permissions:
@@ -25,9 +25,11 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
 
-# The Rust version comes from rust-toolchain.toml, which `rustup toolchain
-# install` reads. Third-party actions are pinned to a commit, which Dependabot
-# keeps up to date.
+# `rustup toolchain install` installs the newest stable Rust, which
+# rust-toolchain.toml asks for, and taiki-e/install-action the newest
+# cargo-deny. Third-party actions are pinned to a commit, so a hijacked tag
+# can't run code with this repository's tokens; Dependabot moves the pins to
+# each new release.
 jobs:
   lint:
     name: Format, clippy and docs
@@ -73,7 +75,7 @@ jobs:
 
       - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
         with:
-          tool: cargo-deny@0.20
+          tool: cargo-deny
 
       # Advisories are checked nightly instead, so a new advisory doesn't fail
       # pull requests that have nothing to do with it.
@@ -81,7 +83,7 @@ jobs:
         run: cargo deny --locked check licenses bans sources
 
   # Linux only, so pull requests get their answer in a minute or two; the
-  # nightly workflow, which releases run too, also tests on macOS and Windows.
+  # nightly workflow, which releases run, also tests on macOS and Windows.
   test:
     name: Tests
     runs-on: ubuntu-latest

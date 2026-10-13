@@ -1,6 +1,5 @@
 [workspace]
-# Prefers dependency versions that build with `rust-version` below.
-resolver = "3"
+resolver = "2"
 members = [
     "crates/nubo-core",
     "crates/nubo-logo",
@@ -23,10 +22,11 @@ license = "GPL-3.0-or-later"
 repository = "https://github.com/mschoenm/nubo"
 version = "0.4.0"
 edition = "2024"
-# The Rust of the freedesktop SDK the Flatpak is built with (its build log
-# shows `rustc --version`), which is older than rust-toolchain.toml's. The
+# The Rust of the freedesktop SDK, which builds the Flatpak here and on
+# Flathub alike and can lag behind the newest stable Rust that CI uses. The
 # crates the app is built from inherit it, so clippy rejects newer standard
-# library items. Raise it when the SDK's Rust is updated.
+# library items in pull requests. The Flatpak build fails when the SDK's
+# Rust is another version, so this follows it.
 rust-version = "1.98"
 
 [workspace.lints.rust]

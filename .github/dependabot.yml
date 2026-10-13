@@ -1,3 +1,6 @@
+# Every dependency follows its newest stable release; the nightly CI run is
+# where an update that breaks something shows up. Rust itself follows the
+# stable channel (rust-toolchain.toml), so it needs no updates here.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -5,7 +8,7 @@ updates:
       - /
       - /.github/actions/*
     schedule:
-      interval: weekly
+      interval: daily
     groups:
       actions:
         patterns: ["*"]
@@ -13,7 +16,7 @@ updates:
   - package-ecosystem: cargo
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
     groups:
       # Pinned to the same exact version in Cargo.toml; they must be upgraded
       # together.
@@ -21,8 +24,3 @@ updates:
         patterns: ["wasm-bindgen", "wasm-bindgen-cli-support"]
       minor-and-patch:
         update-types: [minor, patch]
-
-  - package-ecosystem: rust-toolchain
-    directory: /
-    schedule:
-      interval: weekly
