@@ -64,7 +64,7 @@ The root `Cargo.toml` is a virtual workspace whose default members are the core 
 - `crates/nubo-logo/`: the logo, drawn from rounded rectangles, for the app's icons.
 - `frontends/iced/` (`CLAUDE.md`): the app, desktop and browser.
 - `frontends/test_rom_runner/` (`CLAUDE.md`): `cargo test-roms`.
-- `frontends/json_test_runner/` (`CLAUDE.md`): `cargo cpu-tests`.
+- `frontends/json_test_runner/`: `cargo cpu-tests`.
 - `frontends/save_state_check/` (`CLAUDE.md`): `cargo save-states`, and the kept sets in `save-states/`.
 - `frontends/benchmark/` (`CLAUDE.md`): `cargo benchmark`.
 - `frontends/headless/`: `cargo screenshot`.
