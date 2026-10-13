@@ -68,6 +68,31 @@ only has to:
   which the game wrote battery RAM.
 - `CartridgeEffects::current_time_millis` and `RtcClock::EmulatedTime` for the MBC3 clock.
 
+## Phase 0: review the plan with Codex (one pull request)
+
+Before any code, bring this plan up to date and have it reviewed thoroughly. Codex's reviews of the
+pull request that added it kept finding real problems in how the libretro interface has to be used:
+- the frame deadline across save states
+- the exported symbols
+- the clock across clock sources and resets
+- the pixel format
+- the achievements opt-in
+
+The plan was merged before those rounds ran out.
+
+1. Read the plan against the code as it is then (after the restructuring), against `libretro.h`,
+   against RetroArch's loader (`runloop.c`) and against SameBoy's `libretro.c`, and update it.
+2. Read the review comments on the pull request that added this plan (mschoenm/nubo#37). Make sure
+   every finding is in the plan, including any posted after it was merged.
+3. Open a docs-only pull request with the updated plan and ask Codex to review it (`@codex review`).
+4. Fix what Codex finds, push, and ask again. Repeat until a review comes back without findings and
+   you agree with the plan too. A finding you disagree with gets an answer on its thread instead of a
+   change.
+5. Merge it the usual way (CLAUDE.md, "Merging Pull Requests"). Phase 1 starts after that.
+
+**Done when:** a Codex review of the plan comes back clean, the maintainer has read the result, and it
+is merged.
+
 ## Phase 1: core additions (one pull request)
 
 The RetroArch core comes after the whole restructuring and the Shootout plan's Parts 1 to 3 (see
@@ -344,6 +369,7 @@ This is outward-facing: only do it once the maintainer says to go ahead.
 
 ## Order
 
-Phases 1 to 3 give a useful core and should come first, as three pull requests. Phase 5 can follow
+Phase 0, the review of this plan, comes first. Phases 1 to 3 give a useful core and come next, as
+three pull requests. Phase 5 can follow
 right after Phase 3, so players can try it before achievements are done. Phase 4 comes after that, and
 Phase 6 once the core has been in releases for a while.
