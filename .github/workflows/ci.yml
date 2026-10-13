@@ -103,7 +103,7 @@ jobs:
         run: cargo test --workspace --locked
 
   test-roms:
-    name: Test ROMs and CPU tests
+    name: Test ROMs, CPU tests and save states
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -126,6 +126,23 @@ jobs:
 
       - name: Run JSON CPU tests
         run: cargo cpu-tests
+
+      # The games of the kept save states (save-states/), pinned and
+      # checksummed, so the cache only changes when the pins do.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: benchmark-roms
+        with:
+          path: target/benchmark-roms
+          key: benchmark-roms-${{ hashFiles('xtask/src/benchmark_roms.rs') }}
+
+      - name: Download the benchmark games
+        if: steps.benchmark-roms.outputs.cache-hit != 'true'
+        run: cargo xtask benchmark-roms
+
+      # cargo test checks the test cartridges' states on every platform; this
+      # also checks the games'.
+      - name: Check that the kept save states still load
+        run: cargo save-states
 
       - name: Upload screens of failing tests
         if: failure()

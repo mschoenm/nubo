@@ -8,6 +8,7 @@ members = [
     "frontends/headless",
     "frontends/iced",
     "frontends/json_test_runner",
+    "frontends/save_state_check",
     "frontends/test_rom_runner",
     "xtask",
 ]

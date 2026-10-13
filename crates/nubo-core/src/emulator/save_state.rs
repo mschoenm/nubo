@@ -201,7 +201,7 @@ impl Emulator {
     /// `ppu.line_state` for a state a newer Nubo made in a PPU mode this one
     /// doesn't know. A state from this version has none, and neither has one
     /// from an earlier version as long as later changes followed the rules in
-    /// `serializable.rs`.
+    /// `serializable.rs`, which `cargo save-states` checks.
     pub fn load_state_with_report(&mut self, data: &[u8]) -> Result<Vec<String>, SaveStateError> {
         let (header, mut state) = split(data)?;
         if header.model != self.model() {
@@ -239,8 +239,8 @@ impl Emulator {
     }
 
     /// The path of every value a save state of this emulator stores, such as
-    /// `header.model` or `ppu.lcdc`, sorted, so a check can tell when a
-    /// version stores other fields than the one before.
+    /// `header.model` or `ppu.lcdc`, sorted, so `cargo save-states` can tell
+    /// when a version stores other fields than the one before.
     pub fn save_state_field_paths(&self) -> Vec<String> {
         let header = field_paths(|| SaveStateHeader::of(self).write(&mut io::sink()))
             .expect("writing to a sink never fails");

@@ -20,6 +20,11 @@
 //!   values): store it under a new name, so versions on either side leave it
 //!   at its power-on value instead of misreading it.
 //!
+//! `cargo test` and `cargo save-states` fail when the fields a state stores
+//! change, listing them: then keep the stored name of a field only renamed in
+//! the code, or keep a new set of states with `cargo save-states --record`,
+//! which later versions are checked against.
+//!
 //! A value that can't be read from its bytes, such as a variant a newer
 //! version added or a field whose size changed under the same name, keeps its
 //! power-on value and the rest of the state still loads ([`collect_unreadable`]
