@@ -4,8 +4,8 @@ Nubo's goal is to be the most accurate Game Boy and Game Boy Color emulator ther
 it would take to claim that honestly: what the claim has to mean, where Nubo stands, and the work left,
 in the order it should happen. Update it as phases finish.
 
-Status on 2026-10-12: `cargo test-roms` passes 6520 of 6557 tests on 12 hardware models, and
-[FAILING_TESTS.md](../frontends/test_rom_runner/FAILING_TESTS.md) explains the other 37. That makes Nubo
+Status on 2026-10-13: `cargo test-roms` passes 6524 of 6557 tests on 12 hardware models, and
+[FAILING_TESTS.md](../frontends/test_rom_runner/FAILING_TESTS.md) explains the other 33. That makes Nubo
 one of the strongest emulators on public test ROMs, but nobody can verify a "most accurate" claim yet:
 other emulators haven't been run on the same tests, nothing has been checked on a real console, and some
 hardware isn't emulated at all.
@@ -32,7 +32,7 @@ the README or a release says "most accurate".
 
 What is strong:
 
-- 6520 of 6557 test ROMs from 20 suites pass, on DMG-0, DMG, MGB, SGB, SGB2, CGB-0 to CGB-E and AGB. The
+- 6524 of 6557 test ROMs from 20 suites pass, on DMG-0, DMG, MGB, SGB, SGB2, CGB-0 to CGB-E and AGB. The
   JSON CPU tests pass on every opcode, M-cycle by M-cycle.
 - Each model leaves the boot ROM in its own state (registers, DIV phase, frame position, the boot
   sound's phase), calibrated against Mooneye's, GBMicrotest's and Gambatte's tests.
@@ -54,9 +54,9 @@ What is missing or unproven:
 - **Link cable.** The serial port always behaves as if no cable is plugged in. Two Nubo instances can't
   be linked, and the Game Boy Printer isn't emulated.
 - **Infrared.** The CGB's RP register (0xFF56) isn't emulated. HuC1's infrared port always sees no light.
-- **Cartridge types.** ROM only, MBC1, MBC2, MBC3, MBC5 (with rumble) and HuC1 are emulated. MBC30
-  (the MBC3 with an 8-bit ROM bank register and 8 RAM banks, used by the Japanese Pokémon Crystal),
-  MBC6, MBC7, HuC3, MMM01, TAMA5 and the Pocket Camera are not.
+- **Cartridge types.** ROM only, MBC1, MBC2, MBC3, MBC30 (the MBC3 with an 8-bit ROM bank register and
+  8 RAM banks, used by the Japanese Pokémon Crystal), MBC5 (with rumble) and HuC1 are emulated. MBC6,
+  MBC7, HuC3, MMM01, TAMA5 and the Pocket Camera are not.
 - **Boot ROMs.** Nubo boots with its own boot ROMs (based on Bootix and SameBoy's), which keep the
   timing and end state of the ones they replaced. The original boot ROMs can't be used, so the boot
   sequence itself isn't Nintendo's, and post-boot state comes from calibration, not from running the
@@ -95,7 +95,6 @@ without hardware:
 
 | Tests | Group | Next step |
 |---|---|---|
-| 4 | MBC3 | MBC30 (8-bit ROM bank register, 8 RAM banks), invalid banks and the single-latch behaviour. Already in progress separately |
 | 9 | Channel 1 duty timing across CGB speed switches | Realign the APU's tick parity at STOP and DIV resets (lead 5.1 in the toolkit's HANDOFF.md) |
 | 2 | Mealybug's tile data switch glitch on CGB-C | Find where CGB-C's glitched fetch takes its data from, using SameBoy traces |
 | 1 | Tile data switch at line 0 in double speed | Line 0 only; the CPU writes already match Gambatte, so look at the line 0 fetcher start |
@@ -150,17 +149,16 @@ and Nubo matches all of them or the differences are fixed or explained.
 
 Largest phase, but each part stands alone:
 
-1. **MBC30** and the remaining MBC3 behaviour (also in Phase 2).
-2. **Super Game Boy**: command packets (palettes, attribute maps, borders, multiplayer, masking, sound),
+1. **Super Game Boy**: command packets (palettes, attribute maps, borders, multiplayer, masking, sound),
    so SameSuite's `sgb` tests and CasualPokePlayer's `sgb-ext-test` can run.
-3. **Link cable**: two linked Nubo instances (in one process first, over a network later), the external
+2. **Link cable**: two linked Nubo instances (in one process first, over a network later), the external
    clock, and the Game Boy Printer.
-4. **Infrared**: the CGB's RP register, including what it reads with nothing in front of it, and linking
+3. **Infrared**: the CGB's RP register, including what it reads with nothing in front of it, and linking
    two instances.
-5. **Cartridge types**: MBC6, MBC7 (tilt sensor and EEPROM, Kirby Tilt 'n' Tumble), HuC3 (clock,
+4. **Cartridge types**: MBC6, MBC7 (tilt sensor and EEPROM, Kirby Tilt 'n' Tumble), HuC3 (clock,
    infrared, speaker), MMM01, TAMA5 and the Pocket Camera (fed with a picture or a webcam). Check the
    cartridge types in the No-Intro game lists to find what else licensed games use.
-6. **Original boot ROMs** as an option for players who supply them, so the boot and the post-boot
+5. **Original boot ROMs** as an option for players who supply them, so the boot and the post-boot
    state can come from the real code. Nubo's own boot ROMs stay the default.
 
 Done when: every cartridge type and accessory in the licensed library is supported, and the tests that
@@ -206,5 +204,5 @@ own right. If it beats Nubo there, say so.
 1. Phase 1 first: it is cheap and shows how far off the claim is.
 2. Phase 2's software fixes at the same time.
 3. Phase 3 once the hardware arrives, then the Phase 2 rows that need it.
-4. Phases 4 and 5 after that, largest gaps first (MBC30, then link cable and SGB).
+4. Phases 4 and 5 after that, largest gaps first (link cable and SGB).
 5. Phase 6 when the table and the hardware results back the claim.
