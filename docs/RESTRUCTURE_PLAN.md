@@ -301,36 +301,45 @@ Each step keeps CLAUDE.md true as it goes. This step checks the whole picture:
 
 ## Order and dependencies
 
-- **The order agreed with the maintainer:**
-  1. step 1
-  2. step 2
-  3. Part 5 of [SHOOTOUT_PLAN.md](SHOOTOUT_PLAN.md) (the Shootout's tests in CI, the nightly run and
-     the metrics)
-  4. steps 3 to 6
-  5. step 7
+The order of all three plans, agreed with the maintainer on 2026-10-13:
 
-  Shootout Part 5 goes before steps 3 to 6 because it only touches the test ROM runner, the nightly
-  workflow and `cargo xtask metrics`, none of which those steps move. It needs step 1, so it is built
-  straight into `tools/nubo-test-rom-runner`.
-- **RetroArch:**
-  - Steps 1 and 2 come first. Step 2 is what the RetroArch core needs.
-  - The RetroArch plan's Phases 2 to 6 only touch `frontends/nubo-libretro`, so they can run alongside
-    steps 3 to 6.
-- **Steps 3 to 6** must go in order. Nothing else should change the Iced app's non-UI modules meanwhile,
-  or the moves will conflict.
-- **Shootout plan:**
-  - Part 1's options (`--scale`, `--fresh`, `--speed`) can go before step 3 or after step 6, but not in
-    the middle.
-  - Before is simpler: they are small, and `--fresh` then moves with `storage` like everything else.
+1. The pull request that adds the plans.
+2. Restructuring steps 1 and 2.
+3. Part 5 of [SHOOTOUT_PLAN.md](SHOOTOUT_PLAN.md): the Shootout's tests in CI and the nightly run, and
+   the score and rank on the wiki.
+4. Restructuring steps 3 to 6, then step 7.
+5. Parts 1 to 3 of the Shootout plan: the app's options, the harness class, and the maintainer's run on
+   Windows.
+6. Phases 1 to 5 of [RETROARCH_PLAN.md](RETROARCH_PLAN.md).
+7. When their conditions are met and the maintainer says to go ahead:
+   - the pull request to the Shootout (its Part 4), once Nubo would rank first
+   - RetroArch's own core downloader (its Phase 6), once the core has been in a few releases
+
+Why this order:
+
+- **Shootout Part 5 before steps 3 to 6.** It only touches the test ROM runner, the nightly workflow
+  and `cargo xtask metrics`, none of which those steps move. It needs step 1, so it is built straight
+  into `tools/nubo-test-rom-runner`.
+- **Steps 3 to 6 in one go.** They must go in order, and nothing else should change the Iced app's
+  non-UI modules meanwhile, or the moves will conflict.
+- **Shootout Parts 1 to 3 after the restructuring.** Part 1's `--fresh` turns off the storage, saves
+  and library that step 4 moves, so it is built once, on the final structure. The Windows run in
+  Part 3 only matters to confirm the score before submitting, and Part 5 already shows the score
+  every night.
+- **Shootout Parts 1 to 3 before the RetroArch core.** They are small, and they finish the Shootout up
+  to the submission, so it can go in as soon as Nubo ranks first.
+- **The RetroArch core after the restructuring.** Step 2 already makes `run_frame()` and
+  `nubo-frontend`'s palettes and model rule. The core then builds on the finished structure.
 
 ## Decisions taken
 
 - The layout and steps are signed off (2026-10-13).
 - The Iced app stays the main app. Its package and program stay `nubo`.
-- The RetroArch core is planned next. iOS, GTK and a React web UI are only kept possible.
+- The RetroArch core is planned, after the restructuring and the Shootout's Parts 1 to 3. iOS, GTK and
+  a React web UI are only kept possible.
 - Every package starts with `nubo`, and every crate's folder is named after its package
   (`frontends/iced` becomes `frontends/nubo`). `xtask` keeps its name.
 - Developer programs go in a `tools/` folder, each its own crate.
-- All steps are scheduled, in the order under "Order and dependencies", with Shootout Part 5 between
-  steps 2 and 3.
+- All steps are scheduled, in the order under "Order and dependencies", which also places the
+  Shootout and RetroArch plans.
 - Review dates carry over to moved paths in the nightly review.

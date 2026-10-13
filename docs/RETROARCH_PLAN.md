@@ -70,6 +70,9 @@ only has to:
 
 ## Phase 1: core additions (one pull request)
 
+The RetroArch core comes after the whole restructuring and the Shootout plan's Parts 1 to 3 (see
+"Order and dependencies" in [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md)).
+
 Steps 1 and 2 of [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md) come first. Step 2 adds `run_frame()`
 (item 1 below) and moves the palettes and the model rule into `nubo-frontend` (item 4), so this phase
 only does what is still left after them.
