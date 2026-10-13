@@ -105,7 +105,7 @@ What's missing:
    also draws the auto-hiding bar, toasts, the pause menu and the fast forward badge.
 2. **Runs aren't independent.** Settings (`settings.toml`), battery saves (`<rom>.sav`, `<rom>.rtc`), the
    library and its pictures live in the per-user folders (`ProjectDirs::from("", "", "Nubo")` in
-   `frontends/nubo/src/storage/files.rs`, under `%APPDATA%\Nubo` on Windows). The harness only deletes a
+   `crates/nubo-frontend/src/storage/files.rs`, under `%APPDATA%\Nubo` on Windows). The harness only deletes a
    `.sav` next to the ROM, so the MBC and clock tests (rtc3test, CasualPokePlayer's tests) would start
    from the save of the previous run. A player's own settings, such as a green palette, would also
    change the results.
