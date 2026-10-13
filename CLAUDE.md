@@ -6,7 +6,7 @@ Folders with their own `CLAUDE.md` (listed under Where Things Are) explain their
 
 ## Setup and Commands
 
-Only a Rust toolchain is needed: the newest stable, as `rust-toolchain.toml` asks (`rustup update`). Linux also needs `libasound2-dev`, `libudev-dev` and `pkg-config`, and the browser build's lint needs `rustup target add wasm32-unknown-unknown`. The `cargo` aliases below are defined in `.cargo/config.toml`; packaging, the web build and the other project tasks are in `xtask/CLAUDE.md`.
+You need the newest stable Rust, as `rust-toolchain.toml` asks (`rustup update`), and `curl`, which downloads the test ROMs and benchmark games. Linux also needs `libasound2-dev`, `libudev-dev` and `pkg-config`. The browser build's lint needs `rustup target add wasm32-unknown-unknown`, and the license check needs `cargo install cargo-deny --locked`. The `cargo` aliases below are defined in `.cargo/config.toml`; packaging, the web build and the other project tasks are in `xtask/CLAUDE.md`.
 
 ```bash
 cargo build / cargo test      # The core crates only (the workspace's default members)
@@ -24,14 +24,16 @@ cargo benchmark <roms> --record a.txt / --compare a.txt   # Speed, and fingerpri
 Run what CI runs, so a pull request is green the first time:
 
 1. `cargo fmt --all`
-2. `cargo clippy --workspace --all-targets` and `cargo clippy -p nubo --target wasm32-unknown-unknown`, both without warnings.
-3. `cargo test --workspace`
-4. If emulation may have changed: `cargo test-roms`. When results change on purpose, run `cargo test-roms --update` and commit `passing.txt`; when a test in `frontends/test_rom_runner/FAILING_TESTS.md` starts passing, update that file too.
-5. If the CPU changed: `cargo cpu-tests`.
-6. If what save states store changed: `cargo save-states`, and keep a new set with `cargo save-states --record` in the same pull request.
-7. If the change must not alter output (an optimization, a refactor): record fingerprints on a build without it (`git stash`), then compare with it. Do this on the benchmark games (`cargo xtask benchmark-roms`, then `cargo benchmark target/benchmark-roms --record before.txt` and later `--compare before.txt`) and on the test ROMs (`cargo benchmark target/test-roms/v7.0 --seconds 4 --jobs <cores>` with the same flags). For a change to the lazy components, also compare against the `eager` build (`frontends/benchmark/CLAUDE.md`).
+2. `cargo clippy --workspace --all-targets -- -D warnings` and `cargo clippy -p nubo --target wasm32-unknown-unknown -- -D warnings`
+3. `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items` (broken links in private docs fail CI too)
+4. `cargo test --workspace`
+5. If emulation may have changed: `cargo test-roms`. When results change on purpose, run `cargo test-roms --update` and commit `passing.txt`; when a test in `frontends/test_rom_runner/FAILING_TESTS.md` starts passing, update that file too.
+6. If the CPU changed: `cargo cpu-tests`.
+7. If what save states store changed: `cargo save-states` (it needs the benchmark games: `cargo xtask benchmark-roms` once), and keep a new set with `cargo save-states --record` in the same pull request.
+8. If dependencies changed: `cargo deny check licenses bans sources`.
+9. If the change must not alter output (an optimization, a refactor): record fingerprints on a build without it (`git stash -u`, so new files go too), then compare with it. Do this on the benchmark games (`cargo xtask benchmark-roms`, then `cargo benchmark target/benchmark-roms --record before.txt` and later `--compare before.txt`) and on the test ROMs (`cargo benchmark target/test-roms/v7.0 --seconds 4 --jobs <cores>` with the same flags). For a change to the lazy components, also compare against the `eager` build (`frontends/benchmark/CLAUDE.md`).
 
-CI also runs `cargo doc` with warnings as errors, `cargo deny check licenses bans sources` and `cargo xtask build-web --quick`; the slow checks run nightly. What runs where: `docs/CI.md`.
+CI also builds the browser version (`cargo xtask build-web --quick`); the slow checks run nightly. What runs where: `docs/CI.md`.
 
 ## Rules
 
@@ -40,9 +42,9 @@ These keep Nubo exact, and players' saves safe. Never break them.
 - **User input never panics the core.** ROMs, zip files, save states and cheat codes return `LoadRomError`, `SaveStateError` or `CheatError`.
 - **Lazy components, exact results.** The PPU and APU run behind the CPU while nothing they do can be seen, then catch up in one go, and plain M-cycles (one CPU step each) run in bulk. The result must be bit for bit what running every component one M-cycle at a time gives. Any new way for the CPU or another component to see or change hardware state must first run the waiting M-cycles and catch the PPU and APU up. How: `crates/nubo-core/CLAUDE.md`.
 - **Timing calibration moves only with the test ROMs.** The PPU's dot positions, each model's state after the boot ROM and the other timings are calibrated against test ROMs and other emulators. Change them only together with `cargo test-roms`.
-- **Players never lose a save state to an update.** A field or variant's stored name is permanent: when you rename it in the code, keep the stored name with `#[serializable(name = "...")]`. A field whose type or meaning changes gets a new stored name. Stored values are fixed-size and little-endian, never `usize`. How: `crates/nubo-core/CLAUDE.md`.
+- **Players never lose a save state to an update.** A field or variant's stored name is permanent: when you rename it in the code, keep the stored name with `#[serializable(name = "...")]` (hand-written implementations and the PPU store names differently; see `crates/nubo-core/CLAUDE.md`). A field whose type or meaning changes gets a new stored name. Stored values are fixed-size and little-endian, never `usize`. How: `crates/nubo-core/CLAUDE.md`.
 - **Only GPLv3-compatible code and dependencies** (MIT, BSD, ISC, Zlib, Apache-2.0, MPL-2.0 and the like, never GPL-2.0-only). Gambatte is GPL-2.0-only: use it as a reference only (its test ROMs, traces of a local build, its behavior) and never port its code or tables. When you port code, tables or data, credit the project with its link and license at the top of the file, in `NOTICE` and in the README's Credits; SameBoy-derived files point to the Expat notice in `apu.rs`.
-- **Code the browser build shares** takes `Instant`, `SystemTime` and `Duration` from `iced::time` (std's panic on wasm32), and sets fonts with `theme::BODY_FONT` or `theme::HEADING_FONT`, never `Font::DEFAULT`, which draws nothing in the browser.
+- **Code the browser build shares** takes `Instant`, `SystemTime` and `Duration` from `iced::time` (std's panic on wasm32), and views set fonts with `theme::BODY_FONT` or `theme::HEADING_FONT`, never `Font::DEFAULT` or a font of their own, which draw nothing in the browser (only `ui/theme.rs` builds fonts).
 - **No `unsafe`.** The workspace lints forbid it.
 - **Newest stable versions** of Rust, crates, GitHub Actions and tools, never a pre-release unless nothing else works; test data stays pinned. Details, and the Flatpak's exception: `docs/CI.md`.
 - **Merging a pull request:** follow the `merge` skill (CI green, Codex's review done and handled). **Making a release:** follow the `release` skill.

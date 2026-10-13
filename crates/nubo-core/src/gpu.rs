@@ -34,8 +34,8 @@ use std::io::{Read, Write};
 
 /// Which part of the line the PPU is working on. The mode the CPU reads from STAT can differ
 /// from it for a few dots, so that is tracked separately in `Gpu::visible_mode`. Save states
-/// store a variant as its position in this list (`OamScan` is 0, `VBlank` 3), which isn't the
-/// mode number STAT shows for it.
+/// store a variant by its name. The order of the variants isn't the order of the mode numbers
+/// STAT shows for them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serializable)]
 enum LineState {
     OamScan,

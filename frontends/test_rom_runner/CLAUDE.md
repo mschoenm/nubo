@@ -18,4 +18,9 @@ cargo test-roms --verify-boot # Run the real boot ROM for every test instead of 
 - Failing screenshot tests write the emulator's screen and a `.diff.png` (the reference with the differing pixels in red) to `target/test-roms/failures/<model>/`.
 - The ROMs are downloaded at pinned versions and checked against checksums, into `target/test-roms/`. Results depend on their exact content, so they stay pinned.
 - Timeouts count emulated time, so results don't depend on how busy the machine is.
-- A new test suite needs its download in `download.rs` and its test cases in `suites.rs` (collected by `discover`); the README's Test ROMs section says what is run and what isn't.
+- A new test suite needs:
+  - its download in `download.rs` (pinned, with checksums);
+  - its test cases in `suites.rs` (collected by `discover`);
+  - its name in the suite list of `main.rs`'s module docs and in the README's Test ROMs section;
+  - its download folder in the CI cache, `.github/actions/test-roms/action.yml` (`path`; the key already follows `download.rs`), or every CI run downloads it again.
+- The fingerprint comparison in the root `CLAUDE.md` runs over `target/test-roms/v7.0` only; pass the other download folders too when a change could affect their tests.

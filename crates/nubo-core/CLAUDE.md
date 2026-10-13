@@ -36,7 +36,10 @@ Running every component every M-cycle is slow, so the core takes shortcuts. They
 Players must never lose a save state to an update. The format is in `emulator/save_state.rs`, how values are stored in `serializable.rs`. What every change needs to know:
 
 - Every value is stored with its name, so adding, removing or reordering fields needs nothing: a value a state lacks starts at its power-on value, and values this version doesn't know are skipped.
-- Stored names are permanent. A field or variant renamed in the code keeps its stored name with `#[serializable(name = "...")]`; a field whose type or meaning changes (another size, other units, other values) is stored under a new name.
+- Stored names are permanent. A field or variant renamed in the code keeps its stored name; a field whose type or meaning changes (another size, other units, other values) is stored under a new name. How a stored name is kept depends on how the type is stored:
+  - Types with `#[derive(Serializable)]`: `#[serializable(name = "stored_name")]` on the field or variant.
+  - Hand-written implementations (`Emulator`, `Apu`, `CartridgeMapper`, `Palettes`, the pipeline FIFOs, `BlepBuffer`, `OamDmaAccess`): the stored name is the text the implementation writes (`FieldWriter::field` or `field_with` for a field, `write_variant` for a variant) and matches when reading; keep that text.
+  - The PPU (`gpu/save_state.rs`): its macro stores each field under its Rust name, so renaming a stored PPU field changes its stored name. Don't, unless you first teach the macro to keep the old one; `cargo test` fails on the changed layout either way.
 - Values are fixed-size and little-endian, never `usize`, and floats are stored as their IEEE 754 bits, so a state loads on every platform.
 - Caches, and values that are always zero between `Emulator` calls, are left out with `#[serializable(skip)]` (or with a comment in a hand-written implementation).
 - When what save states store changes, `cargo test` and `cargo save-states` fail and list what was added and removed; keep a new set with `cargo save-states --record` in the same pull request (see `frontends/save_state_check/CLAUDE.md`).

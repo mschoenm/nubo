@@ -25,8 +25,8 @@ Settings (`settings.toml`, with the controls) are in the per-user config folder;
 ## The Browser Build
 
 - `emulation/web.rs` replaces the emulator thread: it emulates whole frames on each frame tick, and `emulation/pacing.rs` decides how many and keeps the audio queue steady by nudging the sample rate.
-- Battery saves go to localStorage instead of files. The library, save states, cheats, screenshots and box art are desktop only; each of those modules has an `AVAILABLE` flag.
-- Code both builds share takes `Instant`, `SystemTime` and `Duration` from `iced::time` (std's panic on wasm32), and sets fonts only with `theme::BODY_FONT` or `theme::HEADING_FONT`: the browser has no system fonts, and `Font::DEFAULT` draws nothing there.
+- Settings and battery saves go to localStorage instead of files. The library, save states, cheats, screenshots and box art are desktop only; each of those modules has an `AVAILABLE` flag.
+- Code both builds share takes `Instant`, `SystemTime` and `Duration` from `iced::time` (std's panic on wasm32), and its views set fonts only with `theme::BODY_FONT` or `theme::HEADING_FONT`: the browser has no system fonts, so `Font::DEFAULT` or any other font draws nothing there (`ui/theme.rs` is the one place that builds fonts).
 - `deploy.yml` publishes the browser build to GitHub Pages on every push to main that passes CI.
 
 ## Packaging Files
