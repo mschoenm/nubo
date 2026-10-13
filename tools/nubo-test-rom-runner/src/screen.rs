@@ -40,6 +40,20 @@ pub(crate) fn normalize(frame: &[u8], model: Model) -> RgbImage {
     RgbImage::from_raw(WIDTH, HEIGHT, pixels).expect("the frame buffer is 160x144 RGBA")
 }
 
+/// An RGBA frame from the emulator in the colors the app shows it in, as
+/// the GB Emulator Shootout's harness sees it: the original Game Boy's
+/// grays (`DMG_SHADES`, which the app's default palette keeps) and the Game
+/// Boy Color's colors as the core draws them.
+pub(crate) fn as_shown(frame: &[u8]) -> RgbImage {
+    let pixels = frame
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .flat_map(|pixel| [pixel[0], pixel[1], pixel[2]])
+        .collect();
+    RgbImage::from_raw(WIDTH, HEIGHT, pixels).expect("the frame buffer is 160x144 RGBA")
+}
+
 /// How [`normalize`] maps each color channel for `model`.
 fn channel_mapping(model: Model) -> fn(u8) -> u8 {
     if model.is_cgb() {
@@ -64,21 +78,18 @@ impl GrayscaleReference {
     }
 
     /// Whether every pixel of the emulator's RGBA `frame`, in the colors
-    /// [`normalize`] gives it for `model`, is within `GRAYSCALE_TOLERANCE`
-    /// of the reference's brightness. Stops at the first pixel that isn't.
-    pub(crate) fn matches(&self, frame: &[u8], model: Model) -> bool {
-        let channel = channel_mapping(model);
+    /// the app shows it in (unlike [`normalize`], which maps them to the
+    /// reference screenshots' own grays), is within `GRAYSCALE_TOLERANCE`
+    /// of the reference's brightness, as the Shootout's harness compares a
+    /// screenshot of the app. Stops at the first pixel that isn't.
+    pub(crate) fn matches_as_shown(&self, frame: &[u8]) -> bool {
         frame
             .as_chunks::<4>()
             .0
             .iter()
             .zip(&self.brightness)
             .all(|(pixel, expected)| {
-                let actual = brightness(image::Rgb([
-                    channel(pixel[0]),
-                    channel(pixel[1]),
-                    channel(pixel[2]),
-                ]));
+                let actual = brightness(image::Rgb([pixel[0], pixel[1], pixel[2]]));
                 actual.abs_diff(*expected) <= GRAYSCALE_TOLERANCE
             })
     }
@@ -199,15 +210,23 @@ mod tests {
     #[test]
     fn grays_match_within_the_shootouts_tolerance() {
         let frame = white_frame();
-        assert!(gray_reference(0xFF - 50).matches(&frame, Model::Dmg));
-        assert!(!gray_reference(0xFF - 51).matches(&frame, Model::Dmg));
+        assert!(gray_reference(0xFF - 50).matches_as_shown(&frame));
+        assert!(!gray_reference(0xFF - 51).matches_as_shown(&frame));
     }
 
     #[test]
     fn one_differing_pixel_is_enough_to_differ() {
         let mut frame = white_frame();
         frame[4 * 1000..4 * 1000 + 3].fill(0);
-        assert!(!gray_reference(0xFF).matches(&frame, Model::CgbE));
-        assert!(gray_reference(0xFF).matches(&white_frame(), Model::CgbE));
+        assert!(!gray_reference(0xFF).matches_as_shown(&frame));
+        assert!(gray_reference(0xFF).matches_as_shown(&white_frame()));
+    }
+
+    #[test]
+    fn the_original_game_boys_grays_are_compared_as_the_app_shows_them() {
+        let dark_gray = DMG_SHADES[2];
+        let frame = dark_gray.repeat((WIDTH * HEIGHT) as usize);
+        assert!(gray_reference(dark_gray[0]).matches_as_shown(&frame));
+        assert!(!gray_reference(0x55).matches_as_shown(&frame));
     }
 }

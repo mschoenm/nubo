@@ -205,10 +205,11 @@ GB Emulator Shootout (https://github.com/gbdev/GBEmulatorShootout)
 
 The test ROM runner's list of the Shootout's tests
 (tools/nubo-test-rom-runner/src/shootout/list.rs) is derived from the
-Shootout's test lists, and its scoreboard
-(tools/nubo-test-rom-runner/shootout_published.txt) from its published
-results. The test ROMs and reference screenshots themselves are downloaded
-when the tests run, not included.
+Shootout's test lists, which are under the MIT License below. Its scoreboard
+(tools/nubo-test-rom-runner/shootout_published.txt) records which emulators
+pass which test in the results the project publishes on its gh-pages branch.
+The test ROMs and reference screenshots themselves are downloaded when the
+tests run, not included.
 
 MIT License
 

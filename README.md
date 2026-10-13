@@ -86,7 +86,7 @@ Esc opens the pause menu, Tab fast forwards while held, F5 and F8 quick save and
 
 ## Test ROMs
 
-`cargo test-roms` downloads a pinned release of the [Game Boy test ROM collection](https://github.com/c-sp/game-boy-test-roms), plus the test ROMs and reference screenshots of the [GB Emulator Shootout](https://gbdev.io/GBEmulatorShootout/) that the collection doesn't have in the same version, and runs each test ROM on the hardware models it targets: DMG-0, DMG, MGB, SGB and SGB2 (monochrome) and CGB-0 to CGB-E and AGB (color). The Shootout's own tests also run the way the Shootout judges them, on a DMG or a CGB-E with its screenshot comparison, and the runner compares the result with the Shootout's published table: counted on the 264 tests published on 2026-06-04, Nubo passes 258, which would put it first (the leader, DocBoy, passes 255; the other six are three Super Game Boy tests and three that only report information). The tests that currently pass are listed in [tools/nubo-test-rom-runner/passing.txt](tools/nubo-test-rom-runner/passing.txt), and CI fails if any of them stop passing. The tests that still fail, and why, are explained in [tools/nubo-test-rom-runner/FAILING_TESTS.md](tools/nubo-test-rom-runner/FAILING_TESTS.md). What still has to happen before Nubo can claim to be the most accurate Game Boy emulator is planned in [docs/ACCURACY_PLAN.md](docs/ACCURACY_PLAN.md).
+`cargo test-roms` downloads a pinned release of the [Game Boy test ROM collection](https://github.com/c-sp/game-boy-test-roms), plus the test ROMs and reference screenshots of the [GB Emulator Shootout](https://gbdev.io/GBEmulatorShootout/) that the collection doesn't have in the same version, and runs each test ROM on the hardware models it targets: DMG-0, DMG, MGB, SGB and SGB2 (monochrome) and CGB-0 to CGB-E and AGB (color). The Shootout's own tests also run the way the Shootout judges them, on a DMG or a CGB-E with its screenshot comparison, and the runner compares the result with the Shootout's published table: counted on the 264 tests published on 2026-06-04, Nubo passes 251, which would put it second, level with Emulicious (the leader, DocBoy, passes 255). Of the other 13, seven are DMG tests whose screenshots have a darker middle gray than the one Nubo shows, three are Super Game Boy tests and three only report information. The tests that currently pass are listed in [tools/nubo-test-rom-runner/passing.txt](tools/nubo-test-rom-runner/passing.txt), and CI fails if any of them stop passing. The tests that still fail, and why, are explained in [tools/nubo-test-rom-runner/FAILING_TESTS.md](tools/nubo-test-rom-runner/FAILING_TESTS.md). What still has to happen before Nubo can claim to be the most accurate Game Boy emulator is planned in [docs/ACCURACY_PLAN.md](docs/ACCURACY_PLAN.md).
 
 | Suite | Monochrome | Color |
 | ----- | ---------- | ----- |
@@ -108,7 +108,9 @@ Esc opens the pause menu, Tab fast forwards while held, F5 and F8 quick save and
 | [TurtleTests](https://github.com/Powerlated/TurtleTests) | 2/2 | 2/2 |
 | [little-things-gb](https://github.com/pinobatch/little-things-gb) | 2/2 | 2/2 |
 | [MBC3 Tester](https://github.com/EricKirschenmann/MBC3-Tester-gb) | 1/1 | 1/1 |
-| [GB Emulator Shootout](https://github.com/gbdev/GBEmulatorShootout), with daid's and CasualPokePlayer's tests | 165/165 | 93/93 |
+| [daid's tests](https://github.com/gbdev/GBEmulatorShootout/tree/main/testroms/daid) | 2/2 | 6/6 |
+| [CasualPokePlayer's MBC3 tests](https://github.com/gbdev/GBEmulatorShootout/tree/main/testroms/cpp) | 3/3 | |
+| [GB Emulator Shootout](https://github.com/gbdev/GBEmulatorShootout), judged as the Shootout judges them | 158/165 | 93/93 |
 
 These aren't run, because nothing can check them automatically or they need hardware Nubo doesn't emulate:
 

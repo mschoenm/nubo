@@ -1,7 +1,7 @@
 # The GB Emulator Shootout's published table (gbdev.io/GBEmulatorShootout), read from its
 # gh-pages branch by `cargo xtask shootout-scoreboard <commit>`: the commit, the day of the
 # newest result, then one line per published test with the emulators that pass it.
-# Derived from the Shootout's results, MIT License, Copyright (c) 2026 daid; see NOTICE.
+# Read from the results the Shootout publishes (the project is MIT-licensed, Copyright (c) 2026 daid); see NOTICE.
 commit	72fd7452fb4febd8832c0ca5b30fab431fde767e
 published	2026-06-04
 acid/which.gb (DMG)	

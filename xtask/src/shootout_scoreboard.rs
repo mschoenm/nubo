@@ -146,7 +146,7 @@ fn scoreboard(commit: &str, tests: &Value, results: &[Value]) -> Result<String> 
         "# The GB Emulator Shootout's published table (gbdev.io/GBEmulatorShootout), read from its\n\
          # gh-pages branch by `cargo xtask shootout-scoreboard <commit>`: the commit, the day of the\n\
          # newest result, then one line per published test with the emulators that pass it.\n\
-         # Derived from the Shootout's results, MIT License, Copyright (c) 2026 daid; see NOTICE.\n",
+         # Read from the results the Shootout publishes (the project is MIT-licensed, Copyright (c) 2026 daid); see NOTICE.\n",
     );
     let _ = writeln!(text, "commit\t{commit}");
     #[expect(

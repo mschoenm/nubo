@@ -525,7 +525,9 @@ enum Verdict {
 /// it passes once the screen has matched one of the `pass` screenshots for
 /// `MATCH_HOLD_AUDIO_BUFFERS`, fails once it has matched one of the `fail`
 /// screenshots that long, and fails at the deadline. Screens are compared in
-/// grayscale, as the Shootout does.
+/// grayscale, as the Shootout does, in the colors the app shows: unlike the
+/// other screenshot checks, the original Game Boy's grays aren't mapped to
+/// the screenshots' own, since the harness takes screenshots of the app.
 fn run_shootout_test(
     emulator: &mut Emulator,
     run: &TestRun<'_>,
@@ -542,7 +544,7 @@ fn run_shootout_test(
             let matches_any = |references: &[GrayscaleReference]| {
                 references
                     .iter()
-                    .any(|reference| reference.matches(frame, test.model))
+                    .any(|reference| reference.matches_as_shown(frame))
             };
             let verdict = if matches_any(&pass_grays) {
                 Some(Verdict::Pass)
@@ -563,13 +565,13 @@ fn run_shootout_test(
             }
             return Err(Failure {
                 reason: "the screen matches a fail screenshot".to_string(),
-                screen: Some(screen::normalize(emulator.frame_buffer(), test.model)),
+                screen: Some(screen::as_shown(emulator.frame_buffer())),
                 stalled: false,
             });
         }
     }
 
-    let actual = screen::normalize(emulator.frame_buffer(), test.model);
+    let actual = screen::as_shown(emulator.frame_buffer());
     let reason = if shown.is_some() {
         format!(
             "the screen matched a screenshot too briefly to count before the deadline of {}",

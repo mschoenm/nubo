@@ -61,7 +61,8 @@ pub(crate) enum Check {
     HighRam,
     /// By matching one of these screenshots a fixed time after the boot ROM,
     /// compared in grayscale like the GB Emulator Shootout does, for
-    /// screenshots in other colors than Nubo's, such as Mooneye's own.
+    /// screenshots in other colors than Nubo's, such as the shootout's (which
+    /// come from several emulators) and Mooneye's own.
     GrayscaleScreen(Vec<PathBuf>),
     /// The way the GB Emulator Shootout judges its tests: passed once the
     /// screen has matched a `pass` screenshot for as long as the Shootout's
@@ -562,6 +563,7 @@ pub(crate) fn discover(dirs: &RomDirs) -> Vec<TestCase> {
     tests.extend(rtc3test());
     tests.extend(screenshot_tests());
     tests.extend(mooneye_madness());
+    tests.extend(shootout_rom_checks());
     tests.extend(shootout::test_cases());
     tests.sort_by_key(TestCase::id);
     tests
@@ -923,6 +925,98 @@ fn mooneye_madness() -> Vec<TestCase> {
                 Model::Mgb,
                 Check::GrayscaleScreen(vec![PathBuf::from(format!("{path}_expected.png"))]),
                 Deadline::AfterBoot(1),
+            )
+        })
+        .collect()
+}
+
+/// Seconds after the boot ROM at which the shootout's tests are checked. The
+/// shootout checks after half a second; these tests keep showing their
+/// result once they are done.
+const SHOOTOUT_SECONDS_AFTER_BOOT: u32 = 1;
+
+/// Tests of the GB Emulator Shootout that the collection lacks: daid's PPU,
+/// STOP and speed switch tests and CasualPokePlayer's MBC3 tests, checked
+/// for what the emulator does. Each runs on the model the shootout uses and
+/// passes if it matches one of its screenshots (several where hardware units
+/// differ) in the screenshots' own grays (see `screen::normalize`). The
+/// Shootout's own judgement of them, in the colors the app shows, is in
+/// `shootout.rs`. Left out are
+/// `daid/rom_and_ram.gb`, which has no expected result, and
+/// `cpp/sgb-ext-test.gb`, which needs the Super Game Boy's packet protocol.
+const SHOOTOUT_ROM_CHECKS: [(&str, Model, &[&str]); 11] = [
+    (
+        "daid/ppu_scanline_bgp.gb",
+        Model::Dmg,
+        &[
+            "daid/ppu_scanline_bgp_0.dmg.png",
+            "daid/ppu_scanline_bgp_1.dmg.png",
+            "daid/ppu_scanline_bgp_2.dmg.png",
+        ],
+    ),
+    (
+        "daid/ppu_scanline_bgp.gb",
+        Model::CgbE,
+        &["daid/ppu_scanline_bgp.gbc.png"],
+    ),
+    (
+        "daid/stop_instr.gb",
+        Model::Dmg,
+        &["daid/stop_instr.dmg.png"],
+    ),
+    (
+        "daid/stop_instr.gb",
+        Model::CgbE,
+        &["daid/stop_instr.gbc.png"],
+    ),
+    (
+        "daid/stop_instr_gbc_mode3.gb",
+        Model::CgbE,
+        &["daid/stop_instr_gbc_mode3.png"],
+    ),
+    (
+        "daid/speed_switch_timing_div.gbc",
+        Model::CgbE,
+        &["daid/speed_switch_timing_div.png"],
+    ),
+    (
+        "daid/speed_switch_timing_ly.gbc",
+        Model::CgbE,
+        &["daid/speed_switch_timing_ly.png"],
+    ),
+    (
+        "daid/speed_switch_timing_stat.gbc",
+        Model::CgbE,
+        &["daid/speed_switch_timing_stat.png"],
+    ),
+    (
+        "cpp/rtc-invalid-banks-test.gb",
+        Model::Dmg,
+        &["cpp/rtc-invalid-banks-test.png"],
+    ),
+    (
+        "cpp/latch-rtc-test.gb",
+        Model::Dmg,
+        &["cpp/latch-rtc-test.png"],
+    ),
+    (
+        "cpp/ramg-mbc3-test.gb",
+        Model::Dmg,
+        &["cpp/ramg-mbc3-test.png"],
+    ),
+];
+
+/// The tests of `SHOOTOUT_ROM_CHECKS`.
+fn shootout_rom_checks() -> Vec<TestCase> {
+    SHOOTOUT_ROM_CHECKS
+        .into_iter()
+        .map(|(rom, model, screens)| TestCase {
+            source: Source::Shootout,
+            ..TestCase::new(
+                PathBuf::from(rom),
+                model,
+                Check::GrayscaleScreen(screens.iter().map(PathBuf::from).collect()),
+                Deadline::AfterBoot(SHOOTOUT_SECONDS_AFTER_BOOT),
             )
         })
         .collect()

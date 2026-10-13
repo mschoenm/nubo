@@ -66,6 +66,12 @@ cgb blargg/mem_timing/mem_timing.gb
 cgb bully/bully.gb
 cgb cgb-acid-hell/cgb-acid-hell.gbc
 cgb cgb-acid2/cgb-acid2.gbc
+cgb daid/ppu_scanline_bgp.gb
+cgb daid/speed_switch_timing_div.gbc
+cgb daid/speed_switch_timing_ly.gbc
+cgb daid/speed_switch_timing_stat.gbc
+cgb daid/stop_instr.gb
+cgb daid/stop_instr_gbc_mode3.gb
 cgb dmg-acid2/dmg-acid2.gb
 cgb little-things-gb/firstwhite.gb
 cgb little-things-gb/tellinglys.gb
@@ -3840,6 +3846,11 @@ dmg blargg/instr_timing/instr_timing.gb
 dmg blargg/mem_timing-2/mem_timing.gb
 dmg blargg/mem_timing/mem_timing.gb
 dmg blargg/oam_bug/oam_bug.gb
+dmg cpp/latch-rtc-test.gb
+dmg cpp/ramg-mbc3-test.gb
+dmg cpp/rtc-invalid-banks-test.gb
+dmg daid/ppu_scanline_bgp.gb
+dmg daid/stop_instr.gb
 dmg dmg-acid2/dmg-acid2.gb
 dmg gambatte/bgtiledata/bgtiledata_spx08_1.gbc
 dmg gambatte/bgtiledata/bgtiledata_spx08_2.gbc
@@ -6516,7 +6527,6 @@ sgb2 mooneye-test-suite/acceptance/ppu/lcdon_write_timing-GS.gb
 sgb2 mooneye-test-suite/acceptance/ppu/vblank_stat_intr-GS.gb
 shootout/acid/cgb-acid-hell.gbc
 shootout/acid/cgb-acid2.gbc
-shootout/acid/dmg-acid2.gb
 shootout/ashiepaws/bully.gb (DMG)
 shootout/ashiepaws/bully.gb (GBC)
 shootout/ashiepaws/strikethrough.gb
@@ -6577,7 +6587,6 @@ shootout/blargg/oam_bug/8-instr_effect.gb
 shootout/cpp/latch-rtc-test.gb
 shootout/cpp/ramg-mbc3-test.gb
 shootout/cpp/rtc-invalid-banks-test.gb
-shootout/daid/ppu_scanline_bgp.gb (DMG)
 shootout/daid/ppu_scanline_bgp.gb (GBC)
 shootout/daid/speed_switch_timing_div.gbc
 shootout/daid/speed_switch_timing_ly.gbc
@@ -6586,23 +6595,18 @@ shootout/daid/stop_instr.gb (DMG)
 shootout/daid/stop_instr.gb (GBC)
 shootout/daid/stop_instr_gbc_mode3.gb
 shootout/mealybug-tearoom-tests/ppu/m2_win_en_toggle.gb (DMG)
-shootout/mealybug-tearoom-tests/ppu/m3_bgp_change.gb (DMG)
 shootout/mealybug-tearoom-tests/ppu/m3_bgp_change_sprites.gb (DMG)
 shootout/mealybug-tearoom-tests/ppu/m3_lcdc_bg_en_change.gb (DMG)
 shootout/mealybug-tearoom-tests/ppu/m3_lcdc_bg_map_change.gb (DMG)
 shootout/mealybug-tearoom-tests/ppu/m3_lcdc_obj_en_change.gb (DMG)
 shootout/mealybug-tearoom-tests/ppu/m3_lcdc_obj_en_change_variant.gb (DMG)
-shootout/mealybug-tearoom-tests/ppu/m3_lcdc_obj_size_change.gb (DMG)
 shootout/mealybug-tearoom-tests/ppu/m3_lcdc_obj_size_change_scx.gb (DMG)
-shootout/mealybug-tearoom-tests/ppu/m3_lcdc_tile_sel_change.gb (DMG)
-shootout/mealybug-tearoom-tests/ppu/m3_lcdc_tile_sel_win_change.gb (DMG)
 shootout/mealybug-tearoom-tests/ppu/m3_lcdc_win_en_change_multiple.gb (DMG)
 shootout/mealybug-tearoom-tests/ppu/m3_lcdc_win_en_change_multiple_wx.gb (DMG)
 shootout/mealybug-tearoom-tests/ppu/m3_lcdc_win_map_change.gb (DMG)
 shootout/mealybug-tearoom-tests/ppu/m3_obp0_change.gb (DMG)
 shootout/mealybug-tearoom-tests/ppu/m3_scx_high_5_bits.gb (DMG)
 shootout/mealybug-tearoom-tests/ppu/m3_scx_low_3_bits.gb (DMG)
-shootout/mealybug-tearoom-tests/ppu/m3_scy_change.gb (DMG)
 shootout/mealybug-tearoom-tests/ppu/m3_window_timing.gb (DMG)
 shootout/mealybug-tearoom-tests/ppu/m3_window_timing_wx_0.gb (DMG)
 shootout/mealybug-tearoom-tests/ppu/m3_wx_4_change.gb (DMG)
