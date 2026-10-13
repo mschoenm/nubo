@@ -42,7 +42,7 @@ Players must never lose a save state to an update. The format is in `emulator/sa
   - The PPU (`gpu/save_state.rs`): its macro stores each field under its Rust name, so renaming a stored PPU field changes its stored name. Don't, unless you first teach the macro to keep the old one; `cargo test` fails on the changed layout either way.
 - Values are fixed-size and little-endian, never `usize`, and floats are stored as their IEEE 754 bits, so a state loads on every platform.
 - Caches, and values that are always zero between `Emulator` calls, are left out with `#[serializable(skip)]` (or with a comment in a hand-written implementation).
-- When what save states store changes, `cargo test` and `cargo save-states` fail and list what was added and removed; keep a new set with `cargo save-states --record` in the same pull request (see `frontends/save_state_check/CLAUDE.md`).
+- When what save states store changes, `cargo test` and `cargo save-states` fail and list what was added and removed; keep a new set with `cargo save-states --record` in the same pull request (see `frontends/save_state_check/AGENTS.md`).
 - A loaded state must go on exactly like the run it was saved from. `a_loaded_state_restores_every_field_of_the_cpu_the_address_bus_the_ppu_and_the_apu` (in `emulator/tests.rs`, with the fields left out on purpose) and `cargo benchmark --check-save-states` catch a field that is missed.
 - The PPU and APU check every loaded value a damaged state could index or overflow with, and a failed load leaves the emulator untouched: input from players never makes the core panic.
 

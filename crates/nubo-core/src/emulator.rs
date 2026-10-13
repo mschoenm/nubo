@@ -280,7 +280,7 @@ impl Emulator {
     /// effects such as acknowledging a register read. Test runners use this
     /// to read results that test ROMs leave in memory. It takes `&mut self`
     /// because the PPU runs behind until something looks at it (see
-    /// "Lazy components" in CLAUDE.md): it is caught up first, so registers
+    /// "Lazy components" in AGENTS.md): it is caught up first, so registers
     /// such as LY and STAT read right. Catching up early changes nothing
     /// else.
     pub fn read_memory(&mut self, address: u16) -> u8 {

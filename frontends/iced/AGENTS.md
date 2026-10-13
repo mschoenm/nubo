@@ -31,4 +31,4 @@ Settings (`settings.toml`, with the controls) are in the per-user config folder;
 
 ## Packaging Files
 
-`linux/` holds the menu entry and the AppStream metainfo, whose `<releases>` list holds the release notes. `windows/nubo.iss` is the Inno Setup script; its `AppId` must never change. `build.rs` gives `nubo.exe` its icon and file properties. They are built by the tasks in `xtask/` (see `xtask/CLAUDE.md`).
+`linux/` holds the menu entry and the AppStream metainfo, whose `<releases>` list holds the release notes. `windows/nubo.iss` is the Inno Setup script; its `AppId` must never change. `build.rs` gives `nubo.exe` its icon and file properties. They are built by the tasks in `xtask/` (see `xtask/AGENTS.md`).

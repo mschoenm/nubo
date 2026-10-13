@@ -1,6 +1,6 @@
 # CI and nightly runs
 
-What runs where, and why. The checks to run yourself before pushing are listed in the root `CLAUDE.md`.
+What runs where, and why. The checks to run yourself before pushing are listed in the root `AGENTS.md`.
 
 ## Pull requests and main
 

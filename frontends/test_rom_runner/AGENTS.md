@@ -23,4 +23,4 @@ cargo test-roms --verify-boot # Run the real boot ROM for every test instead of 
   - its test cases in `suites.rs` (collected by `discover`);
   - its name in the suite list of `main.rs`'s module docs and in the README's Test ROMs section;
   - its download folder in the CI cache, `.github/actions/test-roms/action.yml` (`path`; the key already follows `download.rs`), or every CI run downloads it again.
-- The fingerprint comparison in the root `CLAUDE.md` runs over `target/test-roms/v7.0` only; pass the other download folders too when a change could affect their tests.
+- The fingerprint comparison in the root `AGENTS.md` runs over `target/test-roms/v7.0` only; pass the other download folders too when a change could affect their tests.

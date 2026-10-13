@@ -18,7 +18,7 @@ Commands taking longer than a minute or two (builds, `cargo test-roms`, benchmar
 
 ## 2. Find tonight's work
 
-1. Read `CLAUDE.md` first, especially its Rules and Style, and the `CLAUDE.md` in the folders of the code you review (`crates/nubo-core/`, `frontends/*/`, `xtask/`), which describe it.
+1. Read `AGENTS.md` first, especially its Rules and Style, and the `AGENTS.md` in the folders of the code you review (`crates/nubo-core/`, `frontends/*/`, `xtask/`), which describe it.
 2. Clone the wiki: `git clone --depth 1 https://github.com/mschoenm/nubo.wiki.git /tmp/wiki`. Its `tonight.json` says what to review: `part.files` (the part to read in detail), `changes_since` (the commit the day's changes start after; `null` on the first night) and `changed_files`. Use it if its `date` is today or yesterday (UTC).
 3. If the wiki or a recent `tonight.json` is missing, pick the part yourself: copy `/tmp/wiki/rotation.json` to `/tmp/rotation.json` if it exists, run `cargo xtask review-units next --state /tmp/rotation.json --date "$(date -u +%F)" --commit "$(git rev-parse HEAD)"`, and say in your report that the wiki wasn't up to date.
 4. The day's changes are `git log --reverse <changes_since>..origin/main`; without `changes_since`, the commits of the last 26 hours. Read their diffs, all files including docs. Beyond about 3,000 changed lines, review the files with the most changes and list the rest as not reviewed.
@@ -29,9 +29,9 @@ Commands taking longer than a minute or two (builds, `cargo test-roms`, benchmar
 
 Read every file of tonight's part in full, and the day's diffs. Check:
 
-- **The style rules in CLAUDE.md:** a short `///` comment on every type and non-trivial function that a junior programmer can follow, Game Boy terms explained in plain words, few `//` comments, whole-word names without `get_`, acronyms written as words (`RtcState`), modules declared at the bottom of the file, `#[expect(..., reason = "...")]` on the smallest item instead of `#[allow]`, no `unsafe`, and ported code credited at the top of the file, in `NOTICE` and in the README's Credits.
+- **The style rules in AGENTS.md:** a short `///` comment on every type and non-trivial function that a junior programmer can follow, Game Boy terms explained in plain words, few `//` comments, whole-word names without `get_`, acronyms written as words (`RtcState`), modules declared at the bottom of the file, `#[expect(..., reason = "...")]` on the smallest item instead of `#[allow]`, no `unsafe`, and ported code credited at the top of the file, in `NOTICE` and in the README's Credits.
 - **Clear, idiomatic Rust:** run `cargo clippy --workspace --all-targets -- -W clippy::pedantic` and look at what it says about tonight's files (a report only: the curated lints in `Cargo.toml` are what CI enforces). Beyond clippy: needless clones and allocations, hand-written loops an iterator says more clearly, unclear ownership or error handling, functions doing several things, names that don't say what a thing is.
-- **Docs that drifted:** doc comments and comments that no longer match the code, references to functions, fields, constants or files that no longer exist (search for them), and the passages of the `CLAUDE.md` files (the root one and the folders' ones), `docs/CI.md`, `README.md`, `frontends/test_rom_runner/FAILING_TESTS.md` and `docs/ACCURACY_PLAN.md` that describe the reviewed code.
+- **Docs that drifted:** doc comments and comments that no longer match the code, references to functions, fields, constants or files that no longer exist (search for them), and the passages of the `AGENTS.md` files (the root one and the folders' ones), `docs/CI.md`, `README.md`, `frontends/test_rom_runner/FAILING_TESTS.md` and `docs/ACCURACY_PLAN.md` that describe the reviewed code.
 - **Bugs in the day's changes.**
 
 Leave alone: dependency versions (Dependabot updates them), the timing calibration (dot positions, cycle counts and the like, which only test ROM work changes), `.github/workflows/`, `rust-toolchain.toml`, `frontends/test_rom_runner/passing.txt` and the wiki.

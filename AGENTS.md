@@ -2,11 +2,11 @@
 
 Nubo is a cycle-accurate Game Boy (DMG) and Game Boy Color (CGB) emulator in Rust, forked from RetroBoy (smparsons/retroboy). It runs through an Iced app, natively on the desktop and as WebAssembly in the browser. Nubo is GPL-3.0-or-later (`LICENSE`); the code from RetroBoy stays Apache-2.0 (`LICENSE-APACHE`), credited in `NOTICE`.
 
-Folders with their own `CLAUDE.md` (listed under Where Things Are) explain their code; read it before you change code there. Facts about a single file are in that file's doc comments.
+Folders with their own `AGENTS.md` (listed under Where Things Are) explain their code; read it before you change code there, since not every agent loads it by itself. Facts about a single file are in that file's doc comments.
 
 ## Setup and Commands
 
-You need the newest stable Rust, as `rust-toolchain.toml` asks (`rustup update`), and `curl`, which downloads the test ROMs and benchmark games. Linux also needs `libasound2-dev`, `libudev-dev` and `pkg-config`. The browser build's lint needs `rustup target add wasm32-unknown-unknown`, and the license check needs `cargo install cargo-deny --locked`. The `cargo` aliases below are defined in `.cargo/config.toml`; packaging, the web build and the other project tasks are in `xtask/CLAUDE.md`.
+You need the newest stable Rust, as `rust-toolchain.toml` asks (`rustup update`), and `curl`, which downloads the test ROMs and benchmark games. Linux also needs `libasound2-dev`, `libudev-dev` and `pkg-config`. The browser build's lint needs `rustup target add wasm32-unknown-unknown`, and the license check needs `cargo install cargo-deny --locked`. The `cargo` aliases below are defined in `.cargo/config.toml`; packaging, the web build and the other project tasks are in `xtask/AGENTS.md`.
 
 ```bash
 cargo build / cargo test      # The core crates only (the workspace's default members)
@@ -31,7 +31,7 @@ Run what CI runs, so a pull request is green the first time:
 6. If the CPU changed: `cargo cpu-tests`.
 7. If what save states store changed: `cargo save-states` (it needs the benchmark games: `cargo xtask benchmark-roms` once), and keep a new set with `cargo save-states --record` in the same pull request.
 8. If dependencies changed: `cargo deny check licenses bans sources`.
-9. If the change must not alter output (an optimization, a refactor): record fingerprints on a build without it (`git stash -u`, so new files go too), then compare with it. Do this on the benchmark games (`cargo xtask benchmark-roms`, then `cargo benchmark target/benchmark-roms --record before.txt` and later `--compare before.txt`) and on the test ROMs (`cargo benchmark target/test-roms/v7.0 --seconds 4 --jobs <cores>` with the same flags). For a change to the lazy components, also compare against the `eager` build (`frontends/benchmark/CLAUDE.md`).
+9. If the change must not alter output (an optimization, a refactor): record fingerprints on a build without it (`git stash -u`, so new files go too), then compare with it. Do this on the benchmark games (`cargo xtask benchmark-roms`, then `cargo benchmark target/benchmark-roms --record before.txt` and later `--compare before.txt`) and on the test ROMs (`cargo benchmark target/test-roms/v7.0 --seconds 4 --jobs <cores>` with the same flags). For a change to the lazy components, also compare against the `eager` build (`frontends/benchmark/AGENTS.md`).
 
 CI also builds the browser version (`cargo xtask build-web --quick`); the slow checks run nightly. What runs where: `docs/CI.md`.
 
@@ -40,9 +40,9 @@ CI also builds the browser version (`cargo xtask build-web --quick`); the slow c
 These keep Nubo exact, and players' saves safe. Never break them.
 
 - **User input never panics the core.** ROMs, zip files, save states and cheat codes return `LoadRomError`, `SaveStateError` or `CheatError`.
-- **Lazy components, exact results.** The PPU and APU run behind the CPU while nothing they do can be seen, then catch up in one go, and plain M-cycles (one CPU step each) run in bulk. The result must be bit for bit what running every component one M-cycle at a time gives. Any new way for the CPU or another component to see or change hardware state must first run the waiting M-cycles and catch the PPU and APU up. How: `crates/nubo-core/CLAUDE.md`.
+- **Lazy components, exact results.** The PPU and APU run behind the CPU while nothing they do can be seen, then catch up in one go, and plain M-cycles (one CPU step each) run in bulk. The result must be bit for bit what running every component one M-cycle at a time gives. Any new way for the CPU or another component to see or change hardware state must first run the waiting M-cycles and catch the PPU and APU up. How: `crates/nubo-core/AGENTS.md`.
 - **Timing calibration moves only with the test ROMs.** The PPU's dot positions, each model's state after the boot ROM and the other timings are calibrated against test ROMs and other emulators. Change them only together with `cargo test-roms`.
-- **Players never lose a save state to an update.** A field or variant's stored name is permanent: when you rename it in the code, keep the stored name with `#[serializable(name = "...")]` (hand-written implementations and the PPU store names differently; see `crates/nubo-core/CLAUDE.md`). A field whose type or meaning changes gets a new stored name. Stored values are fixed-size and little-endian, never `usize`. How: `crates/nubo-core/CLAUDE.md`.
+- **Players never lose a save state to an update.** A field or variant's stored name is permanent: when you rename it in the code, keep the stored name with `#[serializable(name = "...")]` (hand-written implementations and the PPU store names differently; see `crates/nubo-core/AGENTS.md`). A field whose type or meaning changes gets a new stored name. Stored values are fixed-size and little-endian, never `usize`. How: `crates/nubo-core/AGENTS.md`.
 - **Only GPLv3-compatible code and dependencies** (MIT, BSD, ISC, Zlib, Apache-2.0, MPL-2.0 and the like, never GPL-2.0-only). Gambatte is GPL-2.0-only: use it as a reference only (its test ROMs, traces of a local build, its behavior) and never port its code or tables. When you port code, tables or data, credit the project with its link and license at the top of the file, in `NOTICE` and in the README's Credits; SameBoy-derived files point to the Expat notice in `apu.rs`.
 - **Code the browser build shares** takes `Instant`, `SystemTime` and `Duration` from `iced::time` (std's panic on wasm32), and views set fonts with `theme::BODY_FONT` or `theme::HEADING_FONT`, never `Font::DEFAULT` or a font of their own, which draw nothing in the browser (only `ui/theme.rs` builds fonts).
 - **No `unsafe`.** The workspace lints forbid it.
@@ -55,23 +55,27 @@ These keep Nubo exact, and players' saves safe. Never break them.
 - **Few inline comments.** Let names and structure explain the code; use `//` only for what the code can't say, such as hardware quirks or the reference something was ported from.
 - **Whole words, not abbreviations.** Acronyms are words in type names (`RtcState`, `Mbc1CartridgeMapper`), getters have no `get_` prefix, and Pan Docs register names (`lcdc`, `nr52`, `svbk`) are fine.
 - **Modules are declared at the bottom of the file.**
-- **Docs move with the code.** Facts about a file live in its doc comments, and how files work together in the folder's `CLAUDE.md`; update whatever your change makes wrong, in the same commit.
+- **Docs move with the code.** Facts about a file live in its doc comments, and how files work together in the folder's `AGENTS.md`; update whatever your change makes wrong, in the same commit.
 - **Clippy stays clean.** The workspace enables the default lints and a curated set of pedantic ones (root `Cargo.toml`); every crate opts in with `[lints] workspace = true`. To silence a lint, put `#[expect(clippy::..., reason = "...")]` on the smallest item possible.
 
 ## Where Things Are
 
 The root `Cargo.toml` is a virtual workspace whose default members are the core crates, so `cargo build` and `cargo test` don't build the frontends or xtask.
 
-- `crates/nubo-core/` (`CLAUDE.md`): the emulator, a plain library with no platform dependencies. `Emulator` in `emulator.rs` is its API.
+- `crates/nubo-core/` (`AGENTS.md`): the emulator, a plain library with no platform dependencies. `Emulator` in `emulator.rs` is its API.
 - `crates/serializable_derive/`: the derive macro behind save states.
 - `crates/nubo-logo/`: the logo, drawn from rounded rectangles, for the app's icons.
-- `frontends/iced/` (`CLAUDE.md`): the app, desktop and browser.
-- `frontends/test_rom_runner/` (`CLAUDE.md`): `cargo test-roms`.
+- `frontends/iced/` (`AGENTS.md`): the app, desktop and browser.
+- `frontends/test_rom_runner/` (`AGENTS.md`): `cargo test-roms`.
 - `frontends/json_test_runner/`: `cargo cpu-tests`.
-- `frontends/save_state_check/` (`CLAUDE.md`): `cargo save-states`, and the kept sets in `save-states/`.
-- `frontends/benchmark/` (`CLAUDE.md`): `cargo benchmark`.
+- `frontends/save_state_check/` (`AGENTS.md`): `cargo save-states`, and the kept sets in `save-states/`.
+- `frontends/benchmark/` (`AGENTS.md`): `cargo benchmark`.
 - `frontends/headless/`: `cargo screenshot`.
-- `xtask/` (`CLAUDE.md`): the web build, packaging, licenses, the emulator comparison and the nightly review's tools.
+- `xtask/` (`AGENTS.md`): the web build, packaging, licenses, the emulator comparison and the nightly review's tools.
+
+## Agent Instructions
+
+Claude Code and Codex both read these `AGENTS.md` files; keep them the only instruction files. Claude Code ignores `AGENTS.md` in a folder that also has a `CLAUDE.md`, so don't add one. The `merge` and `release` skills are written in `.claude/skills/`, where Claude Code reads them; `.agents/skills/` holds pointers to them for Codex, so change the steps only in `.claude/skills/`. Each skill's `name` and `description` appear in both places; keep them the same.
 
 ## More Documentation
 

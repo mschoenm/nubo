@@ -1,6 +1,6 @@
 # Save state check
 
-`cargo save-states` keeps players' save states loading across updates: it loads every state in `save-states/` (sets made by earlier versions), fails on any value it can't read, plays each on for 2 seconds, and fails when this version stores other fields or variants than the newest set's `layout.txt` lists. `main.rs` and `cartridges.rs` explain how; the rules for changing what save states store are in `crates/nubo-core/CLAUDE.md`.
+`cargo save-states` keeps players' save states loading across updates: it loads every state in `save-states/` (sets made by earlier versions), fails on any value it can't read, plays each on for 2 seconds, and fails when this version stores other fields or variants than the newest set's `layout.txt` lists. `main.rs` and `cartridges.rs` explain how; the rules for changing what save states store are in `crates/nubo-core/AGENTS.md`.
 
 ```bash
 cargo xtask benchmark-roms    # Once: the games whose states are kept
