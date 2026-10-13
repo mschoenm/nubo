@@ -345,7 +345,7 @@ counted on the published list, not on everything `main` runs.
    counted on the published tests only:
 
    ```
-     shootout  259/264  rank 1  leader DocBoy 255  published 2026-06-04
+     shootout  259/264  rank 1  leader DocBoy 255  published 2026-06-04 72fd745
    ```
 
    Nubo's rank is one more than the number of emulators that pass more published tests than it does.
@@ -356,8 +356,12 @@ counted on the published list, not on everything `main` runs.
      into job outputs. In "Write tonight's metrics", add them to `night.json`:
 
      ```json
-     "shootout": {"passed": 259, "total": 264, "rank": 1, "leader": "DocBoy", "leader_passed": 255}
+     "shootout": {"passed": 259, "total": 264, "rank": 1, "leader": "DocBoy", "leader_passed": 255,
+                  "published": "2026-06-04", "published_commit": "72fd745"}
      ```
+
+     Each night keeps the publication its score was counted against, so the history stays right after
+     `shootout_published.txt` moves to a newer publication.
 
    - **On the wiki page:** in `cargo xtask metrics report` (`xtask/src/metrics.rs`), put a line at the
      top of the "Nightly metrics" page, such as "GB Emulator Shootout: 259 of 264, would rank 1st

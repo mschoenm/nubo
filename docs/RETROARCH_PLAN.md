@@ -81,9 +81,17 @@ before.
 1. **Run one frame's worth of time.** RetroArch calls `retro_run` once per frame and expects about
    1/59.7275 s of emulation: 70,224 ticks of the 4 MHz clock (17,556 M-cycles at normal speed, 35,112
    in double speed).
-   - Add something like `Emulator::run_frame()`. It should run until the PPU's dot count since power-on
-     (the counter `RtcClock::EmulatedTime` uses) has moved on by 70,224, and hand back every sample
-     made in that time.
+   - Add something like `Emulator::run_frame()`. It runs to a frame deadline on the PPU's dot count
+     since power-on (the counter `RtcClock::EmulatedTime` uses), and hands back every sample made in
+     that time.
+   - The deadline is kept in the emulator and moves on by exactly 70,224 dots per call, instead of being
+     70,224 dots after wherever the last call stopped. A step can't always stop exactly on the deadline:
+     an instruction takes several M-cycles, and a halted CPU skips ahead in bulk stretches. If each call
+     counted from where the last one stopped, every overshoot would be added again and the game would
+     run fast, most of all while the CPU is halted or the screen is off. With a kept deadline, a call
+     that overshoots makes the next one that much shorter.
+   - Cap the halted CPU's bulk stretches at the deadline, so an overshoot is never more than one
+     instruction.
    - It must count time, not frames, because no frames come while the game has the screen off.
    - Calling `step()` in a loop would end the bulk shortcuts on every call (see "Lazy components,
      exact results" in CLAUDE.md), so it has to be one call.
@@ -92,7 +100,9 @@ before.
    - While the screen stays on, each run of 70,224 dots contains exactly one VBlank, so every call
      normally has exactly one new frame. Find out what the completed frame holds while the screen is
      off and match what the Iced app shows.
-   - Test: N calls give exactly N × 70,224 dots, and samples per emulated second equal the sample rate.
+   - Test: after N calls the dot count is within one instruction of N × 70,224 past the start and never
+     drifts further, also while the CPU is halted and with the screen off; and samples per emulated
+     second equal the sample rate.
 2. **Set the clock state after loading.** RetroArch fills in the saved clock only after
    `retro_load_game`, but `CartridgeEffects::load_rtc_state` is only asked at `load_rom`. Add
    `Emulator::rtc_state()` and `Emulator::set_rtc_state(&RtcState)` (or similar), next to
