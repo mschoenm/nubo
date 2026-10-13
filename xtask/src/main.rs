@@ -46,6 +46,13 @@ Commands:
   benchmark-roms
                 Download the free homebrew games the nightly CI benchmarks into
                 target/benchmark-roms and check their checksums
+  compare-emulators [roms or folders] [--seconds <s>] [--rounds <n>] [--models dmg,cgb]
+                    [--emulators nubo,nubo-eager,sameboy,gambatte,mgba,binjgb,gearboy]
+                    [--instructions] [--screenshots]
+                Measure Nubo's speed next to other emulators on the benchmark games (or the
+                ROMs given), building them into target/emulator-comparison; --instructions
+                counts instructions with Valgrind instead of timing (Linux and macOS; needs git,
+                a C/C++ compiler, make, RGBDS and CMake)
   review-units [next --state <rotation.json> --date <YYYY-MM-DD> --commit <sha>]
                 List the parts the nightly review splits the code into, or pick tonight's part
                 and record it in the rotation's state
@@ -310,6 +317,9 @@ fn main() -> ExitCode {
         Some("benchmark-roms") => benchmark_roms::ensure_benchmark_roms().map(|folder| {
             println!("The benchmark games are in {}", folder.display());
         }),
+        Some("compare-emulators") => {
+            compare_emulators::run_comparison(&env::args().skip(2).collect::<Vec<_>>())
+        }
         Some("review-units") => review_units::run(&env::args().skip(2).collect::<Vec<_>>()),
         Some("metrics") => metrics::run(&env::args().skip(2).collect::<Vec<_>>()),
         Some("help") | None => {
@@ -346,6 +356,7 @@ mod tests {
 
 mod benchmark_roms;
 mod bundle;
+mod compare_emulators;
 mod flatpak;
 mod licenses;
 mod metrics;
