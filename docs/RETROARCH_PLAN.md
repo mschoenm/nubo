@@ -163,8 +163,8 @@ before.
      On emulated time the core converts on load and on save.
    - Test: real time to emulated time and back, through a save state and through the `.rtc` layout,
      never freezes or jumps the clock.
-3. **Share the `.rtc` file layout.** Move `encode_rtc`/`decode_rtc` (17 bytes, in `battery.rs` of the
-   Iced app, `frontends/nubo`) into nubo-core, for example as
+3. **Share the `.rtc` file layout.** Move `encode_rtc`/`decode_rtc` (17 bytes, in `battery.rs` of
+   `crates/nubo-frontend`) into nubo-core, for example as
    `RtcState::to_bytes`/`from_bytes`. Battery saves can then
    move between the Nubo app and RetroArch: `.sav` and `.srm` are both the raw cartridge RAM.
 4. **Share the model rule and the palettes.** Done by step 2 of the restructuring plan:

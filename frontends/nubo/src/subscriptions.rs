@@ -9,8 +9,8 @@ use crate::emulation::FrameListener;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::game::Game;
 use crate::library::WatchEvent;
-use crate::settings::LibraryFolder;
 use iced::Subscription;
+use nubo_frontend::settings::LibraryFolder;
 
 /// News about the controllers: from a thread of their own on the desktop,
 /// which sleeps until a controller has something to report.

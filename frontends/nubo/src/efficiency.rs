@@ -9,12 +9,12 @@
 //! emulated second with `cargo benchmark` under cachegrind. Real battery
 //! drain and the window's drawing can only be measured on real hardware.
 
-use crate::battery::BatterySaves;
 use crate::emulation::{ActivityCount, Command, Playback, Session};
-use crate::notices::Notices;
-use crate::rom::Rom;
-use crate::settings::FastForwardSpeed;
 use nubo_core::Model;
+use nubo_frontend::battery::BatterySaves;
+use nubo_frontend::notices::Notices;
+use nubo_frontend::rom::Rom;
+use nubo_frontend::settings::FastForwardSpeed;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -96,8 +96,8 @@ pub fn run_from_command_line() -> Option<i32> {
 /// saves are never touched.
 pub fn measure(rom_path: &Path, model: Model) -> Result<String, String> {
     let rom = Rom::read(rom_path)?;
-    let saves_directory = std::env::temp_dir().join("nubo-efficiency");
-    let saves = || BatterySaves::in_directory(&saves_directory, &rom.path);
+    let data_folder = std::env::temp_dir().join("nubo-efficiency");
+    let saves = || BatterySaves::in_data_folder(&data_folder, &rom.path);
     let normal = Playback {
         running: true,
         fast_forward: None,

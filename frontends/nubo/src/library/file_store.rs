@@ -3,10 +3,10 @@
 //! game in `thumbnails`, a PNG of each title screen in `title_screens`, and
 //! downloaded box art in `box_art`.
 
-pub use crate::storage::files::decode_png;
+pub use nubo_frontend::storage::files::decode_png;
 
 use super::{LibraryEntry, PictureKind};
-use crate::storage::files::{encode_png, project_directories, write_atomically};
+use nubo_frontend::storage::files::{encode_png, project_directories, write_atomically};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::ErrorKind;

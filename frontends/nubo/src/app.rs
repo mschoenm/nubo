@@ -8,17 +8,12 @@
 //! the window itself (`app/window_events.rs`), and keys and controller
 //! buttons (`app/player_input.rs`).
 
-use crate::background;
 use crate::box_art::GameList;
 use crate::controllers::ControllerEvent;
-use crate::controls::{Action, Device};
 use crate::game::{Game, PauseMenu};
 use crate::input::{self, KeyInput};
 use crate::library::Library;
 use crate::menu_presses::MenuPresses;
-use crate::notices::Notices;
-use crate::rom::Rom;
-use crate::save_states;
 use crate::settings::Settings;
 use crate::subscriptions;
 use crate::ui::theme;
@@ -29,9 +24,15 @@ use iced::theme::Mode;
 use iced::widget::Stack;
 use iced::{Element, Subscription, Task, Theme, event, keyboard, system, window};
 use nubo_core::{CartridgeHeader, ControllerState, Model};
+use nubo_frontend::background;
+use nubo_frontend::controls::{Action, Device};
+use nubo_frontend::notices::Notices;
+use nubo_frontend::rom::Rom;
+use nubo_frontend::save_states;
 use std::sync::Arc;
 
 pub use library_screen::LibraryMessage;
+pub use nubo_frontend::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
 pub use playing::GameMessage;
 pub use settings_window::SettingsMessage;
 pub use window_events::WindowMessage;
@@ -44,9 +45,6 @@ const QUICK_CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_mill
 /// game reported, which would wait for the next new frame on a still screen.
 #[cfg(not(target_arch = "wasm32"))]
 const NOTICE_CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
-
-pub const SCREEN_WIDTH: u32 = 160;
-pub const SCREEN_HEIGHT: u32 = 144;
 
 /// The Iced application state.
 pub struct App {
@@ -308,7 +306,7 @@ impl App {
             subscriptions::controllers().map(Message::Controller),
             event::listen_with(window_events::message_for),
             system::theme_changes().map(|mode| WindowMessage::SystemThemeChanged(mode).into()),
-            subscriptions::library_changes(&self.settings.library_folders)
+            subscriptions::library_changes(&self.settings.shared.library_folders)
                 .map(|event| LibraryMessage::Watch(event).into()),
             window::close_requests().map(|_| WindowMessage::CloseRequested.into()),
         ];
@@ -338,7 +336,7 @@ impl App {
     /// The model to start the game with this header on.
     fn model_for(&self, header: &CartridgeHeader) -> Model {
         self.model_override
-            .unwrap_or_else(|| self.settings.model.model_for(header))
+            .unwrap_or_else(|| self.settings.shared.model.model_for(header))
     }
 
     /// Whether the running game uses another model than the settings pick,

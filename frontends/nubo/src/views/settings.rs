@@ -3,10 +3,8 @@
 
 use crate::app::{GameMessage, LibraryMessage, Message, SettingsMessage};
 use crate::box_art;
-use crate::controls::{Action, Device};
 use crate::library::{self, Library};
-use crate::save_states;
-use crate::settings::{Appearance, FastForwardSpeed, LibraryFolder, Settings};
+use crate::settings::{Appearance, Settings};
 use crate::ui::icons::{Icon, icon};
 use crate::ui::theme;
 use crate::ui::widgets::{icon_button, secondary_button, section, segmented};
@@ -15,8 +13,11 @@ use iced::widget::{
 };
 use iced::{Alignment, Color, Element, Fill, Theme, widget};
 use nubo_core::Model;
+use nubo_frontend::controls::{Action, Device};
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::palettes::DmgPalette;
+use nubo_frontend::save_states;
+use nubo_frontend::settings::{FastForwardSpeed, LibraryFolder};
 use std::fmt;
 
 const WIDTH: f32 = 700.0;
@@ -141,7 +142,7 @@ pub fn rows(
             rows.extend(shortcuts(device).iter().copied().map(SettingsRow::Binding));
         }
         SettingsTab::Library => {
-            rows.extend((0..settings.library_folders.len()).map(SettingsRow::Folder));
+            rows.extend((0..settings.shared.library_folders.len()).map(SettingsRow::Folder));
             rows.extend([SettingsRow::AddFolder, SettingsRow::Rescan]);
             if box_art::AVAILABLE {
                 rows.push(SettingsRow::BoxArt);
@@ -366,7 +367,7 @@ fn general<'a>(
 fn screen_settings<'a>(settings: &Settings, rings: &Rings) -> Element<'a, Message> {
     let palettes = row(DmgPalette::ALL
         .into_iter()
-        .map(|palette| palette_button(palette, palette == settings.dmg_palette)))
+        .map(|palette| palette_button(palette, palette == settings.shared.dmg_palette)))
     .spacing(8);
 
     column![
@@ -404,9 +405,11 @@ fn hardware_settings<'a>(
 
     let mut hardware = column![
         rings.around(
-            pick_list(choices, Some(ModelChoice(settings.model)), |choice| {
-                Message::Settings(SettingsMessage::ModelSelected(choice.0))
-            })
+            pick_list(
+                choices,
+                Some(ModelChoice(settings.shared.model)),
+                |choice| { Message::Settings(SettingsMessage::ModelSelected(choice.0)) }
+            )
             .width(Fill),
             SettingsRow::Model,
         ),
@@ -446,7 +449,7 @@ fn playing_settings<'a>(settings: &Settings, rings: &Rings) -> Element<'a, Messa
     if save_states::AVAILABLE {
         playing = playing.push(
             rings.around(
-                toggler(settings.resume_games)
+                toggler(settings.shared.resume_games)
                     .label("Continue games where you left off")
                     .text_size(14)
                     .size(18)
@@ -465,7 +468,7 @@ fn playing_settings<'a>(settings: &Settings, rings: &Rings) -> Element<'a, Messa
                 rings.around(
                     segmented(
                         &FastForwardSpeed::ALL,
-                        settings.fast_forward_speed,
+                        settings.shared.fast_forward_speed,
                         |_| None,
                         |speed| Message::Settings(SettingsMessage::FastForwardSpeedSelected(speed)),
                     ),
@@ -482,16 +485,18 @@ fn playing_settings<'a>(settings: &Settings, rings: &Rings) -> Element<'a, Messa
 
 /// The volume slider, with the mute state as its icon.
 fn sound_settings<'a>(settings: &Settings, rings: &Rings) -> Element<'a, Message> {
-    let volume_percent = (settings.effective_volume() * 100.0).round();
+    let volume_percent = (settings.shared.effective_volume() * 100.0).round();
     let sound = row![
-        icon(if settings.muted {
+        icon(if settings.shared.muted {
             Icon::VolumeX
         } else {
             Icon::Volume2
         }),
-        slider(0.0..=1.0_f32, settings.effective_volume(), |volume| {
-            Message::Settings(SettingsMessage::VolumeChanged(volume))
-        })
+        slider(
+            0.0..=1.0_f32,
+            settings.shared.effective_volume(),
+            |volume| { Message::Settings(SettingsMessage::VolumeChanged(volume)) }
+        )
         .step(0.01_f32)
         .on_release(Message::Settings(SettingsMessage::VolumeReleased)),
         text(format!("{volume_percent}%"))
@@ -643,7 +648,7 @@ fn binding_row(
     action: Action,
     capturing: bool,
 ) -> Element<'_, Message> {
-    let bound = settings.controls.input_label(device, action);
+    let bound = settings.shared.controls.input_label(device, action);
 
     let label = match (&bound, capturing, device) {
         (_, true, Device::Keyboard) => String::from("Press a key…"),
@@ -684,26 +689,25 @@ fn library_folders<'a>(
     rings: &Rings,
 ) -> Element<'a, Message> {
     let ring = |content, row| rings.around(content, row);
-    let folders: Element<'a, Message> =
-        if settings.library_folders.is_empty() {
-            text("No folders yet. Add the folders that hold your ROMs.")
-                .size(14)
-                .style(theme::muted_text)
-                .into()
-        } else {
-            Column::with_children(settings.library_folders.iter().enumerate().map(
-                |(index, folder)| {
-                    folder_row(
-                        index,
-                        folder,
-                        library.is_missing(&folder.path),
-                        rings.is_focused(SettingsRow::Folder(index)),
-                    )
-                },
-            ))
-            .spacing(8)
+    let folders: Element<'a, Message> = if settings.shared.library_folders.is_empty() {
+        text("No folders yet. Add the folders that hold your ROMs.")
+            .size(14)
+            .style(theme::muted_text)
             .into()
-        };
+    } else {
+        Column::with_children(settings.shared.library_folders.iter().enumerate().map(
+            |(index, folder)| {
+                folder_row(
+                    index,
+                    folder,
+                    library.is_missing(&folder.path),
+                    rings.is_focused(SettingsRow::Folder(index)),
+                )
+            },
+        ))
+        .spacing(8)
+        .into()
+    };
 
     let actions = row![
         ring(
@@ -738,7 +742,7 @@ fn library_folders<'a>(
             "Box art",
             column![
                 ring(
-                    toggler(settings.download_box_art)
+                    toggler(settings.shared.download_box_art)
                         .label("Download box art for your games")
                         .text_size(14)
                         .size(18)

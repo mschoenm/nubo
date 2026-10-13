@@ -1,13 +1,11 @@
-//! The user's preferences. They are kept between runs as TOML in
-//! `settings.toml` in the per-user config folder (or in localStorage in the
-//! browser build), and saved as soon as they change.
+//! The player's preferences: the ones every app shares
+//! (`nubo_frontend::settings`) and two only this app has, its appearance
+//! and integer scaling. They are kept together in one `settings.toml` (in
+//! localStorage in the browser build), and saved as soon as they change.
 
-use crate::controls::Controls;
-use nubo_frontend::model::ModelPreference;
-use nubo_frontend::palettes::DmgPalette;
+use nubo_frontend::storage;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::path::PathBuf;
 
 /// Whether the window uses light or dark colors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -35,115 +33,31 @@ impl fmt::Display for Appearance {
     }
 }
 
-/// A folder the library looks for ROMs in.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct LibraryFolder {
-    pub path: PathBuf,
-    /// Whether to look in the folders inside it too, all the way down.
-    pub include_subfolders: bool,
-}
-
-/// Everything the user can change in the Settings window. Fields missing
+/// Everything the player can change in the Settings window. Fields missing
 /// from the saved file get their default, so older files keep working.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
+///
+/// The fields are in the order earlier versions wrote them, which keeps
+/// `settings.toml` the same: `appearance` first, then the shared settings,
+/// then `integer_scaling`. TOML puts plain values before tables, so the
+/// shared tables (the library folders and the controls) still come last.
+/// Reading goes through [`Settings::from_toml`].
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct Settings {
     pub appearance: Appearance,
-    /// The hardware that games start on.
-    pub model: ModelPreference,
-    pub library_folders: Vec<LibraryFolder>,
-    /// Whether to download box art for the library and show it on the
-    /// cards. On until the player turns it off; the Settings page says
-    /// that it sends the games' names to the libretro servers. It is on the
-    /// Library tab of the settings.
-    pub download_box_art: bool,
-    /// Whether leaving a game saves its state, so it continues there the
-    /// next time it starts. Off until the player turns it on, in the
-    /// Playing section of the settings' General tab.
-    pub resume_games: bool,
-    pub fast_forward_speed: FastForwardSpeed,
-    /// How loud to play, from 0 (silent) to 1 (as loud as the game).
-    pub volume: f32,
-    pub muted: bool,
-    pub controls: Controls,
-    /// The colors original Game Boy games are shown in.
-    pub dmg_palette: DmgPalette,
+    /// The settings every app shares, stored next to this app's own.
+    #[serde(flatten)]
+    pub shared: nubo_frontend::settings::Settings,
     /// Whether the screen only grows in whole steps (2×, 3×, …), which keeps
     /// every pixel the same size.
     pub integer_scaling: bool,
 }
 
-impl Default for Settings {
-    fn default() -> Self {
-        Settings {
-            appearance: Appearance::default(),
-            model: ModelPreference::default(),
-            library_folders: Vec::new(),
-            download_box_art: true,
-            resume_games: false,
-            fast_forward_speed: FastForwardSpeed::default(),
-            volume: 1.0,
-            muted: false,
-            controls: Controls::default(),
-            dmg_palette: DmgPalette::default(),
-            integer_scaling: false,
-        }
-    }
-}
-
-impl Settings {
-    /// The volume to play at, taking mute into account.
-    pub fn effective_volume(&self) -> f32 {
-        if self.muted { 0.0 } else { self.volume }
-    }
-}
-
-/// How many times faster than real time fast forward runs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(try_from = "u32", into = "u32")]
-pub struct FastForwardSpeed(u32);
-
-impl FastForwardSpeed {
-    /// The speeds the settings offer.
-    pub const ALL: [FastForwardSpeed; 4] = [
-        FastForwardSpeed(2),
-        FastForwardSpeed(3),
-        FastForwardSpeed(4),
-        FastForwardSpeed(8),
-    ];
-
-    pub fn multiplier(self) -> u32 {
-        self.0
-    }
-}
-
-impl Default for FastForwardSpeed {
-    fn default() -> Self {
-        FastForwardSpeed(4)
-    }
-}
-
-impl From<FastForwardSpeed> for u32 {
-    fn from(speed: FastForwardSpeed) -> u32 {
-        speed.0
-    }
-}
-
-impl TryFrom<u32> for FastForwardSpeed {
-    type Error = String;
-
-    fn try_from(multiplier: u32) -> Result<Self, Self::Error> {
-        FastForwardSpeed::ALL
-            .into_iter()
-            .find(|speed| speed.0 == multiplier)
-            .ok_or_else(|| format!("{multiplier}× isn't a fast forward speed"))
-    }
-}
-
-impl fmt::Display for FastForwardSpeed {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}×", self.0)
-    }
+/// This app's own settings, read from the same text as the shared ones.
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct OwnSettings {
+    appearance: Appearance,
+    integer_scaling: bool,
 }
 
 impl Settings {
@@ -151,33 +65,28 @@ impl Settings {
     /// defaults; if they can't be read it returns the defaults together with
     /// the reason.
     pub fn load() -> (Settings, Option<String>) {
-        match store::read() {
-            Ok(None) => (Settings::default(), None),
-            Ok(Some(contents)) => match toml::from_str(&contents) {
-                Ok(settings) => (settings, None),
-                Err(error) => (
-                    Settings::default(),
-                    Some(format!(
-                        "Your settings couldn't be read and were reset: {error}"
-                    )),
-                ),
-            },
-            Err(error) => (
-                Settings::default(),
-                Some(format!("Your settings couldn't be read: {error}")),
-            ),
-        }
+        nubo_frontend::settings::load(&*storage::platform(), Settings::from_toml)
+    }
+
+    /// Reads the settings from the text of a `settings.toml`. The shared
+    /// settings and this app's own are read separately, each skipping the
+    /// other's keys, rather than with serde's flatten, which would report a
+    /// mistake in the shared settings at the top of the file instead of
+    /// where it is.
+    pub fn from_toml(contents: &str) -> Result<Settings, toml::de::Error> {
+        let own: OwnSettings = toml::from_str(contents)?;
+        Ok(Settings {
+            appearance: own.appearance,
+            shared: toml::from_str(contents)?,
+            integer_scaling: own.integer_scaling,
+        })
     }
 
     /// Saves the settings, returning why if that failed.
     pub fn save(&self) -> Result<(), String> {
-        let contents = toml::to_string(self).map_err(|error| error.to_string())?;
-        store::write(&contents).map_err(|error| format!("Your settings couldn't be saved: {error}"))
+        nubo_frontend::settings::save(&*storage::platform(), self)
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", path = "settings/local_storage_store.rs")]
-#[cfg_attr(not(target_arch = "wasm32"), path = "settings/file_store.rs")]
-mod store;
 #[cfg(test)]
 mod tests;

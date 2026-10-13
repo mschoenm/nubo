@@ -1,0 +1,9 @@
+[[cheats]]
+name = "Infinite health"
+code = "01FF56D0"
+enabled = true
+
+[[cheats]]
+name = "00A-17B-C49"
+code = "00A-17B-C49"
+enabled = false

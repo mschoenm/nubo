@@ -5,12 +5,12 @@
 //! same [`Command`]s, which [`Machine::handle`] carries out.
 
 use crate::audio::AudioOutput;
-use crate::battery::{BatteryCartridgeEffects, BatterySaves};
-use crate::cheats::Cheat;
-use crate::notices::Notices;
-use crate::rom::Rom;
-use crate::settings::FastForwardSpeed;
 use nubo_core::{ControllerMapping, ControllerState, Emulator, Key, Model};
+use nubo_frontend::battery::{BatteryCartridgeEffects, BatterySaves};
+use nubo_frontend::cheats::Cheat;
+use nubo_frontend::notices::Notices;
+use nubo_frontend::rom::Rom;
+use nubo_frontend::settings::FastForwardSpeed;
 use nubo_frontend::time::Duration;
 use std::sync::Arc;
 use std::sync::mpsc::{self, Sender};

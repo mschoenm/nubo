@@ -6,7 +6,8 @@ use nubo_core::CartridgeEffects;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The folder in the temporary directory for a test's battery saves.
+/// The data folder in the temporary directory for a test's battery saves,
+/// which go to `saves/` in it.
 fn saves_directory(name: &str) -> PathBuf {
     std::env::temp_dir().join(format!("nubo-emulation-{name}-{}", std::process::id()))
 }
@@ -21,7 +22,7 @@ const NORMAL_SPEED: Playback = Playback {
 fn machine(name: &str) -> Machine {
     let directory = saves_directory(name);
     let _ = fs::remove_dir_all(&directory);
-    let saves = BatterySaves::in_directory(&directory, Path::new("game.gb"));
+    let saves = BatterySaves::in_data_folder(&directory, Path::new("game.gb"));
     Machine::new(
         &[0; 0x8000],
         saves,
@@ -79,7 +80,7 @@ fn pausing_writes_the_battery_saves_still_waiting() {
         ..NORMAL_SPEED
     }));
 
-    let saved = fs::read(saves_directory("pause").join("game.sav")).unwrap();
+    let saved = fs::read(saves_directory("pause").join("saves/game.sav")).unwrap();
     assert_eq!(saved, [0x42; 0x2000]);
 }
 

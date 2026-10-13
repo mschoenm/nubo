@@ -4,9 +4,9 @@
 //! desktop the callback also wakes the emulator thread when the queue runs
 //! low, so the thread can sleep until then.
 
-use crate::notices::Notices;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, FromSample, SampleFormat, SizedSample, Stream, StreamConfig};
+use nubo_frontend::notices::Notices;
 use nubo_frontend::time::{Duration, Instant};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, OnceLock};

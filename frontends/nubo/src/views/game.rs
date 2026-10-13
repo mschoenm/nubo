@@ -5,11 +5,7 @@
 //! hidden behind the menu bar that macOS slides down there.
 
 use crate::app::{GameMessage, Message, SettingsMessage, WindowMessage};
-use crate::cheats;
-use crate::controls::Action;
 use crate::game::{Game, PauseMenu};
-use crate::save_states::{self, Slot, SlotInfo};
-use crate::screenshots;
 use crate::settings::Settings;
 use crate::ui::icons::{Icon, icon};
 use crate::ui::pictures;
@@ -23,6 +19,10 @@ use iced::widget::{
     text_input, toggler, tooltip,
 };
 use iced::{Alignment, ContentFit, Element, Fill};
+use nubo_frontend::cheats;
+use nubo_frontend::controls::Action;
+use nubo_frontend::save_states::{self, Slot, SlotInfo};
+use nubo_frontend::screenshots;
 
 const MENU_WIDTH: f32 = 400.0;
 const MENU_MAX_HEIGHT: f32 = 560.0;
@@ -89,7 +89,7 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
     } else {
         (Icon::Pause, "Pause (Esc)")
     };
-    let (volume_icon, volume_label) = if settings.muted {
+    let (volume_icon, volume_label) = if settings.shared.muted {
         (Icon::VolumeX, "Unmute")
     } else {
         (Icon::Volume2, "Mute")
@@ -164,7 +164,7 @@ fn fast_forward_badge(settings: &Settings) -> Element<'_, Message> {
     let badge = container(
         row![
             icon(Icon::FastForward).size(14),
-            text(settings.fast_forward_speed.to_string()).size(13),
+            text(settings.shared.fast_forward_speed.to_string()).size(13),
         ]
         .spacing(6)
         .align_y(Alignment::Center),
@@ -196,6 +196,7 @@ pub fn main_entries(settings: &Settings, fullscreen: bool) -> Vec<MenuEntry> {
     };
     let key = |action, what: &str| {
         settings
+            .shared
             .controls
             .keyboard
             .input(action)

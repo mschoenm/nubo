@@ -9,7 +9,7 @@
 
 use app::App;
 use nubo_core::Model;
-use rom::Rom;
+use nubo_frontend::rom::Rom;
 use std::env;
 use std::path::PathBuf;
 
@@ -89,9 +89,9 @@ fn main() -> iced::Result {
             // without asking: winit's default menu calls `terminate:`, and
             // Iced 0.14 doesn't pass winit's `exiting` event on. The battery
             // saves are on disk by then all the same, unless the game wrote
-            // them in the last quarter of a second (see `battery.rs`), but the
-            // Resume slot and the thumbnail aren't written. This hasn't been
-            // checked on a Mac yet.
+            // them in the last quarter of a second (see
+            // `nubo_frontend::battery`), but the Resume slot and the thumbnail
+            // aren't written. This hasn't been checked on a Mac yet.
             exit_on_close_request: false,
             #[cfg(target_os = "linux")]
             platform_specific: iced::window::settings::PlatformSpecific {
@@ -105,12 +105,8 @@ fn main() -> iced::Result {
 
 mod app;
 mod audio;
-mod background;
-mod battery;
 mod box_art;
-mod cheats;
 mod controllers;
-mod controls;
 #[cfg(not(target_arch = "wasm32"))]
 mod efficiency;
 mod emulation;
@@ -118,12 +114,8 @@ mod game;
 mod input;
 mod library;
 mod menu_presses;
-mod notices;
-mod rom;
-mod save_states;
-mod screenshots;
+mod rom_picker;
 mod settings;
-mod storage;
 mod subscriptions;
 #[cfg(not(target_arch = "wasm32"))]
 mod ticks;

@@ -2,8 +2,8 @@
 //! `Emulator::read_rom_header`.
 
 use super::LibraryEntry;
-use crate::settings::LibraryFolder;
 use nubo_core::{CartridgeHeader, Emulator};
+use nubo_frontend::settings::LibraryFolder;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};

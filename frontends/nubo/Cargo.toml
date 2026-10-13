@@ -8,7 +8,6 @@ rust-version.workspace = true
 
 [dependencies]
 nubo-core.workspace = true
-nubo-frontend.workspace = true
 nubo-logo.workspace = true
 iced = { version = "0.14", features = ["image", "canvas"] }
 # Iced's image handles hold their pixels as `Bytes`; ui/pictures.rs shares a
@@ -23,20 +22,22 @@ lucide-icons = "1.55"
 serde = { version = "1", features = ["derive"] }
 toml = "1"
 
+# The shared crate keeps data in files on the desktop and in localStorage in
+# the browser.
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+nubo-frontend = { workspace = true, features = ["desktop"] }
 cpal = "0.18"
 crc32fast = "1.5"
-directories = "6"
 image = { version = "0.25", default-features = false, features = ["png"] }
 notify-debouncer-mini = "0.7"
 ureq = { version = "2.12", default-features = false, features = ["tls"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+nubo-frontend = { workspace = true, features = ["web"] }
 iced = { version = "0.14", features = ["image", "canvas", "webgl", "fira-sans"] }
 cpal = { version = "0.18", features = ["wasm-bindgen"] }
 console_error_panic_hook = "0.1"
-base64 = "0.23"
-web-sys = { version = "0.3", features = ["Window", "Storage"] }
+web-sys = { version = "0.3", features = ["Window"] }
 # Not used directly: pins wasm-bindgen to the version of the bindings
 # generator in xtask, which must match it exactly.
 wasm-bindgen.workspace = true
