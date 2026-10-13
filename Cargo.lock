@@ -5905,6 +5905,7 @@ dependencies = [
  "nubo-logo",
  "roxmltree",
  "serde_json",
+ "sha2",
  "toml",
  "wasm-bindgen-cli-support",
 ]

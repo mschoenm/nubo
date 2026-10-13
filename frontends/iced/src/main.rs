@@ -53,6 +53,11 @@ fn main() -> iced::Result {
     #[cfg(target_arch = "wasm32")]
     console_error_panic_hook::set_once();
 
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(exit_code) = efficiency::run_from_command_line() {
+        std::process::exit(exit_code);
+    }
+
     let (rom_path, model) = parse_args();
     let rom = rom_path.map(|path| Rom::read(&path));
 
@@ -104,6 +109,8 @@ mod box_art;
 mod cheats;
 mod controllers;
 mod controls;
+#[cfg(not(target_arch = "wasm32"))]
+mod efficiency;
 mod emulation;
 mod game;
 mod input;

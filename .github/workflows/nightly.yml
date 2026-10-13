@@ -1,10 +1,12 @@
 name: Nightly
 
-# The checks too slow for every pull request. GitHub emails whoever last
-# changed the schedule below when a scheduled run fails.
+# The checks too slow for every pull request, and the nightly metrics. GitHub
+# emails whoever last changed the schedule below when a scheduled run fails.
+# It runs at 22:17 UTC so that even the slowest job is done before the
+# nightly review starts at 02:07 Amsterdam time (see docs/NIGHTLY_REVIEW.md).
 on:
   schedule:
-    - cron: "17 2 * * *"
+    - cron: "17 22 * * *"
   workflow_dispatch:
   # The release workflow runs these checks too.
   workflow_call:
@@ -33,10 +35,38 @@ jobs:
       - name: Check the RustSec advisories
         run: cargo deny --locked check advisories
 
+  tests:
+    name: Tests and CPU tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install audio and controller libraries
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: false
+
+      - uses: ./.github/actions/test-roms
+
+      - name: Run tests
+        run: cargo test --workspace --locked
+
+      - name: Run JSON CPU tests
+        run: cargo cpu-tests
+
   verify-boot:
     name: Test ROMs with real boots
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    outputs:
+      passed: ${{ steps.count.outputs.passed }}
+      total: ${{ steps.count.outputs.total }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -53,8 +83,19 @@ jobs:
       # Runs the boot ROM before every test and checks that the shortcut the
       # other runs take (starting from a copy of an earlier boot) would have
       # left each test in exactly the same state.
+      # `shell: bash` adds pipefail, so a failing run isn't hidden by tee.
       - name: Run test ROMs
-        run: cargo test-roms --verify-boot
+        shell: bash
+        run: cargo test-roms --verify-boot | tee "$RUNNER_TEMP/test-roms.txt"
+
+      # The runner's last line counts every test: "  total   2412/2630".
+      - name: Count the passing tests
+        id: count
+        if: always()
+        run: |
+          counts=$(awk '$1 == "total" { print $2 }' "$RUNNER_TEMP/test-roms.txt" | tail -n 1)
+          echo "passed=${counts%/*}" >> "$GITHUB_OUTPUT"
+          echo "total=${counts#*/}" >> "$GITHUB_OUTPUT"
 
       - name: Upload screens of failing tests
         if: failure()
@@ -132,3 +173,146 @@ jobs:
   windows:
     name: Windows
     uses: ./.github/workflows/windows.yml
+
+  # Measures speed, instructions and battery use, and writes them with every
+  # job's result to the metrics log in the repository's wiki
+  # (`cargo xtask metrics`). It also picks the part of the code the nightly
+  # review reads in detail (`cargo xtask review-units`), so CI is the only
+  # writer of the wiki. Pushing to the wiki needs the WIKI_TOKEN secret, a
+  # token that can write to this repository; without it the files are only
+  # kept as this run's artifact. Releases run the other jobs only.
+  metrics:
+    name: Metrics
+    if: always() && github.workflow == 'Nightly'
+    needs: [advisories, tests, verify-boot, save-states, eager]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The rotation counts the files changed since the last night.
+          fetch-depth: 0
+
+      - name: Install audio and controller libraries and Valgrind
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev pkg-config valgrind
+
+      - name: Install Rust
+        run: rustup toolchain install && rustup target add wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: release
+          save-if: false
+
+      - name: Download the benchmark games
+        run: cargo xtask benchmark-roms
+
+      - name: Build
+        run: cargo build --release --locked -p nubo -p nubo-benchmark
+
+      # One game at a time, so the games don't slow each other down.
+      - name: Measure speed
+        shell: bash
+        run: target/release/nubo-benchmark target/benchmark-roms --seconds 30 | tee "$RUNNER_TEMP/speed.txt"
+
+      # Instructions vary far less than time on shared machines, so they
+      # show slow regressions that the speed's noise hides.
+      - name: Count instructions per emulated second
+        shell: bash
+        run: |
+          for rom in target/benchmark-roms/*; do
+            for model in dmg cgb; do
+              instructions=$(valgrind --tool=cachegrind --cache-sim=no --cachegrind-out-file=/dev/null \
+                target/release/nubo-benchmark "$rom" --seconds 10 --models "$model" 2>&1 \
+                | awk '/I *refs:/ { gsub(",", "", $NF); print $NF }')
+              echo "$(basename "${rom%.*}")-$model $((instructions / 10))" >> "$RUNNER_TEMP/instructions.txt"
+            done
+          done
+          cat "$RUNNER_TEMP/instructions.txt"
+
+      - name: Measure battery use
+        shell: bash
+        run: target/release/nubo --measure-efficiency target/benchmark-roms/tobudx.gb | tee "$RUNNER_TEMP/efficiency.json"
+
+      - name: Build the web version
+        run: cargo xtask build-web
+
+      - name: Write tonight's metrics
+        shell: bash
+        env:
+          ADVISORIES: ${{ needs.advisories.result }}
+          TESTS: ${{ needs.tests.result }}
+          VERIFY_BOOT: ${{ needs.verify-boot.result }}
+          SAVE_STATES: ${{ needs.save-states.result }}
+          EAGER: ${{ needs.eager.result }}
+          PASSED: ${{ needs.verify-boot.outputs.passed }}
+          TOTAL: ${{ needs.verify-boot.outputs.total }}
+        run: |
+          # "tobudx [CGB-E]   108.2x ..." becomes {"tobudx-cgb": 108.2}.
+          speed=$(awk '$2 ~ /^\[/ && $3 ~ /x$/ {
+              model = tolower($2); gsub(/[\[\]]/, "", model); sub(/-.*/, "", model)
+              speed = $3; sub(/x$/, "", speed)
+              print $1 "-" model, speed
+            }' "$RUNNER_TEMP/speed.txt" | jq -R -n '[inputs | split(" ") | {(.[0]): (.[1] | tonumber)}] | add')
+          instructions=$(jq -R -n '[inputs | split(" ") | {(.[0]): (.[1] | tonumber)}] | add' "$RUNNER_TEMP/instructions.txt")
+          jq -n \
+            --arg date "$(date -u +%F)" \
+            --arg commit "$(git rev-parse --short HEAD)" \
+            --arg advisories "$ADVISORIES" --arg tests "$TESTS" --arg verify_boot "$VERIFY_BOOT" \
+            --arg save_states "$SAVE_STATES" --arg eager "$EAGER" \
+            --arg passed "$PASSED" --arg total "$TOTAL" \
+            --argjson speed "$speed" \
+            --argjson instructions "$instructions" \
+            --slurpfile efficiency "$RUNNER_TEMP/efficiency.json" \
+            --argjson desktop "$(stat -c %s target/release/nubo)" \
+            --argjson wasm "$(stat -c %s target/web/nubo_bg.wasm)" \
+            '{date: $date, commit: $commit,
+              tests: {advisories: $advisories, unit_tests: $tests, verify_boot: $verify_boot,
+                      save_states: $save_states, eager: $eager},
+              test_roms_passed: ($passed | tonumber? // null),
+              test_roms_total: ($total | tonumber? // null),
+              speed: $speed,
+              instructions_per_emulated_second: $instructions,
+              efficiency: $efficiency[0],
+              size_bytes: {desktop: $desktop, wasm: $wasm}}' > "$RUNNER_TEMP/night.json"
+          cat "$RUNNER_TEMP/night.json"
+
+      - name: Update the wiki
+        env:
+          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
+        run: |
+          wiki="$RUNNER_TEMP/wiki"
+          if [ -n "$WIKI_TOKEN" ]; then
+            remote="https://x-access-token:$WIKI_TOKEN@github.com/${{ github.repository }}.wiki.git"
+          else
+            remote="https://github.com/${{ github.repository }}.wiki.git"
+          fi
+          git clone --depth 1 "$remote" "$wiki" || mkdir -p "$wiki"
+          cargo xtask metrics append "$wiki/metrics.jsonl" "$RUNNER_TEMP/night.json"
+          cargo xtask review-units next --state "$wiki/rotation.json" \
+            --date "$(date -u +%F)" --commit "$(git rev-parse HEAD)" > "$wiki/tonight.json"
+          cargo xtask metrics report "$wiki/metrics.jsonl" > "$wiki/Nightly-metrics.md"
+          cat "$wiki/tonight.json"
+          if [ -n "$WIKI_TOKEN" ] && [ -d "$wiki/.git" ]; then
+            cd "$wiki"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add metrics.jsonl rotation.json tonight.json Nightly-metrics.md
+            git commit -m "Nightly metrics $(date -u +%F)"
+            git push
+          else
+            echo "::warning::The wiki wasn't updated: it needs the WIKI_TOKEN secret and a first page."
+          fi
+
+      - name: Keep tonight's metrics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nightly-metrics
+          path: |
+            ${{ runner.temp }}/night.json
+            ${{ runner.temp }}/wiki/metrics.jsonl
+            ${{ runner.temp }}/wiki/rotation.json
+            ${{ runner.temp }}/wiki/tonight.json
+            ${{ runner.temp }}/wiki/Nightly-metrics.md
+          if-no-files-found: ignore
