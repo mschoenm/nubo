@@ -1,6 +1,6 @@
 # Plan: restructuring the repository
 
-**Status: waiting for the maintainer's final sign-off. Don't implement any of it before then.**
+**Status: signed off by the maintainer on 2026-10-13. No step has been done yet.**
 
 ## What is planned and what is only kept possible
 
@@ -291,8 +291,17 @@ Each step keeps CLAUDE.md true as it goes. This step checks the whole picture:
 
 ## Order and dependencies
 
-- **Timing:** start after the CI rebuild in progress has landed. Steps 1 and 6 touch workflow and
-  action files it is changing.
+- **The order agreed with the maintainer:**
+  1. step 1
+  2. step 2
+  3. Part 5 of [SHOOTOUT_PLAN.md](SHOOTOUT_PLAN.md) (the Shootout's tests in CI, the nightly run and
+     the metrics)
+  4. steps 3 to 6
+  5. step 7
+
+  Shootout Part 5 goes before steps 3 to 6 because it only touches the test ROM runner, the nightly
+  workflow and `cargo xtask metrics`, none of which those steps move. It needs step 1, so it is built
+  straight into `tools/test_rom_runner`.
 - **RetroArch:**
   - Steps 1 and 2 come first. Step 2 is what the RetroArch core needs.
   - The RetroArch plan's Phases 2 to 6 only touch `frontends/libretro`, so they can run alongside
@@ -306,10 +315,11 @@ Each step keeps CLAUDE.md true as it goes. This step checks the whole picture:
 
 ## Decisions taken
 
-- The layout and steps are approved in principle. Final sign-off is still pending.
+- The layout and steps are signed off (2026-10-13).
 - The Iced app stays the main app. Its package and program stay `nubo`.
 - The RetroArch core is planned next. iOS, GTK and a React web UI are only kept possible.
 - Every package starts with `nubo`. Folder names stay as they are. `xtask` keeps its name.
 - Developer programs go in a `tools/` folder, each its own crate.
-- All steps are scheduled, in order.
+- All steps are scheduled, in the order under "Order and dependencies", with Shootout Part 5 between
+  steps 2 and 3.
 - Review dates carry over to moved paths in the nightly review.

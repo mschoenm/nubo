@@ -12,8 +12,9 @@ The work has five parts:
 - Part 4 is a pull request to another project's repository. It waits until Nubo would land at the top
   of the published table (Part 5 shows where it stands), and then for the maintainer's go.
 - Part 5 adds the Shootout's tests to `cargo test-roms`, so CI and the nightly run check them, and the
-  nightly metrics on the wiki show where Nubo would rank. It doesn't depend on the other parts and can
-  go first.
+  nightly metrics on the wiki show where Nubo would rank. It doesn't depend on the other parts and goes
+  first, right after steps 1 and 2 of [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md) (the order the
+  maintainer agreed to).
 
 ## Where the code lives
 
