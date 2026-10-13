@@ -63,6 +63,14 @@ pub enum SaveStateError {
         /// The title of the game that is loaded now.
         expected: String,
     },
+    /// The save state was made while playing another version of the game: a
+    /// game with the same title but another checksum in its cartridge header,
+    /// such as another revision or a patched copy. Its code and data can be
+    /// elsewhere, so the state could crash the game or spoil its own save.
+    DifferentGameVersion {
+        /// The title of the game.
+        title: String,
+    },
     /// The save state was made on different Game Boy hardware.
     DifferentModel {
         /// The model the save state was made on.
@@ -94,6 +102,11 @@ impl fmt::Display for SaveStateError {
                 f,
                 "This save state is meant to be used for a different game. \
                  Save state game: '{found}', current game: '{expected}'."
+            ),
+            Self::DifferentGameVersion { title } => write!(
+                f,
+                "This save state was made with another version of '{title}', such as another \
+                 revision or a patched copy of the game. Load the version it was made with."
             ),
             Self::DifferentModel { found, expected } => write!(
                 f,

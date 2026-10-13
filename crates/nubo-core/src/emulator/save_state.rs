@@ -178,8 +178,9 @@ impl Emulator {
 
     /// Restores a state captured by [`Emulator::save_state`].
     ///
-    /// The save state must come from the same game and the same hardware
-    /// model, and its data must be read to the last byte. It may come from
+    /// The save state must come from the same game (the same title and
+    /// header checksum, so not another revision or a patched copy) and the
+    /// same hardware model, and its data must be read to the last byte. It may come from
     /// another version of Nubo: values it doesn't have start as they do right
     /// after power-on, and values this version doesn't know, or can't read,
     /// are skipped (see [`Emulator::load_state_with_report`]). If it can't be
@@ -209,11 +210,16 @@ impl Emulator {
                 expected: self.model(),
             });
         }
-        let current_title = self.address_bus().cartridge().title();
-        if header.game_title != current_title {
+        let current = SaveStateHeader::of(self);
+        if header.game_title != current.game_title {
             return Err(SaveStateError::DifferentGame {
                 found: header.game_title,
-                expected: current_title.to_string(),
+                expected: current.game_title,
+            });
+        }
+        if header.game_checksum != current.game_checksum {
+            return Err(SaveStateError::DifferentGameVersion {
+                title: current.game_title,
             });
         }
 
@@ -476,6 +482,26 @@ mod tests {
 
         assert_eq!(emulator.registers().stack_pointer, power_on);
         assert_eq!(emulator.registers().program_counter, program_counter);
+    }
+
+    #[test]
+    fn rejects_a_state_of_another_version_of_the_game() {
+        let saved = emulator_with_game().save_state();
+        let mut revision = build_rom(CART_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        revision[0x014E] = 0x12;
+        let mut emulator = Emulator::new(Model::Dmg);
+        emulator
+            .load_rom(&revision, empty_cartridge_effects())
+            .unwrap();
+        let before = emulator.serialized_state();
+
+        assert_eq!(
+            emulator.load_state(&saved),
+            Err(SaveStateError::DifferentGameVersion {
+                title: String::new()
+            })
+        );
+        assert_eq!(emulator.serialized_state(), before);
     }
 
     #[test]
