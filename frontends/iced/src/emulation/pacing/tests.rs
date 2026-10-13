@@ -28,7 +28,14 @@ fn measured(hz: f64, jitter: f64, count: usize) -> RefreshRate {
 
 #[test]
 fn frames_lock_to_screens_near_a_multiple_of_the_game_boys_rate() {
-    for (hz, refreshes_per_frame) in [(60.0, 1.0), (59.94, 1.0), (120.0, 2.0), (240.0, 4.0)] {
+    for (hz, refreshes_per_frame) in [
+        (30.0, 0.5),
+        (29.97, 0.5),
+        (60.0, 1.0),
+        (59.94, 1.0),
+        (120.0, 2.0),
+        (240.0, 4.0),
+    ] {
         let lock = measured(hz, 0.001 / (hz / 60.0), 300).lock();
         assert_eq!(
             lock.map(|lock| lock.refreshes_per_frame),
@@ -82,6 +89,25 @@ fn the_rate_is_measured_again_when_the_screen_changes() {
     }
     assert_eq!(rate.lock().map(|lock| lock.refreshes_per_frame), Some(2.0));
 
+    for elapsed in ticks(60.0, 0.001, 300, 3) {
+        rate.observe(elapsed);
+    }
+    assert_eq!(rate.lock().map(|lock| lock.refreshes_per_frame), Some(1.0));
+}
+
+#[test]
+fn a_browser_that_draws_30_times_a_second_gets_two_frames_per_refresh() {
+    let mut rate = measured(60.0, 0.001, 300);
+    for elapsed in ticks(30.0, 0.002, 300, 2) {
+        rate.observe(elapsed);
+    }
+    let lock = rate.lock().unwrap();
+    assert_eq!(lock.refreshes_per_frame, 0.5);
+    assert_eq!(lock.frames_in(1.0 / 30.0 + 0.004), 2.0);
+    assert!((lock.speed() - 1.0045).abs() < 0.0005, "{}", lock.speed());
+
+    rate.observe(1.0 / 60.0);
+    assert_eq!(rate.lock(), None);
     for elapsed in ticks(60.0, 0.001, 300, 3) {
         rate.observe(elapsed);
     }
@@ -183,6 +209,7 @@ fn simulate(hz: f64, refreshes_per_frame: f64, drift: f64, seconds: f64) -> Soun
 #[test]
 fn the_sample_rate_keeps_the_sound_queue_filled_on_a_locked_screen() {
     for (hz, refreshes_per_frame, drift) in [
+        (30.0, 0.5, 0.001),
         (60.0, 1.0, 0.0),
         (60.0, 1.0, 0.001),
         (59.94, 1.0, -0.001),

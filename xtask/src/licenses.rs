@@ -76,10 +76,11 @@ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.";
 
-const BSL_TEMPLATE: &str = "\
+/// The Boost Software License as boost.org publishes it. Unlike the MIT and
+/// ISC licenses it has no copyright line: it asks to keep the notices in the
+/// software itself, so it names nobody.
+const BSL_TEXT: &str = "\
 Boost Software License - Version 1.0 - August 17th, 2003
-
-Copyright (c) {holders}
 
 Permission is hereby granted, free of charge, to any person or organization
 obtaining a copy of the software and accompanying documentation covered by
@@ -334,7 +335,7 @@ fn standard_texts(krate: &Crate) -> Option<Vec<String>> {
                 "Apache-2.0" => fs::read_to_string(workspace_root().join("LICENSE-APACHE")).ok()?,
                 "MIT" => MIT_TEMPLATE.replace("{holders}", &holders),
                 "ISC" => ISC_TEMPLATE.replace("{holders}", &holders),
-                "BSL-1.0" => BSL_TEMPLATE.replace("{holders}", &holders),
+                "BSL-1.0" => BSL_TEXT.to_owned(),
                 _ => CC0_TEXT.to_owned(),
             })
         })
@@ -393,7 +394,8 @@ fn third_party_licenses(crates: &[Crate]) -> Result<String> {
          Cargo.toml states (\"OR\" means it may be used under either license). \
          The license texts follow, each listed once with the crates that ship it. \
          For crates that ship no license text, the standard text of their \
-         license is given instead, naming the authors they list. Nubo itself and \
+         license is given instead, naming the authors they list where that \
+         text has a copyright line. Nubo itself and \
          the code it includes from other projects are covered by LICENSE.txt, \
          LICENSE-APACHE.txt and NOTICE.txt.",
     ));
@@ -456,10 +458,11 @@ mod tests {
         let boost = standard_texts(&krate("BSL-1.0")).unwrap();
         assert_eq!(boost.len(), 1);
         assert!(boost[0].starts_with("Boost Software License - Version 1.0"));
-        assert!(boost[0].contains("Copyright (c) Jane Doe\n"));
+        assert!(!boost[0].contains("Copyright (c)"));
 
         let either = standard_texts(&krate("MIT OR BSL-1.0")).unwrap();
         assert!(either[0].starts_with("MIT License"));
+        assert!(either[0].contains("Copyright (c) Jane Doe\n"));
 
         let both = standard_texts(&krate("ISC AND BSL-1.0")).unwrap();
         assert!(both[0].starts_with("ISC License"));

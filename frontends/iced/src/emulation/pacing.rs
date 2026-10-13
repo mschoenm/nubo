@@ -4,14 +4,16 @@
 //!
 //! On screens that refresh about 60, 120 or 240 times a second, frames are
 //! locked to the refreshes: one frame every one, two or four of them, so
-//! every frame stays on screen equally long. The Game Boy draws 59.73 frames
-//! a second, so this runs the game about 0.45% fast. The sound keeps up by
-//! making that much fewer samples per emulated second, which keeps its pitch
-//! within 8 cents, too little to hear. Other screens (75 or 144 Hz, or ones
-//! with variable refresh) get frames by the clock instead, and a frame now
-//! and then stays up one refresh longer. Either way the audio queue only
-//! changes how many samples are made, never when a frame runs, so the
-//! queue's jumps by a whole sound buffer don't move frames.
+//! every frame stays on screen equally long. Browsers that save power by
+//! drawing only 30 times a second get two frames per refresh, of which the
+//! second is shown. The Game Boy draws 59.73 frames a second, so this runs
+//! the game about 0.45% fast. The sound keeps up by making that much fewer
+//! samples per emulated second, which keeps its pitch within 8 cents, too
+//! little to hear. Other screens (75 or 144 Hz, or ones with variable
+//! refresh) get frames by the clock instead, and a frame now and then stays
+//! up one refresh longer. Either way the audio queue only changes how many
+//! samples are made, never when a frame runs, so the queue's jumps by a
+//! whole sound buffer don't move frames.
 
 use iced::time::Duration;
 
@@ -39,13 +41,14 @@ const CHANGE_TOLERANCE: f64 = 0.05;
 /// 144 Hz don't, and large enough for browsers that round their timestamps
 /// to the millisecond (8 or 9 ms apart at 120 Hz).
 const REFRESH_TOLERANCE: f64 = 0.15;
-/// How far a whole number of refreshes may be from a Game Boy frame, as a
-/// share, for frames to lock to them. Covers 59.94 to about 60.3 Hz and
-/// their multiples.
+/// How far one of `LOCKED_REFRESHES_PER_FRAME` may be from a Game Boy frame,
+/// as a share, for frames to lock to it. Covers 59.94 to about 60.3 Hz and
+/// their multiples, and half of them.
 const LOCK_TOLERANCE: f64 = 0.01;
-/// The most refreshes one frame is locked to: 240 Hz screens show each frame
-/// four times.
-const MOST_REFRESHES_PER_FRAME: f64 = 4.0;
+/// How many refreshes a frame can be locked to: half of one when the browser
+/// draws 30 times a second (two frames per refresh), up to four on 240 Hz
+/// screens, which show each frame four times.
+const LOCKED_REFRESHES_PER_FRAME: [f64; 5] = [0.5, 1.0, 2.0, 3.0, 4.0];
 
 /// How long the audio queue's length is averaged over, in seconds. Long
 /// enough to smooth out its jumps by a whole sound buffer.
@@ -146,11 +149,11 @@ impl RefreshRate {
             return None;
         }
         let refreshes = FRAME_DURATION.as_secs_f64() / interval;
-        let whole = refreshes.round();
-        ((1.0..=MOST_REFRESHES_PER_FRAME).contains(&whole)
-            && (refreshes / whole - 1.0).abs() <= LOCK_TOLERANCE)
-            .then_some(Lock {
-                refreshes_per_frame: whole,
+        LOCKED_REFRESHES_PER_FRAME
+            .into_iter()
+            .find(|&locked| (refreshes / locked - 1.0).abs() <= LOCK_TOLERANCE)
+            .map(|refreshes_per_frame| Lock {
+                refreshes_per_frame,
                 refresh_interval: interval,
             })
     }
@@ -159,7 +162,8 @@ impl RefreshRate {
 /// Frames locked to the screen's refreshes.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Lock {
-    /// How many refreshes each frame stays on screen.
+    /// How many refreshes each frame stays on screen, or 0.5 when two frames
+    /// run per refresh.
     refreshes_per_frame: f64,
     /// The average time between refreshes in seconds.
     refresh_interval: f64,
@@ -167,8 +171,9 @@ pub struct Lock {
 
 impl Lock {
     /// How many frames are due after `elapsed` seconds: one for every
-    /// `refreshes_per_frame` refreshes, counted whole, so they come at the
-    /// same refreshes however early or late the ticks are.
+    /// `refreshes_per_frame` refreshes (two per refresh at 0.5), counted
+    /// whole, so they come at the same refreshes however early or late the
+    /// ticks are.
     pub fn frames_in(self, elapsed: f64) -> f64 {
         (elapsed / self.refresh_interval).round() / self.refreshes_per_frame
     }
