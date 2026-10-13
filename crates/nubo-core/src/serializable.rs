@@ -20,12 +20,13 @@
 //!   values): store it under a new name, so versions on either side leave it
 //!   at its power-on value instead of misreading it.
 //!
-//! `cargo test` and `cargo save-states` fail when the fields, their types or
-//! the enum variants a state can store change ([`stored_layout`]), listing
-//! them: then keep the stored name of a field or variant only renamed in the
-//! code, store a field whose type changed under a new name, or keep a new set
-//! of states with `cargo save-states --record`, which later versions are
-//! checked against.
+//! `cargo test --workspace` and `cargo save-states` fail when the fields,
+//! their types or the enum variants a state can store change
+//! ([`stored_layout`]), listing them: then keep the stored name of a field or
+//! variant only renamed in the code, store a field whose type changed under a
+//! new name, or keep a new set of states with `cargo save-states --record`,
+//! which later versions are checked against. (The check is in the
+//! save_state_check crate, which a plain `cargo test` doesn't build.)
 //!
 //! A value that can't be read from its bytes, such as a variant a newer
 //! version added or a field whose size changed under the same name, keeps its
