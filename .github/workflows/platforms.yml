@@ -1,0 +1,50 @@
+name: macOS and Windows
+
+# Runs the workspace tests on macOS and Windows, which CI leaves out to stay
+# fast (it tests on Linux). Pull requests run it too, but "CI passed" doesn't
+# wait for it, so it never holds up a merge: a failure shows on the pull
+# request, and GitHub notifies whoever started the run. A workflow of its
+# own rather than jobs in ci.yml, so a failure here doesn't fail the CI run
+# that deploy.yml publishes the web version after. The nightly workflow, which
+# releases run, calls it too.
+on:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels the tests still running for the old
+# one.
+concurrency:
+  group: platform-tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  tests:
+    name: Tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      # The same key as CI's tests on Linux; the nightly runs on main keep
+      # the macOS and Windows caches up to date.
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: tests
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Run tests
+        run: cargo test --workspace --locked
