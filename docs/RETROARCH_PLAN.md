@@ -181,11 +181,16 @@ before.
    - **Audio and video info:** `retro_get_system_av_info` gives 160×144 at 4194304 / 70224 fps and a
      sample rate such as 48,000 Hz (any rate works: Nubo makes exactly that many samples per emulated
      second, and RetroArch adjusts for small differences).
-   - **Pixel format:** `retro_set_environment`, asking for `RETRO_PIXEL_FORMAT_XRGB8888`. Each pixel is
-     a native-endian `u32` holding `0x00RRGGBB`, so convert from RGBA with a pitch of 640 bytes.
+   - **Pixel format:** ask for `RETRO_PIXEL_FORMAT_XRGB8888` with `RETRO_ENVIRONMENT_SET_PIXEL_FORMAT`
+     in `retro_load_game`, where `libretro.h` says to ask, not in `retro_set_environment`. Each pixel
+     is a native-endian `u32` holding `0x00RRGGBB`, so convert from RGBA with a pitch of 640 bytes. If
+     the frontend says no, it keeps the default 0RGB1555 and would misread the frames, so either
+     convert to that format instead or fail the load with a message. Test both answers.
    - **Load and unload:** `retro_load_game` picks the model, loads the ROM, and fails on a
      `LoadRomError`. Also `retro_unload_game`, `retro_reset` (a new `Emulator` with the same ROM and
-     model, keeping save RAM), `retro_get_region` (NTSC), `retro_load_game_special` (false) and
+     model, which keeps the cartridge's battery-backed state: the current save RAM and, on an MBC3
+     with a clock, the current `RtcState`, handed to the new emulator before the buffers are synced
+     as Phase 3 describes; a test resets an MBC3 game and checks that its save and clock survive), `retro_get_region` (NTSC), `retro_load_game_special` (false) and
      `retro_set_controller_port_device`.
    - **`retro_run`:**
      1. Poll input once and press or release changed buttons: A, B, Start, Select and the D-pad.
@@ -265,6 +270,10 @@ before.
 ## Phase 4: achievements and rumble (one pull request)
 
 1. **Memory maps for RetroAchievements.**
+   - Opt in first: call `RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS` with `true` in `retro_load_game`,
+     before the first `retro_run`, as `libretro.h` requires. The memory descriptors and the info file
+     don't opt the core in on their own, and without it RetroArch treats the core as not supporting
+     achievements (no hardcore mode).
    - rcheevos reads the Game Boy's address space through memory descriptors
      (`RETRO_ENVIRONMENT_SET_MEMORY_MAPS`), with Game Boy Color work RAM banks 2-7 after 0xFFFF. See
      `rc_consoles.c`, and SameBoy's `libretro.c` for one way to describe it.
