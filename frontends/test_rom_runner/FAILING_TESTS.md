@@ -11,7 +11,7 @@ ported.
 
 | Group | Tests | Status |
 |---|---|---|
-| [Channel 1 duty timing across CGB speed switches](#channel-1-duty-timing-across-cgb-speed-switches) | 9 | Open |
+| [Channel 1 duty timing across CGB speed switches](#channel-1-duty-timing-across-cgb-speed-switches) | 9 | Open; 2 conflict with SameSuite on CGB-C |
 | [DMG palette writes during mode 3](#dmg-palette-writes-during-mode-3) | 9 | References disagree |
 | [MBC3](#mbc3) | 4 | Being worked on separately |
 | [Interrupts during a speed switch (AGE spsw-interrupts)](#interrupts-during-a-speed-switch) | 3 | Open, no reference emulator gets it right |
@@ -65,10 +65,39 @@ lost during it. In `ds_6`, the start is one tick later than in `ds_2` (which pas
 first step lands on the same tick in both, while Nubo's moves by two.
 
 **Why it isn't fixed.** No fixed offset per switch gives that pattern: the error changes by +1, −1,
-0, −2 and 0 over the five switches. So the phase between the sound clock and the CPU after a switch
-depends on more than the number of switches. Nubo's sound clock keeps the tick parity it got when the
-APU was powered on, while STOP resets DIV; if the hardware's sound clock is derived from the same
-counter, each switch can realign it. These were tried and rejected:
+0, −2 and 0 over the five switches. The nine split into two groups, and neither can be fixed by
+realigning the sound clock's tick parity (SameBoy's `lf_div`), which was the lead tried last.
+
+Seven of them (`speedchange_ch1_..._timing_2`, `..._timing_nop_2` and the `speedchange4` and
+`speedchange5` ones) start the channel at normal speed before the first switch and don't restart it until the
+measurement, which freezes the step it reached. The tick parity only sets the delay of a restart, so
+these depend on nothing but how many sound ticks pass between the start and the measurement. Counted in
+Nubo and in a traced Gambatte between the same two writes, the two agree over every switch to double
+speed and differ only at switches back to normal speed, where Nubo counts one tick more than Gambatte
+on the first and two more on the second. Gambatte keeps the sound clock's position within a 2 MHz tick
+relative to the CPU clock, and that position alternates at each switch back, adding a tick on the
+first and none on the second. Gambatte also starts a channel at normal speed with its
+steps one tick earlier than Nubo (halfway through an M-cycle instead of at its end). At normal speed
+that makes no difference a test can see, but it does at double speed, which is the one-switch error.
+Nubo's normal speed phase is SameBoy's, which its PCM12 and PCM34 read glitches are modelled on and
+which SameSuite checks on CGB-C hardware. For each of the 36 tests, the range of extra ticks Nubo could
+count and still pass was worked out from where its channel stands at the measurement. No rule that adds
+or removes up to three ticks at each switch, chosen by the switch's direction, the tick parity at the
+STOP and a bit that flips at each switch back to normal speed, passes the 34 that switch between the
+start and the measurement, not even the 24 that start the channel at normal speed: the first switch
+after the start and the fifth come with the same parity and the same bit, but the first needs an
+extra tick and the fifth doesn't.
+
+The other two (`nr4init_2` and `ds_6`) start the channel in double speed, where the restart delay does
+matter. Gambatte's delay there follows bit 2 of the system counter, Nubo's (like SameBoy's) the tick
+parity since the APU was powered on. Gambatte's rule fixes both, but breaks SameSuite's
+`channel_1_freq_change_timing-cgb0BC` on CGB-0, CGB-B and CGB-C. The two suites disagree directly as
+Nubo models the restart: on CGB-C, `ds_5` and `ds_6` need a delay two ticks shorter than the second
+double speed subtest of `channel_1_freq_change_timing-cgb0BC`, which starts the channel with the same
+tick parity, the same bit 2 of the system counter and the APU also powered on after the switch. Both
+were verified on CGB-C hardware.
+
+These were tried and rejected (the last three counted over the 482 sound and speed switch tests):
 
 | Change | Result |
 |---|---|
@@ -76,12 +105,20 @@ counter, each switch can realign it. These were tried and rejected:
 | A sound clock that follows real time (8 MHz) across switches, from any starting phase | 3 fewer |
 | Freezing the sound clock together with the LCD during the switch | 5 more, 14 fewer |
 | The double speed trigger delay measured in Gambatte | 3 more (`ds_2`, `ds_4`, `ds_6`), 8 fewer: SameSuite's `channel_1_freq_change_timing-cgb0BC` on CGB-0, CGB-B and CGB-C (real hardware) and 5 `speedchange` tests |
+| Realigning the tick parity when STOP resets DIV, to 0 or 1 in either direction, alone or moving running channels a tick so they stay on the realigned 1 MHz clock, combined with −1, 0 or +1 ticks at each switch (153 combinations) | None fixes a test without breaking at least as many |
+| A tick parity that follows bit 2 of the system counter in double speed (set at every DIV reset and speed switch, with or without APU power-on), with the restart delays above | No net gain at best, up to 18 fewer |
+| Gambatte's double speed restart delay with that parity | 2 more (`nr4init_2`, `ds_6`), 17 fewer: SameSuite's double speed channel tests on every model, `channel_1_freq_change_timing-cgb0BC` on CGB-0, CGB-B and CGB-C among them, and 5 `speedchange` tests |
 
-**Next step.** Realign the sound clock's tick parity from the system counter when STOP resets DIV,
-then retry the measured double speed trigger delay,
-which may only conflict with SameSuite because the parity isn't realigned yet. Start with
-`nr4init_2`, which isolates the delay after a switch, and keep SameSuite's channel tests and every
-`speedchange` test that passes now passing.
+**Next step.** Run `sound/ch1_duty0_pos6_to_pos7_timing_ds_5` and `ds_6` and SameSuite's
+`channel_1_freq_change_timing-cgb0BC` on one CGB-C (Phase 3 of the accuracy plan). If both suites hold
+on the same console, the restart depends on something neither model has, such as the time since the
+switch; if one of them fails, follow the other. For the seven that start at normal speed, a model of
+the sound clock's position within a 2 MHz tick across switches is needed, as in Gambatte, which also
+moves the channel's steps at normal speed. SameBoy's PCM12/PCM34 read glitches and its period write
+quirks are expressed relative to the end of an M-cycle, so they would have to be worked out again in
+that model to keep SameSuite passing. Comparing the two emulators means tracing channel 1's step
+position and the sound ticks counted at every NR14 write and STOP, in Nubo and in a local Gambatte
+build.
 
 ## DMG palette writes during mode 3
 

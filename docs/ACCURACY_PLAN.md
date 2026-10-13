@@ -96,10 +96,10 @@ without hardware:
 | Tests | Group | Next step |
 |---|---|---|
 | 4 | MBC3 | MBC30 (8-bit ROM bank register, 8 RAM banks), invalid banks and the single-latch behaviour. Already in progress separately |
-| 9 | Channel 1 duty timing across CGB speed switches | Realign the APU's tick parity at STOP and DIV resets (lead 5.1 in the toolkit's HANDOFF.md) |
 | 2 | Mealybug's tile data switch glitch on CGB-C | Find where CGB-C's glitched fetch takes its data from, using SameBoy traces |
 | 1 | Tile data switch at line 0 in double speed | Line 0 only; the CPU writes already match Gambatte, so look at the line 0 fetcher start |
 | 1 | Window toggled at WX 166 | The window line counter is one line ahead; trace the window's state across the line |
+| 9 | Channel 1 duty timing across CGB speed switches | Realigning the tick parity at STOP and DIV resets was tried and can't fix them. 7 need the sound clock's position within a 2 MHz tick modelled across switches without breaking SameSuite's PCM12 tests; 2 conflict with SameSuite on CGB-C and need a CGB-C (Phase 3) |
 | 3 | AGE spsw-interrupts | No reference emulator passes it; needs a CGB (Phase 3) |
 | 2 | Mooneye's MGB madness | MGB only and unexplained by its author; needs an MGB (Phase 3) |
 | 9 | DMG palette writes during mode 3 | Mealybug's DMG-blob references and AGE disagree; settle on hardware (Phase 3) |
