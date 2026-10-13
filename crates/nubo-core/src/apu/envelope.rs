@@ -17,7 +17,7 @@
 
 use crate::apu::{Apu, Channel, MAX_VOLUME, NR22, NR42, Square};
 use crate::model::Model;
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 
 /// NRx2 bits 0-2: the envelope steps between volume changes. 0 stops the
 /// envelope.

@@ -9,7 +9,7 @@
 use crate::address_bus::{AddressBus, CartridgeEffects};
 use crate::error::LoadRomError;
 use getset::{Getters, MutGetters};
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 
 /// Bit of the `f` register set when a result is zero.
 const ZERO_FLAG: u8 = 0x80;

@@ -21,7 +21,7 @@ use crate::address_bus::{AddressBus, MemoryMapped, reaches_ppu, reads_plain_memo
 use crate::apu::Apu;
 use crate::gpu::OamDmaAccess;
 use crate::model::Model;
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 
 /// The state of the OAM DMA transfer. The rest of the address bus only sees
 /// it through the methods below; the transfer itself runs in this file.

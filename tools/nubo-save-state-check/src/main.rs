@@ -95,7 +95,7 @@ fn workspace_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
         .nth(2)
-        .expect("the crate is in frontends/")
+        .expect("the crate is in tools/")
         .to_path_buf()
 }
 

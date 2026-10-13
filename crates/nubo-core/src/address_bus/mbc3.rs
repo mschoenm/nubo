@@ -20,7 +20,7 @@ use crate::address_bus::constants::{
     CART_TYPE_MBC3_TIMER_RAM_BATTERY, RAM_BANK_SIZE,
 };
 use crate::address_bus::effects::{CartridgeEffects, RtcClock};
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 
 /// The state of an MBC3 real-time clock. Frontends store it next to the
 /// game's save so the clock keeps counting while the emulator is closed.

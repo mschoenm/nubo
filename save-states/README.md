@@ -5,12 +5,12 @@ never costs a player their save states. Each folder is a set of states made by
 Nubo on the day it is named after, with `layout.txt`: every field that
 version's save states store with how its value is stored (such as
 `ppu.lcdc: u8`), and every variant each enum value can be stored as. A new set is only made when that list changes: `cargo test` and `cargo
-save-states` (see `frontends/save_state_check`) fail when the current version
+save-states` (see `tools/nubo-save-state-check`) fail when the current version
 stores other fields or variants than the newest set lists, and `cargo
 save-states --record` then adds a set. Never change or remove a set once it is
 made.
 
-The states are of the test cartridges `frontends/save_state_check` builds,
+The states are of the test cartridges `tools/nubo-save-state-check` builds,
 one for each kind of memory bank controller, and of three free homebrew games,
 20 emulated seconds in, which `cargo xtask benchmark-roms` downloads. The
 states hold the games' graphics and memory as the games left them:

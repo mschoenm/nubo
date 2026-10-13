@@ -4,7 +4,7 @@
 //! The built-in RAM holds 512 half-bytes (4-bit values). It repeats across the
 //! whole 0xA000-0xBFFF area, and the upper four bits of each byte read as 1s.
 
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 
 /// The number of half-byte cells in MBC2's built-in RAM.
 pub(super) const MBC2_RAM_SIZE: usize = 0x200;

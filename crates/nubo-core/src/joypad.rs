@@ -9,7 +9,7 @@
 
 use crate::controller::{ControllerMapping, ControllerState};
 use getset::{CopyGetters, Setters};
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 
 /// A Game Boy button.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

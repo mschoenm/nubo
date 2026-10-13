@@ -58,7 +58,7 @@ On Linux, audio and controller support need the ALSA and udev development files,
 
 ## Desktop App
 
-The app lives in the frontends/iced folder. Add your ROM folders under Settings > Library to fill the library, or open a single ROM. Everything it keeps (settings, the library, in-game saves, save states, cheats and pictures) goes in the user's data folder: `~/Library/Application Support/Nubo` on macOS, `%APPDATA%\Nubo` on Windows and `~/.local/share/nubo` (or `$XDG_DATA_HOME/nubo`) on Linux, with settings in `~/.config/nubo` on Linux.
+The app lives in the frontends/nubo folder. Add your ROM folders under Settings > Library to fill the library, or open a single ROM. Everything it keeps (settings, the library, in-game saves, save states, cheats and pictures) goes in the user's data folder: `~/Library/Application Support/Nubo` on macOS, `%APPDATA%\Nubo` on Windows and `~/.local/share/nubo` (or `$XDG_DATA_HOME/nubo`) on Linux, with settings in `~/.config/nubo` on Linux.
 
 On Windows, `cargo xtask windows` builds `Nubo-<version>-windows-x64-setup.exe` in `target/bundle/`, which installs Nubo for your user (no administrator rights) with a Start menu entry and an uninstaller, and can offer Nubo for opening `.gb` and `.gbc` files, plus a zip of the same files to run Nubo without installing. It needs [Inno Setup 6](https://jrsoftware.org/isinfo.php). Each release has both files (as `Nubo-windows-x64-setup.exe` and `Nubo-windows-x64.zip`), and so does the `nightly` pre-release. They aren't signed yet, so Windows SmartScreen may warn the first time: choose More info and then Run anyway.
 
@@ -86,7 +86,7 @@ Esc opens the pause menu, Tab fast forwards while held, F5 and F8 quick save and
 
 ## Test ROMs
 
-`cargo test-roms` downloads a pinned release of the [Game Boy test ROM collection](https://github.com/c-sp/game-boy-test-roms), plus the tests of the [GB Emulator Shootout](https://gbdev.io/GBEmulatorShootout/) that the collection lacks, and runs each test ROM on the hardware models it targets: DMG-0, DMG, MGB, SGB and SGB2 (monochrome) and CGB-0 to CGB-E and AGB (color). The tests that currently pass are listed in [frontends/test_rom_runner/passing.txt](frontends/test_rom_runner/passing.txt), and CI fails if any of them stop passing. The tests that still fail, and why, are explained in [frontends/test_rom_runner/FAILING_TESTS.md](frontends/test_rom_runner/FAILING_TESTS.md). What still has to happen before Nubo can claim to be the most accurate Game Boy emulator is planned in [docs/ACCURACY_PLAN.md](docs/ACCURACY_PLAN.md).
+`cargo test-roms` downloads a pinned release of the [Game Boy test ROM collection](https://github.com/c-sp/game-boy-test-roms), plus the tests of the [GB Emulator Shootout](https://gbdev.io/GBEmulatorShootout/) that the collection lacks, and runs each test ROM on the hardware models it targets: DMG-0, DMG, MGB, SGB and SGB2 (monochrome) and CGB-0 to CGB-E and AGB (color). The tests that currently pass are listed in [tools/nubo-test-rom-runner/passing.txt](tools/nubo-test-rom-runner/passing.txt), and CI fails if any of them stop passing. The tests that still fail, and why, are explained in [tools/nubo-test-rom-runner/FAILING_TESTS.md](tools/nubo-test-rom-runner/FAILING_TESTS.md). What still has to happen before Nubo can claim to be the most accurate Game Boy emulator is planned in [docs/ACCURACY_PLAN.md](docs/ACCURACY_PLAN.md).
 
 | Suite | Monochrome | Color |
 | ----- | ---------- | ----- |

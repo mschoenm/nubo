@@ -16,7 +16,7 @@ use std::time::Instant;
 
 /// Run the Game Boy test ROM suites and compare the results with the list of passing tests
 #[derive(Parser)]
-#[command(name = "test_rom_runner")]
+#[command(name = "nubo-test-rom-runner")]
 struct Args {
     /// Only run tests whose name contains this text, such as "mooneye" or "cgb blargg"
     filter: Option<String>,

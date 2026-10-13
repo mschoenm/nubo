@@ -22,7 +22,7 @@
 use crate::address_bus::AddressBus;
 use crate::clock::dots_per_m_cycle;
 use crate::utils::is_bit_set;
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 
 /// The CPU speed, the state of the KEY1 register and a switch in progress.
 /// The address bus only routes KEY1 here on a CGB.

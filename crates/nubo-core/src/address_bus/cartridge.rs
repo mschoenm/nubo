@@ -24,7 +24,7 @@ use crate::address_bus::mbc3::{Mbc3CartridgeMapper, rtc_time};
 use crate::address_bus::mbc5::Mbc5CartridgeMapper;
 use crate::error::LoadRomError;
 use crate::serializable::{FieldWriter, Serializable, read_fields};
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 use std::io::{Read, Write};
 use std::sync::Arc;
 

@@ -32,7 +32,7 @@ use crate::gpu::{Gpu, OamDmaAccess, TimingVariant};
 use crate::model::Model;
 use crate::serializable::{FieldWriter, Serializable, array_encoding, read_fields};
 use crate::utils::is_bit_set;
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 use std::io::{self, Read, Write};
 
 const FIFO_LENGTH: usize = 8;

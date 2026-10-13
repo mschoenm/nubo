@@ -35,7 +35,7 @@ const WEB_ADDRESS: &str = "127.0.0.1:8080";
 const APP_ID: &str = "io.github.mschoenm.nubo";
 /// The folder with the Linux menu entry and the AppStream description (what
 /// app stores show), which the Flatpak installs.
-const LINUX_FILES: &str = "frontends/iced/linux";
+const LINUX_FILES: &str = "frontends/nubo/linux";
 
 const USAGE: &str = "\
 Usage: cargo xtask <command>
@@ -223,7 +223,7 @@ fn build_iced_web(options: &[String]) -> Result<PathBuf> {
 
     let index = workspace_root()
         .join("frontends")
-        .join("iced")
+        .join("nubo")
         .join("web")
         .join("index.html");
     fs::copy(&index, output_dir.join("index.html"))

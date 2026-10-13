@@ -3,18 +3,18 @@ resolver = "2"
 members = [
     "crates/nubo-core",
     "crates/nubo-logo",
-    "crates/serializable_derive",
-    "frontends/benchmark",
-    "frontends/headless",
-    "frontends/iced",
-    "frontends/json_test_runner",
-    "frontends/save_state_check",
-    "frontends/test_rom_runner",
+    "crates/nubo-serializable-derive",
+    "frontends/nubo",
+    "tools/nubo-benchmark",
+    "tools/nubo-headless",
+    "tools/nubo-json-test-runner",
+    "tools/nubo-save-state-check",
+    "tools/nubo-test-rom-runner",
     "xtask",
 ]
 default-members = [
     "crates/nubo-core",
-    "crates/serializable_derive",
+    "crates/nubo-serializable-derive",
 ]
 
 [workspace.package]
@@ -67,7 +67,7 @@ wildcard_imports = "warn"
 [workspace.dependencies]
 nubo-core = { path = "crates/nubo-core" }
 nubo-logo = { path = "crates/nubo-logo" }
-serializable_derive = { path = "crates/serializable_derive" }
+nubo-serializable-derive = { path = "crates/nubo-serializable-derive" }
 wasm-bindgen = "=0.2.129"
 wasm-bindgen-cli-support = "=0.2.129"
 

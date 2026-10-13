@@ -8,7 +8,9 @@
 //! own file and its child modules, and small neighbours are packed together
 //! again. The rotation remembers when each file was last reviewed, not each
 //! part, so regrouping the parts as the code changes loses nothing: a part
-//! counts as last reviewed when its least recently reviewed file was.
+//! counts as last reviewed when its least recently reviewed file was. A file
+//! moved without changes keeps its date under its new path, so moving
+//! folders doesn't send their files to the front or back of the rotation.
 
 use crate::{Result, workspace_root};
 use serde_json::{Map, Value, json};
@@ -19,7 +21,7 @@ use std::process::Command;
 /// The most lines a part has, unless one file alone has more.
 const PART_LINES: usize = 1200;
 /// The folders whose crates are reviewed, relative to the workspace root.
-const CRATE_FOLDERS: [&str; 2] = ["crates", "frontends"];
+const CRATE_FOLDERS: [&str; 3] = ["crates", "frontends", "tools"];
 /// Folders that never hold reviewed code.
 const SKIPPED_FOLDERS: [&str; 2] = ["target", "node_modules"];
 
@@ -118,10 +120,14 @@ fn next_part(options: &NextOptions) -> Result<String> {
         .cloned()
         .unwrap_or_default();
 
-    let changed_files = match &last_commit {
-        Some(last) => changed_rust_files(last, &options.commit)?,
+    let changes = match &last_commit {
+        Some(last) => rust_changes(last, &options.commit)?,
         None => Vec::new(),
     };
+    carry_over_moves(&mut reviewed, &changes);
+    let changed_files: Vec<String> = changed_files(&changes)
+        .filter(|file| workspace_root().join(file).is_file())
+        .collect();
     for file in &changed_files {
         reviewed.insert(file.clone(), Value::from(options.date.as_str()));
     }
@@ -161,13 +167,27 @@ fn last_reviewed<'a>(part: &Part, reviewed: &'a Map<String, Value>) -> Option<&'
         .flatten()
 }
 
-/// The Rust files that changed between the commits `from` and `to` and
-/// still exist.
-fn changed_rust_files(from: &str, to: &str) -> Result<Vec<String>> {
+/// A Rust file that git sees as changed between two commits.
+#[derive(Debug, PartialEq)]
+enum Change {
+    /// Added, changed or deleted in place.
+    Edited(String),
+    /// Moved from `from` to `to`; `unchanged` when its content is the same.
+    Moved {
+        from: String,
+        to: String,
+        unchanged: bool,
+    },
+}
+
+/// The Rust files that changed between the commits `from` and `to`, with
+/// moved files found by git's rename detection.
+fn rust_changes(from: &str, to: &str) -> Result<Vec<Change>> {
     let output = Command::new("git")
         .args([
             "diff",
-            "--name-only",
+            "--name-status",
+            "-M",
             &format!("{from}..{to}"),
             "--",
             "*.rs",
@@ -181,11 +201,57 @@ fn changed_rust_files(from: &str, to: &str) -> Result<Vec<String>> {
             String::from_utf8_lossy(&output.stderr).trim()
         ));
     }
-    Ok(String::from_utf8_lossy(&output.stdout)
+    Ok(parse_name_status(&String::from_utf8_lossy(&output.stdout)))
+}
+
+/// Reads the output of `git diff --name-status`: a status letter (`R` with
+/// a similarity score for a move, such as `R100`) and the paths, separated
+/// by tabs.
+fn parse_name_status(output: &str) -> Vec<Change> {
+    output
         .lines()
-        .filter(|file| workspace_root().join(file).is_file())
-        .map(String::from)
-        .collect())
+        .filter_map(|line| {
+            let mut fields = line.split('\t');
+            let status = fields.next()?;
+            let path = fields.next()?.to_string();
+            if status.starts_with('R') {
+                Some(Change::Moved {
+                    from: path,
+                    to: fields.next()?.to_string(),
+                    unchanged: status == "R100",
+                })
+            } else {
+                Some(Change::Edited(path))
+            }
+        })
+        .collect()
+}
+
+/// Moves the review date of each moved file in `reviewed` to its new path.
+fn carry_over_moves(reviewed: &mut Map<String, Value>, changes: &[Change]) {
+    for change in changes {
+        if let Change::Moved { from, to, .. } = change
+            && let Some(date) = reviewed.remove(from)
+        {
+            reviewed.insert(to.clone(), date);
+        }
+    }
+}
+
+/// The paths of the files whose content changed: everything but files only
+/// moved.
+fn changed_files(changes: &[Change]) -> impl Iterator<Item = String> + '_ {
+    changes.iter().filter_map(|change| match change {
+        Change::Edited(path)
+        | Change::Moved {
+            to: path,
+            unchanged: false,
+            ..
+        } => Some(path.clone()),
+        Change::Moved {
+            unchanged: true, ..
+        } => None,
+    })
 }
 
 /// Every reviewed crate's code, split into parts in path order.
@@ -332,3 +398,6 @@ fn relative(path: &Path) -> String {
         .collect::<Vec<_>>()
         .join("/")
 }
+
+#[cfg(test)]
+mod tests;

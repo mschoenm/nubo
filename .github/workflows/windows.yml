@@ -13,8 +13,8 @@ on:
       - Cargo.lock
       - xtask/src/windows.rs
       - xtask/src/licenses.rs
-      - frontends/iced/windows/**
-      - frontends/iced/build.rs
+      - frontends/nubo/windows/**
+      - frontends/nubo/build.rs
       - crates/nubo-logo/**
   workflow_call:
   workflow_dispatch:

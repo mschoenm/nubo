@@ -19,8 +19,7 @@ The work has five parts:
 
 ## Where the code lives
 
-- **In this repository, in the Iced app (`frontends/iced`, which becomes `frontends/nubo` in step 1 of
-  [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md)).** The Shootout downloads the Windows zip of
+- **In this repository, in the Iced app (`frontends/nubo`).** The Shootout downloads the Windows zip of
   Nubo's latest release and takes screenshots of the real `nubo.exe`, so the options it needs
   (`--scale`, `--fresh`, `--speed`, Part 1) must be in the app Nubo ships, not in a separate program.
   - The options are parsed in `main.rs`.
@@ -33,8 +32,7 @@ The work has five parts:
   through a pull request from the maintainer's fork (Part 4). Until then their draft lives in this
   document (Part 2), never in the Nubo crates: ACCURACY_PLAN.md keeps harnesses for other emulators
   out of them.
-- **In the test ROM runner (`tools/nubo-test-rom-runner` after the restructuring's step 1,
-  `frontends/test_rom_runner` before it), the nightly workflow and `cargo xtask metrics`.** Part 5 runs
+- **In the test ROM runner (`tools/nubo-test-rom-runner`), the nightly workflow and `cargo xtask metrics`.** Part 5 runs
   the Shootout's tests headless with its reference images and tolerance, and compares the result with
   the published table. It needs no new tool: the runner already runs daid's and CasualPokePlayer's
   Shootout tests this way (`Check::GrayscaleScreen`).
@@ -81,18 +79,15 @@ Everything below about the Shootout was read from its repository,
 
 ## Where Nubo stands
 
-Paths below are as they were when this plan was written. After step 1 of the restructuring,
-`frontends/iced` is `frontends/nubo`.
-
 What already works:
 
 - Releases have a Windows zip, `Nubo-windows-x64.zip`. It unpacks into a `Nubo` folder, so the program
   is `Nubo/nubo.exe` (`xtask/src/windows.rs`). The release also has `Nubo-windows-x64-setup.exe`, which
   `downloadGithubRelease`'s default filter (`"win" in name`) would match too, so the harness class
   must filter on the zip's name.
-- `nubo.exe <rom> --model dmg|cgb` (`frontends/iced/src/main.rs`, `parse_args`). `dmg` is `Model::Dmg`
+- `nubo.exe <rom> --model dmg|cgb` (`frontends/nubo/src/main.rs`, `parse_args`). `dmg` is `Model::Dmg`
   and `cgb` is `Model::CgbE` (`crates/nubo-core/src/model.rs`).
-- While a game runs, the window title is `<game> — Nubo` (`App::title` in `frontends/iced/src/app.rs`).
+- While a game runs, the window title is `<game> — Nubo` (`App::title` in `frontends/nubo/src/app.rs`).
   The class's `title_check` has to be `title.endswith("Nubo")`.
 - The default palette for original Game Boy games is plain gray (`DmgPalette::Gray`), the colors the
   references expect.
@@ -101,12 +96,12 @@ What already works:
 What's missing:
 
 1. **The window shows more than the game screen.** It opens at 4× with 24 px of padding and a 52 px
-   top bar, and can't be made smaller than 480×420 (`frontends/iced/src/main.rs`, `DEFAULT_SCALE_FACTOR`,
-   `SCREEN_PADDING`, `TOP_BAR_HEIGHT`, `MINIMUM_SIZE`). The game view (`frontends/iced/src/views/game.rs`)
+   top bar, and can't be made smaller than 480×420 (`frontends/nubo/src/main.rs`, `DEFAULT_SCALE_FACTOR`,
+   `SCREEN_PADDING`, `TOP_BAR_HEIGHT`, `MINIMUM_SIZE`). The game view (`frontends/nubo/src/views/game.rs`)
    also draws the auto-hiding bar, toasts, the pause menu and the fast forward badge.
 2. **Runs aren't independent.** Settings (`settings.toml`), battery saves (`<rom>.sav`, `<rom>.rtc`), the
    library and its pictures live in the per-user folders (`ProjectDirs::from("", "", "Nubo")` in
-   `frontends/iced/src/storage/files.rs`, under `%APPDATA%\Nubo` on Windows). The harness only deletes a
+   `frontends/nubo/src/storage/files.rs`, under `%APPDATA%\Nubo` on Windows). The harness only deletes a
    `.sav` next to the ROM, so the MBC and clock tests (rtc3test, CasualPokePlayer's tests) would start
    from the save of the previous run. A player's own settings, such as a green palette, would also
    change the results.
@@ -116,7 +111,7 @@ What's missing:
 ## Expected results
 
 This is an estimate: each Shootout test was matched by ROM file name and model against
-`frontends/test_rom_runner/passing.txt`. Nubo's own runner checks registers exactly where the
+`tools/nubo-test-rom-runner/passing.txt`. Nubo's own runner checks registers exactly where the
 Shootout checks screenshots, so a real run may differ.
 
 | Suite | Tests | Already passing in Nubo's runner | Notes |
@@ -164,7 +159,7 @@ must ignore or leave them out.
 3. **`--speed <n>`**: start with fast forward on at `n`×, using the existing fast forward path. Check
    which speeds `FastForwardSpeed` allows.
 4. Document the options. Update the doc comment at the top of `main.rs`, the commands in
-   `frontends/iced/AGENTS.md`, and the README if it lists command-line options.
+   `frontends/nubo/AGENTS.md`, and the README if it lists command-line options.
 5. Add unit tests for `parse_args` (new options, missing or invalid values) and for the window size.
 
 A cloud session has no display, so the window itself can only be checked on a real desktop. Ask the
@@ -380,7 +375,7 @@ counted on the published list, not on everything `main` runs.
      through `passing.txt`, and the column shows the trend.
    - **Tests:** cover the new line and column in `xtask/src/metrics/tests.rs`.
 7. **Docs.**
-   - `frontends/test_rom_runner/AGENTS.md` and the runner's module docs: the Shootout tests, the scoreboard and the summary line
+   - `tools/nubo-test-rom-runner/AGENTS.md` and the runner's module docs: the Shootout tests, the scoreboard and the summary line
    - `docs/CI.md`: the Shootout score in the metrics
 
    In the README: the test suite list.

@@ -17,4 +17,4 @@ runs:
           target/test-roms/v*
           target/test-roms/gb-emulator-shootout-*
           target/json-cpu-tests
-        key: test-roms-${{ hashFiles('frontends/test_rom_runner/src/download.rs', 'frontends/test_rom_runner/shootout.sha256', 'frontends/json_test_runner/src/download.rs', 'frontends/json_test_runner/v2.sha256') }}
+        key: test-roms-${{ hashFiles('tools/nubo-test-rom-runner/src/download.rs', 'tools/nubo-test-rom-runner/shootout.sha256', 'tools/nubo-json-test-runner/src/download.rs', 'tools/nubo-json-test-runner/v2.sha256') }}

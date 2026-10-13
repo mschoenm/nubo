@@ -4,7 +4,7 @@
 
 use crate::address_bus::bank_utils::{banked_read, banked_write};
 use crate::address_bus::constants::RAM_BANK_SIZE;
-use serializable_derive::Serializable;
+use nubo_serializable_derive::Serializable;
 
 /// What 0xA000-0xBFFF shows, chosen by writing to 0x0000-0x1FFF.
 #[derive(Debug, PartialEq, Serializable)]

@@ -2303,16 +2303,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "json_test_runner"
-version = "0.4.0"
-dependencies = [
- "nubo-core",
- "serde",
- "serde_json",
- "sha2",
-]
-
-[[package]]
 name = "kamadak-exif"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2880,7 +2870,7 @@ name = "nubo-core"
 version = "0.4.0"
 dependencies = [
  "getset",
- "serializable_derive",
+ "nubo-serializable-derive",
  "zip",
 ]
 
@@ -2895,6 +2885,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "nubo-json-test-runner"
+version = "0.4.0"
+dependencies = [
+ "nubo-core",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "nubo-logo"
 version = "0.4.0"
 
@@ -2904,6 +2904,26 @@ version = "0.4.0"
 dependencies = [
  "clap",
  "nubo-core",
+]
+
+[[package]]
+name = "nubo-serializable-derive"
+version = "0.4.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.7",
+]
+
+[[package]]
+name = "nubo-test-rom-runner"
+version = "0.4.0"
+dependencies = [
+ "clap",
+ "image",
+ "nubo-core",
+ "sha2",
+ "zip",
 ]
 
 [[package]]
@@ -4214,15 +4234,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serializable_derive"
-version = "0.4.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 3.0.7",
-]
-
-[[package]]
 name = "sha2"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4542,17 +4553,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "test_rom_runner"
-version = "0.4.0"
-dependencies = [
- "clap",
- "image",
- "nubo-core",
- "sha2",
- "zip",
 ]
 
 [[package]]

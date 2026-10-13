@@ -6,7 +6,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-serializable_derive.workspace = true
+nubo-serializable-derive.workspace = true
 getset = "0.1.6"
 zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
