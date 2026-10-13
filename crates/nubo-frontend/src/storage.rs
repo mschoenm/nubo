@@ -102,7 +102,6 @@ impl Storage for NoStorage {
 
 #[cfg(feature = "desktop")]
 pub mod files;
-#[cfg(feature = "web")]
 pub mod local_storage;
 #[cfg(test)]
 mod tests;

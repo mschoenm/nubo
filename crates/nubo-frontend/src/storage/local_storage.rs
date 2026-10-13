@@ -3,16 +3,23 @@
 //! settings as TOML text under `nubo:settings.toml`, and battery saves as
 //! base64 under the ROM's name with the save's extension, such as
 //! `nubo:game.sav` for `game.gb`. The browser build keeps no cheats yet.
+//!
+//! The keys are worked out without the `web` feature too, so their tests run
+//! in every build; only reaching the browser's localStorage needs it.
 
-use super::{Entry, Storage};
+use super::Entry;
+#[cfg(feature = "web")]
+use super::Storage;
+#[cfg(feature = "web")]
 use base64::Engine;
+#[cfg(feature = "web")]
 use base64::engine::general_purpose::STANDARD;
 
 /// Put in front of every key, so Nubo's entries don't clash with other
 /// apps on the same site.
 pub const KEY_PREFIX: &str = "nubo:";
 
-/// [`Storage`] in the page's localStorage.
+/// [`super::Storage`] in the page's localStorage.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct LocalStorage;
 
@@ -34,6 +41,7 @@ impl LocalStorage {
     }
 }
 
+#[cfg(feature = "web")]
 impl Storage for LocalStorage {
     fn read(&self, entry: Entry<'_>) -> Result<Option<Vec<u8>>, String> {
         let Ok(key) = Self::key(entry) else {
@@ -78,12 +86,14 @@ impl Storage for LocalStorage {
 }
 
 /// Whether `entry` is kept as text as it is, rather than as base64.
+#[cfg(feature = "web")]
 fn is_text(entry: Entry<'_>) -> bool {
     matches!(entry, Entry::Settings | Entry::Cheats(_))
 }
 
 /// The page's localStorage, which can be missing (for example when the user
 /// blocks site data).
+#[cfg(feature = "web")]
 fn local_storage() -> Result<web_sys::Storage, String> {
     web_sys::window()
         .and_then(|window| window.local_storage().ok().flatten())
