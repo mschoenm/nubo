@@ -55,6 +55,7 @@ cargo xtask flatpak           # Build the app as a Flatpak, install it for this 
 cargo xtask windows           # Build target/bundle/Nubo-<version>-windows-x64-setup.exe and a zip to run without installing (Windows, needs Inno Setup 6)
 cargo xtask icon path.png     # Write the logo as a 256 px PNG (images/icon.png in the README)
 cargo xtask icon path.svg     # Write the logo as an SVG (images/icon.svg)
+cargo xtask icon path.ico     # Write the logo as a Windows icon with every size
 cargo xtask licenses folder   # Write LICENSE, NOTICE and the crates' licenses for the desktop app into folder
 cargo xtask release-notes v0.2.0   # Check the tag, Cargo.toml and the newest AppStream release agree, and print its notes
 ```
