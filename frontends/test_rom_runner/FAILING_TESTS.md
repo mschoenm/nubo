@@ -1,6 +1,6 @@
 # Failing test ROMs
 
-`cargo test-roms` passes 6520 of the 6557 tests it runs. This file explains the 37 that fail: what each
+`cargo test-roms` passes 6524 of the 6557 tests it runs. This file explains the 33 that fail: what each
 test checks, what Nubo does instead, and why it isn't fixed yet or can't be. `cargo test-roms --verbose`
 prints the same list with each test's symptom, and failing screenshot tests leave the emulator's
 screen and a diff in `target/test-roms/failures/<model>/`.
@@ -13,7 +13,6 @@ ported.
 |---|---|---|
 | [Channel 1 duty timing across CGB speed switches](#channel-1-duty-timing-across-cgb-speed-switches) | 9 | Open |
 | [DMG palette writes during mode 3](#dmg-palette-writes-during-mode-3) | 9 | References disagree |
-| [MBC3](#mbc3) | 4 | Being worked on separately |
 | [Interrupts during a speed switch (AGE spsw-interrupts)](#interrupts-during-a-speed-switch) | 3 | Open, no reference emulator gets it right |
 | [CGB object palette RAM at power-on](#cgb-object-palette-ram-at-power-on) | 3 | Depends on one console's power-on state |
 | [GBMicrotest](#gbmicrotest) | 2 | The expected values are wrong |
@@ -127,19 +126,6 @@ subtle ways, while Gambatte's only switch between 00 and FF. **Next step:** tabu
 of the three suites (the dot it lands on, the pixel being output, the fetcher step, SCX & 7, the old
 and new values, what the hardware shows) and look for what separates the OR cases from the "new
 value" cases.
-
-## MBC3
-
-```
-dmg mbc3-tester/mbc3-tester.gb
-cgb mbc3-tester/mbc3-tester.gb
-dmg cpp/latch-rtc-test.gb
-dmg cpp/rtc-invalid-banks-test.gb
-```
-
-These are being worked on separately and were left alone here. Known causes: the MBC3 Tester uses a
-4 MB ROM, which needs the MBC30's 8-bit ROM bank number for banks 0x80 to 0xFF; CasualPokePlayer's
-tests differ in how invalid RAM/RTC bank numbers and a single latch write behave.
 
 ## Interrupts during a speed switch
 
