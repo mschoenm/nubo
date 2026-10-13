@@ -36,8 +36,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Otherwise the release would take over a tag on another commit and
-      # attach downloads that weren't built from it.
+      # Before the checks rather than only when tagging, so a version that was
+      # released already fails in a minute.
       - name: Check that a release started by hand is of main and its tag is new
         if: github.event_name == 'workflow_dispatch'
         run: |
@@ -99,14 +99,29 @@ jobs:
           cp artifacts/windows-x64/*-setup.exe upload/Nubo-windows-x64-setup.exe
           cp artifacts/windows-x64/*.zip upload/Nubo-windows-x64.zip
 
+      # A release started by hand tags the commit every check ran on. GitHub
+      # refuses a tag that exists, such as one pushed while the checks ran,
+      # so the downloads can't end up under a tag on another commit; a re-run
+      # finds the tag it made itself.
+      - name: Tag a release started by hand
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if ! gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$GITHUB_SHA" > /dev/null; then
+            tagged=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq .object.sha)
+            if [ "$tagged" != "$GITHUB_SHA" ]; then
+              echo "::error::$TAG was made on $tagged while the checks ran, not on $GITHUB_SHA"
+              exit 1
+            fi
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       # gh uploads the files to a draft and publishes it once they are all
-      # there, so the release never shows without its downloads. A pushed tag
-      # is on the commit every check ran on; a release started by hand makes
-      # its tag there.
+      # there, so the release never shows without its downloads.
       - name: Publish the release with the downloads
         run: >-
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY"
-          --target "$GITHUB_SHA" --title "Nubo ${TAG#v}"
+          --verify-tag --title "Nubo ${TAG#v}"
           --notes-file artifacts/release-notes/notes.md
           upload/*
         env:
