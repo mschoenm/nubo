@@ -276,6 +276,16 @@ fn within_field<T>(name: &str, run: impl FnOnce() -> T) -> T {
     result
 }
 
+/// While [`stored_layout`] runs, lists what a `T` stores for a value that
+/// holds none right now (an empty `Vec`, a `None`), so the layout has its
+/// fields whatever the value is.
+fn note_layout_of<T: Serializable + Default>() -> Result<()> {
+    if TRACKING.with_borrow(|tracking| tracking.layout.is_some()) {
+        T::default().serialize(&mut std::io::sink())?;
+    }
+    Ok(())
+}
+
 /// Notes the field being read as unreadable, for [`collect_unreadable`].
 fn note_unreadable() {
     TRACKING.with_borrow_mut(|tracking| {
@@ -304,7 +314,8 @@ pub fn collect_unreadable(read: impl FnOnce() -> Result<()>) -> Result<Vec<Strin
 /// Runs `write` and returns what it stores: the path of every field it
 /// wrote, such as `ppu.lcdc`, and for each enum value every variant it can be
 /// stored as, such as `cpu.run_state = Halted`. A field of the items of a
-/// `Vec` appears once.
+/// `Vec` appears once, and the fields of an empty `Vec`'s items or of a
+/// `None` are listed too.
 pub fn stored_layout(write: impl FnOnce() -> Result<()>) -> Result<BTreeSet<String>> {
     TRACKING.with_borrow_mut(|tracking| {
         *tracking = Tracking {
@@ -414,6 +425,9 @@ impl<T: Serializable + Default> Serializable for Vec<T> {
         let length = u32::try_from(self.len())
             .map_err(|_| Error::new(ErrorKind::InvalidInput, "Vec is too long to save"))?;
         length.serialize(writer)?;
+        if self.is_empty() {
+            note_layout_of::<T>()?;
+        }
         for item in self {
             item.serialize(writer)?;
         }
@@ -444,7 +458,10 @@ impl<T: Serializable + Default> Serializable for Option<T> {
                 1u8.serialize(writer)?;
                 value.serialize(writer)
             }
-            None => 0u8.serialize(writer),
+            None => {
+                note_layout_of::<T>()?;
+                0u8.serialize(writer)
+            }
         }
     }
 
@@ -712,6 +729,22 @@ mod tests {
             let mut read = original();
             assert!(read.deserialize(&mut &state[..length]).is_err());
         }
+    }
+
+    #[test]
+    fn the_layout_lists_the_fields_of_values_that_are_not_there() {
+        #[derive(Serializable)]
+        struct Outer {
+            maybe: Option<Original>,
+            items: Vec<Original>,
+        }
+        let outer = Outer {
+            maybe: None,
+            items: Vec::new(),
+        };
+        let layout = stored_layout(|| outer.serialize(&mut std::io::sink())).unwrap();
+        assert!(layout.contains("maybe.counter"));
+        assert!(layout.contains("items.mode = Busy"));
     }
 
     #[test]

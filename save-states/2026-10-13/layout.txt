@@ -277,6 +277,8 @@ ppu.palettes.object_palette_ram
 ppu.palettes.obp0
 ppu.palettes.obp1
 ppu.pending_dma_oam_write
+ppu.pending_dma_oam_write.index
+ppu.pending_dma_oam_write.value
 ppu.pipeline
 ppu.pipeline.bg_fifo
 ppu.pipeline.bg_fifo.bg_priority
@@ -341,6 +343,23 @@ ppu.pipeline.visible_object_y
 ppu.pipeline.window_continue_pending
 ppu.pipeline.window_is_being_fetched
 ppu.pipeline.window_start_backup
+ppu.pipeline.window_start_backup.bg_fifo
+ppu.pipeline.window_start_backup.bg_fifo.bg_priority
+ppu.pipeline.window_start_backup.bg_fifo.lower
+ppu.pipeline.window_start_backup.bg_fifo.palette
+ppu.pipeline.window_start_backup.bg_fifo.size
+ppu.pipeline.window_start_backup.bg_fifo.upper
+ppu.pipeline.window_start_backup.current_tile
+ppu.pipeline.window_start_backup.current_tile_attributes
+ppu.pipeline.window_start_backup.current_tile_data
+ppu.pipeline.window_start_backup.fetcher_state
+ppu.pipeline.window_start_backup.fetcher_state = GetTileDataHighT1
+ppu.pipeline.window_start_backup.fetcher_state = GetTileDataHighT2
+ppu.pipeline.window_start_backup.fetcher_state = GetTileDataLowT1
+ppu.pipeline.window_start_backup.fetcher_state = GetTileDataLowT2
+ppu.pipeline.window_start_backup.fetcher_state = GetTileT1
+ppu.pipeline.window_start_backup.fetcher_state = GetTileT2
+ppu.pipeline.window_start_backup.fetcher_state = Push
 ppu.pipeline.window_tile_x
 ppu.pipeline.window_y
 ppu.pipeline.wx_triggered
