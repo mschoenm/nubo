@@ -42,11 +42,17 @@ pub fn controllers() -> Subscription<ControllerEvent> {
 pub fn library_changes(folders: &[LibraryFolder]) -> Subscription<WatchEvent> {
     Subscription::run_with(folders.to_vec(), |folders| {
         let folders = folders.clone();
-        iced::stream::channel(16, async move |output| {
-            let watcher = nubo_frontend::library::watch(&folders, move |event| {
-                let _ = executor::block_on(output.clone().send(event));
+        iced::stream::channel(16, async move |mut output| {
+            // The watcher's thread may wait for room in the channel; this
+            // task, which empties it, must not.
+            let changes = output.clone();
+            let watching = nubo_frontend::library::watch(&folders, move |event| {
+                let _ = executor::block_on(changes.clone().send(event));
             });
-            if watcher.is_some() {
+            for failure in watching.failures {
+                let _ = output.send(WatchEvent::Failed(failure)).await;
+            }
+            if watching.watcher.is_some() {
                 std::future::pending::<()>().await;
             }
         })

@@ -8,7 +8,6 @@ use crate::settings::LibraryFolder;
 use notify_debouncer_mini::notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer};
 use std::path::Path;
-use std::sync::Arc;
 use std::time::Duration;
 
 /// Changes are collected for this long before the library hears about
@@ -25,37 +24,45 @@ pub struct Watcher {
     _debouncer: Debouncer<RecommendedWatcher>,
 }
 
+/// What starting to watch the library folders gave (see [`watch`]).
+pub struct Watching {
+    /// Watches until it is dropped, or `None` when watching couldn't start
+    /// at all.
+    pub watcher: Option<Watcher>,
+    /// Why folders can't be watched, or why watching couldn't start, for
+    /// the caller to report as [`WatchEvent::Failed`].
+    pub failures: Vec<String>,
+}
+
 /// Reports changes to ROMs and folders in `folders`, including their
 /// subfolders where the folder says so, by calling `report` on the
-/// watcher's own thread. Watching goes on until the returned [`Watcher`] is
-/// dropped, such as when the app stops listening because the folders
-/// changed.
+/// watcher's own thread, which may block until the app takes the event.
+/// Watching goes on until the returned watcher is dropped, such as when the
+/// app stops listening because the folders changed.
 ///
-/// A folder that can't be watched is reported as [`WatchEvent::Failed`]
-/// before this returns. If watching can't start at all, that is reported
-/// the same way and there is no watcher.
-pub fn watch(
-    folders: &[LibraryFolder],
-    report: impl Fn(WatchEvent) + Send + Sync + 'static,
-) -> Option<Watcher> {
-    let report = Arc::new(report);
-    let report_change = Arc::clone(&report);
+/// What goes wrong while starting (a folder that can't be watched, or no
+/// watcher at all) is returned instead of reported, so the caller can pass
+/// it on without blocking: `report` never runs on the caller's thread.
+pub fn watch(folders: &[LibraryFolder], report: impl Fn(WatchEvent) + Send + 'static) -> Watching {
     let debouncer = new_debouncer(QUIET_TIME, move |result: DebounceEventResult| {
         let event = match result {
             Ok(events) if events.iter().any(|event| matters(&event.path)) => WatchEvent::Changed,
             Ok(_) => return,
             Err(error) => WatchEvent::Failed(error.to_string()),
         };
-        report_change(event);
+        report(event);
     });
 
     let mut debouncer = match debouncer {
         Ok(debouncer) => debouncer,
         Err(error) => {
-            report(WatchEvent::Failed(error.to_string()));
-            return None;
+            return Watching {
+                watcher: None,
+                failures: vec![error.to_string()],
+            };
         }
     };
+    let mut failures = Vec::new();
 
     for folder in folders.iter().filter(|folder| folder.path.is_dir()) {
         let mode = if folder.include_subfolders {
@@ -65,13 +72,16 @@ pub fn watch(
         };
 
         if let Err(error) = debouncer.watcher().watch(&folder.path, mode) {
-            report(WatchEvent::Failed(error.to_string()));
+            failures.push(error.to_string());
         }
     }
 
-    Some(Watcher {
-        _debouncer: debouncer,
-    })
+    Watching {
+        watcher: Some(Watcher {
+            _debouncer: debouncer,
+        }),
+        failures,
+    }
 }
 
 /// Whether a change at `path` can affect the library: a ROM, or a folder

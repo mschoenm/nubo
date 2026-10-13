@@ -308,14 +308,17 @@ with the new build. Test this by hand on the desktop and in the browser.
   `box_art::AVAILABLE` are false, and title screens can still be captured (they only need the core).
 - **`Cache`:** where the library keeps `library.toml` and its pictures. `Library::load()` uses the
   player's data folder as before; `Library::load_from(Cache::in_folder(...))` keeps a library in
-  another folder, for tests, and every save goes there too. The work the app runs in the background
+  another folder, for tests, and every save of the library goes there too (the box art game lists
+  stay in the player's data folder). The work the app runs in the background
   for a game's title screen or box art (the saved picture if it is still current, else capture or
   download it) moved with it as `Cache::title_screen` and `Cache::box_art`.
-- **Watcher:** `library::watch(folders, report)` calls `report` on the watcher's thread with each
-  `WatchEvent` and returns a `Watcher` that watches until it is dropped (or `None`, after reporting
-  why, if watching can't start). `subscriptions::library_changes` keeps its `Subscription::run_with`
-  on the folders, sends each event into the stream's channel and holds the `Watcher` while the
-  subscription runs.
+- **Watcher:** `library::watch(folders, report)` calls `report` only on the watcher's own thread with
+  each `WatchEvent`, and returns `Watching`: a `Watcher` that watches until it is dropped (`None` if
+  watching can't start) and the failures from starting, which the caller passes on itself. So
+  `report` may block until the app takes the event, while the subscription that empties the channel
+  never blocks. `subscriptions::library_changes` keeps its `Subscription::run_with` on the folders,
+  sends the startup failures with `.await`, has the watcher's thread send its events into the
+  stream's channel and holds the `Watcher` while the subscription runs.
 - **`LibraryEntry::example`**, which the Iced crate's library screen tests use, is public now, since
   `cfg(test)` doesn't reach another crate.
 - **An existing library:** `tests/existing_data_folder/data/` now also has a `library.toml`, two

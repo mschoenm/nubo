@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 
 pub use scan::{FileCheck, ScanResult};
 #[cfg(feature = "desktop")]
-pub use watcher::{Watcher, watch};
+pub use watcher::{Watcher, Watching, watch};
 
 /// How many title screens are captured at the same time.
 const MAX_CAPTURES: usize = 2;
@@ -126,7 +126,8 @@ impl Cache {
 
     /// The library's files in `data_folder` instead of the player's data
     /// folder, for tests and measurements that mustn't touch the player's
-    /// data.
+    /// library. The box art game lists (see `box_art`) stay in the player's
+    /// data folder.
     #[cfg(feature = "desktop")]
     pub fn in_folder(data_folder: PathBuf) -> Cache {
         Cache {
