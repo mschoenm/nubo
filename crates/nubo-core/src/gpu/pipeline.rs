@@ -28,7 +28,7 @@ use crate::gpu::lcdc::{
     uses_tall_objects, window_enabled, window_uses_high_tile_map,
 };
 use crate::gpu::palettes::{BLACK, Color, WHITE};
-use crate::gpu::{Gpu, LAST_VISIBLE_LINE, OamDmaAccess, TimingVariant};
+use crate::gpu::{Gpu, OamDmaAccess, TimingVariant};
 use crate::model::Model;
 use crate::serializable::{FieldWriter, Serializable, array_encoding, read_fields};
 use crate::utils::is_bit_set;
@@ -740,7 +740,6 @@ impl Gpu {
         // The request is made even with the window enable bit clear; it only has to be set
         // when the next line starts (Gambatte's window on_screen wxA6 tests).
         let window_continues = !is_cgb && self.window_y_triggered && self.wx == LAST_PIXEL_WX;
-        let last_line = self.ly == LAST_VISIBLE_LINE;
         let pipeline = &mut self.pipeline;
         pipeline.position_in_line = POSITION_LINE_START;
         pipeline.line_has_fractional_scrolling = false;
@@ -754,9 +753,6 @@ impl Gpu {
             pipeline.current_tile_data[1] = pipeline.current_tile_data[0];
         }
 
-        if last_line {
-            pipeline.window_y = 0xFF;
-        }
         pipeline.window_continue_pending = window_continues;
         pipeline.wx_triggered = false;
     }

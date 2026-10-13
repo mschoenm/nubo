@@ -449,6 +449,7 @@ cgb-c gambatte/bgtiledata/bgtiledata_spx08_2.gbc
 cgb-c gambatte/bgtiledata/bgtiledata_spx08_3.gbc
 cgb-c gambatte/bgtiledata/bgtiledata_spx08_4.gbc
 cgb-c gambatte/bgtiledata/bgtiledata_spx08_ds_3.gbc
+cgb-c gambatte/bgtiledata/bgtiledata_spx08_ds_4.gbc
 cgb-c gambatte/bgtiledata/bgtiledata_spx09_1.gbc
 cgb-c gambatte/bgtiledata/bgtiledata_spx09_3.gbc
 cgb-c gambatte/bgtiledata/bgtiledata_spx09_ds_1.gbc
@@ -5712,6 +5713,7 @@ dmg gambatte/window/on_screen/wxA6_late_we_reenable_2.gbc
 dmg gambatte/window/on_screen/wxA6_late_we_reenable_3.gbc
 dmg gambatte/window/on_screen/wxA6_late_we_reenable_4.gbc
 dmg gambatte/window/on_screen/wxA6_scx7.gbc
+dmg gambatte/window/on_screen/wxA6_weoff_at_xposA6.gbc
 dmg gambatte/window/on_screen/wxA6_wy00.gbc
 dmg gambatte/window/on_screen/wxA6_wy01.gbc
 dmg gambatte/window/on_screen/wxA6_wy01_weoff_ly02.gbc

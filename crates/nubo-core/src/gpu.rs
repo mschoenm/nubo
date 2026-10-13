@@ -593,11 +593,14 @@ impl Gpu {
     }
 
     /// Compares WY with LY at the dots of the line where the PPU does (`*_WINDOW_Y_CHECK_DOTS`).
-    /// Line 0 starts the frame over.
+    /// Line 0 starts the frame over, and only then resets the window's line counter, so a DMG
+    /// window enabled during VBlank with a WX 166 start pending doesn't carry a counted line into
+    /// the new frame (Gambatte's window on_screen wxA6_weoff_at_xposA6 test).
     fn check_window_y(&mut self) {
         let (line_0_dot, line_start_dot, line_end_dot) = self.window_y_check_dots();
         if self.line == 0 && self.line_dot == line_0_dot {
             self.window_y_triggered = false;
+            self.pipeline.reset_window_line();
             self.update_window_y_trigger();
         } else if (1..VBLANK_START_LINE).contains(&self.line) && self.line_dot == line_start_dot {
             self.update_window_y_trigger();
