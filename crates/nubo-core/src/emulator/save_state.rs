@@ -200,7 +200,7 @@ impl Emulator {
     /// `ppu.line_state` for a state a newer Nubo made in a PPU mode this one
     /// doesn't know. A state from this version has none, and neither has one
     /// from an earlier version as long as later changes followed the rules in
-    /// `serializable.rs`, which `cargo release-states` checks.
+    /// `serializable.rs`.
     pub fn load_state_with_report(&mut self, data: &[u8]) -> Result<Vec<String>, SaveStateError> {
         let (header, mut state) = split(data)?;
         if header.model != self.model() {
@@ -233,13 +233,20 @@ impl Emulator {
     }
 
     /// The path of every value a save state of this emulator stores, such as
-    /// `ppu.lcdc`, so `cargo release-states` can tell when a version stores
-    /// other fields than the one before.
+    /// `header.model` or `ppu.lcdc`, sorted, so a check can tell when a
+    /// version stores other fields than the one before.
     pub fn save_state_field_paths(&self) -> Vec<String> {
-        field_paths(|| self.serialize(&mut io::sink()))
-            .expect("writing to a sink never fails")
+        let header = field_paths(|| SaveStateHeader::of(self).write(&mut io::sink()))
+            .expect("writing to a sink never fails");
+        let state =
+            field_paths(|| self.serialize(&mut io::sink())).expect("writing to a sink never fails");
+        let mut paths: Vec<String> = header
             .into_iter()
-            .collect()
+            .map(|path| format!("header.{path}"))
+            .chain(state)
+            .collect();
+        paths.sort();
+        paths
     }
 
     fn serialized_state(&self) -> Vec<u8> {
@@ -372,6 +379,7 @@ mod tests {
                 "bus",
                 "cartridge",
                 "cpu",
+                "header",
                 "joypad",
                 "oam_dma",
                 "ppu",
@@ -382,6 +390,7 @@ mod tests {
             ]
         );
         for path in [
+            "header.model",
             "cpu.registers.program_counter",
             "bus.work_ram",
             "bus.high_ram",
