@@ -22,7 +22,9 @@ const GLOBAL_CHECKSUM: usize = 0x014E;
 
 /// A cartridge header (0x0100-0x014F) for a game with the given CGB flag,
 /// SGB flag, cartridge type and old licensee code. The logo is a made-up
-/// pattern; the boot ROMs Nubo ships don't check it.
+/// pattern; the boot ROMs Nubo ships don't check it. The title is made up too,
+/// with a checksum (0xDB) the CGB boot ROM's palette table lists, so a Nintendo
+/// game gets a CGB palette.
 fn header(cgb_flag: u8, sgb_flag: u8, cartridge_type: u8, old_licensee: u8) -> Vec<u8> {
     let mut header = vec![0; 0x50];
     let mut set = |address: usize, value: u8| header[address - HEADER_START] = value;
@@ -33,7 +35,7 @@ fn header(cgb_flag: u8, sgb_flag: u8, cartridge_type: u8, old_licensee: u8) -> V
     for offset in 0..0x30 {
         set(0x0104 + offset, (offset as u8).wrapping_mul(37) ^ 0x5A);
     }
-    for (offset, byte) in b"TETRIS".iter().enumerate() {
+    for (offset, byte) in b"TEST GAME A".iter().enumerate() {
         set(0x0134 + offset, *byte);
     }
     set(CGB_FLAG, cgb_flag);
