@@ -1,8 +1,9 @@
 //! Finds the test ROMs in the downloaded collection and decides which
-//! hardware models each one runs on and how its result is checked.
+//! hardware models each one runs on and how its result is checked. The GB
+//! Emulator Shootout's tests are listed in `shootout.rs`.
 
 use crate::download::RomDirs;
-use crate::gambatte;
+use crate::{gambatte, shootout};
 use nubo_core::Key;
 pub(crate) use nubo_core::Model;
 use std::fmt;
@@ -31,8 +32,9 @@ pub(crate) fn model_label(model: Model) -> String {
 pub(crate) enum Source {
     /// The c-sp/game-boy-test-roms collection.
     Collection,
-    /// The GB Emulator Shootout (gbdev/GBEmulatorShootout), for tests the
-    /// collection doesn't include.
+    /// The GB Emulator Shootout (gbdev/GBEmulatorShootout): the ROMs of its
+    /// tests that the collection lacks or has in another version, and all its
+    /// reference screenshots.
     Shootout,
 }
 
@@ -62,6 +64,15 @@ pub(crate) enum Check {
     /// screenshots in other colors than Nubo's, such as the shootout's (which
     /// come from several emulators) and Mooneye's own.
     GrayscaleScreen(Vec<PathBuf>),
+    /// The way the GB Emulator Shootout judges its tests: passed once the
+    /// screen has matched a `pass` screenshot for as long as the Shootout's
+    /// harness could take to see it, failed once it has matched a `fail`
+    /// screenshot that long, compared in grayscale (see `shootout.rs`). The
+    /// paths are in the Shootout's folder, whichever source the ROM is from.
+    Shootout {
+        pass: Vec<PathBuf>,
+        fail: Vec<PathBuf>,
+    },
 }
 
 /// How much emulated time a test gets before it fails, and when that time
@@ -75,6 +86,9 @@ pub(crate) enum Deadline {
     /// Frames after the boot ROM hands over to the cartridge, like Gambatte's
     /// own test runner counts.
     FramesAfterBoot(u32),
+    /// Milliseconds from power-on, like the GB Emulator Shootout's
+    /// `runtime`. Rounded up to whole audio buffers.
+    MillisecondsFromPowerOn(u32),
 }
 
 impl Deadline {
@@ -89,6 +103,10 @@ impl Deadline {
             Self::FramesAfterBoot(frames) => {
                 (frames * T_CYCLES_PER_FRAME).div_ceil(T_CYCLES_PER_AUDIO_BUFFER)
             }
+            Self::MillisecondsFromPowerOn(milliseconds) => (milliseconds
+                * AUDIO_BUFFERS_PER_SECOND)
+                .div_ceil(1000)
+                .saturating_sub(boot_audio_buffers),
         }
     }
 }
@@ -102,6 +120,9 @@ impl fmt::Display for Deadline {
             }
             Self::FramesAfterBoot(frames) => {
                 write!(formatter, "{frames} frames after the boot ROM")
+            }
+            Self::MillisecondsFromPowerOn(milliseconds) => {
+                write!(formatter, "{} seconds", f64::from(*milliseconds) / 1000.0)
             }
         }
     }
@@ -122,6 +143,9 @@ pub(crate) struct TestCase {
     /// Buttons pressed one after another after the boot ROM, such as the
     /// menu choices that start a subtest.
     pub(crate) input: &'static [Key],
+    /// The test's name in the GB Emulator Shootout, for its tests, which
+    /// makes their ID `shootout/<name>`.
+    pub(crate) shootout_name: Option<&'static str>,
 }
 
 impl TestCase {
@@ -135,12 +159,18 @@ impl TestCase {
             deadline,
             subtest: None,
             input: &[],
+            shootout_name: None,
         }
     }
 
-    /// The name used in `passing.txt`, such as `dmg blargg/halt_bug.gb`, or
-    /// `dmg rtc3test/rtc3test.gb (range-tests)` for a subtest.
+    /// The name used in `passing.txt`, such as `dmg blargg/halt_bug.gb`,
+    /// `dmg rtc3test/rtc3test.gb (range-tests)` for a subtest, or
+    /// `shootout/daid/stop_instr.gb (DMG)` for a test of the GB Emulator
+    /// Shootout.
     pub(crate) fn id(&self) -> String {
+        if let Some(name) = self.shootout_name {
+            return format!("{}{name}", shootout::ID_PREFIX);
+        }
         let id = format!("{} {}", model_label(self.model), relative_name(&self.rom));
         match self.subtest {
             Some(subtest) => format!("{id} ({subtest})"),
@@ -153,13 +183,18 @@ impl TestCase {
     pub(crate) fn longest_run_seconds(&self) -> u32 {
         match self.deadline {
             Deadline::FromPowerOn(seconds) | Deadline::AfterBoot(seconds) => seconds,
+            Deadline::MillisecondsFromPowerOn(milliseconds) => milliseconds.div_ceil(1000),
             // Gambatte's 15 frames are a quarter of a second.
             Deadline::FramesAfterBoot(_) => 0,
         }
     }
 
-    /// The suite's folder name, such as `mooneye-test-suite`.
+    /// The suite's folder name, such as `mooneye-test-suite`, or `shootout`
+    /// for the GB Emulator Shootout's tests.
     pub(crate) fn suite(&self) -> String {
+        if self.shootout_name.is_some() {
+            return "shootout".to_string();
+        }
         relative_name(&self.rom)
             .split('/')
             .next()
@@ -184,10 +219,6 @@ const BOOT_ROM_SECONDS: u32 = 10;
 /// Extra time added to rtc3test's timeouts for picking a subtest from its
 /// menu, which takes up to a second.
 const RTC3TEST_MENU_SECONDS: u32 = 2;
-/// Seconds after the boot ROM at which the shootout's tests are checked. The
-/// shootout checks after half a second; these tests keep showing their
-/// result once they are done.
-const SHOOTOUT_SECONDS_AFTER_BOOT: u32 = 1;
 
 /// Every Game Boy button, for tests that want them all pressed.
 const ALL_KEYS: [Key; 8] = [
@@ -440,74 +471,6 @@ const RTC3TEST_SUBTESTS: [(&str, &[Key], u32); 3] = [
     ("sub-second-writes", &[Key::Down, Key::Down, Key::A], 26),
 ];
 
-/// The GB Emulator Shootout's tests that the collection lacks: daid's PPU,
-/// STOP and speed switch tests and CasualPokePlayer's MBC3 tests. Each runs
-/// on the model the shootout uses and passes if it matches one of its
-/// screenshots (several where hardware units differ). Left out are
-/// `daid/rom_and_ram.gb`, which has no expected result, and
-/// `cpp/sgb-ext-test.gb`, which needs the Super Game Boy's packet protocol.
-const SHOOTOUT_TESTS: [(&str, Model, &[&str]); 11] = [
-    (
-        "daid/ppu_scanline_bgp.gb",
-        Model::Dmg,
-        &[
-            "daid/ppu_scanline_bgp_0.dmg.png",
-            "daid/ppu_scanline_bgp_1.dmg.png",
-            "daid/ppu_scanline_bgp_2.dmg.png",
-        ],
-    ),
-    (
-        "daid/ppu_scanline_bgp.gb",
-        Model::CgbE,
-        &["daid/ppu_scanline_bgp.gbc.png"],
-    ),
-    (
-        "daid/stop_instr.gb",
-        Model::Dmg,
-        &["daid/stop_instr.dmg.png"],
-    ),
-    (
-        "daid/stop_instr.gb",
-        Model::CgbE,
-        &["daid/stop_instr.gbc.png"],
-    ),
-    (
-        "daid/stop_instr_gbc_mode3.gb",
-        Model::CgbE,
-        &["daid/stop_instr_gbc_mode3.png"],
-    ),
-    (
-        "daid/speed_switch_timing_div.gbc",
-        Model::CgbE,
-        &["daid/speed_switch_timing_div.png"],
-    ),
-    (
-        "daid/speed_switch_timing_ly.gbc",
-        Model::CgbE,
-        &["daid/speed_switch_timing_ly.png"],
-    ),
-    (
-        "daid/speed_switch_timing_stat.gbc",
-        Model::CgbE,
-        &["daid/speed_switch_timing_stat.png"],
-    ),
-    (
-        "cpp/rtc-invalid-banks-test.gb",
-        Model::Dmg,
-        &["cpp/rtc-invalid-banks-test.png"],
-    ),
-    (
-        "cpp/latch-rtc-test.gb",
-        Model::Dmg,
-        &["cpp/latch-rtc-test.png"],
-    ),
-    (
-        "cpp/ramg-mbc3-test.gb",
-        Model::Dmg,
-        &["cpp/ramg-mbc3-test.png"],
-    ),
-];
-
 /// A Blargg test ROM and, per model, its reference screenshot and how many
 /// seconds it needs.
 struct BlarggTest {
@@ -600,7 +563,8 @@ pub(crate) fn discover(dirs: &RomDirs) -> Vec<TestCase> {
     tests.extend(rtc3test());
     tests.extend(screenshot_tests());
     tests.extend(mooneye_madness());
-    tests.extend(shootout());
+    tests.extend(shootout_rom_checks());
+    tests.extend(shootout::test_cases());
     tests.sort_by_key(TestCase::id);
     tests
 }
@@ -966,9 +930,85 @@ fn mooneye_madness() -> Vec<TestCase> {
         .collect()
 }
 
-/// The tests taken from the GB Emulator Shootout (see `SHOOTOUT_TESTS`).
-fn shootout() -> Vec<TestCase> {
-    SHOOTOUT_TESTS
+/// Seconds after the boot ROM at which the shootout's tests are checked. The
+/// shootout checks after half a second; these tests keep showing their
+/// result once they are done.
+const SHOOTOUT_SECONDS_AFTER_BOOT: u32 = 1;
+
+/// Tests of the GB Emulator Shootout that the collection lacks: daid's PPU,
+/// STOP and speed switch tests and CasualPokePlayer's MBC3 tests, checked
+/// for what the emulator does. Each runs on the model the shootout uses and
+/// passes if it matches one of its screenshots (several where hardware units
+/// differ) in the screenshots' own grays (see `screen::normalize`). The
+/// Shootout's own judgement of them, in the colors the app shows, is in
+/// `shootout.rs`. Left out are
+/// `daid/rom_and_ram.gb`, which has no expected result, and
+/// `cpp/sgb-ext-test.gb`, which needs the Super Game Boy's packet protocol.
+const SHOOTOUT_ROM_CHECKS: [(&str, Model, &[&str]); 11] = [
+    (
+        "daid/ppu_scanline_bgp.gb",
+        Model::Dmg,
+        &[
+            "daid/ppu_scanline_bgp_0.dmg.png",
+            "daid/ppu_scanline_bgp_1.dmg.png",
+            "daid/ppu_scanline_bgp_2.dmg.png",
+        ],
+    ),
+    (
+        "daid/ppu_scanline_bgp.gb",
+        Model::CgbE,
+        &["daid/ppu_scanline_bgp.gbc.png"],
+    ),
+    (
+        "daid/stop_instr.gb",
+        Model::Dmg,
+        &["daid/stop_instr.dmg.png"],
+    ),
+    (
+        "daid/stop_instr.gb",
+        Model::CgbE,
+        &["daid/stop_instr.gbc.png"],
+    ),
+    (
+        "daid/stop_instr_gbc_mode3.gb",
+        Model::CgbE,
+        &["daid/stop_instr_gbc_mode3.png"],
+    ),
+    (
+        "daid/speed_switch_timing_div.gbc",
+        Model::CgbE,
+        &["daid/speed_switch_timing_div.png"],
+    ),
+    (
+        "daid/speed_switch_timing_ly.gbc",
+        Model::CgbE,
+        &["daid/speed_switch_timing_ly.png"],
+    ),
+    (
+        "daid/speed_switch_timing_stat.gbc",
+        Model::CgbE,
+        &["daid/speed_switch_timing_stat.png"],
+    ),
+    (
+        "cpp/rtc-invalid-banks-test.gb",
+        Model::Dmg,
+        &["cpp/rtc-invalid-banks-test.png"],
+    ),
+    (
+        "cpp/latch-rtc-test.gb",
+        Model::Dmg,
+        &["cpp/latch-rtc-test.png"],
+    ),
+    (
+        "cpp/ramg-mbc3-test.gb",
+        Model::Dmg,
+        &["cpp/ramg-mbc3-test.png"],
+    ),
+];
+
+/// The tests of `SHOOTOUT_ROM_CHECKS`.
+fn shootout_rom_checks() -> Vec<TestCase> {
+    SHOOTOUT_ROM_CHECKS
         .into_iter()
         .map(|(rom, model, screens)| TestCase {
             source: Source::Shootout,
@@ -1152,6 +1192,14 @@ mod tests {
         );
         assert_eq!(Deadline::FromPowerOn(2).audio_buffers_after_boot(boot), 0);
         assert_eq!(Deadline::AfterBoot(1).audio_buffers_after_boot(boot), 128);
+        assert_eq!(
+            Deadline::MillisecondsFromPowerOn(3500).audio_buffers_after_boot(boot),
+            448 - boot
+        );
+        assert_eq!(
+            Deadline::MillisecondsFromPowerOn(2000).audio_buffers_after_boot(boot),
+            0
+        );
         // 15 frames of 70224 T-cycles are 32.1 buffers of 32768.
         assert_eq!(
             Deadline::FramesAfterBoot(15).audio_buffers_after_boot(boot),

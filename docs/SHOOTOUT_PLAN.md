@@ -13,7 +13,9 @@ The work has five parts:
   of the published table (Part 5 shows where it stands), and then for the maintainer's go.
 - Part 5 adds the Shootout's tests to `cargo test-roms`, so CI and the nightly run check them, and the
   nightly metrics on the wiki show where Nubo would rank. It doesn't depend on the other parts and goes
-  first, right after steps 1 and 2 of [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md). Parts 1 to 3 follow
+  first, right after steps 1 and 2 of [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md). **Done**: Nubo passes
+  251 of the 264 published tests, which would rank it second, level with Emulicious; the seven DMG
+  tests it misses only need darker middle grays on screen (see "What Part 5 found"). Parts 1 to 3 follow
   once the restructuring is finished. That plan's "Order and dependencies" has the whole order the
   maintainer agreed to.
 
@@ -89,8 +91,10 @@ What already works:
   and `cgb` is `Model::CgbE` (`crates/nubo-core/src/model.rs`).
 - While a game runs, the window title is `<game> — Nubo` (`App::title` in `frontends/nubo/src/app.rs`).
   The class's `title_check` has to be `title.endswith("Nubo")`.
-- The default palette for original Game Boy games is plain gray (`DmgPalette::Gray`), the colors the
-  references expect.
+- The default palette for original Game Boy games is plain gray (`DmgPalette::Gray`). Its middle grays
+  (0xD3 and 0xA9) aren't the references' evenly spaced ones (0xAA and 0x55): the light gray is within
+  the harness's tolerance of 50, but the dark gray is 84 away, so seven DMG tests with dark gray in
+  their screenshots fail (see "What Part 5 found").
 - Nubo has its own boot ROMs, so the harness doesn't need to download any.
 
 What's missing:
@@ -109,6 +113,11 @@ What's missing:
    (runtime + a few seconds) at normal speed.
 
 ## Expected results
+
+Part 5 replaced this estimate with a real count: 251 of the 258 tests the harness class would run
+pass. The seven that fail are DMG tests whose screenshots have a darker middle gray than Nubo shows,
+and the other six are the three Super Game Boy tests and the three that only report information (see
+"What Part 5 found"). The estimate as it was:
 
 This is an estimate: each Shootout test was matched by ROM file name and model against
 `tools/nubo-test-rom-runner/passing.txt`. Nubo's own runner checks registers exactly where the
@@ -301,9 +310,11 @@ table has 264 tests. The top of it reads:
 The other rows are counted as "info": tests with no reference image, such as `which.gb` and
 `rom_and_ram.gb`, and the tests an emulator can't run, such as the Super Game Boy ones.
 
-The published list is older than the Shootout's `main`. It has no Mealybug tests, for example, and none
-of the `main` tests that target one hardware revision on another model. So "would rank first" has to be
-counted on the published list, not on everything `main` runs.
+The plan assumed the published list was older than the Shootout's `main`, with no Mealybug tests and
+none of the tests that target one hardware revision. At the pinned `main` commit `38b926b` the two lists
+turned out to be the same 264 tests: `main` runs only the DMG Mealybug tests, and the revision tests are
+commented out. "Would rank first" is still counted on the published list, so it stays right when they
+part again.
 
 ### Steps
 
@@ -380,7 +391,7 @@ counted on the published list, not on everything `main` runs.
 
    In the README: the test suite list.
 
-**Cost.** Measured on 2026-10-13 in a 4-core cloud container:
+**Cost.** Estimated on 2026-10-13 in a 4-core cloud container, before it was built:
 - Nubo ran all 294 Shootout ROMs for 2 emulated seconds on both DMG and CGB-E in 7.0 s with
   `--jobs 4`. That is about 1,180 emulated seconds, or 170 per second of real time.
 - The Shootout's roughly 310 tests on `main` add up to about 555 emulated seconds of `runtime`; the
@@ -394,10 +405,55 @@ counted on the published list, not on everything `main` runs.
   each of these tests instead of starting from a copy, as it does for every other test.
 - The runner starts the longest tests first, so the 20-second ones overlap with the rest.
 
-Measure it again once it is built, with and without the new tests, and note the result here.
+Measured once it was built, on 2026-10-13 in the same 4-core container, three runs each of the whole
+`cargo test-roms` with and without the Shootout's 258 tests (other work shared the machine, so the
+CPU time is the steadier number):
+- With them: about 88.7 CPU seconds. Without them: about 76.0. So they add **about 13 CPU seconds,
+  about 3 seconds on 4 cores**, or 17%. On an idle machine the whole run took 23.5 to 26 seconds with
+  them.
+- On their own (`cargo test-roms shootout`) they take 3.5 to 4.5 seconds, and 9 seconds with
+  `--verify-boot`, which runs the boot ROM for each of them.
+- Every test passes long before its deadline, so the longer deadline below costs nothing unless tests
+  start failing; a failing test then runs for its `runtime` plus 24 emulated seconds.
 
 **Done when:**
 - `cargo test-roms` runs the Shootout's tests in CI and at night, and prints the summary line.
 - `passing.txt` and `FAILING_TESTS.md` list them.
 - The "Nightly metrics" wiki page shows the score and rank at the top, and a column in its history.
 - The extra time is measured and noted.
+
+### What Part 5 found
+
+Done on 2026-10-13. `cargo test-roms` prints
+`  shootout  251/264  rank 2  leader DocBoy 255  published 2026-06-04 72fd745`. Where the build
+differs from the steps above, and why:
+
+- **Files.** Only 53 of the 258 tests' ROMs are in the c-sp collection with the Shootout's SHA-256
+  (the acid tests, Blargg's sound tests and `interrupt_time`, Strikethrough and the DMG Mealybug tests);
+  the collection's Mooneye, SameSuite, `cpu_instrs`, `mem_timing`, `oam_bug` and other ROMs are other
+  builds. So the runner downloads 202 ROMs (29 MB, most of it four large Mooneye MBC ROMs) and 259
+  reference screenshots (0.25 MB) from the Shootout, once; CI caches them through `shootout.sha256`.
+  The download's marker now holds the manifest's checksum, so a changed manifest downloads the new
+  files on machines that already have the old ones.
+- **Deadline.** "The `runtime` plus 2 seconds from power-on" failed 100 of the 258 tests that pass
+  with more time: the CGB boot ROM alone takes 3.1 seconds and the DMG's 1.7, and some tests need up
+  to 8.5 seconds more than their `runtime`. The runner uses the harness's own deadline instead,
+  `runtime / speed + startup_time + 5` seconds of real time, which at speed 4 with the draft's
+  `startup_time` of 1 second is the `runtime` plus 24 emulated seconds.
+- **Seven failing tests, all for the colors.** None of the plan's expected failures happen: the
+  revision tests aren't in the list, and Nubo passes the Shootout's build of Bully on DMG. But the
+  harness compares a screenshot of the app, so the runner compares the frame in the colors the app
+  shows, not mapped to the screenshots' grays as the other screenshot checks are. Nubo's dark gray
+  (0xA9) is 84 steps of brightness from the screenshots' (0x55), more than the 50 the comparison
+  allows, so the seven DMG tests with dark gray in their screenshots fail. `FAILING_TESTS.md` lists
+  them with what to try, and explains the six published tests that aren't counted. Making the middle
+  grays evenly spaced (on screen, in the default palette or under `--fresh`) is a decision for Part 1.
+- **daid's and CasualPokePlayer's tests run twice.** Since the two comparisons now judge different
+  things (the emulation, in the screenshots' grays, and what the harness would see), their old
+  checks under their own IDs stay, next to the `shootout/` ones.
+- **Fail screenshots.** The Shootout has no `.fail.png` at the pinned commit. The check handles them,
+  and a regenerated list adds them when they appear.
+- **The publication date** in `shootout_published.txt` is the day of the newest result in the
+  emulators' files (2026-06-04, the day of `gh-pages` commit `72fd745`), since the GitHub API that
+  would give the commit's date isn't reachable from every machine. The command takes the full commit
+  hash.

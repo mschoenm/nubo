@@ -24,6 +24,9 @@ cargo xtask compare-emulators --instructions  # Instructions per emulated second
 cargo xtask benchmark-roms    # Download the benchmark games into target/benchmark-roms
 cargo xtask review-units [next --state rotation.json --date <YYYY-MM-DD> --commit <sha>]   # The parts the review splits the code into, or tonight's
 cargo xtask metrics report metrics.jsonl   # Write the Nightly metrics wiki page from the log
+
+# The GB Emulator Shootout's published table (docs/SHOOTOUT_PLAN.md, Part 5)
+cargo xtask shootout-scoreboard <commit>   # Read its gh-pages branch at <commit> into tools/nubo-test-rom-runner/shootout_published.txt
 ```
 
 ## Keep in Mind

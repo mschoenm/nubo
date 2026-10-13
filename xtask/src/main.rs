@@ -2,7 +2,8 @@
 //! frontend for the browser and serving it locally, building the macOS app
 //! bundle, the Flatpak and the Windows installer, writing the logo and the
 //! license files that go with them, checking a release's version and notes,
-//! timing Nubo next to other emulators, and the nightly review's tooling.
+//! timing Nubo next to other emulators, the nightly review's tooling, and
+//! reading the GB Emulator Shootout's published table.
 //!
 //! The packaging tasks need their platform's tools, and `compare-emulators`
 //! builds other emulators from their C and C++ sources; nothing else needs
@@ -73,6 +74,9 @@ Commands:
                 and record it in the rotation's state
   metrics append <metrics.jsonl> <night.json> | metrics report <metrics.jsonl>
                 Add a night to the nightly metrics log, or write the Nightly metrics wiki page
+  shootout-scoreboard <commit>
+                Read the GB Emulator Shootout's published table from its gh-pages branch at
+                <commit> (a full hash) into tools/nubo-test-rom-runner/shootout_published.txt
   help          Show this message";
 
 /// Every task reports failures as a message for the user.
@@ -352,6 +356,7 @@ fn main() -> ExitCode {
         Some("compare-emulators") => compare_emulators::run_comparison(&options),
         Some("review-units") => review_units::run(&options),
         Some("metrics") => metrics::run(&options),
+        Some("shootout-scoreboard") => shootout_scoreboard::run(&options),
         Some("help") | None => {
             println!("{USAGE}");
             Ok(())
@@ -392,4 +397,5 @@ mod licenses;
 mod metrics;
 mod release;
 mod review_units;
+mod shootout_scoreboard;
 mod windows;

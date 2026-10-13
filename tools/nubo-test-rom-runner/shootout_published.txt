@@ -1,0 +1,270 @@
+# The GB Emulator Shootout's published table (gbdev.io/GBEmulatorShootout), read from its
+# gh-pages branch by `cargo xtask shootout-scoreboard <commit>`: the commit, the day of the
+# newest result, then one line per published test with the emulators that pass it.
+# Read from the results the Shootout publishes (the project is MIT-licensed, Copyright (c) 2026 daid); see NOTICE.
+commit	72fd7452fb4febd8832c0ca5b30fab431fde767e
+published	2026-06-04
+acid/which.gb (DMG)	
+acid/which.gb (GBC)	
+acid/dmg-acid2.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+acid/cgb-acid2.gbc	ares,Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+acid/cgb-acid-hell.gbc	Beaten Dying Moon,Emulicious,GSE,SameBoy
+blargg/cpu_instrs/01-special.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/cpu_instrs/02-interrupts.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/cpu_instrs/03-op_sp,hl.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/cpu_instrs/04-op_r,imm.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+blargg/cpu_instrs/05-op_rp.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+blargg/cpu_instrs/06-ld_r,r.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+blargg/cpu_instrs/07-jr,jp,call,ret,rst.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+blargg/cpu_instrs/08-misc_instrs.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/cpu_instrs/09-op_r,r.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+blargg/cpu_instrs/10-bit_ops.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+blargg/cpu_instrs/11-op_a,(hl).gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,SameBoy,VisualBoyAdvance-M
+blargg/halt_bug.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,No$gmb,SameBoy,VisualBoyAdvance-M
+blargg/instr_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/interrupt_time.gb	ares,Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,mGBA,PyBoy,SameBoy
+blargg/mem_timing/01-read_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/mem_timing/02-write_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/mem_timing/03-modify_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy
+blargg/mem_timing-2/01-read_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/mem_timing-2/02-write_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/mem_timing-2/03-modify_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy
+blargg/oam_bug/1-lcd_sync.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+blargg/oam_bug/2-causes.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+blargg/oam_bug/3-non_causes.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+blargg/oam_bug/4-scanline_timing.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+blargg/oam_bug/5-timing_bug.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+blargg/oam_bug/6-timing_no_bug.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+blargg/oam_bug/8-instr_effect.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+blargg/dmg_sound/01-registers.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/dmg_sound/02-len_ctr.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/dmg_sound/03-trigger.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+blargg/dmg_sound/04-sweep.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+blargg/dmg_sound/05-sweep_details.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+blargg/dmg_sound/06-overflow_on_trigger.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/dmg_sound/07-len_sweep_period_sync.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+blargg/dmg_sound/08-len_ctr_during_power.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,KiGB,mGBA,SameBoy,VisualBoyAdvance-M
+blargg/dmg_sound/09-wave_read_while_on.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+blargg/dmg_sound/10-wave_trigger_while_on.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,SameBoy,VisualBoyAdvance-M
+blargg/dmg_sound/11-regs_after_power.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/dmg_sound/12-wave_write_while_on.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+blargg/cgb_sound/01-registers.gb	ares,Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/cgb_sound/02-len_ctr.gb	ares,Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/cgb_sound/03-trigger.gb	ares,Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+blargg/cgb_sound/04-sweep.gb	ares,Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+blargg/cgb_sound/05-sweep_details.gb	ares,Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+blargg/cgb_sound/06-overflow_on_trigger.gb	ares,Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/cgb_sound/07-len_sweep_period_sync.gb	ares,Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+blargg/cgb_sound/08-len_ctr_during_power.gb	ares,Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/cgb_sound/09-wave_read_while_on.gb	ares,Beaten Dying Moon,binjgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,mGBA,SameBoy
+blargg/cgb_sound/10-wave_trigger_while_on.gb	ares,Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,GSE,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+blargg/cgb_sound/11-regs_after_power.gb	ares,Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+blargg/cgb_sound/12-wave.gb	ares,Beaten Dying Moon,binjgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+daid/ppu_scanline_bgp.gb (DMG)	Beaten Dying Moon,bgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,SameBoy,VisualBoyAdvance-M
+daid/ppu_scanline_bgp.gb (GBC)	Beaten Dying Moon,bgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,SameBoy
+daid/stop_instr.gb (DMG)	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,Goomba,PyBoy,SameBoy,VisualBoyAdvance-M
+daid/stop_instr.gb (GBC)	Beaten Dying Moon,bgb,DocBoy,Emulicious,Goomba,mGBA,SameBoy
+daid/stop_instr_gbc_mode3.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,No$gmb,SameBoy
+daid/speed_switch_timing_div.gbc	ares,Beaten Dying Moon,bgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,PyBoy,SameBoy
+daid/speed_switch_timing_ly.gbc	Beaten Dying Moon,bgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,SameBoy
+daid/speed_switch_timing_stat.gbc	Beaten Dying Moon,bgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,SameBoy
+daid/rom_and_ram.gb	
+ax6/rtc3test-1.gb	ares,Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+ax6/rtc3test-2.gb	ares,Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+ax6/rtc3test-3.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+mooneye/acceptance/add_sp_e_timing.gb	Beaten Dying Moon,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/bits/mem_oam.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/acceptance/bits/reg_f.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/bits/unused_hwio-GS.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/boot_div-dmgABCmgb.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/boot_hwio-dmgABCmgb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/boot_regs-dmgABC.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/acceptance/call_cc_timing.gb	Beaten Dying Moon,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/call_cc_timing2.gb	Beaten Dying Moon,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/call_timing.gb	Beaten Dying Moon,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/call_timing2.gb	Beaten Dying Moon,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/div_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/di_timing-GS.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy
+mooneye/acceptance/ei_sequence.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,KiGB,mGBA,No$gmb,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/ei_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,KiGB,mGBA,No$gmb,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/acceptance/halt_ime0_ei.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/acceptance/halt_ime0_nointr_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/halt_ime1_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/acceptance/halt_ime1_timing2-GS.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/if_ie_registers.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,No$gmb,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/acceptance/instr/daa.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/interrupts/ie_push.gb	Beaten Dying Moon,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/intr_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/jp_cc_timing.gb	Beaten Dying Moon,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/jp_timing.gb	Beaten Dying Moon,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/ld_hl_sp_e_timing.gb	Beaten Dying Moon,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/oam_dma/basic.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/acceptance/oam_dma/reg_read.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,KiGB,mGBA,No$gmb,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/acceptance/oam_dma/sources-GS.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/oam_dma_restart.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/oam_dma_start.gb	Beaten Dying Moon,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,SameBoy
+mooneye/acceptance/oam_dma_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/pop_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/ppu/hblank_ly_scx_timing-GS.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,SameBoy
+mooneye/acceptance/ppu/intr_1_2_timing-GS.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy
+mooneye/acceptance/ppu/intr_2_0_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/ppu/intr_2_mode0_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/ppu/intr_2_mode0_timing_sprites.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,SameBoy
+mooneye/acceptance/ppu/intr_2_mode3_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/ppu/intr_2_oam_ok_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/ppu/lcdon_timing-GS.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,SameBoy
+mooneye/acceptance/ppu/lcdon_write_timing-GS.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,SameBoy
+mooneye/acceptance/ppu/stat_irq_blocking.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/ppu/stat_lyc_onoff.gb	Beaten Dying Moon,bgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/ppu/vblank_stat_intr-GS.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/push_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,SameBoy
+mooneye/acceptance/rapid_di_ei.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,KiGB,mGBA,No$gmb,SameBoy,VisualBoyAdvance
+mooneye/acceptance/reti_intr_timing.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,KiGB,mGBA,No$gmb,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/acceptance/reti_timing.gb	Beaten Dying Moon,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/ret_cc_timing.gb	Beaten Dying Moon,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/ret_timing.gb	Beaten Dying Moon,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/rst_timing.gb	Beaten Dying Moon,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/serial/boot_sclk_align-dmgABCmgb.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,SameBoy
+mooneye/acceptance/timer/div_write.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/timer/rapid_toggle.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/timer/tim00.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/timer/tim00_div_trigger.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/acceptance/timer/tim01.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/acceptance/timer/tim01_div_trigger.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/timer/tim10.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/timer/tim10_div_trigger.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/timer/tim11.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/acceptance/timer/tim11_div_trigger.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/acceptance/timer/tima_reload.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/timer/tima_write_reloading.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/acceptance/timer/tma_write_reloading.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,SameBoy
+mooneye/emulator-only/mbc1/bits_bank1.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/emulator-only/mbc1/bits_bank2.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/emulator-only/mbc1/bits_mode.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/emulator-only/mbc1/bits_ramg.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy
+mooneye/emulator-only/mbc1/multicart_rom_8Mb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,gameroy,mGBA,SameBoy
+mooneye/emulator-only/mbc1/ram_256kb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/emulator-only/mbc1/ram_64kb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/emulator-only/mbc1/rom_16Mb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,gameroy,GSE,mGBA,PyBoy,SameBoy
+mooneye/emulator-only/mbc1/rom_1Mb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/emulator-only/mbc1/rom_2Mb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/emulator-only/mbc1/rom_4Mb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/emulator-only/mbc1/rom_512kb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/emulator-only/mbc1/rom_8Mb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,gameroy,GSE,mGBA,PyBoy,SameBoy
+mooneye/emulator-only/mbc2/bits_ramg.gb	Beaten Dying Moon,bgb,DocBoy,Emmy,Emulicious,gameroy,GSE,mGBA,PyBoy,SameBoy
+mooneye/emulator-only/mbc2/bits_romb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,gameroy,GSE,mGBA,PyBoy,SameBoy
+mooneye/emulator-only/mbc2/bits_unused.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/emulator-only/mbc2/ram.gb	Beaten Dying Moon,bgb,DocBoy,Emmy,Emulicious,gameroy,GSE,mGBA,PyBoy,SameBoy
+mooneye/emulator-only/mbc2/rom_1Mb.gb	Beaten Dying Moon,bgb,DocBoy,Emmy,Emulicious,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/emulator-only/mbc2/rom_2Mb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,gameroy,Goomba,GSE,KiGB,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/emulator-only/mbc2/rom_512kb.gb	Beaten Dying Moon,bgb,DocBoy,Emmy,Emulicious,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/emulator-only/mbc5/rom_16Mb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/emulator-only/mbc5/rom_1Mb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/emulator-only/mbc5/rom_2Mb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/emulator-only/mbc5/rom_32Mb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/emulator-only/mbc5/rom_4Mb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/emulator-only/mbc5/rom_512kb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/emulator-only/mbc5/rom_64Mb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/emulator-only/mbc5/rom_8Mb.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance,VisualBoyAdvance-M
+mooneye/manual-only/sprite_priority.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+mooneye/misc/boot_div-cgbABCDE.gb	Beaten Dying Moon,DocBoy,Emulicious,GambatteSpeedrun,GSE,SameBoy,VisualBoyAdvance-M
+mooneye/misc/boot_regs-cgb.gb	ares,Beaten Dying Moon,DocBoy,Emulicious,GambatteSpeedrun,GSE,mGBA,PyBoy,SameBoy,VisualBoyAdvance-M
+samesuite/apu/channel_1/channel_1_align.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_1/channel_1_align_cpu.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_1/channel_1_delay.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_1/channel_1_duty.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_1/channel_1_duty_delay.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_1/channel_1_freq_change.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_1/channel_1_nrx2_glitch.gb	bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_1/channel_1_nrx2_speed_change.gb	bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_1/channel_1_restart.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_1/channel_1_restart_nrx2_glitch.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_1/channel_1_stop_div.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_1/channel_1_stop_restart.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_1/channel_1_sweep.gb	DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_1/channel_1_sweep_restart.gb	DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_1/channel_1_sweep_restart_2.gb	Emulicious,GambatteSpeedrun,GSE,SameBoy
+samesuite/apu/channel_1/channel_1_volume.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_1/channel_1_volume_div.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_2/channel_2_align.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_2/channel_2_align_cpu.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_2/channel_2_delay.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_2/channel_2_duty.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_2/channel_2_duty_delay.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_2/channel_2_freq_change.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_2/channel_2_nrx2_glitch.gb	bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_2/channel_2_nrx2_speed_change.gb	bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_2/channel_2_restart.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_2/channel_2_restart_nrx2_glitch.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_2/channel_2_stop_div.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_2/channel_2_stop_restart.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_2/channel_2_volume.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_2/channel_2_volume_div.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_3/channel_3_and_glitch.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_3/channel_3_delay.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_3/channel_3_first_sample.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_3/channel_3_freq_change_delay.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_3/channel_3_restart_delay.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,mGBA,SameBoy
+samesuite/apu/channel_3/channel_3_restart_during_delay.gb	Beaten Dying Moon,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_3/channel_3_restart_stop_delay.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_3/channel_3_shift_delay.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,mGBA,SameBoy
+samesuite/apu/channel_3/channel_3_shift_skip_delay.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_3/channel_3_stop_delay.gb	ares,Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,PyBoy,SameBoy
+samesuite/apu/channel_3/channel_3_stop_div.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_3/channel_3_wave_ram_locked_write.gb	ares,Beaten Dying Moon,binjgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+samesuite/apu/channel_3/channel_3_wave_ram_sync.gb	Beaten Dying Moon,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_4/channel_4_align.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_4/channel_4_delay.gb	bgb,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_4/channel_4_equivalent_frequencies.gb	DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_4/channel_4_frequency_alignment.gb	DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_4/channel_4_freq_change.gb	DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_4/channel_4_lfsr.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,PyBoy,SameBoy
+samesuite/apu/channel_4/channel_4_lfsr15.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,PyBoy,SameBoy
+samesuite/apu/channel_4/channel_4_lfsr_15_7.gb	Beaten Dying Moon,DocBoy,Emulicious,PyBoy,SameBoy
+samesuite/apu/channel_4/channel_4_lfsr_7_15.gb	Beaten Dying Moon,DocBoy,Emulicious,SameBoy
+samesuite/apu/channel_4/channel_4_lfsr_restart.gb	Beaten Dying Moon,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_4/channel_4_lfsr_restart_fast.gb	Beaten Dying Moon,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/channel_4/channel_4_volume_div.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,mGBA,SameBoy
+samesuite/apu/div_trigger_volume_10.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,mGBA,SameBoy
+samesuite/apu/div_write_trigger.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,SameBoy
+samesuite/apu/div_write_trigger_10.gb	bgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,SameBoy
+samesuite/apu/div_write_trigger_volume.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/apu/div_write_trigger_volume_10.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/dma/gbc_dma_cont.gb	ares,Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,GSE,mGBA,No$gmb,SameBoy,VisualBoyAdvance-M
+samesuite/dma/gdma_addr_mask.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,mGBA,SameBoy,VisualBoyAdvance-M
+samesuite/dma/hdma_lcd_off.gb	Beaten Dying Moon,bgb,DocBoy,Emulicious,GSE,SameBoy
+samesuite/dma/hdma_mode0.gb	ares,Beaten Dying Moon,bgb,DocBoy,Emulicious,GambatteSpeedrun,GSE,No$gmb,SameBoy
+samesuite/ppu/blocking_bgpi_increase.gb	ares,Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,GSE,mGBA,No$gmb,PyBoy,SameBoy,VisualBoyAdvance-M
+samesuite/sgb/command_mlt_req.gb	GSE,mGBA
+samesuite/sgb/command_mlt_req_1_incrementing.gb	bgb,GSE,mGBA,SameBoy
+ashiepaws/bully.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious,GambatteSpeedrun,GSE,SameBoy
+ashiepaws/bully.gb (GBC)	Beaten Dying Moon,DocBoy,Emulicious,GambatteSpeedrun,GSE,SameBoy
+ashiepaws/strikethrough.gb	DocBoy,Emulicious,SameBoy
+cpp/rtc-invalid-banks-test.gb	bgb,DocBoy,Emulicious,GSE,SameBoy
+cpp/latch-rtc-test.gb	Beaten Dying Moon,bgb,Emulicious,GSE,SameBoy
+cpp/ramg-mbc3-test.gb	Beaten Dying Moon,bgb,binjgb,DocBoy,Emulicious,GambatteSpeedrun,gameroy,Goomba,GSE,mGBA,PyBoy,SameBoy
+cpp/sgb-ext-test.gb	GSE
+mealybug-tearoom-tests/ppu/m2_win_en_toggle.gb (DMG)	Beaten Dying Moon,bgb,binjgb,DocBoy,Emmy,Emulicious,GambatteSpeedrun,gameroy,GSE,mGBA,No$gmb,SameBoy
+mealybug-tearoom-tests/ppu/m3_bgp_change.gb (DMG)	Beaten Dying Moon,bgb,DocBoy,Emulicious,gameroy,SameBoy
+mealybug-tearoom-tests/ppu/m3_bgp_change_sprites.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious,gameroy,SameBoy
+mealybug-tearoom-tests/ppu/m3_lcdc_bg_en_change.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious
+mealybug-tearoom-tests/ppu/m3_lcdc_bg_map_change.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE
+mealybug-tearoom-tests/ppu/m3_lcdc_obj_en_change.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious,SameBoy
+mealybug-tearoom-tests/ppu/m3_lcdc_obj_en_change_variant.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious,SameBoy
+mealybug-tearoom-tests/ppu/m3_lcdc_obj_size_change.gb (DMG)	Beaten Dying Moon,DocBoy
+mealybug-tearoom-tests/ppu/m3_lcdc_obj_size_change_scx.gb (DMG)	Beaten Dying Moon,DocBoy
+mealybug-tearoom-tests/ppu/m3_lcdc_tile_sel_change.gb (DMG)	Beaten Dying Moon,DocBoy,GambatteSpeedrun,gameroy,GSE
+mealybug-tearoom-tests/ppu/m3_lcdc_tile_sel_win_change.gb (DMG)	Beaten Dying Moon,DocBoy,GambatteSpeedrun,gameroy,GSE
+mealybug-tearoom-tests/ppu/m3_lcdc_win_en_change_multiple.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious,GambatteSpeedrun,GSE,SameBoy
+mealybug-tearoom-tests/ppu/m3_lcdc_win_en_change_multiple_wx.gb (DMG)	Beaten Dying Moon,DocBoy
+mealybug-tearoom-tests/ppu/m3_lcdc_win_map_change.gb (DMG)	Beaten Dying Moon,DocBoy,GambatteSpeedrun,gameroy,GSE
+mealybug-tearoom-tests/ppu/m3_obp0_change.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,SameBoy
+mealybug-tearoom-tests/ppu/m3_scx_high_5_bits.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious,GambatteSpeedrun,GSE,SameBoy
+mealybug-tearoom-tests/ppu/m3_scx_low_3_bits.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,SameBoy
+mealybug-tearoom-tests/ppu/m3_scy_change.gb (DMG)	Beaten Dying Moon,DocBoy,GambatteSpeedrun,GSE
+mealybug-tearoom-tests/ppu/m3_window_timing.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,SameBoy
+mealybug-tearoom-tests/ppu/m3_window_timing_wx_0.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious,gameroy,SameBoy
+mealybug-tearoom-tests/ppu/m3_wx_4_change.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious,gameroy,SameBoy
+mealybug-tearoom-tests/ppu/m3_wx_4_change_sprites.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious,gameroy,SameBoy
+mealybug-tearoom-tests/ppu/m3_wx_5_change.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious,gameroy,SameBoy
+mealybug-tearoom-tests/ppu/m3_wx_6_change.gb (DMG)	Beaten Dying Moon,DocBoy,Emulicious,GambatteSpeedrun,gameroy,GSE,SameBoy

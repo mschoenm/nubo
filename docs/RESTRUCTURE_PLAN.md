@@ -310,7 +310,7 @@ The order of all three plans, agreed with the maintainer on 2026-10-13:
 1. The pull request that adds the plans.
 2. Restructuring steps 1 and 2.
 3. Part 5 of [SHOOTOUT_PLAN.md](SHOOTOUT_PLAN.md): the Shootout's tests in CI and the nightly run, and
-   the score and rank on the wiki.
+   the score and rank on the wiki. Done.
 4. Restructuring steps 3 to 6, then step 7.
 5. Parts 1 to 3 of the Shootout plan: the app's options, the harness class, and the maintainer's run on
    Windows.

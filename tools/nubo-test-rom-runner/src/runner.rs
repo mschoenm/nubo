@@ -2,13 +2,15 @@
 
 use crate::boot::{BootCache, BootError, Booted};
 use crate::download::RomDirs;
-use crate::suites::{Check, TestCase, model_label};
+use crate::screen::GrayscaleReference;
+use crate::shootout::MATCH_HOLD_AUDIO_BUFFERS;
+use crate::suites::{Check, Source, TestCase, model_label};
 use crate::{gambatte, screen};
 use image::RgbImage;
 use nubo_core::{Emulator, Key};
 use std::fs;
 use std::panic::{self, AssertUnwindSafe};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::thread;
@@ -236,16 +238,19 @@ fn run_test(
         Ok(rom) => rom,
         Err(error) => return (Outcome::Fail(format!("failed to read ROM: {error}")), false),
     };
-    let reference_paths = match &test.check {
-        Check::Screen(path) | Check::EveryFrame(path) | Check::GambatteScreen(path) => {
-            std::slice::from_ref(path)
-        }
-        Check::GrayscaleScreen(paths) => paths.as_slice(),
-        Check::Registers | Check::Number(_) | Check::Sound(_) | Check::HighRam => &[],
+    let reference_paths: Vec<&PathBuf> = match &test.check {
+        Check::Screen(path) | Check::EveryFrame(path) | Check::GambatteScreen(path) => vec![path],
+        Check::GrayscaleScreen(paths) => paths.iter().collect(),
+        Check::Shootout { pass, fail } => pass.iter().chain(fail).collect(),
+        Check::Registers | Check::Number(_) | Check::Sound(_) | Check::HighRam => Vec::new(),
+    };
+    let reference_root = match &test.check {
+        Check::Shootout { .. } => dirs.root(Source::Shootout),
+        _ => root,
     };
     let references = match reference_paths
         .iter()
-        .map(|path| screen::load_reference(&root.join(path)))
+        .map(|path| screen::load_reference(&reference_root.join(path)))
         .collect::<Result<Vec<_>, _>>()
     {
         Ok(references) => references,
@@ -326,6 +331,9 @@ fn emulate(
             run_gambatte_test(emulator, &run, reference)
         }
         (Check::GrayscaleScreen(_), _) => run_grayscale_screen_test(emulator, &run, references),
+        (Check::Shootout { pass, .. }, _) => {
+            run_shootout_test(emulator, &run, references.split_at(pass.len()))
+        }
         _ => run_register_test(emulator, &run),
     }
 }
@@ -506,6 +514,87 @@ fn run_grayscale_screen_test(
     })
 }
 
+/// What a frame of a GB Emulator Shootout test matches.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Verdict {
+    Pass,
+    Fail,
+}
+
+/// Runs a test of the GB Emulator Shootout the way its harness judges it:
+/// it passes once the screen has matched one of the `pass` screenshots for
+/// `MATCH_HOLD_AUDIO_BUFFERS`, fails once it has matched one of the `fail`
+/// screenshots that long, and fails at the deadline. Screens are compared in
+/// grayscale, as the Shootout does, in the colors the app shows: unlike the
+/// other screenshot checks, the original Game Boy's grays aren't mapped to
+/// the screenshots' own, since the harness takes screenshots of the app.
+fn run_shootout_test(
+    emulator: &mut Emulator,
+    run: &TestRun<'_>,
+    (pass, fail): (&[RgbImage], &[RgbImage]),
+) -> Result<(), Failure> {
+    let TestRun { test, progress, .. } = *run;
+    let pass_grays: Vec<GrayscaleReference> = pass.iter().map(GrayscaleReference::new).collect();
+    let fail_grays: Vec<GrayscaleReference> = fail.iter().map(GrayscaleReference::new).collect();
+    // What the screen matches, and since which audio buffer.
+    let mut shown: Option<(Verdict, u32)> = None;
+    for audio_buffer in 0..run.audio_buffers {
+        step_audio_buffer(emulator, progress, test)?;
+        if let Some(frame) = emulator.take_frame() {
+            let matches_any = |references: &[GrayscaleReference]| {
+                references
+                    .iter()
+                    .any(|reference| reference.matches_as_shown(frame))
+            };
+            let verdict = if matches_any(&pass_grays) {
+                Some(Verdict::Pass)
+            } else if matches_any(&fail_grays) {
+                Some(Verdict::Fail)
+            } else {
+                None
+            };
+            if verdict != shown.map(|(shown, _)| shown) {
+                shown = verdict.map(|verdict| (verdict, audio_buffer));
+            }
+        }
+        if let Some((verdict, since)) = shown
+            && audio_buffer + 1 - since >= MATCH_HOLD_AUDIO_BUFFERS
+        {
+            if verdict == Verdict::Pass {
+                return Ok(());
+            }
+            return Err(Failure {
+                reason: "the screen matches a fail screenshot".to_string(),
+                screen: Some(screen::as_shown(emulator.frame_buffer())),
+                stalled: false,
+            });
+        }
+    }
+
+    let actual = screen::as_shown(emulator.frame_buffer());
+    let reason = if shown.is_some() {
+        format!(
+            "the screen matched a screenshot too briefly to count before the deadline of {}",
+            test.deadline
+        )
+    } else {
+        let fewest_differing = pass
+            .iter()
+            .map(|reference| screen::differing_pixels_in_grayscale(&actual, reference))
+            .min()
+            .unwrap_or(0);
+        format!(
+            "{} pixels differ from the closest pass screenshot after {}",
+            fewest_differing, test.deadline
+        )
+    };
+    Err(Failure {
+        reason,
+        screen: Some(actual),
+        stalled: false,
+    })
+}
+
 /// Runs a GBMicrotest ROM until it writes its result to high RAM, for up to
 /// the test's timeout after the boot ROM.
 fn run_high_ram_test(emulator: &mut Emulator, run: &TestRun<'_>) -> Result<(), Failure> {
@@ -614,7 +703,12 @@ fn save_failure_screens(
     failures_dir: &Path,
     test: &TestCase,
 ) {
-    let mut path = failures_dir.join(model_label(test.model)).join(&test.rom);
+    let folder = if test.shootout_name.is_some() {
+        failures_dir.join("shootout")
+    } else {
+        failures_dir.to_path_buf()
+    };
+    let mut path = folder.join(model_label(test.model)).join(&test.rom);
     if let Some(subtest) = test.subtest {
         let stem = path.file_stem().unwrap_or_default().to_string_lossy();
         path.set_file_name(format!("{stem}-{subtest}"));
@@ -624,7 +718,10 @@ fn save_failure_screens(
     }
     let _ = actual.save(path.with_extension("png"));
     if let Some(reference) = reference {
-        let differences = if matches!(test.check, Check::GrayscaleScreen(_)) {
+        let differences = if matches!(
+            test.check,
+            Check::GrayscaleScreen(_) | Check::Shootout { .. }
+        ) {
             screen::highlight_differences_in_grayscale(actual, reference)
         } else {
             screen::highlight_differences(actual, reference)

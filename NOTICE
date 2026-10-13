@@ -200,6 +200,40 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 --------------------------------------------------------------------------------
+GB Emulator Shootout (https://github.com/gbdev/GBEmulatorShootout)
+--------------------------------------------------------------------------------
+
+The test ROM runner's list of the Shootout's tests
+(tools/nubo-test-rom-runner/src/shootout/list.rs) is derived from the
+Shootout's test lists, which are under the MIT License below. Its scoreboard
+(tools/nubo-test-rom-runner/shootout_published.txt) records which emulators
+pass which test in the results the project publishes on its gh-pages branch.
+The test ROMs and reference screenshots themselves are downloaded when the
+tests run, not included.
+
+MIT License
+
+Copyright (c) 2026 daid
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------------
 Other dependencies
 --------------------------------------------------------------------------------
 
