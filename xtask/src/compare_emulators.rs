@@ -337,8 +337,10 @@ pub fn run_comparison(args: &[String]) -> Result {
             }
         }
     }
+    let labels = rom_labels(&roms);
     let context = RunContext {
         roms: &roms,
+        labels: &labels,
         root: &root,
         seconds: options.seconds,
         instructions: options.instructions,
@@ -373,7 +375,7 @@ pub fn run_comparison(args: &[String]) -> Result {
     print!(
         "{}",
         table(
-            &roms,
+            &labels,
             &options.models,
             &ready,
             &results,
@@ -385,7 +387,7 @@ pub fn run_comparison(args: &[String]) -> Result {
             println!(
                 "{} on {} {}: {error}",
                 emulator.name(),
-                rom_name(&roms[*rom]),
+                labels[*rom],
                 model.label()
             );
         }
@@ -455,6 +457,22 @@ fn rom_name(rom: &Path) -> String {
         .map_or_else(String::new, |stem| stem.to_string_lossy().into_owned())
 }
 
+/// What the table and progress lines call each ROM: its name, or its path
+/// when ROMs from different folders share the name.
+fn rom_labels(roms: &[PathBuf]) -> Vec<String> {
+    let names: Vec<String> = roms.iter().map(|rom| rom_name(rom)).collect();
+    roms.iter()
+        .zip(&names)
+        .map(|(rom, name)| {
+            if names.iter().filter(|other| *other == name).count() > 1 {
+                rom.display().to_string()
+            } else {
+                name.clone()
+            }
+        })
+        .collect()
+}
+
 /// Whether a program is on the `PATH`.
 fn has_tool(name: &str) -> bool {
     env::var_os("PATH")
@@ -517,6 +535,8 @@ struct Run {
 /// What every run shares.
 struct RunContext<'a> {
     roms: &'a [PathBuf],
+    /// What to call each ROM, from [`rom_labels`].
+    labels: &'a [String],
     root: &'a Path,
     seconds: f64,
     instructions: bool,
@@ -570,7 +590,7 @@ fn time_runs(runs: &[Run], context: &RunContext, rounds: u32, screenshots: bool)
             if last_group != Some((run.rom, run.model)) {
                 println!(
                     "Round {round} of {rounds}: {} on {}",
-                    rom_name(&context.roms[run.rom]),
+                    context.labels[run.rom],
                     run.model.label()
                 );
                 last_group = Some((run.rom, run.model));
@@ -591,7 +611,7 @@ fn count_instructions(runs: &[Run], context: &RunContext, screenshots: bool) -> 
         println!(
             "Counted {} on {} {}",
             run.emulator.name(),
-            rom_name(&context.roms[run.rom]),
+            context.labels[run.rom],
             run.model.label()
         );
         (run, measurement)
@@ -622,12 +642,19 @@ fn measure(run: Run, context: &RunContext, screenshot: bool) -> Result<Measureme
     };
     let rom = &context.roms[run.rom];
     let seconds = context.seconds.to_string();
+    // Numbered by the ROM's place in the list, since ROMs from different
+    // folders can share a name.
     let screenshot_path = screenshot.then(|| {
         context
             .root
             .join("screenshots")
             .join(run.emulator.id())
-            .join(format!("{}-{}.png", rom_name(rom), run.model.id()))
+            .join(format!(
+                "{:03}-{}-{}.png",
+                run.rom + 1,
+                rom_name(rom),
+                run.model.id()
+            ))
     });
     let nubo_screenshots = match (&screenshot_path, run.emulator.source()) {
         (Some(path), None) => Some(path.with_extension("tmp")),
@@ -804,7 +831,7 @@ fn print_versions(emulators: &[Emulator]) {
 /// The table of results: a row for each ROM on each model, a column for each
 /// emulator.
 fn table(
-    roms: &[PathBuf],
+    labels: &[String],
     models: &[Model],
     emulators: &[Emulator],
     results: &Results,
@@ -815,9 +842,9 @@ fn table(
             .chain(emulators.iter().map(|emulator| emulator.name().to_owned()))
             .collect::<Vec<_>>(),
     ];
-    for (rom_index, rom) in roms.iter().enumerate() {
+    for (rom_index, label) in labels.iter().enumerate() {
         for &model in models {
-            let mut row = vec![format!("{} {}", rom_name(rom), model.label())];
+            let mut row = vec![format!("{label} {}", model.label())];
             for &emulator in emulators {
                 let cell = match results.outcomes.get(&(rom_index, model, emulator)) {
                     Some(Ok(measurements)) => summarize(measurements, instructions),
@@ -942,8 +969,25 @@ mod tests {
     }
 
     #[test]
+    fn roms_that_share_a_name_are_labelled_by_their_path() {
+        let roms = [
+            PathBuf::from("originals/game.gb"),
+            PathBuf::from("hacks/game.gb"),
+            PathBuf::from("hacks/other.gbc"),
+        ];
+        assert_eq!(
+            rom_labels(&roms),
+            vec![
+                PathBuf::from("originals/game.gb").display().to_string(),
+                PathBuf::from("hacks/game.gb").display().to_string(),
+                String::from("other"),
+            ]
+        );
+    }
+
+    #[test]
     fn the_table_shows_the_best_round_and_failures_as_dashes() {
-        let roms = [PathBuf::from("games/tobudx.gb")];
+        let labels = [String::from("tobudx")];
         let mut results = Results::default();
         let run = |emulator| Run {
             emulator,
@@ -959,7 +1003,7 @@ mod tests {
         results.add(run(Emulator::Nubo), Ok(speed(86.12)));
         results.add(run(Emulator::Binjgb), Err(String::from("can't")));
         let text = table(
-            &roms,
+            &labels,
             &[Model::Dmg],
             &[Emulator::Nubo, Emulator::Binjgb],
             &results,
