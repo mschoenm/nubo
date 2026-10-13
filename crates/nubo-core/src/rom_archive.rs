@@ -1,4 +1,8 @@
 //! Loading ROMs that are packed in zip archives.
+//!
+//! `Emulator::load_rom` accepts zip files through [`extract_rom`]. The `zip`
+//! crate is built with only its pure-Rust deflate backend (zlib-rs), so the
+//! core still builds for WebAssembly (wasm32) without C dependencies.
 
 use crate::error::LoadRomError;
 use std::fmt::Display;

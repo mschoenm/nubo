@@ -6,14 +6,25 @@
 //! 2. The format version, one byte ([`FORMAT_VERSION`]).
 //! 3. The header ([`SaveStateHeader`]), a struct of named fields.
 //! 4. The emulator, a struct of named fields: `cpu` and the components on the
-//!    address bus, named after the hardware (see
-//!    `AddressBus::write_save_state_components`).
+//!    address bus, named after the hardware (`bus`, `cartridge`, `timers`,
+//!    `ppu`, `apu`, `oam_dma`, `vram_dma`, `serial`, `speed_switch` and
+//!    `joypad`; see `AddressBus::write_save_state_components`), so moving
+//!    code from one struct to another doesn't move the values a state stores.
 //!
 //! The bytes are the same on every platform, and the rules in
 //! `serializable.rs` keep states loading in later versions of Nubo and, as
 //! far as they can, in earlier ones: a value a state doesn't have starts as it
 //! does right after power-on, and values this version doesn't know or can't
 //! read are skipped.
+//!
+//! A loaded state must go on exactly like the run it was saved from, which
+//! `cargo benchmark --check-save-states` checks. So every field is stored
+//! except the ones that don't belong in a save state (see `Serializable`), and
+//! two tests catch a field that is missed:
+//! `a_loaded_state_restores_every_field_of_the_cpu_the_address_bus_the_ppu_and_the_apu`
+//! (in `tests.rs`, which lists the fields left out on purpose) compares every
+//! field after loading, and `a_value_a_state_lacks_starts_at_its_power_on_value`
+//! checks that a value a state lacks gets its power-on value.
 
 use crate::address_bus::effects::NoSaves;
 use crate::emulator::Emulator;
@@ -264,8 +275,9 @@ impl Emulator {
     /// What a save state of this emulator stores, sorted: the path of every
     /// value, such as `header.model` or `ppu.lcdc`, and every variant each
     /// enum value can be stored as, such as `cpu.run_state = Halted`. `cargo
-    /// save-states` compares it with the newest kept set, so a version that
-    /// stores other values or names than the one before can't go unnoticed.
+    /// save-states` compares it with the newest kept set (its `layout.txt`),
+    /// so a version that stores other values or names than the one before
+    /// can't go unnoticed.
     pub fn save_state_layout(&self) -> Vec<String> {
         let header = stored_layout(|| SaveStateHeader::of(self).write(&mut io::sink()))
             .expect("writing to a sink never fails");
@@ -492,6 +504,8 @@ mod tests {
         state[start..start + name.len()].copy_from_slice(new_name.as_bytes());
     }
 
+    /// A value a state doesn't have, as if it came from a version without it,
+    /// starts at its power-on value, while the rest of the state still loads.
     #[test]
     fn a_value_a_state_lacks_starts_at_its_power_on_value() {
         let power_on = emulator_with_game().registers().stack_pointer;

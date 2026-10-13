@@ -1,4 +1,8 @@
 //! The errors the public API can return.
+//!
+//! Everything a player hands the core (ROMs, zip files, save states, cheat
+//! codes) may be broken or made up, so it must never make the core panic:
+//! the public API returns one of these errors instead.
 
 use crate::model::Model;
 use std::error::Error;

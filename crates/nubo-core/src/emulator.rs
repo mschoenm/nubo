@@ -1,4 +1,7 @@
 //! The public entry point of the emulator core.
+//!
+//! [`Emulator`] owns the CPU, which owns the address bus and through it the
+//! rest of the hardware, and offers everything frontends can do with them.
 
 use crate::address_bus::{AddressBus, CartridgeEffects, CartridgeHeader, read_header};
 use crate::controller::{ControllerMapping, ControllerState};

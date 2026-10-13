@@ -1008,6 +1008,9 @@ impl Cpu {
     /// it switches speed (`switch_speed`). Otherwise it resets DIV and enters
     /// STOP mode until a button is pressed, skipping the byte after it unless
     /// an interrupt is pending (SameBoy; daid's stop_instr tests).
+    ///
+    /// What the rest of the hardware does in STOP mode is in
+    /// `address_bus/stop_mode.rs`.
     fn stop(&mut self) {
         if self.address_bus.speed_switch_requested() {
             self.switch_speed();
@@ -1064,6 +1067,9 @@ impl Cpu {
     /// Switching from normal speed, the block is copied while the CPU is
     /// halted, which ends the transfer (Gambatte's hdma_transition_speedchange
     /// tests); switching back, it is copied when the CPU wakes up.
+    ///
+    /// When double speed starts, how long the PPU and DMA stand still and how
+    /// long the CPU stays halted are timed in `address_bus/speed_switch.rs`.
     fn switch_speed(&mut self) {
         self.address_bus.run_deferred_cycles_before_change();
         let interrupt_pending = self.has_pending_interrupt();
