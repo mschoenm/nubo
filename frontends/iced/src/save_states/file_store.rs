@@ -93,7 +93,8 @@ pub fn keep_aside(rom_path: &Path, slot: Slot) -> Result<PathBuf, String> {
 
 /// Moves a slot's state and picture in `directory` (the folder for every
 /// game's states) to the first free `<slot>.kept-<number>` name, so saving to
-/// the slot again can't overwrite them. Returns where the state went.
+/// the slot again can't overwrite them. Returns where the state went, once the
+/// state has moved.
 pub fn keep_aside_in(directory: &Path, rom_path: &Path, slot: Slot) -> Result<PathBuf, String> {
     let state = slot_path(directory, rom_path, slot, "state");
     let mut number = 1;
@@ -106,11 +107,12 @@ pub fn keep_aside_in(directory: &Path, rom_path: &Path, slot: Slot) -> Result<Pa
     };
     fs::rename(&state, &kept).map_err(|error| error.to_string())?;
 
+    // The picture only shows in the menu next to a state, so the state counts
+    // as kept even if it can't move (it may be locked on Windows): the empty
+    // slot doesn't show it, and the next save to the slot replaces it.
     let picture = slot_path(directory, rom_path, slot, "png");
-    match fs::rename(picture, kept.with_extension("png")) {
-        Err(error) if error.kind() != ErrorKind::NotFound => Err(error.to_string()),
-        _ => Ok(kept),
-    }
+    let _ = fs::rename(picture, kept.with_extension("png"));
+    Ok(kept)
 }
 
 /// Describes a slot in `directory` (the folder for every game's states).
