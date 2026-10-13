@@ -1,5 +1,7 @@
 # Kept save states are binary: never change their line endings.
 save-states/**/*.state binary
-# The settings fixture is compared byte for byte with what Nubo writes, which
-# ends lines with LF on every system.
+# The settings fixtures and the data folder of an earlier version are compared
+# byte for byte with what Nubo writes, which ends lines with LF on every system.
 frontends/nubo/src/settings/tests/*.toml -text
+crates/nubo-frontend/src/settings/tests/*.toml -text
+crates/nubo-frontend/tests/existing_data_folder/** -text
