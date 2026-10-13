@@ -4,6 +4,10 @@ name: Nightly
 # emails whoever last changed the schedule below when a scheduled run fails.
 # It runs at 22:17 UTC so that even the slowest job is done before the
 # nightly review starts at 02:07 Amsterdam time (see docs/NIGHTLY_REVIEW.md).
+#
+# Releases wait for these checks, so the long ones are split over several
+# machines: each part runs one share of the test ROMs (`--shard`). To
+# rebalance, add or remove numbers in a matrix; the parts follow.
 on:
   schedule:
     - cron: "17 22 * * *"
@@ -18,6 +22,12 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # CI too, so whatever a new stable Rust or another new release breaks
+  # shows up the night it comes out, and releases need only run this.
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+
   advisories:
     name: Security advisories
     runs-on: ubuntu-latest
@@ -30,35 +40,35 @@ jobs:
 
       - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
         with:
-          tool: cargo-deny@0.20
+          tool: cargo-deny
 
       - name: Check the RustSec advisories
         run: cargo deny --locked check advisories
 
+  # CI (above) tests on Linux; this covers macOS and Windows.
   tests:
-    name: Tests and CPU tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    name: Tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install audio and controller libraries
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev pkg-config
 
       - name: Install Rust
         run: rustup toolchain install
 
+      # The same key as CI's tests on Linux; the scheduled runs keep the
+      # macOS and Windows caches up to date.
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          save-if: false
-
-      - uses: ./.github/actions/test-roms
+          shared-key: tests
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Run tests
         run: cargo test --workspace --locked
-
-      - name: Run JSON CPU tests
-        run: cargo cpu-tests
 
   verify-boot:
     name: Test ROMs with real boots
@@ -97,18 +107,21 @@ jobs:
           echo "passed=${counts%/*}" >> "$GITHUB_OUTPUT"
           echo "total=${counts#*/}" >> "$GITHUB_OUTPUT"
 
+      # Named apart from CI's, which runs in the same run.
       - name: Upload screens of failing tests
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: test-rom-failures
+          name: test-rom-failures-real-boots
           path: target/test-roms/failures
           if-no-files-found: ignore
 
-  save-states:
-    name: Save states of all test ROMs
+  # Builds the benchmark once for the parts below, with the lazy shortcuts
+  # and with the eager feature, which runs every M-cycle on its own.
+  benchmark:
+    name: Build the benchmark
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -120,51 +133,91 @@ jobs:
           shared-key: release
           save-if: false
 
+      # The parts restore the test ROMs from the cache this job saves when it
+      # had to download them.
+      - id: test-roms
+        uses: ./.github/actions/test-roms
+
+      - name: Download the test ROMs
+        if: steps.test-roms.outputs.cache-hit != 'true'
+        run: cargo test-roms acid2
+
+      - name: Build the benchmark
+        run: |
+          mkdir "$RUNNER_TEMP/benchmark"
+          cargo build --release --locked -p nubo-benchmark
+          cp target/release/nubo-benchmark "$RUNNER_TEMP/benchmark/lazy"
+          cargo build --release --locked -p nubo-benchmark --features nubo-core/eager
+          cp target/release/nubo-benchmark "$RUNNER_TEMP/benchmark/eager"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nubo-benchmark
+          path: ${{ runner.temp }}/benchmark
+          retention-days: 1
+          if-no-files-found: error
+
+  save-states:
+    name: Save states of all test ROMs (${{ matrix.shard }}/${{ strategy.job-total }})
+    needs: benchmark
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - uses: ./.github/actions/test-roms
 
-      # Downloads the test ROMs if the cache had none, and runs only a few.
-      - name: Download the test ROMs
-        run: cargo test-roms acid2
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nubo-benchmark
+          path: ${{ runner.temp }}/benchmark
 
       # Halfway through each run a save state is loaded into a new emulator,
       # which must go on to make exactly the same frames, sound and state.
       - name: Check save states
-        run: >-
-          cargo benchmark target/test-roms/v* target/test-roms/gb-emulator-shootout-*
-          --seconds 6 --jobs "$(nproc)" --check-save-states
+        run: |
+          chmod +x "$RUNNER_TEMP/benchmark/lazy"
+          "$RUNNER_TEMP/benchmark/lazy" target/test-roms/v* target/test-roms/gb-emulator-shootout-* \
+            --seconds 6 --jobs "$(nproc)" --check-save-states \
+            --shard ${{ matrix.shard }}/${{ strategy.job-total }}
 
   eager:
-    name: Lazy components against every M-cycle
+    name: Lazy components against every M-cycle (${{ matrix.shard }}/${{ strategy.job-total }})
+    needs: benchmark
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install Rust
-        run: rustup toolchain install
-
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          shared-key: release
-          save-if: false
-
       - uses: ./.github/actions/test-roms
 
-      - name: Download the test ROMs
-        run: cargo test-roms acid2
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nubo-benchmark
+          path: ${{ runner.temp }}/benchmark
 
       - name: Record fingerprints with the lazy shortcuts
-        run: >-
-          cargo benchmark target/test-roms/v* target/test-roms/gb-emulator-shootout-*
-          --seconds 4 --jobs "$(nproc)" --record "$RUNNER_TEMP/lazy.txt"
+        run: |
+          chmod +x "$RUNNER_TEMP/benchmark/lazy" "$RUNNER_TEMP/benchmark/eager"
+          "$RUNNER_TEMP/benchmark/lazy" target/test-roms/v* target/test-roms/gb-emulator-shootout-* \
+            --seconds 4 --jobs "$(nproc)" --record "$RUNNER_TEMP/lazy.txt" \
+            --shard ${{ matrix.shard }}/${{ strategy.job-total }}
 
       # The eager feature runs every M-cycle on its own, with nothing left
       # behind; the lazy PPU and APU must give bit for bit the same output.
       - name: Compare with running every M-cycle on its own
         run: >-
-          cargo run --release -p nubo-benchmark --features nubo-core/eager --
-          target/test-roms/v* target/test-roms/gb-emulator-shootout-*
+          "$RUNNER_TEMP/benchmark/eager" target/test-roms/v* target/test-roms/gb-emulator-shootout-*
           --seconds 4 --jobs "$(nproc)" --compare "$RUNNER_TEMP/lazy.txt"
+          --shard ${{ matrix.shard }}/${{ strategy.job-total }}
 
   flatpak:
     name: Flatpak
@@ -174,19 +227,28 @@ jobs:
     name: Windows
     uses: ./.github/workflows/windows.yml
 
-  # Measures speed, instructions and battery use, and writes them with every
-  # job's result to the metrics log in the repository's wiki
+  # Measures speed, instructions, battery use and the build sizes, and writes
+  # them with every job's result to the metrics log in the repository's wiki
   # (`cargo xtask metrics`). It also picks the part of the code the nightly
   # review reads in detail (`cargo xtask review-units`), so CI is the only
-  # writer of the wiki. Pushing to the wiki needs the WIKI_TOKEN secret, a
-  # token that can write to this repository; without it the files are only
-  # kept as this run's artifact. Releases run the other jobs only.
+  # writer of the wiki. It starts once every other job has finished, so
+  # nothing else of this run is busy while it measures and every night is
+  # measured alike. Only scheduled runs write to the wiki: the review reads
+  # the part of the latest night, and the rotation counts the changes since
+  # the last night, so a run started by hand would hide the day's changes
+  # from the review. Pushing to the wiki needs the WIKI_TOKEN secret, a token
+  # that can write to this repository; runs that don't push keep the files as
+  # their artifact. Releases run the other jobs only.
   metrics:
     name: Metrics
     if: always() && github.workflow == 'Nightly'
-    needs: [advisories, tests, verify-boot, save-states, eager]
+    needs: [ci, advisories, tests, verify-boot, save-states, eager, flatpak, windows]
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Two runs at once would both push to the wiki.
+    concurrency:
+      group: nightly-metrics
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -240,6 +302,7 @@ jobs:
       - name: Write tonight's metrics
         shell: bash
         env:
+          CI: ${{ needs.ci.result }}
           ADVISORIES: ${{ needs.advisories.result }}
           TESTS: ${{ needs.tests.result }}
           VERIFY_BOOT: ${{ needs.verify-boot.result }}
@@ -258,7 +321,7 @@ jobs:
           jq -n \
             --arg date "$(date -u +%F)" \
             --arg commit "$(git rev-parse --short HEAD)" \
-            --arg advisories "$ADVISORIES" --arg tests "$TESTS" --arg verify_boot "$VERIFY_BOOT" \
+            --arg ci "$CI" --arg advisories "$ADVISORIES" --arg tests "$TESTS" --arg verify_boot "$VERIFY_BOOT" \
             --arg save_states "$SAVE_STATES" --arg eager "$EAGER" \
             --arg passed "$PASSED" --arg total "$TOTAL" \
             --argjson speed "$speed" \
@@ -267,7 +330,7 @@ jobs:
             --argjson desktop "$(stat -c %s target/release/nubo)" \
             --argjson wasm "$(stat -c %s target/web/nubo_bg.wasm)" \
             '{date: $date, commit: $commit,
-              tests: {advisories: $advisories, unit_tests: $tests, verify_boot: $verify_boot,
+              tests: {ci: $ci, advisories: $advisories, unit_tests: $tests, verify_boot: $verify_boot,
                       save_states: $save_states, eager: $eager},
               test_roms_passed: ($passed | tonumber? // null),
               test_roms_total: ($total | tonumber? // null),
@@ -280,6 +343,7 @@ jobs:
       - name: Update the wiki
         env:
           WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
+          SCHEDULED: ${{ github.event_name == 'schedule' }}
         run: |
           wiki="$RUNNER_TEMP/wiki"
           if [ -n "$WIKI_TOKEN" ]; then
@@ -293,7 +357,9 @@ jobs:
             --date "$(date -u +%F)" --commit "$(git rev-parse HEAD)" > "$wiki/tonight.json"
           cargo xtask metrics report "$wiki/metrics.jsonl" > "$wiki/Nightly-metrics.md"
           cat "$wiki/tonight.json"
-          if [ -n "$WIKI_TOKEN" ] && [ -d "$wiki/.git" ]; then
+          if [ "$SCHEDULED" != true ]; then
+            echo "::notice::Only scheduled runs update the wiki; this run's files are kept as its artifact."
+          elif [ -n "$WIKI_TOKEN" ] && [ -d "$wiki/.git" ]; then
             cd "$wiki"
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

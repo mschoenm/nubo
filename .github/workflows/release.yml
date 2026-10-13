@@ -64,13 +64,8 @@ jobs:
           name: release-notes
           path: ${{ runner.temp }}/notes.md
 
-  ci:
-    name: CI
-    needs: notes
-    uses: ./.github/workflows/ci.yml
-
-  # Includes the test ROMs with --verify-boot, the Flatpaks and the Windows
-  # installer.
+  # Includes CI, the test ROMs with --verify-boot, the Flatpaks and the
+  # Windows installer.
   nightly:
     name: Nightly
     needs: notes
@@ -78,7 +73,7 @@ jobs:
 
   release:
     name: Publish the release
-    needs: [ci, nightly]
+    needs: nightly
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

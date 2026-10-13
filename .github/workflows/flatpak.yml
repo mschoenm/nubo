@@ -1,13 +1,16 @@
 name: Flatpak
 
 # Builds the Linux app as a Flatpak for x86_64 and ARM with `cargo xtask
-# flatpak` and checks it with Flathub's linter. Runs on pull requests that
-# change how it is built, every night, and for releases, which attach the
-# .flatpak files it makes.
+# flatpak`, plays a game in it and checks it with Flathub's linter. Runs on
+# pull requests that
+# change how it is built or the crates it is built from (Dependabot's
+# updates), every night, and for releases, which attach the .flatpak files
+# it makes. It isn't one of the checks that pull requests wait for.
 on:
   pull_request:
     paths:
       - .github/workflows/flatpak.yml
+      - Cargo.lock
       - xtask/src/flatpak.rs
       - xtask/src/licenses.rs
       - frontends/iced/linux/**
@@ -49,8 +52,23 @@ jobs:
       - name: Build the Flatpak
         run: cargo xtask flatpak
 
+      # The Flatpak is what Linux users install: the app built with the SDK's
+      # Rust, running on the runtime's libraries inside its sandbox, which
+      # nothing else tests. So the installed Flatpak plays a game here with
+      # its efficiency harness, which needs no window or sound and fails
+      # unless the game ran and made frames.
+      - name: Play a game in the Flatpak
+        shell: bash
+        run: |
+          cargo xtask benchmark-roms
+          dbus-run-session -- flatpak run --user io.github.mschoenm.nubo \
+            --measure-efficiency "$PWD/target/benchmark-roms/tobudx.gb" | tee "$RUNNER_TEMP/efficiency.json"
+          jq -e '.playing.buffers_per_second > 0 and .playing.frames_per_second > 0' "$RUNNER_TEMP/efficiency.json"
+
       # Flathub shows the AppStream file as it is in the repository, so it
-      # has to pass Flathub's checks as it is.
+      # has to pass Flathub's checks as it is. The linter isn't pinned on
+      # purpose: when Flathub adds a check, the nightly run should fail
+      # until Nubo could be published on Flathub again.
       - name: Check the AppStream file with Flathub's linter
         if: matrix.arch == 'x86_64'
         run: >-

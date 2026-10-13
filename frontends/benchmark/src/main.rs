@@ -8,7 +8,8 @@
 //! save state; `--record` writes them to a file and `--compare` checks a later
 //! run against it. `--check-save-states` also checks that a save state taken
 //! halfway through each run, loaded into a new emulator, goes on exactly like
-//! the run it was taken from.
+//! the run it was taken from. `--shard` runs one of several equal parts of the
+//! ROMs, so the nightly CI can split these checks over several machines.
 
 use clap::Parser;
 use image::RgbaImage;
@@ -67,6 +68,43 @@ struct Args {
     /// state
     #[arg(long)]
     check_save_states: bool,
+
+    /// Run only one of several equal parts of the ROMs, such as 2/4 for the
+    /// second of four, so several machines can share a long check
+    #[arg(long, value_parser = parse_shard)]
+    shard: Option<Shard>,
+}
+
+/// One of several equal parts of the ROMs, chosen with `--shard`: every
+/// `count`th ROM, starting with ROM number `number` (counted from 1). Taking
+/// every `count`th ROM spreads each folder of test ROMs over all the parts, so
+/// they take about as long as each other.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Shard {
+    number: usize,
+    count: usize,
+}
+
+impl Shard {
+    /// Whether the ROM at `position` in the list of all ROMs (counted from 0)
+    /// is in this part.
+    fn contains(self, position: usize) -> bool {
+        position % self.count == self.number - 1
+    }
+}
+
+/// Reads a part such as `2/4`.
+fn parse_shard(text: &str) -> Result<Shard, String> {
+    let invalid = || format!("expected a part such as 2/4, not {text}");
+    let (number, count) = text.split_once('/').ok_or_else(invalid)?;
+    let number: usize = number.trim().parse().map_err(|_| invalid())?;
+    let count: usize = count.trim().parse().map_err(|_| invalid())?;
+    if number == 0 || number > count {
+        return Err(format!(
+            "{text} is not a part: the first number must be from 1 to the second"
+        ));
+    }
+    Ok(Shard { number, count })
 }
 
 /// One game on one model.
@@ -447,7 +485,9 @@ fn benchmark(args: &Args) -> Result<bool, String> {
     let expected = args.compare.as_deref().map(read_fingerprints).transpose()?;
     let jobs: Vec<Run> = find_roms(&args.paths)?
         .into_iter()
-        .flat_map(|rom| {
+        .enumerate()
+        .filter(|&(position, _)| args.shard.is_none_or(|shard| shard.contains(position)))
+        .flat_map(|(_, rom)| {
             args.models.iter().map(move |&model| Run {
                 rom: rom.clone(),
                 model,
@@ -575,3 +615,6 @@ fn benchmark(args: &Args) -> Result<bool, String> {
     }
     Ok(all_good)
 }
+
+#[cfg(test)]
+mod tests;
