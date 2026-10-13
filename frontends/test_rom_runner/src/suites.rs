@@ -212,6 +212,9 @@ struct ScreenshotTest {
     every_frame: bool,
     /// Buttons to press after the boot ROM.
     input: &'static [Key],
+    /// Whether to compare in grayscale, for a reference made with other
+    /// colors than Nubo's.
+    grayscale: bool,
 }
 
 /// The collection's smaller screenshot tests, on the models c-sp's notes
@@ -219,7 +222,7 @@ struct ScreenshotTest {
 /// no reference screenshot: `scribbltests/fairylake`, `scribbltests/winpos`,
 /// `scribbltests/statcount/statcount.gb` (the manual version of
 /// `statcount-auto.gb`) and `mealybug-tearoom-tests/mbc/mbc3_rtc.gb`.
-const SCREENSHOT_TESTS: [ScreenshotTest; 14] = [
+const SCREENSHOT_TESTS: [ScreenshotTest; 15] = [
     // Bully only runs on the CGB: on a DMG even real hardware reports "Bad
     // Echo RAM Reads".
     ScreenshotTest {
@@ -228,6 +231,7 @@ const SCREENSHOT_TESTS: [ScreenshotTest; 14] = [
         seconds: 1,
         every_frame: false,
         input: &[],
+        grayscale: false,
     },
     ScreenshotTest {
         rom: "strikethrough/strikethrough.gb",
@@ -238,6 +242,7 @@ const SCREENSHOT_TESTS: [ScreenshotTest; 14] = [
         seconds: 1,
         every_frame: false,
         input: &[],
+        grayscale: false,
     },
     // firstwhite turns the screen on for one frame at a time. Hardware never
     // shows the first frame after the screen turns on, so it stays white.
@@ -250,6 +255,7 @@ const SCREENSHOT_TESTS: [ScreenshotTest; 14] = [
         seconds: 1,
         every_frame: true,
         input: &[],
+        grayscale: false,
     },
     // Telling LYs passes once every button has been pressed.
     ScreenshotTest {
@@ -261,16 +267,29 @@ const SCREENSHOT_TESTS: [ScreenshotTest; 14] = [
         seconds: 8,
         every_frame: false,
         input: &ALL_KEYS,
+        grayscale: false,
     },
+    // The MBC3 Tester repeats its test every few seconds and shows TEST
+    // COMPLETE in between: 16 seconds from power-on is in the middle of that
+    // on both models.
     ScreenshotTest {
         rom: "mbc3-tester/mbc3-tester.gb",
-        screens: &[
-            (Model::Dmg, "mbc3-tester/mbc3-tester-dmg.png"),
-            (Model::CgbE, "mbc3-tester/mbc3-tester-cgb.png"),
-        ],
-        seconds: 1,
+        screens: &[(Model::Dmg, "mbc3-tester/mbc3-tester-dmg.png")],
+        seconds: 6,
         every_frame: false,
         input: &[],
+        grayscale: false,
+    },
+    // Its CGB reference was made with other colors: its light green is
+    // 0x7BFF4A, where the CGB boot ROM's palette for the game (0x1BEF) is
+    // 0x7BFF31.
+    ScreenshotTest {
+        rom: "mbc3-tester/mbc3-tester.gb",
+        screens: &[(Model::CgbE, "mbc3-tester/mbc3-tester-cgb.png")],
+        seconds: 6,
+        every_frame: false,
+        input: &[],
+        grayscale: true,
     },
     ScreenshotTest {
         rom: "mooneye-test-suite/manual-only/sprite_priority.gb",
@@ -287,6 +306,7 @@ const SCREENSHOT_TESTS: [ScreenshotTest; 14] = [
         seconds: 1,
         every_frame: false,
         input: &[],
+        grayscale: false,
     },
     ScreenshotTest {
         rom: "mooneye-test-suite-wilbertpol/manual-only/sprite_priority.gb",
@@ -303,6 +323,7 @@ const SCREENSHOT_TESTS: [ScreenshotTest; 14] = [
         seconds: 1,
         every_frame: false,
         input: &[],
+        grayscale: false,
     },
     ScreenshotTest {
         rom: "scribbltests/lycscx/lycscx.gb",
@@ -313,6 +334,7 @@ const SCREENSHOT_TESTS: [ScreenshotTest; 14] = [
         seconds: 1,
         every_frame: false,
         input: &[],
+        grayscale: false,
     },
     ScreenshotTest {
         rom: "scribbltests/lycscy/lycscy.gb",
@@ -323,6 +345,7 @@ const SCREENSHOT_TESTS: [ScreenshotTest; 14] = [
         seconds: 1,
         every_frame: false,
         input: &[],
+        grayscale: false,
     },
     ScreenshotTest {
         rom: "scribbltests/palettely/palettely.gb",
@@ -333,6 +356,7 @@ const SCREENSHOT_TESTS: [ScreenshotTest; 14] = [
         seconds: 1,
         every_frame: false,
         input: &[],
+        grayscale: false,
     },
     // The collection's CGB screenshot of scxly is in the green shades of
     // another emulator's DMG palette. The test only draws black and white,
@@ -346,6 +370,7 @@ const SCREENSHOT_TESTS: [ScreenshotTest; 14] = [
         seconds: 1,
         every_frame: false,
         input: &[],
+        grayscale: false,
     },
     ScreenshotTest {
         rom: "scribbltests/statcount/statcount-auto.gb",
@@ -362,6 +387,7 @@ const SCREENSHOT_TESTS: [ScreenshotTest; 14] = [
         seconds: 5,
         every_frame: false,
         input: &[],
+        grayscale: false,
     },
     ScreenshotTest {
         rom: "turtle-tests/window_y_trigger/window_y_trigger.gb",
@@ -378,6 +404,7 @@ const SCREENSHOT_TESTS: [ScreenshotTest; 14] = [
         seconds: 1,
         every_frame: false,
         input: &[],
+        grayscale: false,
     },
     ScreenshotTest {
         rom: "turtle-tests/window_y_trigger_wx_offscreen/window_y_trigger_wx_offscreen.gb",
@@ -394,6 +421,7 @@ const SCREENSHOT_TESTS: [ScreenshotTest; 14] = [
         seconds: 1,
         every_frame: false,
         input: &[],
+        grayscale: false,
     },
 ];
 
@@ -900,7 +928,9 @@ fn screenshot_tests() -> Vec<TestCase> {
         .flat_map(|test| {
             test.screens.iter().map(|(model, screen)| {
                 let screen = PathBuf::from(screen);
-                let check = if test.every_frame {
+                let check = if test.grayscale {
+                    Check::GrayscaleScreen(vec![screen])
+                } else if test.every_frame {
                     Check::EveryFrame(screen)
                 } else {
                     Check::Screen(screen)

@@ -1,6 +1,6 @@
 # Failing test ROMs
 
-`cargo test-roms` passes 6520 of the 6557 tests it runs. This file explains the 37 that fail: what each
+`cargo test-roms` passes 6526 of the 6557 tests it runs. This file explains the 31 that fail: what each
 test checks, what Nubo does instead, and why it isn't fixed yet or can't be. `cargo test-roms --verbose`
 prints the same list with each test's symptom, and failing screenshot tests leave the emulator's
 screen and a diff in `target/test-roms/failures/<model>/`.
@@ -13,14 +13,11 @@ ported.
 |---|---|---|
 | [Channel 1 duty timing across CGB speed switches](#channel-1-duty-timing-across-cgb-speed-switches) | 9 | Open; 2 conflict with SameSuite on CGB-C |
 | [DMG palette writes during mode 3](#dmg-palette-writes-during-mode-3) | 9 | References disagree |
-| [MBC3](#mbc3) | 4 | Being worked on separately |
 | [Interrupts during a speed switch (AGE spsw-interrupts)](#interrupts-during-a-speed-switch) | 3 | Open, no reference emulator gets it right |
 | [CGB object palette RAM at power-on](#cgb-object-palette-ram-at-power-on) | 3 | Depends on one console's power-on state |
 | [GBMicrotest](#gbmicrotest) | 2 | The expected values are wrong |
 | [Mealybug's tile data switch glitch on CGB-C](#tile-data-switch-glitch-on-cgb-c) | 2 | Open |
 | [Mooneye's MGB madness test](#mooneyes-mgb-madness-test) | 2 | Open, unexplained by its author |
-| [Tile data switch at line 0 in double speed](#tile-data-switch-at-line-0-in-double-speed) | 1 | Open |
-| [Window toggled at WX 166](#window-toggled-at-wx-166) | 1 | Open |
 | [AGE oam-write on DMG-C](#age-oam-write-on-dmg-c) | 1 | Depends on state its author flags as unexplained |
 
 Tests are named as the runner prints them: the hardware model, then the ROM's path under
@@ -165,19 +162,6 @@ of the three suites (the dot it lands on, the pixel being output, the fetcher st
 and new values, what the hardware shows) and look for what separates the OR cases from the "new
 value" cases.
 
-## MBC3
-
-```
-dmg mbc3-tester/mbc3-tester.gb
-cgb mbc3-tester/mbc3-tester.gb
-dmg cpp/latch-rtc-test.gb
-dmg cpp/rtc-invalid-banks-test.gb
-```
-
-These are being worked on separately and were left alone here. Known causes: the MBC3 Tester uses a
-4 MB ROM, which needs the MBC30's 8-bit ROM bank number for banks 0x80 to 0xFF; CasualPokePlayer's
-tests differ in how invalid RAM/RTC bank numbers and a single latch write behave.
-
 ## Interrupts during a speed switch
 
 ```
@@ -284,36 +268,6 @@ falls in particular ranges, and verified it on the MGB only (the DMG and AGB sho
 the CGB none). Nubo stops the DMA while halted and keeps OAM away from the LCD, as SameBoy does, so
 it draws only the background. Matching the reference would need an MGB-only rule taken from the
 author's description rather than an understanding of the hardware, so it was left open.
-
-## Tile data switch at line 0 in double speed
-
-```
-cgb-c gambatte/bgtiledata/bgtiledata_spx08_ds_4.gbc
-```
-
-In double speed, an interrupt handler switches LCDC to the other tile data area (where tile 0 is
-black) and back during mode 3. Only line 0, pixels 24 to 31, differ: the reference is black and Nubo
-shows the normal tile. Lines 1 to 143 match, and so does `bgtiledata_spx08_ds_3`, one M-cycle
-earlier. Every CPU write lands on the same dot as in Gambatte, so the difference is inside the
-renderer: line 0 starts differently after line 153, and Nubo's fetch of that tile on line 0 likely
-comes a dot early relative to the write. **Next step:** compare the dots of that tile's data reads on
-lines 0 and 1, and try starting line 0's rendering a dot later in double speed without moving its
-STAT and VRAM timing.
-
-## Window toggled at WX 166
-
-```
-dmg gambatte/window/on_screen/wxA6_weoff_at_xposA6.gbc
-```
-
-With WY = 16 and WX = 166, the test clears the window enable bit at dot 176 of every line and sets it
-again in HBlank. The window's internal line counter then decides which window row is drawn. Nubo's
-counter is one line ahead from line 16 on, so the window's 4-line bands start at lines 19, 23, 27...
-instead of 20, 24, 28... (464 pixels). The test passes on CGB-C, and the writes land on the same dots
-as in Gambatte. Nubo counts a line both when the window is re-enabled in HBlank and when the WX 166
-start carries over to the next line; dropping either count (when the window was disabled at the end
-of the line) fixes nothing and breaks one or two other WX 166 tests. **Next step:** trace the window
-line counter in both emulators line by line and find which of the two counts the hardware skips.
 
 ## AGE oam-write on DMG-C
 

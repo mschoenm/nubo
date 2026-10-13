@@ -55,6 +55,8 @@ pub(crate) const ROM_SIZE_1MB: u8 = 0x5;
 #[cfg(test)]
 pub(crate) const ROM_SIZE_2MB: u8 = 0x6;
 #[cfg(test)]
+pub(crate) const ROM_SIZE_4MB: u8 = 0x7;
+#[cfg(test)]
 pub(crate) const ROM_SIZE_8MB: u8 = 0x8;
 
 #[cfg(test)]
@@ -65,3 +67,5 @@ pub(crate) const RAM_SIZE_8KB: u8 = 0x2;
 pub(crate) const RAM_SIZE_32KB: u8 = 0x3;
 #[cfg(test)]
 pub(crate) const RAM_SIZE_128KB: u8 = 0x4;
+#[cfg(test)]
+pub(crate) const RAM_SIZE_64KB: u8 = 0x5;

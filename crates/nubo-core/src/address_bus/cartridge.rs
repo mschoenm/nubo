@@ -308,14 +308,16 @@ impl MapperKind {
         }
     }
 
-    /// The controller in its power-on state, for a cartridge with this ROM
-    /// and type byte. Whether it has RAM comes from the type byte, never from
-    /// the size of a save file. An MBC3's clock starts from the state the
-    /// frontend saved, if any.
+    /// The controller in its power-on state, for a cartridge with this ROM,
+    /// type byte and RAM size (from the header). Whether it has RAM comes
+    /// from the type byte, never from the size of a save file. An MBC3 with
+    /// more ROM or RAM than an MBC3 can address is an MBC30, and its clock
+    /// starts from the state the frontend saved, if any.
     fn create_mapper(
         self,
         rom: &[u8],
         cartridge_type: u8,
+        ram_size: usize,
         effects: &dyn CartridgeEffects,
     ) -> CartridgeMapper {
         match self {
@@ -324,6 +326,8 @@ impl MapperKind {
             Self::Mbc2 => CartridgeMapper::Mbc2(Mbc2CartridgeMapper::new()),
             Self::Mbc3 => CartridgeMapper::Mbc3(Mbc3CartridgeMapper::new(
                 cartridge_type,
+                rom.len(),
+                ram_size,
                 effects.load_rtc_state(),
             )),
             Self::Mbc5 => CartridgeMapper::Mbc5(Mbc5CartridgeMapper::new(cartridge_type)),
@@ -498,7 +502,7 @@ pub(super) fn load_cartridge(
         rom.resize(MINIMUM_ROM_SIZE, 0xFF);
     }
 
-    let mapper = kind.create_mapper(&rom, header.cartridge_type, effects.as_ref());
+    let mapper = kind.create_mapper(&rom, header.cartridge_type, ram_size, effects.as_ref());
     Ok(Cartridge {
         rom: rom.into(),
         header,

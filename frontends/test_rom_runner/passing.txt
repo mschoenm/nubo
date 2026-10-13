@@ -75,6 +75,7 @@ cgb daid/stop_instr_gbc_mode3.gb
 cgb dmg-acid2/dmg-acid2.gb
 cgb little-things-gb/firstwhite.gb
 cgb little-things-gb/tellinglys.gb
+cgb mbc3-tester/mbc3-tester.gb
 cgb mealybug-tearoom-tests/dma/hdma_during_halt-C.gb
 cgb mealybug-tearoom-tests/dma/hdma_timing-C.gb
 cgb mealybug-tearoom-tests/ppu/m2_win_en_toggle.gb
@@ -448,6 +449,7 @@ cgb-c gambatte/bgtiledata/bgtiledata_spx08_2.gbc
 cgb-c gambatte/bgtiledata/bgtiledata_spx08_3.gbc
 cgb-c gambatte/bgtiledata/bgtiledata_spx08_4.gbc
 cgb-c gambatte/bgtiledata/bgtiledata_spx08_ds_3.gbc
+cgb-c gambatte/bgtiledata/bgtiledata_spx08_ds_4.gbc
 cgb-c gambatte/bgtiledata/bgtiledata_spx09_1.gbc
 cgb-c gambatte/bgtiledata/bgtiledata_spx09_3.gbc
 cgb-c gambatte/bgtiledata/bgtiledata_spx09_ds_1.gbc
@@ -3848,7 +3850,9 @@ dmg blargg/instr_timing/instr_timing.gb
 dmg blargg/mem_timing-2/mem_timing.gb
 dmg blargg/mem_timing/mem_timing.gb
 dmg blargg/oam_bug/oam_bug.gb
+dmg cpp/latch-rtc-test.gb
 dmg cpp/ramg-mbc3-test.gb
+dmg cpp/rtc-invalid-banks-test.gb
 dmg daid/ppu_scanline_bgp.gb
 dmg daid/stop_instr.gb
 dmg dmg-acid2/dmg-acid2.gb
@@ -5709,6 +5713,7 @@ dmg gambatte/window/on_screen/wxA6_late_we_reenable_2.gbc
 dmg gambatte/window/on_screen/wxA6_late_we_reenable_3.gbc
 dmg gambatte/window/on_screen/wxA6_late_we_reenable_4.gbc
 dmg gambatte/window/on_screen/wxA6_scx7.gbc
+dmg gambatte/window/on_screen/wxA6_weoff_at_xposA6.gbc
 dmg gambatte/window/on_screen/wxA6_wy00.gbc
 dmg gambatte/window/on_screen/wxA6_wy01.gbc
 dmg gambatte/window/on_screen/wxA6_wy01_weoff_ly02.gbc
@@ -6198,6 +6203,7 @@ dmg gbmicrotest/win9_a.gb
 dmg gbmicrotest/win9_b.gb
 dmg little-things-gb/firstwhite.gb
 dmg little-things-gb/tellinglys.gb
+dmg mbc3-tester/mbc3-tester.gb
 dmg mealybug-tearoom-tests/ppu/m2_win_en_toggle.gb
 dmg mealybug-tearoom-tests/ppu/m3_bgp_change.gb
 dmg mealybug-tearoom-tests/ppu/m3_bgp_change_sprites.gb

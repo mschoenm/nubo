@@ -1,15 +1,18 @@
 //! The MBC3 memory bank controller, which can also have a real-time clock
 //! (RTC) that keeps counting while the console is off, powered by the
-//! cartridge battery.
+//! cartridge battery, and the MBC30, an MBC3 for up to 4 MiB of ROM and 64
+//! KiB of RAM (Nubo treats an MBC3 cartridge with more as one, like SameBoy).
 //!
 //! The clock has five registers: seconds, minutes, hours, and a 9-bit day
 //! counter split over DL (its lower 8 bits) and DH (its top bit, plus a halt
 //! flag and a day carry flag). A game selects a register by writing 0x08-0x0C
-//! where it would otherwise select a RAM bank, then reads or writes it at
-//! 0xA000-0xBFFF. Writing 0 and then 1 to 0x6000-0x7FFF latches the clock,
-//! which is when Nubo brings the registers up to date with the
-//! frontend's clock (or, with [`RtcClock::EmulatedTime`], with the time the
-//! emulator has run).
+//! where it would otherwise select a RAM bank, then writes it at
+//! 0xA000-0xBFFF. Reads there show a copy of the registers, which any write to
+//! 0x6000-0x7FFF latches (games write 0 and then 1): that is when Nubo brings
+//! the clock up to date with the frontend's clock (or, with
+//! [`RtcClock::EmulatedTime`], with the time the emulator has run). The bank
+//! and latch behaviour follows SameBoy (MIT, see `apu.rs`) and
+//! CasualPokePlayer's latch-rtc-test and rtc-invalid-banks-test.
 
 use crate::address_bus::bank_utils::{banked_read, banked_write};
 use crate::address_bus::constants::{
@@ -46,31 +49,44 @@ pub struct RtcState {
     pub day_carry: bool,
 }
 
-/// The registers and clock of an MBC3, with or without RAM and a clock.
+/// The registers and clock of an MBC3 or MBC30, with or without RAM and a
+/// clock.
 #[derive(Debug, Serializable)]
 pub(super) struct Mbc3CartridgeMapper {
-    /// The ROM bank visible at 0x4000-0x7FFF.
+    /// The ROM bank visible at 0x4000-0x7FFF: the seven lower bits written to
+    /// 0x2000-0x3FFF (all eight on an MBC30), where 0 selects bank 1.
     rom_bank_number: u8,
     /// Whether the game may access the RAM and the clock registers.
     ram_rtc_enabled: bool,
-    /// What 0xA000-0xBFFF shows: RAM bank 0-3, or clock register 0x08-0x0C.
+    /// What 0xA000-0xBFFF shows: the four lower bits written to 0x4000-0x5FFF.
+    /// Bit 3 selects a clock register (0x08-0x0C, while 0x0D-0x0F read 0xFF)
+    /// on a cartridge with the clock, and bits 0-2 the RAM bank otherwise.
     ram_bank_or_rtc_register: u8,
+    /// The clock, which keeps counting.
     rtc: RtcState,
-    /// The last value written to 0x6000-0x7FFF. Writing 1 after 0 latches the
-    /// clock.
-    last_latch_write: u8,
+    /// What reads of the clock registers show: the registers as they were at
+    /// the last latch.
+    latched_rtc: LatchedRtc,
     /// Whether the cartridge type has RAM, which the game can then enable.
     #[serializable(skip)]
     has_ram: bool,
     /// Whether the cartridge type has the clock.
     #[serializable(skip)]
     has_timer: bool,
+    /// Whether it is an MBC30: an 8-bit ROM bank number and eight RAM banks.
+    #[serializable(skip)]
+    is_mbc30: bool,
     /// Set when the clock changed, until it is passed to the frontend to save
     /// (see `Cartridge::report_save_changes`). Like the cartridge's
     /// `ram_changed`, loading a save state leaves it alone.
     #[serializable(skip)]
     rtc_changed: bool,
 }
+
+/// The ROM size above which an MBC3 is an MBC30 (2 MiB, 128 banks).
+const MBC3_MAX_ROM_SIZE: usize = 0x20_0000;
+/// The RAM size above which an MBC3 is an MBC30 (32 KiB, 4 banks).
+const MBC3_MAX_RAM_SIZE: usize = 0x8000;
 
 /// PPU dots in a millisecond: the clock runs at 4,194,304 Hz.
 const DOTS_PER_MILLISECOND: f64 = 4_194.304;
@@ -101,15 +117,23 @@ pub(super) fn rtc_time(effects: &dyn CartridgeEffects, elapsed_dots: u64) -> f64
 }
 
 impl Mbc3CartridgeMapper {
-    /// The controller at power-on, for a cartridge with this type byte. The
-    /// clock goes on from `saved_rtc`, the state the frontend saved, if any.
-    pub(super) fn new(cartridge_type: u8, saved_rtc: Option<RtcState>) -> Self {
+    /// The controller at power-on, for a cartridge with this type byte, ROM
+    /// size and RAM size. The clock goes on from `saved_rtc`, the state the
+    /// frontend saved, if any, which reads show until the game latches it.
+    pub(super) fn new(
+        cartridge_type: u8,
+        rom_size: usize,
+        ram_size: usize,
+        saved_rtc: Option<RtcState>,
+    ) -> Self {
+        let rtc = saved_rtc.unwrap_or_default();
         Mbc3CartridgeMapper {
             rom_bank_number: 1,
             ram_rtc_enabled: false,
             ram_bank_or_rtc_register: 0,
-            rtc: saved_rtc.unwrap_or_default(),
-            last_latch_write: 0xFF,
+            latched_rtc: LatchedRtc::of(&rtc),
+            rtc,
+            is_mbc30: rom_size > MBC3_MAX_ROM_SIZE || ram_size > MBC3_MAX_RAM_SIZE,
             has_ram: matches!(
                 cartridge_type,
                 CART_TYPE_MBC3_RAM | CART_TYPE_MBC3_RAM_BATTERY | CART_TYPE_MBC3_TIMER_RAM_BATTERY
@@ -188,31 +212,13 @@ impl Mbc3CartridgeMapper {
         true
     }
 
-    /// Brings the clock registers up to date when the game latches them.
+    /// Brings the clock up to date and copies its registers to the ones
+    /// reads show, when the game latches it.
     fn latch_rtc(&mut self, current_time: f64) {
         if self.catch_up(current_time) {
             self.rtc_changed = true;
         }
-    }
-
-    fn read_rtc_register(&self, register: u8) -> u8 {
-        match register {
-            RTC_SECONDS => self.rtc.seconds,
-            RTC_MINUTES => self.rtc.minutes,
-            RTC_HOURS => self.rtc.hours,
-            RTC_DAY_LOW => (self.rtc.days & 0xFF) as u8,
-            RTC_DAY_HIGH => {
-                let mut value = (self.rtc.days >> 8) as u8;
-                if self.rtc.halted {
-                    value |= 0x40;
-                }
-                if self.rtc.day_carry {
-                    value |= 0x80;
-                }
-                value
-            }
-            _ => 0xFF,
-        }
+        self.latched_rtc = LatchedRtc::of(&self.rtc);
     }
 
     /// Brings the clock up to date, then writes a clock register.
@@ -259,9 +265,26 @@ impl Mbc3CartridgeMapper {
         [0, u16::from(self.rom_bank_number)]
     }
 
-    /// What 0xA000-0xBFFF shows: RAM bank 0-3, or clock register 0x08-0x0C.
+    /// What 0xA000-0xBFFF shows: a RAM bank, or a clock register 0x08-0x0F.
     pub(super) fn ram_bank_or_rtc_register(&self) -> u8 {
         self.ram_bank_or_rtc_register
+    }
+
+    /// What the selected RAM bank or clock register is.
+    fn selected(&self) -> Selected {
+        let index = self.ram_bank_or_rtc_register & 0x07;
+        if self.has_timer && self.ram_bank_or_rtc_register & 0x08 != 0 {
+            Selected::Clock(index)
+        } else if !self.has_ram {
+            Selected::Nothing
+        } else if self.is_mbc30 {
+            Selected::Ram(index)
+        } else if self.has_timer && index > 3 {
+            // Banks 4-7 read nothing on an MBC3 with a clock (SameBoy).
+            Selected::Nothing
+        } else {
+            Selected::Ram(index & 0x03)
+        }
     }
 
     /// Sets a register by writing to the ROM area. Latching the clock asks
@@ -279,22 +302,16 @@ impl Mbc3CartridgeMapper {
                 }
             }
             0x2000..=0x3FFF => {
-                // The bank number has seven bits; only after masking does 0
-                // select bank 1, so writing 0x80 selects bank 1 (SameBoy).
-                let bank = value & 0x7F;
+                // The bank number has seven bits (eight on an MBC30); only
+                // after masking does 0 select bank 1, so writing 0x80 selects
+                // bank 1 on an MBC3 (SameBoy).
+                let bank = if self.is_mbc30 { value } else { value & 0x7F };
                 self.rom_bank_number = if bank == 0 { 1 } else { bank };
             }
-            0x4000..=0x5FFF => {
-                if matches!(value, 0x00..=0x03 | RTC_SECONDS..=RTC_DAY_HIGH) {
-                    self.ram_bank_or_rtc_register = value;
-                }
-            }
+            0x4000..=0x5FFF => self.ram_bank_or_rtc_register = value & 0x0F,
             0x6000..=0x7FFF => {
                 if self.has_timer {
-                    if self.last_latch_write == 0x00 && value == 0x01 {
-                        self.latch_rtc(current_time());
-                    }
-                    self.last_latch_write = value;
+                    self.latch_rtc(current_time());
                 }
             }
             _ => unreachable!("the address bus only routes ROM addresses here, got {address:#X}"),
@@ -307,14 +324,10 @@ impl Mbc3CartridgeMapper {
         if !self.ram_rtc_enabled {
             return 0xFF;
         }
-        match self.ram_bank_or_rtc_register {
-            bank @ 0x00..=0x03 if self.has_ram => {
-                banked_read(ram, RAM_BANK_SIZE, address, u16::from(bank))
-            }
-            register @ RTC_SECONDS..=RTC_DAY_HIGH if self.has_timer => {
-                self.read_rtc_register(register)
-            }
-            _ => 0xFF,
+        match self.selected() {
+            Selected::Ram(bank) => banked_read(ram, RAM_BANK_SIZE, address, u16::from(bank)),
+            Selected::Clock(index) => self.latched_rtc.register(index),
+            Selected::Nothing => 0xFF,
         }
     }
 
@@ -331,15 +344,73 @@ impl Mbc3CartridgeMapper {
         if !self.ram_rtc_enabled {
             return false;
         }
-        match self.ram_bank_or_rtc_register {
-            bank @ 0x00..=0x03 if self.has_ram => {
+        match self.selected() {
+            Selected::Ram(bank) => {
                 banked_write(ram, RAM_BANK_SIZE, address, u16::from(bank), value)
             }
-            register @ RTC_SECONDS..=RTC_DAY_HIGH if self.has_timer => {
-                self.write_rtc_register(register, value, current_time());
+            Selected::Clock(index) if RTC_SECONDS + index <= RTC_DAY_HIGH => {
+                self.write_rtc_register(RTC_SECONDS + index, value, current_time());
                 false
             }
-            _ => false,
+            Selected::Clock(_) | Selected::Nothing => false,
+        }
+    }
+}
+
+/// What 0xA000-0xBFFF of an MBC3 shows.
+enum Selected {
+    /// A RAM bank.
+    Ram(u8),
+    /// A clock register: 0-4 for seconds, minutes, hours, DL and DH, 5-7 for
+    /// nothing.
+    Clock(u8),
+    /// Neither: reads give 0xFF and writes are lost.
+    Nothing,
+}
+
+/// The clock registers as the game reads them, copied from the clock at
+/// each latch.
+#[derive(Debug, Default, Clone, Copy, Serializable)]
+struct LatchedRtc {
+    seconds: u8,
+    minutes: u8,
+    hours: u8,
+    /// DL: the lower 8 bits of the day counter.
+    day_low: u8,
+    /// DH: bit 0 is bit 8 of the day counter, bit 6 the halt flag and bit 7
+    /// the day carry flag.
+    day_high: u8,
+}
+
+impl LatchedRtc {
+    /// The registers of `rtc` as they are now.
+    fn of(rtc: &RtcState) -> Self {
+        let mut day_high = (rtc.days >> 8) as u8 & 0x01;
+        if rtc.halted {
+            day_high |= 0x40;
+        }
+        if rtc.day_carry {
+            day_high |= 0x80;
+        }
+        LatchedRtc {
+            seconds: rtc.seconds,
+            minutes: rtc.minutes,
+            hours: rtc.hours,
+            day_low: (rtc.days & 0xFF) as u8,
+            day_high,
+        }
+    }
+
+    /// Clock register `index` (0x08-0x0C written to 0x4000-0x5FFF, without
+    /// bit 3), or 0xFF for the ones after DH.
+    fn register(self, index: u8) -> u8 {
+        match index {
+            0 => self.seconds,
+            1 => self.minutes,
+            2 => self.hours,
+            3 => self.day_low,
+            4 => self.day_high,
+            _ => 0xFF,
         }
     }
 }
@@ -350,7 +421,8 @@ mod tests {
     use crate::address_bus::cartridge::test_utils::*;
     use crate::address_bus::cartridge::*;
     use crate::address_bus::constants::{
-        CART_TYPE_MBC3, RAM_SIZE_2KB, RAM_SIZE_32KB, ROM_SIZE_64KB,
+        CART_TYPE_MBC3, RAM_SIZE_2KB, RAM_SIZE_8KB, RAM_SIZE_32KB, RAM_SIZE_64KB, ROM_SIZE_2MB,
+        ROM_SIZE_4MB, ROM_SIZE_64KB,
     };
     use crate::address_bus::effects::{CartridgeEffects, empty_cartridge_effects};
     use crate::address_bus::test_utils::*;
@@ -748,68 +820,178 @@ mod tests {
     }
 
     #[test]
-    fn does_not_read_from_minutes_rtc_register_if_not_supported() {
+    fn a_clock_register_without_a_clock_selects_a_ram_bank() {
         let mut mapper = build_cartridge_mapper_with_effects(
             CART_TYPE_MBC3_RAM_BATTERY,
             ROM_SIZE_64KB,
-            RAM_SIZE_2KB,
+            RAM_SIZE_32KB,
             fake_cartridge_effects(),
         );
-
         mapper.write_rom(0x0000, 0xA);
+        mapper.write_rom(0x4000, 0x1);
+        mapper.write_ram(0x0000, 0x5A);
 
         mapper.write_rom(0x4000, 0x9);
-
-        // Latch RTC
-        mapper.write_rom(0x6000, 0x0);
-        mapper.write_rom(0x6000, 0x1);
-
-        let byte = mapper.read_ram(0x0000);
-        assert_eq!(byte, 0xFF);
+        assert_eq!(mapper.read_ram(0x0000), 0x5A);
+        mapper.write_ram(0x0000, 0x2);
+        mapper.write_rom(0x4000, 0x1);
+        assert_eq!(mapper.read_ram(0x0000), 0x2);
     }
 
     #[test]
-    fn writes_to_minutes_rtc_register() {
+    fn a_written_clock_register_reads_back_after_the_next_latch() {
         let mut mapper = build_cartridge_mapper_with_effects(
             CART_TYPE_MBC3_TIMER_RAM_BATTERY,
             ROM_SIZE_64KB,
             RAM_SIZE_2KB,
             fake_cartridge_effects(),
         );
-
         mapper.write_rom(0x0000, 0xA);
-
-        mapper.write_rom(0x4000, 0x9);
-
-        // Latch RTC
-        mapper.write_rom(0x6000, 0x0);
         mapper.write_rom(0x6000, 0x1);
+        assert_eq!(read_rtc_register(&mut mapper, RTC_MINUTES), 10);
 
         mapper.write_ram(0x0000, 0x2);
-        let byte = mapper.read_ram(0x0000);
-        assert_eq!(byte, 0x02);
+        assert_eq!(mapper.read_ram(0x0000), 10);
+        mapper.write_rom(0x6000, 0x1);
+        assert_eq!(mapper.read_ram(0x0000), 0x2);
     }
 
     #[test]
-    fn does_not_write_to_minutes_rtc_register_if_not_supported() {
+    fn any_write_to_the_latch_register_latches_the_clock() {
+        for value in [0x00, 0x01, 0x5A] {
+            let mut mapper = build_cartridge_mapper_with_effects(
+                CART_TYPE_MBC3_TIMER_BATTERY,
+                ROM_SIZE_64KB,
+                0,
+                fake_cartridge_effects(),
+            );
+            mapper.write_rom(0x0000, 0xA);
+            mapper.write_rom(0x4000, RTC_HOURS);
+            mapper.write_ram(0x0000, 0x7);
+
+            mapper.write_rom(0x6000, value);
+            assert_eq!(mapper.read_ram(0x0000), 0x7, "{value:#X}");
+        }
+    }
+
+    #[test]
+    fn the_bank_register_keeps_its_four_lower_bits() {
         let mut mapper = build_cartridge_mapper_with_effects(
-            CART_TYPE_MBC3_RAM_BATTERY,
+            CART_TYPE_MBC3_TIMER_RAM_BATTERY,
             ROM_SIZE_64KB,
-            RAM_SIZE_2KB,
+            RAM_SIZE_32KB,
             fake_cartridge_effects(),
         );
-
         mapper.write_rom(0x0000, 0xA);
-
-        mapper.write_rom(0x4000, 0x9);
-
-        // Latch RTC
-        mapper.write_rom(0x6000, 0x0);
+        for bank in 0..4 {
+            mapper.write_rom(0x4000, bank);
+            mapper.write_ram(0x0000, bank + 0x10);
+        }
         mapper.write_rom(0x6000, 0x1);
 
-        mapper.write_ram(0x0000, 0x2);
-        let byte = mapper.read_ram(0x0000);
-        assert_eq!(byte, 0xFF);
+        let expected = [
+            0x10, 0x11, 0x12, 0x13, 0xFF, 0xFF, 0xFF, 0xFF, 10, 10, 10, 0, 0, 0xFF, 0xFF, 0xFF,
+        ];
+        for high_bits in [0x00, 0x10, 0xF0] {
+            for (low_bits, expected) in expected.iter().enumerate() {
+                mapper.write_rom(0x4000, high_bits | low_bits as u8);
+                assert_eq!(
+                    mapper.read_ram(0x0000),
+                    *expected,
+                    "bank {:#X}",
+                    high_bits | low_bits as u8
+                );
+            }
+        }
+    }
+
+    /// Cartridge effects that count how often the clock is saved.
+    struct RtcSaveCounter(Rc<Cell<usize>>);
+
+    impl CartridgeEffects for RtcSaveCounter {
+        fn current_time_millis(&self) -> f64 {
+            0.0
+        }
+
+        fn save_rtc_state(&mut self, _state: &RtcState) {
+            self.0.set(self.0.get() + 1);
+        }
+    }
+
+    #[test]
+    fn writes_to_the_missing_clock_registers_change_nothing() {
+        let saves = Rc::new(Cell::new(0));
+        let mut mapper = build_cartridge_mapper_with_effects(
+            CART_TYPE_MBC3_TIMER_BATTERY,
+            ROM_SIZE_64KB,
+            0,
+            Box::new(RtcSaveCounter(Rc::clone(&saves))),
+        );
+        mapper.write_rom(0x0000, 0xA);
+        for register in 0x0D..=0x0F {
+            mapper.write_rom(0x4000, register);
+            mapper.write_ram(0x0000, 0x00);
+            assert_eq!(mapper.read_ram(0x0000), 0xFF);
+        }
+        mapper.report_save_changes();
+        assert_eq!(saves.get(), 0);
+
+        mapper.write_rom(0x4000, RTC_SECONDS);
+        mapper.write_ram(0x0000, 0x00);
+        mapper.report_save_changes();
+        assert_eq!(saves.get(), 1);
+    }
+
+    #[test]
+    fn ram_banks_4_to_7_wrap_around_without_a_clock() {
+        let mut mapper =
+            build_cartridge_mapper(CART_TYPE_MBC3_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_32KB);
+        mapper.write_rom(0x0000, 0xA);
+        mapper.write_rom(0x4000, 0x1);
+        mapper.write_ram(0x0000, 0x5A);
+
+        mapper.write_rom(0x4000, 0x5);
+        assert_eq!(mapper.read_ram(0x0000), 0x5A);
+    }
+
+    #[test]
+    fn an_mbc3_with_more_than_2_mib_of_rom_uses_all_eight_rom_bank_bits() {
+        let mut mbc3 = build_cartridge_mapper(CART_TYPE_MBC3, ROM_SIZE_2MB, 0);
+        mbc3.write_rom(0x2000, 0x85);
+        assert_eq!(mbc3.rom_banks(), [0, 0x05]);
+
+        let mut mbc30 = build_cartridge_mapper(CART_TYPE_MBC3, ROM_SIZE_4MB, 0);
+        mbc30.write_rom(0x2000, 0x85);
+        assert_eq!(mbc30.rom_banks(), [0, 0x85]);
+        mbc30.write_rom(0x2000, 0x00);
+        assert_eq!(mbc30.rom_banks(), [0, 0x01]);
+    }
+
+    #[test]
+    fn an_mbc3_with_64_kib_of_ram_has_eight_ram_banks() {
+        let mut mbc30 = build_cartridge_mapper_with_effects(
+            CART_TYPE_MBC3_TIMER_RAM_BATTERY,
+            ROM_SIZE_64KB,
+            RAM_SIZE_64KB,
+            fake_cartridge_effects(),
+        );
+        mbc30.write_rom(0x0000, 0xA);
+        for bank in 0..8 {
+            mbc30.write_rom(0x4000, bank);
+            mbc30.write_ram(0x0000, bank + 0x10);
+        }
+        for bank in 0..8 {
+            mbc30.write_rom(0x4000, bank);
+            assert_eq!(mbc30.read_ram(0x0000), bank + 0x10);
+        }
+
+        let mut mbc3 =
+            build_cartridge_mapper(CART_TYPE_MBC3_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_8KB);
+        mbc3.write_rom(0x0000, 0xA);
+        mbc3.write_rom(0x4000, 0x7);
+        mbc3.write_ram(0x0000, 0x33);
+        mbc3.write_rom(0x4000, 0x3);
+        assert_eq!(mbc3.read_ram(0x0000), 0x33);
     }
 
     #[test]

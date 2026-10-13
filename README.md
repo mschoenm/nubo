@@ -25,7 +25,7 @@ These are the files of the [latest release](https://github.com/mschoenm/nubo/rel
 - Accurate audio emulation, with channel timing ported from [SameBoy](https://github.com/LIJI32/SameBoy)
 - Dot-based graphics emulation with a pixel FIFO, so mid-scanline effects and mode 3 timing match the hardware
 - Every hardware model from the first Game Boy to the Game Boy Advance, picked automatically per game or by hand
-- MBC1, MBC2, MBC3, MBC5, and HuC1 support, with RTC support for MBC3 cartridges
+- MBC1, MBC2, MBC3 (including the MBC30 for 4 MB games), MBC5, and HuC1 support, with RTC support for MBC3 cartridges
 - Loading ROMs directly from `.zip` files
 - A desktop app with:
   - A game library built from your ROM folders (optionally including subfolders), with search, recently played games, and each game's title screen or downloaded box art
@@ -107,9 +107,9 @@ Esc opens the pause menu, Tab fast forwards while held, F5 and F8 quick save and
 | [Scribbltests](https://github.com/Hacktix/scribbltests) | 5/5 | 5/5 |
 | [TurtleTests](https://github.com/Powerlated/TurtleTests) | 2/2 | 2/2 |
 | [little-things-gb](https://github.com/pinobatch/little-things-gb) | 2/2 | 2/2 |
-| [MBC3 Tester](https://github.com/EricKirschenmann/MBC3-Tester-gb) | 0/1 | 0/1 |
+| [MBC3 Tester](https://github.com/EricKirschenmann/MBC3-Tester-gb) | 1/1 | 1/1 |
 | [daid's tests](https://github.com/gbdev/GBEmulatorShootout/tree/main/testroms/daid) | 2/2 | 6/6 |
-| [CasualPokePlayer's MBC3 tests](https://github.com/gbdev/GBEmulatorShootout/tree/main/testroms/cpp) | 1/3 | |
+| [CasualPokePlayer's MBC3 tests](https://github.com/gbdev/GBEmulatorShootout/tree/main/testroms/cpp) | 3/3 | |
 
 These aren't run, because nothing can check them automatically or they need hardware Nubo doesn't emulate:
 
@@ -133,7 +133,7 @@ Nubo started as a fork of [Retro Boy](https://github.com/smparsons/retroboy) by 
 
 Much of its accuracy comes from other people's research and code:
 
-- [SameBoy](https://github.com/LIJI32/SameBoy) by Lior Halphon: the APU channel timing, the mode 3 pixel pipeline, the OAM corruption bug, the OAM DMA bus conflicts, the CGB speed switch timing, STOP mode, the PPU register write timing and the serial clock are ported from SameBoy, and the Game Boy Color boot ROM is a modified version of SameBoy's (Expat License, see [NOTICE](NOTICE)). SameBoy was also the reference for halt timing, the order of the hardware models, GameShark codes and many smaller hardware quirks.
+- [SameBoy](https://github.com/LIJI32/SameBoy) by Lior Halphon: the APU channel timing, the mode 3 pixel pipeline, the OAM corruption bug, the OAM DMA bus conflicts, the CGB speed switch timing, STOP mode, the PPU register write timing, the serial clock and the MBC3's banks and clock latch are ported from SameBoy, and the Game Boy Color boot ROM is a modified version of SameBoy's (Expat License, see [NOTICE](NOTICE)). SameBoy was also the reference for halt timing, the order of the hardware models, GameShark codes and many smaller hardware quirks.
 - [Bootix](https://github.com/Hacktix/Bootix) by Hacktix: the boot ROM of the monochrome models is a modified version of Bootix (CC0).
 - [Gambatte](https://github.com/pokemon-speedrunning/gambatte-core) by sinamas: a reference for the timing of double speed and the window, worked out by running the same test ROMs in Gambatte and Nubo and studying where they differ. Gambatte's GPL-2.0-only license can't be combined with Nubo's, so no code comes from it.
 - [Pan Docs](https://gbdev.io/pandocs/) and the [gbdev](https://gbdev.io) community: the reference for nearly every hardware register.
