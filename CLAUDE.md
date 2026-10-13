@@ -176,7 +176,7 @@ cargo screenshot path/to/test_rom.gb 10
 
 ## Merging Pull Requests
 
-Codex reviews every pull request when it is opened. Its summary comment ("Codex Review Summary") shows the review as running and then as completed, and its findings arrive as review comments. When the maintainer asks Claude to merge a pull request, Claude waits until CI is green and Codex's review has completed. It then handles Codex's findings like any other review comments (fix and push, or answer why not, then resolve the thread) before it merges. A push after Codex's review doesn't start a new one; a comment saying `@codex review` does.
+Codex reviews every pull request when it is opened. Its summary comment ("Codex Review Summary") shows the review as running and then as completed, and its findings arrive as review comments. When the maintainer asks Claude to merge a pull request, Claude waits until CI is green and Codex's review has completed. It then handles Codex's findings like any other review comments (fix and push, or answer why not, then resolve the thread) before it merges. A push after Codex's review doesn't start a new one, so when commits were pushed after its last review, Claude asks for a new review with a comment saying `@codex review` and waits for that one too. Codex doesn't always start: if a requested review hasn't started after about five minutes (its summary comment doesn't show it running and nothing else comes from Codex), Claude merges without it.
 
 ## Making a Release
 
