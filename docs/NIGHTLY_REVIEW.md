@@ -22,7 +22,7 @@ Commands taking longer than a minute or two (builds, `cargo test-roms`, benchmar
 2. Clone the wiki: `git clone --depth 1 https://github.com/mschoenm/nubo.wiki.git /tmp/wiki`. Its `tonight.json` says what to review: `part.files` (the part to read in detail), `changes_since` (the commit the day's changes start after; `null` on the first night) and `changed_files`. Use it if its `date` is today or yesterday (UTC).
 3. If the wiki or a recent `tonight.json` is missing, pick the part yourself: copy `/tmp/wiki/rotation.json` to `/tmp/rotation.json` if it exists, run `cargo xtask review-units next --state /tmp/rotation.json --date "$(date -u +%F)" --commit "$(git rev-parse HEAD)"`, and say in your report that the wiki wasn't up to date.
 4. The day's changes are `git log --reverse <changes_since>..origin/main`; without `changes_since`, the commits of the last 26 hours. Read their diffs, all files including docs. Beyond about 3,000 changed lines, review the files with the most changes and list the rest as not reviewed.
-5. Read last night's CI: `gh api 'repos/mschoenm/nubo/actions/workflows/nightly.yml/runs?per_page=1'` (its `conclusion` and `html_url`), and the Regressions section of `/tmp/wiki/Nightly-metrics.md`.
+5. Read last night's CI: `gh api 'repos/mschoenm/nubo/actions/workflows/nightly.yml/runs?per_page=1'` (its `conclusion` and `html_url`), the newest run of `nightly-build.yml` the same way (it publishes the `nightly` pre-release once the nightly run passes: `failure` means publishing failed, `skipped` follows a nightly run that didn't pass), and the Regressions section of `/tmp/wiki/Nightly-metrics.md`.
 6. Look for an open pull request of an earlier night: `gh api 'repos/mschoenm/nubo/pulls?state=open&per_page=100' --jq '.[] | select(.head.ref | startswith("claude/nightly-")) | .number'`.
 
 ## 3. Review
@@ -77,7 +77,7 @@ GitHub's GraphQL API is blocked in routines, so `gh pr create` and `gh issue` do
   5. **Suggestions:** what you didn't change and why, most important first.
   6. **Reviewed:** the commit range of the day's changes and tonight's part, with its files.
 - **When an earlier nightly PR is still open:** make no new changes; add tonight's findings to it as a comment: `gh api repos/mschoenm/nubo/issues/<number>/comments -F body=@/tmp/comment.md`.
-- **When a metric regressed or a nightly CI job failed:** open an issue titled `Nightly: <what>` with the numbers, the CI run's link and the commits since the last good night, unless an open issue with that title exists; then add a comment to it. Look with `gh api 'repos/mschoenm/nubo/issues?state=open&per_page=100'`.
+- **When a metric regressed, a nightly CI job failed or the nightly build couldn't be published:** open an issue titled `Nightly: <what>` with the numbers, the CI run's link and the commits since the last good night, unless an open issue with that title exists; then add a comment to it. Look with `gh api 'repos/mschoenm/nubo/issues?state=open&per_page=100'`.
 - **When the run can't finish** (setup fails, a tool is missing): open an issue `Nightly review failed: <date>` saying where and why.
 - **When there is nothing to fix and nothing regressed:** no pull request and no issue.
 
