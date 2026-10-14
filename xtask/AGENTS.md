@@ -9,7 +9,7 @@ cargo xtask build-web         # Build it into target/web/ (what deploy.yml publi
 cargo xtask build-web --quick # Much faster to build, bigger and slower to run (what CI checks)
 
 # Packages and the logo
-cargo xtask bundle            # Nubo.app into target/bundle/ (macOS)
+cargo xtask macos             # Nubo.app into target/bundle/ (macOS)
 cargo xtask flatpak           # Build, install for this user and export target/bundle/Nubo-<version>-linux-<arch>.flatpak (Linux, needs flatpak-builder)
 cargo xtask windows           # The installer (an MSI) and a zip into target/bundle/ (Windows, needs the WiX Toolset); --nightly <date> names them as a nightly build
 cargo xtask libretro          # The RetroArch core's zip into target/bundle/ (Linux, Windows; universal on macOS)

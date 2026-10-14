@@ -46,7 +46,7 @@ Commands:
   build-web [--quick]
                 Build the Iced frontend for the browser into target/web, ready to publish;
                 --quick builds it much faster, but bigger and slower to run
-  bundle        Build Nubo.app, the macOS app with its icon, into target/bundle (macOS only)
+  macos         Build Nubo.app, the macOS app with its icon, into target/bundle (macOS only)
   flatpak       Build the desktop app as a Flatpak, install it for this user and write it into
                 target/bundle as a .flatpak file to share (Linux with flatpak-builder only)
   windows [--nightly <YYYY-MM-DD>] [--version <x.y.z>]
@@ -319,7 +319,7 @@ fn main() -> ExitCode {
         Some("build-web") => build_iced_web(&options).map(|root| {
             println!("Built the web version in {}", root.display());
         }),
-        Some("bundle") => bundle::build_app_bundle().map(|app| {
+        Some("macos") => macos::build_macos_app().map(|app| {
             println!(
                 "Built {}. Drag it to the Applications folder to install it.",
                 app.display()
@@ -349,7 +349,7 @@ fn main() -> ExitCode {
             );
         }),
         Some("icon") => match env::args().nth(2) {
-            Some(path) => bundle::write_icon(Path::new(&path), 256),
+            Some(path) => icon::write_icon(Path::new(&path), 256),
             None => Err(format!("icon needs a path to write to\n\n{USAGE}")),
         },
         Some("licenses") => match env::args().nth(2) {
@@ -401,11 +401,12 @@ mod tests {
 }
 
 mod benchmark_roms;
-mod bundle;
 mod compare_emulators;
 mod flatpak;
+mod icon;
 mod libretro;
 mod licenses;
+mod macos;
 mod metrics;
 mod release;
 mod review_units;
