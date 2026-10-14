@@ -18,7 +18,8 @@ impl App {
         self.controller_states
             .each()
             .iter()
-            .map(|state| self.menu_presses.hide_from(state))
+            .enumerate()
+            .map(|(index, state)| self.menu_presses.hide_from(index, state))
             .collect()
     }
 
@@ -101,7 +102,7 @@ impl App {
             }
             ControllerEvent::Changed(controllers) => {
                 let state = controllers.combined();
-                self.controller_states = controllers;
+                let previous_states = std::mem::replace(&mut self.controller_states, controllers);
                 let previous = std::mem::replace(&mut self.controller_state, state);
                 let changed: Vec<(ControllerButton, bool)> = ControllerButton::ALL
                     .into_iter()
@@ -109,7 +110,11 @@ impl App {
                     .map(|button| (button, state.is_pressed(button)))
                     .collect();
 
-                self.menu_presses.update(&previous, &state, self.in_menus());
+                self.menu_presses.update(
+                    previous_states.each(),
+                    self.controller_states.each(),
+                    self.in_menus(),
+                );
                 let states = self.controller_states_for_game();
                 if let Some(game) = &mut self.game {
                     game.session.set_controller_states(states);
