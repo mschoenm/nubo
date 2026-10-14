@@ -1003,3 +1003,41 @@ fn memory_changed_directly_is_kept_in_save_states() {
     emulator.load_state(&state).unwrap();
     assert_eq!(emulator.work_ram()[0x5123], 0x99);
 }
+
+/// A Super Game Boy state made by a version without the intro lacks its
+/// frames; loaded past the boot ROM, the game must go on rather than be held
+/// in reset again.
+#[test]
+fn an_older_super_game_boy_state_past_the_boot_rom_skips_the_intro() {
+    let rom = program_rom(Model::Sgb, &[0x18, 0xFE]);
+    let emulator = booted(Model::Sgb, &rom);
+    assert!(!emulator.address_bus().held_in_reset());
+
+    let state = emulator.save_state();
+    let mut loaded = booted(Model::Sgb, &rom);
+    loaded.load_state(&state).unwrap();
+    assert!(!loaded.address_bus().held_in_reset());
+
+    loaded
+        .address_bus_mut()
+        .gpu_mut_for_tests()
+        .sgb_mut()
+        .unwrap()
+        .restart_intro_for_tests();
+    loaded.address_bus_mut().finish_loading_save_state();
+    assert!(!loaded.address_bus().held_in_reset());
+}
+
+/// The intro counts the frames the PPU hands over, which a game switching
+/// the LCD off and on could hold back. No game runs before the intro is over,
+/// though: Nubo's boot ROM, which switches the LCD on once and never off,
+/// runs until after it ends.
+#[test]
+fn the_super_game_boy_intro_is_over_before_the_game_runs() {
+    for model in [Model::Sgb, Model::Sgb2] {
+        let rom = program_rom(model, &[0x18, 0xFE]);
+        let mut emulator = booted(model, &rom);
+        let gpu = emulator.address_bus_mut().gpu_mut_for_tests();
+        assert!(gpu.sgb().unwrap().intro_over(), "{model:?}");
+    }
+}
