@@ -26,7 +26,7 @@ Nubo plays your Game Boy and Game Boy Color games the way you remember them. It 
 Point it at your ROM folder and your games appear in a library with their title screens, the ones you played last up front. Save anywhere with a save state, pick up right where you left off, play with a keyboard or a controller, and see Super Game Boy games in their own colors and borders, as they looked on a TV.
 
 <p align="center">
-  <img src="images/screenshots/super-game-boy.png" width="700" alt="Tobu Tobu Girl Deluxe in Nubo, inside the game's own illustrated Super Game Boy border">
+  <img src="images/screenshots/super-game-boy.png" width="700" alt="Tobu Tobu Girl Deluxe being played in Nubo: the girl jumps toward a crab over pink mountains, inside the game's own illustrated Super Game Boy border">
 </p>
 
 ## Download
