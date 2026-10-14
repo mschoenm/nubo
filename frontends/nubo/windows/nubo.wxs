@@ -182,6 +182,14 @@
         <Show Dialog="FatalErrorDlg" OnExit="error" />
       </InstallUISequence>
 
+      <!-- An administrative install (msiexec /a) only unpacks the files;
+           it shows the same last pages. -->
+      <AdminUISequence>
+        <Show Dialog="ExitDlg" OnExit="success" />
+        <Show Dialog="UserExitDlg" OnExit="cancel" />
+        <Show Dialog="FatalErrorDlg" OnExit="error" />
+      </AdminUISequence>
+
       <Dialog Id="InstallDlg" Width="370" Height="270" Title="[ProductName] Setup">
         <Control Id="Banner" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="NuboBanner" />
         <Control Id="Title" Type="Text" X="15" Y="8" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\NuboTitle}Install Nubo" />
@@ -347,6 +355,22 @@
           <Publish Event="EndDialog" Value="Return" Order="2" />
         </Control>
         <Control Id="Cancel" Type="PushButton" X="229" Y="132" Width="56" Height="17" Cancel="yes" Text="Cancel">
+          <Publish Event="EndDialog" Value="Exit" />
+        </Control>
+      </Dialog>
+
+      <!-- What Windows Installer shows instead when it can't close Nubo
+           itself. -->
+      <Dialog Id="FilesInUse" Width="300" Height="160" Title="[ProductName] Setup" KeepModeless="yes">
+        <Control Id="Text" Type="Text" X="15" Y="12" Width="270" Height="30" NoPrefix="yes" Text="Nubo is running. Close it, then choose Retry." />
+        <Control Id="List" Type="ListBox" X="15" Y="45" Width="270" Height="70" Property="FileInUseProcess" Sunken="yes" Sorted="yes" TabSkip="yes" />
+        <Control Id="Retry" Type="PushButton" X="96" Y="132" Width="56" Height="17" Default="yes" Text="&amp;Retry">
+          <Publish Event="EndDialog" Value="Retry" />
+        </Control>
+        <Control Id="Ignore" Type="PushButton" X="162" Y="132" Width="56" Height="17" Text="&amp;Ignore">
+          <Publish Event="EndDialog" Value="Ignore" />
+        </Control>
+        <Control Id="Exit" Type="PushButton" X="229" Y="132" Width="56" Height="17" Cancel="yes" Text="Cancel">
           <Publish Event="EndDialog" Value="Exit" />
         </Control>
       </Dialog>
