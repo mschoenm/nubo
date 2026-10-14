@@ -23,8 +23,9 @@ use crate::address_bus::effects::{CartridgeEffects, RtcClock};
 use nubo_serializable_derive::Serializable;
 
 /// The state of an MBC3 real-time clock. Frontends store it next to the
-/// game's save so the clock keeps counting while the emulator is closed.
-#[derive(Debug, Default, Serializable)]
+/// game's save so the clock keeps counting while the emulator is closed,
+/// for example in the 17-byte layout of [`RtcState::to_bytes`].
+#[derive(Debug, Default, Clone, PartialEq, Serializable)]
 pub struct RtcState {
     /// Milliseconds into the current second, 0-999.
     pub milliseconds: u16,
@@ -36,9 +37,10 @@ pub struct RtcState {
     pub hours: u8,
     /// Days, 0-511.
     pub days: u16,
-    /// The time from [`CartridgeEffects::current_time_millis`], in
-    /// milliseconds, that the registers above were last brought up to date
-    /// with.
+    /// The time, in milliseconds, that the registers above were last brought
+    /// up to date with, on the clock the cartridge follows ([`RtcClock`]):
+    /// [`CartridgeEffects::current_time_millis`] on the wall clock, the time
+    /// the emulator has run on emulated time.
     ///
     /// [`CartridgeEffects::current_time_millis`]: crate::CartridgeEffects::current_time_millis
     pub base_timestamp: f64,
@@ -47,6 +49,126 @@ pub struct RtcState {
     /// Whether the day counter went past 511 (bit 7 of DH). It stays set until
     /// the game clears it.
     pub day_carry: bool,
+}
+
+impl RtcState {
+    /// The length of [`RtcState::to_bytes`]: the `.rtc` file the Nubo app
+    /// keeps next to a battery save, and RetroArch's RTC memory.
+    pub const BYTES: usize = 17;
+
+    /// Packs the state into the little-endian `.rtc` layout: milliseconds
+    /// (2 bytes), seconds, minutes, hours, days (2 bytes),
+    /// `base_timestamp` (an `f64`, 8 bytes), `halted` and `day_carry`.
+    pub fn to_bytes(&self) -> [u8; Self::BYTES] {
+        let mut bytes = [0; Self::BYTES];
+        bytes[0..2].copy_from_slice(&self.milliseconds.to_le_bytes());
+        bytes[2] = self.seconds;
+        bytes[3] = self.minutes;
+        bytes[4] = self.hours;
+        bytes[5..7].copy_from_slice(&self.days.to_le_bytes());
+        bytes[7..15].copy_from_slice(&self.base_timestamp.to_le_bytes());
+        bytes[15] = u8::from(self.halted);
+        bytes[16] = u8::from(self.day_carry);
+        bytes
+    }
+
+    /// Unpacks the layout of [`RtcState::to_bytes`], or returns `None` if
+    /// `bytes` has another length.
+    pub fn from_bytes(bytes: &[u8]) -> Option<RtcState> {
+        let bytes: &[u8; Self::BYTES] = bytes.try_into().ok()?;
+        let [timestamp @ .., halted, day_carry] = *bytes.last_chunk::<10>()?;
+        Some(RtcState {
+            milliseconds: u16::from_le_bytes([bytes[0], bytes[1]]),
+            seconds: bytes[2],
+            minutes: bytes[3],
+            hours: bytes[4],
+            days: u16::from_le_bytes([bytes[5], bytes[6]]),
+            base_timestamp: f64::from_le_bytes(timestamp),
+            halted: halted != 0,
+            day_carry: day_carry != 0,
+        })
+    }
+
+    /// Moves the clock forward by `elapsed_ms` milliseconds. A register that
+    /// holds an invalid value (such as 61 seconds) doesn't carry into the next
+    /// one; it keeps counting until it overflows its bits and wraps to 0.
+    fn advance(&mut self, elapsed_ms: f64) {
+        let mut new_milliseconds = u64::from(self.milliseconds).saturating_add(elapsed_ms as u64);
+        let mut new_seconds = u64::from(self.seconds);
+        let mut new_minutes = u64::from(self.minutes);
+        let mut new_hours = u64::from(self.hours);
+        let mut new_days = u64::from(self.days);
+
+        let mut invalid_rollover = false;
+
+        new_seconds += new_milliseconds / 1000;
+        new_milliseconds %= 1000;
+
+        if self.seconds < 60 {
+            new_minutes += new_seconds / 60;
+            new_seconds %= 60;
+        } else if new_seconds > u64::from(SECONDS_REGISTER_MAX) {
+            invalid_rollover = true;
+            new_seconds = 0;
+        }
+
+        if self.minutes < 60 && !invalid_rollover {
+            new_hours += new_minutes / 60;
+            new_minutes %= 60;
+        } else if new_minutes > u64::from(MINUTES_REGISTER_MAX) {
+            invalid_rollover = true;
+            new_minutes = 0;
+        }
+
+        if self.hours < 24 && !invalid_rollover {
+            new_days += new_hours / 24;
+            new_hours %= 24;
+        } else if new_hours > u64::from(HOURS_REGISTER_MAX) {
+            invalid_rollover = true;
+            new_hours = 0;
+        }
+
+        if new_days >= 512 && !invalid_rollover {
+            new_days %= 512;
+            self.day_carry = true;
+        }
+
+        self.milliseconds = new_milliseconds as u16;
+        self.seconds = new_seconds as u8;
+        self.minutes = new_minutes as u8;
+        self.hours = new_hours as u8;
+        self.days = new_days as u16;
+    }
+
+    /// Counts the whole milliseconds that passed since the clock was last
+    /// brought up to date. The fraction of a millisecond left over stays in
+    /// `base_timestamp`, so a game that latches the clock very often doesn't
+    /// lose it. A halted clock doesn't count. Returns whether the clock moved.
+    fn catch_up(&mut self, current_time: f64) -> bool {
+        let elapsed_ms = (current_time - self.base_timestamp).floor();
+        if self.halted || elapsed_ms < 1.0 {
+            return false;
+        }
+        self.advance(elapsed_ms);
+        self.base_timestamp += elapsed_ms;
+        true
+    }
+
+    /// Moves the clock over to another time source without changing what it
+    /// shows: it counts the time that passed on the old source up to
+    /// `old_now`, then goes on from `new_now`, the same moment on the new
+    /// source, keeping the fraction of a millisecond it had counted.
+    /// `base_timestamp` is a time on the source the clock follows, so a
+    /// state read on the other one would otherwise stand still (wall-clock
+    /// time read as emulated time) or jump decades ahead.
+    pub(crate) fn rebase(&mut self, old_now: f64, new_now: f64) {
+        let mut fraction = 0.0;
+        if !self.halted && old_now >= self.base_timestamp {
+            self.catch_up(old_now);
+            fraction = old_now - self.base_timestamp;
+        }
+        self.base_timestamp = new_now - fraction;
+    }
 }
 
 /// The registers and clock of an MBC3 or MBC30, with or without RAM and a
@@ -68,6 +190,13 @@ pub(super) struct Mbc3CartridgeMapper {
     /// What reads of the clock registers show: the registers as they were at
     /// the last latch.
     latched_rtc: LatchedRtc,
+    /// The clock `rtc.base_timestamp` is a time on. A state made on the other
+    /// clock is moved over to this emulator's when it loads
+    /// (`Mbc3CartridgeMapper::follow_clock`). A state from before this field
+    /// lacks it and keeps the value the load starts from: the power-on
+    /// state, already moved over to this emulator's clock, so its clock
+    /// loads as it is, as it did before.
+    rtc_clock: RtcClock,
     /// Whether the cartridge type has RAM, which the game can then enable.
     #[serializable(skip)]
     has_ram: bool,
@@ -111,7 +240,17 @@ const RTC_DAY_HIGH: u8 = 0x0C;
 /// clock, or with [`RtcClock::EmulatedTime`] the `elapsed_dots` the emulator
 /// has run since power-on.
 pub(super) fn rtc_time(effects: &dyn CartridgeEffects, elapsed_dots: u64) -> f64 {
-    match effects.rtc_clock() {
+    clock_time(effects, effects.rtc_clock(), elapsed_dots)
+}
+
+/// The current time on `clock`, in milliseconds: the frontend's wall clock,
+/// or the `elapsed_dots` the emulator has run since power-on.
+pub(super) fn clock_time(
+    effects: &dyn CartridgeEffects,
+    clock: RtcClock,
+    elapsed_dots: u64,
+) -> f64 {
+    match clock {
         RtcClock::WallClock => effects.current_time_millis(),
         RtcClock::EmulatedTime => elapsed_dots as f64 / DOTS_PER_MILLISECOND,
     }
@@ -119,12 +258,14 @@ pub(super) fn rtc_time(effects: &dyn CartridgeEffects, elapsed_dots: u64) -> f64
 
 impl Mbc3CartridgeMapper {
     /// The controller at power-on, for a cartridge with this type byte, ROM
-    /// size and RAM size. The clock goes on from `saved_rtc`, the state the
-    /// frontend saved, if any, which reads show until the game latches it.
+    /// size and RAM size. The clock follows `rtc_clock` and goes on from
+    /// `saved_rtc`, the state the frontend saved, if any, which reads show
+    /// until the game latches it.
     pub(super) fn new(
         cartridge_type: u8,
         rom_size: usize,
         ram_size: usize,
+        rtc_clock: RtcClock,
         saved_rtc: Option<RtcState>,
     ) -> Self {
         let rtc = saved_rtc.unwrap_or_default();
@@ -134,6 +275,7 @@ impl Mbc3CartridgeMapper {
             ram_bank_or_rtc_register: 0,
             latched_rtc: LatchedRtc::of(&rtc),
             rtc,
+            rtc_clock,
             is_mbc30: rom_size > MBC3_MAX_ROM_SIZE || ram_size > MBC3_MAX_RAM_SIZE,
             has_ram: matches!(
                 cartridge_type,
@@ -147,76 +289,10 @@ impl Mbc3CartridgeMapper {
         }
     }
 
-    /// Moves the clock forward by `elapsed_ms` milliseconds. A register that
-    /// holds an invalid value (such as 61 seconds) doesn't carry into the next
-    /// one; it keeps counting until it overflows its bits and wraps to 0.
-    fn advance_rtc(&mut self, elapsed_ms: f64) {
-        let mut new_milliseconds =
-            u64::from(self.rtc.milliseconds).saturating_add(elapsed_ms as u64);
-        let mut new_seconds = u64::from(self.rtc.seconds);
-        let mut new_minutes = u64::from(self.rtc.minutes);
-        let mut new_hours = u64::from(self.rtc.hours);
-        let mut new_days = u64::from(self.rtc.days);
-
-        let mut invalid_rollover = false;
-
-        new_seconds += new_milliseconds / 1000;
-        new_milliseconds %= 1000;
-
-        if self.rtc.seconds < 60 {
-            new_minutes += new_seconds / 60;
-            new_seconds %= 60;
-        } else if new_seconds > u64::from(SECONDS_REGISTER_MAX) {
-            invalid_rollover = true;
-            new_seconds = 0;
-        }
-
-        if self.rtc.minutes < 60 && !invalid_rollover {
-            new_hours += new_minutes / 60;
-            new_minutes %= 60;
-        } else if new_minutes > u64::from(MINUTES_REGISTER_MAX) {
-            invalid_rollover = true;
-            new_minutes = 0;
-        }
-
-        if self.rtc.hours < 24 && !invalid_rollover {
-            new_days += new_hours / 24;
-            new_hours %= 24;
-        } else if new_hours > u64::from(HOURS_REGISTER_MAX) {
-            invalid_rollover = true;
-            new_hours = 0;
-        }
-
-        if new_days >= 512 && !invalid_rollover {
-            new_days %= 512;
-            self.rtc.day_carry = true;
-        }
-
-        self.rtc.milliseconds = new_milliseconds as u16;
-        self.rtc.seconds = new_seconds as u8;
-        self.rtc.minutes = new_minutes as u8;
-        self.rtc.hours = new_hours as u8;
-        self.rtc.days = new_days as u16;
-    }
-
-    /// Counts the whole milliseconds that passed since the clock was last
-    /// brought up to date. The fraction of a millisecond left over stays in
-    /// `base_timestamp`, so a game that latches the clock very often doesn't
-    /// lose it. A halted clock doesn't count. Returns whether the clock moved.
-    fn catch_up(&mut self, current_time: f64) -> bool {
-        let elapsed_ms = (current_time - self.rtc.base_timestamp).floor();
-        if self.rtc.halted || elapsed_ms < 1.0 {
-            return false;
-        }
-        self.advance_rtc(elapsed_ms);
-        self.rtc.base_timestamp += elapsed_ms;
-        true
-    }
-
     /// Brings the clock up to date and copies its registers to the ones
     /// reads show, when the game latches it.
     fn latch_rtc(&mut self, current_time: f64) {
-        if self.catch_up(current_time) {
+        if self.rtc.catch_up(current_time) {
             self.rtc_changed = true;
         }
         self.latched_rtc = LatchedRtc::of(&self.rtc);
@@ -230,7 +306,7 @@ impl Mbc3CartridgeMapper {
     /// wall clock that went back restarts from the current time. Writing the
     /// seconds register also restarts the current second.
     fn write_rtc_register(&mut self, register: u8, value: u8, current_time: f64) {
-        self.catch_up(current_time);
+        self.rtc.catch_up(current_time);
         if self.rtc.halted || current_time < self.rtc.base_timestamp {
             self.rtc.base_timestamp = current_time;
         }
@@ -253,6 +329,31 @@ impl Mbc3CartridgeMapper {
         }
 
         self.rtc_changed = true;
+    }
+
+    /// The clock's state, on a cartridge that has the clock.
+    pub(super) fn rtc(&self) -> Option<&RtcState> {
+        self.has_timer.then_some(&self.rtc)
+    }
+
+    /// Replaces the clock's state, and what reads show until the game latches
+    /// it, as if the cartridge had been inserted with `state`. Does nothing
+    /// on a cartridge without the clock.
+    pub(super) fn set_rtc(&mut self, state: RtcState) {
+        if self.has_timer {
+            self.latched_rtc = LatchedRtc::of(&state);
+            self.rtc = state;
+        }
+    }
+
+    /// Moves the clock over to `clock` if it follows the other one (see
+    /// [`RtcState::rebase`]), keeping what it shows. `now` gives the current
+    /// time on either clock.
+    pub(super) fn follow_clock(&mut self, clock: RtcClock, now: impl Fn(RtcClock) -> f64) {
+        if self.rtc_clock != clock {
+            self.rtc.rebase(now(self.rtc_clock), now(clock));
+            self.rtc_clock = clock;
+        }
     }
 
     /// The clock's state if it changed since the last call, for the frontend
@@ -425,10 +526,9 @@ mod tests {
         CART_TYPE_MBC3, RAM_SIZE_2KB, RAM_SIZE_8KB, RAM_SIZE_32KB, RAM_SIZE_64KB, ROM_SIZE_2MB,
         ROM_SIZE_4MB, ROM_SIZE_64KB,
     };
+    use crate::address_bus::effects::Shared;
     use crate::address_bus::effects::{CartridgeEffects, empty_cartridge_effects};
     use crate::address_bus::test_utils::*;
-    use std::cell::Cell;
-    use std::rc::Rc;
 
     /// Starts the clock at 10:10:10 and `milliseconds`, last updated at
     /// `base_timestamp`, and reports `now` as the current time.
@@ -483,6 +583,60 @@ mod tests {
     }
 
     #[test]
+    fn the_clock_state_round_trips_through_the_rtc_file_layout() {
+        let state = RtcState {
+            milliseconds: 999,
+            seconds: 59,
+            minutes: 30,
+            hours: 23,
+            days: 511,
+            base_timestamp: 1_791_633_740_867.5,
+            halted: true,
+            day_carry: true,
+        };
+        let bytes = state.to_bytes();
+        assert_eq!(
+            bytes,
+            [
+                0xE7, 0x03, 59, 30, 23, 0xFF, 0x01, 0x00, 0x38, 0x44, 0x15, 0x5B, 0x12, 0x7A, 0x42,
+                1, 1
+            ]
+        );
+        assert_eq!(RtcState::from_bytes(&bytes), Some(state));
+    }
+
+    #[test]
+    fn a_clock_state_of_another_length_is_ignored() {
+        assert!(RtcState::from_bytes(&[0; RtcState::BYTES - 1]).is_none());
+        assert!(RtcState::from_bytes(&[0; RtcState::BYTES + 1]).is_none());
+    }
+
+    #[test]
+    fn rebasing_counts_the_time_on_the_old_clock_and_goes_on_from_the_new_one() {
+        let mut state = RtcState {
+            seconds: 10,
+            base_timestamp: 1_000.25,
+            ..RtcState::default()
+        };
+        state.rebase(3_500.5, 20.0);
+        assert_eq!((state.seconds, state.milliseconds), (12, 500));
+        assert_eq!(state.base_timestamp, 20.0 - 0.25);
+    }
+
+    #[test]
+    fn rebasing_a_halted_clock_counts_nothing() {
+        let mut state = RtcState {
+            seconds: 10,
+            halted: true,
+            base_timestamp: 1_000.0,
+            ..RtcState::default()
+        };
+        state.rebase(90_000.0, 20.0);
+        assert_eq!(state.seconds, 10);
+        assert_eq!(state.base_timestamp, 20.0);
+    }
+
+    #[test]
     fn latching_advances_the_clock_by_the_elapsed_time() {
         let mut mapper = latched_clock(ClockEffects {
             now: 3_723_000.0,
@@ -498,8 +652,8 @@ mod tests {
     /// A clock that starts at 10:10:10 at time 0, whose current time the
     /// test can move forward, and that counts how often it is saved.
     struct AdjustableClock {
-        now: Rc<Cell<f64>>,
-        saves: Rc<Cell<usize>>,
+        now: Shared<f64>,
+        saves: Shared<usize>,
     }
 
     impl CartridgeEffects for AdjustableClock {
@@ -523,9 +677,9 @@ mod tests {
 
     /// A cartridge with an `AdjustableClock` and its RAM and clock enabled,
     /// with the clock's current time and save count.
-    fn adjustable_clock_counting_saves() -> (Cartridge, Rc<Cell<f64>>, Rc<Cell<usize>>) {
-        let now = Rc::new(Cell::new(0.0));
-        let saves = Rc::new(Cell::new(0));
+    fn adjustable_clock_counting_saves() -> (Cartridge, Shared<f64>, Shared<usize>) {
+        let now = Shared::new(0.0);
+        let saves = Shared::new(0);
         let mut mapper = build_cartridge_mapper_with_effects(
             CART_TYPE_MBC3_TIMER_BATTERY,
             ROM_SIZE_64KB,
@@ -539,7 +693,7 @@ mod tests {
         (mapper, now, saves)
     }
 
-    fn adjustable_clock() -> (Cartridge, Rc<Cell<f64>>) {
+    fn adjustable_clock() -> (Cartridge, Shared<f64>) {
         let (mapper, now, _) = adjustable_clock_counting_saves();
         (mapper, now)
     }
@@ -907,7 +1061,7 @@ mod tests {
     }
 
     /// Cartridge effects that count how often the clock is saved.
-    struct RtcSaveCounter(Rc<Cell<usize>>);
+    struct RtcSaveCounter(Shared<usize>);
 
     impl CartridgeEffects for RtcSaveCounter {
         fn current_time_millis(&self) -> f64 {
@@ -921,12 +1075,12 @@ mod tests {
 
     #[test]
     fn writes_to_the_missing_clock_registers_change_nothing() {
-        let saves = Rc::new(Cell::new(0));
+        let saves = Shared::new(0);
         let mut mapper = build_cartridge_mapper_with_effects(
             CART_TYPE_MBC3_TIMER_BATTERY,
             ROM_SIZE_64KB,
             0,
-            Box::new(RtcSaveCounter(Rc::clone(&saves))),
+            Box::new(RtcSaveCounter(saves.clone())),
         );
         mapper.write_rom(0x0000, 0xA);
         for register in 0x0D..=0x0F {

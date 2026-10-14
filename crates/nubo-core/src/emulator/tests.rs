@@ -2,8 +2,11 @@
 //! exactly the state that booting that game would have left it in, which
 //! test runners rely on to skip the boot ROM, that a loaded save state
 //! restores every field save states are meant to keep, that
-//! battery-backed RAM reaches the frontend once per call, and that
-//! `run_frame` keeps to the frame boundaries and hands out every sample.
+//! battery-backed RAM reaches the frontend once per call, that
+//! `run_frame` keeps to the frame boundaries and hands out every sample, and
+//! that what frontends such as the RetroArch core read and set besides
+//! frames and sound (the cartridge's clock on either time source, the rumble
+//! motor and the memory) is right.
 
 use crate::address_bus::effects::empty_cartridge_effects;
 use crate::{CartridgeEffects, DOTS_PER_FRAME, Emulator, Model};
@@ -290,7 +293,7 @@ fn debug_fields(debug: &str, indent: usize) -> Vec<(String, String)> {
 
 /// The parts of the address bus whose own fields are compared one by one, so
 /// fields they leave out of save states on purpose can be listed.
-const COMPONENTS_COMPARED_BY_FIELD: [&str; 2] = ["gpu", "apu"];
+const COMPONENTS_COMPARED_BY_FIELD: [&str; 3] = ["cartridge", "gpu", "apu"];
 
 /// The fields of the CPU, the address bus, the PPU and the APU, each named by
 /// its path, with the PPU caught up.
@@ -319,12 +322,14 @@ fn cpu_and_bus_fields(emulator: &mut Emulator) -> Vec<(String, String)> {
 /// Fields that save states leave out on purpose and that can differ after
 /// loading one: the address bus's budgets for running ahead (see its
 /// `Serializable` implementation), the PPU's hand-over of the finished frame
-/// to the frontend, and the samples the APU already made for the frontend.
+/// to the frontend, the samples the APU already made for the frontend, and
+/// how long the rumble motor was on since the frontend last asked.
 /// The buttons the player holds and the sample rate are left out on purpose
 /// too (they belong to the player and the sound card, not the console), but
 /// both emulators here have the same ones, so they aren't listed.
-const FIELDS_NOT_IN_SAVE_STATES: [&str; 5] = [
+const FIELDS_NOT_IN_SAVE_STATES: [&str; 6] = [
     "address_bus.ppu_quiet_dots",
+    "address_bus.cartridge.rumble",
     "address_bus.deferral_budget",
     "address_bus.gpu.frame_ready",
     "address_bus.apu.left_sample_queue",
@@ -626,4 +631,305 @@ fn a_save_state_with_an_impossible_time_since_power_on_does_not_load() {
         "the failed load changed the emulator"
     );
     emulator.run_frame(&mut Vec::new(), &mut Vec::new());
+}
+
+const CART_TYPE_MBC3_TIMER_RAM_BATTERY: u8 = 0x10;
+const CART_TYPE_MBC5_RUMBLE: u8 = 0x1C;
+/// A wall-clock time in milliseconds, about 2001.
+const WALL_CLOCK_NOW: f64 = 1_000_000_000_000.0;
+/// Milliseconds in an hour.
+const HOUR: f64 = 3_600_000.0;
+
+/// A DMG game of `cartridge_type` that runs `program` from 0x0150.
+fn cartridge_rom(cartridge_type: u8, program: &[u8]) -> Vec<u8> {
+    let header = header(0x00, 0x00, cartridge_type, 0x33);
+    let mut rom = vec![0; ROM_SIZE];
+    rom[HEADER_START..HEADER_START + header.len()].copy_from_slice(&header);
+    rom[BUSY_PROGRAM_START..BUSY_PROGRAM_START + program.len()].copy_from_slice(program);
+    rom
+}
+
+/// Cartridge effects whose clock follows `clock` and whose wall clock reads
+/// whatever the test sets.
+struct ClockEffects {
+    clock: crate::RtcClock,
+    wall_clock: Arc<Mutex<f64>>,
+}
+
+impl CartridgeEffects for ClockEffects {
+    fn current_time_millis(&self) -> f64 {
+        *self.wall_clock.lock().unwrap()
+    }
+
+    fn rtc_clock(&self) -> crate::RtcClock {
+        self.clock
+    }
+}
+
+/// An MBC3 game with a clock, booted on the DMG with its clock following
+/// `clock`, and the wall clock it reads.
+fn clock_game(clock: crate::RtcClock) -> (Emulator, Arc<Mutex<f64>>) {
+    let wall_clock = Arc::new(Mutex::new(WALL_CLOCK_NOW));
+    let rom = cartridge_rom(CART_TYPE_MBC3_TIMER_RAM_BATTERY, &[0x18, 0xFE]); // JR -2
+    let mut emulator = Emulator::new(Model::Dmg);
+    emulator
+        .load_rom(
+            &rom,
+            Box::new(ClockEffects {
+                clock,
+                wall_clock: wall_clock.clone(),
+            }),
+        )
+        .unwrap();
+    run_frames(&mut emulator, 2);
+    (emulator, wall_clock)
+}
+
+/// A clock showing day 3, 10:20:30, last brought up to date at `base`.
+fn ten_twenty_thirty(base: f64) -> crate::RtcState {
+    crate::RtcState {
+        seconds: 30,
+        minutes: 20,
+        hours: 10,
+        days: 3,
+        base_timestamp: base,
+        ..crate::RtcState::default()
+    }
+}
+
+/// The time an emulator has run, in milliseconds, as the clock counts it on
+/// emulated time.
+fn emulated_millis(emulator: &Emulator) -> f64 {
+    emulator.address_bus().elapsed_dots() as f64 / 4_194.304
+}
+
+#[test]
+fn the_clock_state_reads_back_on_its_own_clock() {
+    let (mut emulator, _) = clock_game(crate::RtcClock::WallClock);
+    let state = ten_twenty_thirty(WALL_CLOCK_NOW - HOUR);
+    emulator.set_rtc_state(&state, crate::RtcClock::WallClock);
+
+    assert_eq!(emulator.rtc_state(crate::RtcClock::WallClock), Some(state));
+}
+
+#[test]
+fn a_wall_clock_state_set_on_emulated_time_neither_stands_still_nor_jumps() {
+    let (mut emulator, _) = clock_game(crate::RtcClock::EmulatedTime);
+    emulator.set_rtc_state(
+        &ten_twenty_thirty(WALL_CLOCK_NOW - HOUR),
+        crate::RtcClock::WallClock,
+    );
+
+    let on_emulated_time = emulator.rtc_state(crate::RtcClock::EmulatedTime).unwrap();
+    assert_eq!(on_emulated_time.hours, 11, "the hour that passed counts");
+    assert_eq!(
+        (on_emulated_time.minutes, on_emulated_time.seconds),
+        (20, 30)
+    );
+    let behind = emulated_millis(&emulator) - on_emulated_time.base_timestamp;
+    assert!((0.0..1.0).contains(&behind), "{behind} ms behind");
+
+    run_frames(&mut emulator, 120);
+    let two_seconds_later = emulator.rtc_state(crate::RtcClock::WallClock).unwrap();
+    assert_eq!(
+        (
+            two_seconds_later.hours,
+            two_seconds_later.minutes,
+            two_seconds_later.seconds
+        ),
+        (11, 20, 32)
+    );
+    let behind = WALL_CLOCK_NOW - two_seconds_later.base_timestamp;
+    assert!((0.0..1.0).contains(&behind), "{behind} ms behind");
+}
+
+#[test]
+fn an_emulated_time_state_set_on_the_wall_clock_neither_stands_still_nor_jumps() {
+    let (mut emulator, wall_clock) = clock_game(crate::RtcClock::WallClock);
+    let start = ten_twenty_thirty(0.0);
+    emulator.set_rtc_state(&start, crate::RtcClock::EmulatedTime);
+
+    let on_the_wall_clock = emulator.rtc_state(crate::RtcClock::WallClock).unwrap();
+    assert_eq!(on_the_wall_clock.days, 3, "no decades were counted");
+    assert_eq!(on_the_wall_clock.hours, 10);
+    assert!((WALL_CLOCK_NOW - on_the_wall_clock.base_timestamp) < 1.0);
+
+    *wall_clock.lock().unwrap() += 5_000.0;
+    let back = emulator.rtc_state(crate::RtcClock::EmulatedTime).unwrap();
+    assert_eq!((back.hours, back.minutes, back.seconds), (10, 20, 35));
+}
+
+#[test]
+fn a_save_state_moves_its_clock_over_to_the_clock_the_loading_emulator_follows() {
+    let (mut saved, _) = clock_game(crate::RtcClock::WallClock);
+    saved.set_rtc_state(
+        &ten_twenty_thirty(WALL_CLOCK_NOW),
+        crate::RtcClock::WallClock,
+    );
+    let state = saved.save_state();
+
+    let (mut loaded, _) = clock_game(crate::RtcClock::EmulatedTime);
+    loaded.load_state(&state).unwrap();
+    let clock = loaded.rtc_state(crate::RtcClock::EmulatedTime).unwrap();
+    assert_eq!(
+        (clock.days, clock.hours, clock.minutes, clock.seconds),
+        (3, 10, 20, 30)
+    );
+    let behind = emulated_millis(&loaded) - clock.base_timestamp;
+    assert!((0.0..1.0).contains(&behind), "{behind} ms behind");
+
+    run_frames(&mut loaded, 60);
+    let a_second_later = loaded.rtc_state(crate::RtcClock::WallClock).unwrap();
+    assert_eq!(a_second_later.seconds, 31);
+
+    let (mut back, _) = clock_game(crate::RtcClock::WallClock);
+    back.load_state(&loaded.save_state()).unwrap();
+    let clock = back.rtc_state(crate::RtcClock::WallClock).unwrap();
+    assert_eq!((clock.hours, clock.minutes, clock.seconds), (10, 20, 31));
+}
+
+#[test]
+fn a_save_state_on_the_same_clock_keeps_its_clock_as_it_is() {
+    let (mut saved, _) = clock_game(crate::RtcClock::WallClock);
+    let state_clock = ten_twenty_thirty(WALL_CLOCK_NOW - HOUR);
+    saved.set_rtc_state(&state_clock, crate::RtcClock::WallClock);
+    let state = saved.save_state();
+
+    let (mut loaded, _) = clock_game(crate::RtcClock::WallClock);
+    loaded.load_state(&state).unwrap();
+    assert_eq!(
+        loaded.rtc_state(crate::RtcClock::WallClock),
+        Some(state_clock)
+    );
+}
+
+#[test]
+fn a_game_without_a_clock_has_no_clock_state() {
+    let mut emulator = booted(Model::Dmg, &ram_writing_rom(0x0A));
+    emulator.set_rtc_state(&ten_twenty_thirty(0.0), crate::RtcClock::WallClock);
+    assert_eq!(emulator.rtc_state(crate::RtcClock::WallClock), None);
+}
+
+/// A rumble cartridge game that switches the motor on, waits `on` times
+/// around a loop of 256 `DEC C`s, switches it off and waits `off` times
+/// around, forever.
+fn rumble_rom(on: u8, off: u8) -> Vec<u8> {
+    #[rustfmt::skip]
+    let program = [
+        0x3E, 0x08, 0xEA, 0x00, 0x40, // loop: LD A, 0x08; LD (0x4000), A
+        0x06, on,                     // LD B, on
+        0x0D, 0x20, 0xFD,             // wait_on: DEC C; JR NZ, wait_on
+        0x05, 0x20, 0xFA,             // DEC B; JR NZ, wait_on
+        0xAF, 0xEA, 0x00, 0x40,       // XOR A; LD (0x4000), A
+        0x06, off,                    // LD B, off
+        0x0D, 0x20, 0xFD,             // wait_off: DEC C; JR NZ, wait_off
+        0x05, 0x20, 0xFA,             // DEC B; JR NZ, wait_off
+        0x18, 0xE5,                   // JR loop
+    ];
+    cartridge_rom(CART_TYPE_MBC5_RUMBLE, &program)
+}
+
+#[test]
+fn the_rumble_level_is_the_share_of_the_time_the_motor_was_on() {
+    for (on, off, expected) in [(1, 0, 1.0), (2, 2, 0.5), (1, 3, 0.25)] {
+        let off = if off == 0 { 1 } else { off };
+        let rom = if expected == 1.0 {
+            cartridge_rom(
+                CART_TYPE_MBC5_RUMBLE,
+                &[0x3E, 0x08, 0xEA, 0x00, 0x40, 0x18, 0xFE], // motor on; JR -2
+            )
+        } else {
+            rumble_rom(on, off)
+        };
+        let mut emulator = booted(Model::Dmg, &rom);
+        run_frames(&mut emulator, 2);
+        emulator.take_rumble_level();
+        for frame in 0..10 {
+            run_frames(&mut emulator, 1);
+            let level = emulator.take_rumble_level();
+            assert!(
+                (level - expected).abs() < 0.05,
+                "on {on}, off {off}, frame {frame}: {level}, expected {expected}"
+            );
+        }
+    }
+}
+
+#[test]
+fn games_without_a_rumble_motor_never_rumble() {
+    let mut emulator = booted(Model::Dmg, &busy_rom());
+    run_frames(&mut emulator, 3);
+    assert_eq!(emulator.take_rumble_level(), 0.0);
+}
+
+#[test]
+fn the_rumble_level_follows_a_loaded_save_state() {
+    let rom = cartridge_rom(
+        CART_TYPE_MBC5_RUMBLE,
+        &[0x3E, 0x08, 0xEA, 0x00, 0x40, 0x18, 0xFE], // motor on; JR -2
+    );
+    let mut emulator = booted(Model::Dmg, &rom);
+    let before_the_motor = emulator.save_state();
+    run_frames(&mut emulator, 2);
+    let with_the_motor_on = emulator.save_state();
+
+    emulator.load_state(&before_the_motor).unwrap();
+    emulator.take_rumble_level();
+    assert_eq!(emulator.take_rumble_level(), 0.0);
+    emulator.load_state(&with_the_motor_on).unwrap();
+    run_frames(&mut emulator, 1);
+    assert_eq!(emulator.take_rumble_level(), 1.0);
+}
+
+#[test]
+fn memory_reads_show_what_the_game_wrote() {
+    #[rustfmt::skip]
+    let program = [
+        0xAF, 0xE0, 0x40,       // LCDC = 0, so VRAM and OAM can be written
+        0x3E, 0x42,             // LD A, 0x42
+        0xEA, 0x23, 0xC1,       // LD (0xC123), A
+        0xEA, 0x45, 0xD0,       // LD (0xD045), A
+        0xE0, 0x90,             // LDH (0x90), A
+        0xEA, 0x10, 0x80,       // LD (0x8010), A
+        0xEA, 0x04, 0xFE,       // LD (0xFE04), A
+        0x18, 0xFE,             // JR -2
+    ];
+    let mut emulator = booted(Model::Dmg, &program_rom(Model::Dmg, &program));
+    run_frames(&mut emulator, 2);
+
+    assert_eq!(emulator.work_ram().len(), 0x8000);
+    assert_eq!(emulator.work_ram()[0x0123], 0x42);
+    assert_eq!(emulator.work_ram()[0x1045], 0x42);
+    assert_eq!(emulator.high_ram().len(), 0x7F);
+    assert_eq!(emulator.high_ram()[0x10], 0x42);
+    let (video_ram, oam) = emulator.video_memory();
+    assert_eq!(video_ram[0x10], 0x42);
+    assert_eq!(oam.len(), 0xA0);
+    assert_eq!(oam[0x04], 0x42);
+}
+
+/// A state from before Nubo stored which clock a cartridge clock follows,
+/// made here by renaming the field so the loader doesn't know it.
+fn without_the_clock_source(mut state: Vec<u8>) -> Vec<u8> {
+    let name = b"\x09rtc_clock";
+    let start = state
+        .windows(name.len())
+        .position(|window| window == name)
+        .expect("the state holds the clock's source");
+    state[start + 1] = b'x';
+    state
+}
+
+#[test]
+fn a_state_from_before_the_clock_source_was_stored_loads_its_clock_as_it_is() {
+    for clock in [crate::RtcClock::WallClock, crate::RtcClock::EmulatedTime] {
+        let (mut saved, _) = clock_game(clock);
+        let state_clock = ten_twenty_thirty(1_000.0);
+        saved.set_rtc_state(&state_clock, clock);
+        let state = without_the_clock_source(saved.save_state());
+
+        let (mut loaded, _) = clock_game(clock);
+        loaded.load_state(&state).unwrap();
+        assert_eq!(loaded.rtc_state(clock), Some(state_clock), "{clock:?}");
+    }
 }

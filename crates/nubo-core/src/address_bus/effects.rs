@@ -3,6 +3,7 @@
 
 use crate::address_bus::mbc3::RtcState;
 use core::fmt::Debug;
+use nubo_serializable_derive::Serializable;
 
 /// Lets the emulator core reach the outside world for things a real cartridge
 /// does on its own: reading the current time and keeping its save data.
@@ -15,7 +16,11 @@ use core::fmt::Debug;
 /// [`NoSaves`] is ready-made for frontends that keep nothing at all. The RTC
 /// (real-time clock) is the clock chip on MBC3 cartridges (MBC = memory bank
 /// controller, the chip on the cartridge that switches ROM and RAM banks).
-pub trait CartridgeEffects {
+///
+/// It is `Send`, so an emulator can move to another thread: an app may
+/// start a game on one thread and run it on another, and the RetroArch core
+/// keeps its emulator in a `static`.
+pub trait CartridgeEffects: Send {
     /// The current wall-clock time in milliseconds. The RTC measures the time
     /// that passed between two calls, so any fixed starting point works, as
     /// long as it is the same across sessions (for example the Unix epoch).
@@ -51,7 +56,7 @@ pub trait CartridgeEffects {
 }
 
 /// The clock an MBC3's real-time clock (RTC) counts.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serializable)]
 pub enum RtcClock {
     /// The wall clock from [`CartridgeEffects::current_time_millis`], so the
     /// game's clock keeps up with real time, also while the emulator is
@@ -95,4 +100,25 @@ impl Debug for dyn CartridgeEffects {
 /// loaded and in tests.
 pub(crate) fn empty_cartridge_effects() -> Box<dyn CartridgeEffects> {
     Box::new(NoSaves::default())
+}
+
+/// A value tests share with the cartridge effects they hand the emulator:
+/// like `Rc<Cell<T>>`, but `Send`, as cartridge effects must be.
+#[cfg(test)]
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Shared<T>(std::sync::Arc<std::sync::Mutex<T>>);
+
+#[cfg(test)]
+impl<T: Copy> Shared<T> {
+    pub(crate) fn new(value: T) -> Self {
+        Shared(std::sync::Arc::new(std::sync::Mutex::new(value)))
+    }
+
+    pub(crate) fn get(&self) -> T {
+        *self.0.lock().unwrap()
+    }
+
+    pub(crate) fn set(&self, value: T) {
+        *self.0.lock().unwrap() = value;
+    }
 }

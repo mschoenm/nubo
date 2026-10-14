@@ -3,7 +3,9 @@
 //! [`Emulator`] owns the CPU, which owns the address bus and through it the
 //! rest of the hardware, and offers everything frontends can do with them.
 
-use crate::address_bus::{AddressBus, CartridgeEffects, CartridgeHeader, read_header};
+use crate::address_bus::{
+    AddressBus, CartridgeEffects, CartridgeHeader, RtcClock, RtcState, read_header,
+};
 use crate::controller::{ControllerMapping, ControllerState};
 use crate::cpu::{BusActivityEntry, Cpu, Registers};
 use crate::error::{CheatError, LoadRomError};
@@ -40,6 +42,9 @@ pub const DOTS_PER_FRAME: u64 = crate::gpu::DOTS_PER_FRAME as u64;
 #[derive(Debug)]
 pub struct Emulator {
     cpu: Cpu,
+    /// What loading a save state starts from, kept after the first load
+    /// (see `save_state.rs`).
+    power_on_state: PowerOnState,
 }
 
 impl Emulator {
@@ -48,6 +53,7 @@ impl Emulator {
     pub fn new(model: Model) -> Self {
         let mut emulator = Emulator {
             cpu: Cpu::new(AddressBus::new(false)),
+            power_on_state: PowerOnState::default(),
         };
         emulator.address_bus_mut().set_model(model);
         emulator.address_bus_mut().load_boot_rom(model.is_cgb());
@@ -62,6 +68,7 @@ impl Emulator {
     pub fn for_cpu_tests() -> Self {
         Emulator {
             cpu: Cpu::new(AddressBus::new(true)),
+            power_on_state: PowerOnState::default(),
         }
     }
 
@@ -85,6 +92,7 @@ impl Emulator {
         cartridge_effects: Box<dyn CartridgeEffects>,
     ) -> Result<CartridgeHeader, LoadRomError> {
         let rom = rom_archive::extract_rom(rom)?;
+        self.power_on_state = PowerOnState::default();
         self.address_bus_mut().load_rom(rom, cartridge_effects)
     }
 
@@ -104,6 +112,7 @@ impl Emulator {
         let rom = rom_archive::extract_rom(rom)?;
         Ok(Emulator {
             cpu: self.cpu.clone_with_rom(rom, cartridge_effects)?,
+            power_on_state: PowerOnState::default(),
         })
     }
 
@@ -137,6 +146,67 @@ impl Emulator {
     /// The contents of the cartridge RAM, which holds the game's save data.
     pub fn cartridge_ram(&self) -> &[u8] {
         self.address_bus().cartridge_ram()
+    }
+
+    /// The state of the cartridge's real-time clock (the clock chip on some
+    /// MBC3 cartridges), or `None` for a cartridge without one. Its
+    /// `base_timestamp` is given as a time on `clock`, converted from the
+    /// clock the cartridge follows ([`CartridgeEffects::rtc_clock`]) if that
+    /// is the other one, so a frontend can keep it in one layout whichever
+    /// clock the game ran on.
+    pub fn rtc_state(&self, clock: RtcClock) -> Option<RtcState> {
+        let address_bus = self.address_bus();
+        address_bus
+            .cartridge()
+            .rtc_state(clock, address_bus.elapsed_dots_including_waiting())
+    }
+
+    /// Replaces the state of the cartridge's real-time clock, for example
+    /// with one a frontend kept, as if the cartridge had been inserted with
+    /// it: reads show it until the game latches the clock again. `state`'s
+    /// `base_timestamp` is a time on `clock`, which is converted to the
+    /// clock the cartridge follows if that is the other one. Does nothing
+    /// for a cartridge without a clock.
+    pub fn set_rtc_state(&mut self, state: &RtcState, clock: RtcClock) {
+        let elapsed_dots = self.address_bus().elapsed_dots_including_waiting();
+        self.address_bus_mut()
+            .cartridge_mut()
+            .set_rtc_state(state.clone(), clock, elapsed_dots);
+    }
+
+    /// The share of the emulated time since the last call that the rumble
+    /// motor of an MBC5 rumble cartridge was on, from 0.0 (off, and always
+    /// for other cartridges) to 1.0 (on all the time). Games switch the motor
+    /// on and off many times a frame to rumble less strongly, so a frontend
+    /// that calls this once a frame can pass it on as the rumble's strength.
+    pub fn take_rumble_level(&mut self) -> f32 {
+        let elapsed_dots = self.address_bus().elapsed_dots_including_waiting();
+        self.address_bus_mut()
+            .cartridge_mut()
+            .take_rumble_level(elapsed_dots)
+    }
+
+    /// All of work RAM (0xC000-0xDFFF): bank 0 followed by the banks
+    /// 0xD000 can show, 4 KiB each. A CGB has banks 1-7; on the DMG, and on
+    /// a CGB running a game for the DMG, only bank 1 is used. Frontends read
+    /// it for features such as RetroAchievements; it is never changed
+    /// through here.
+    pub fn work_ram(&self) -> &[u8] {
+        self.address_bus().working_ram()
+    }
+
+    /// High RAM (0xFF80-0xFFFE), the 127 bytes the CPU can always reach.
+    pub fn high_ram(&self) -> &[u8] {
+        self.address_bus().high_ram()
+    }
+
+    /// Video RAM (0x8000-0x9FFF; on a CGB bank 0 followed by bank 1) and
+    /// OAM (0xFE00-0xFE9F, the objects' attributes), as stored, whether or
+    /// not the CPU could read them right now. It takes `&mut self` because
+    /// the PPU runs behind until something looks at it (see
+    /// [`Emulator::read_memory`]).
+    pub fn video_memory(&mut self) -> (&[u8], &[u8]) {
+        self.address_bus_mut().video_memory()
     }
 
     /// The Game Boy hardware being emulated.
@@ -361,6 +431,7 @@ impl Emulator {
 }
 
 mod save_state;
+use save_state::PowerOnState;
 pub use save_state::{BUILD_COMMIT, SaveStateHeader};
 #[cfg(test)]
 mod tests;

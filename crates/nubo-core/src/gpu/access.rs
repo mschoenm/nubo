@@ -131,6 +131,11 @@ impl Gpu {
         }
     }
 
+    /// Video RAM (both banks on a CGB) and OAM, as they are stored.
+    pub(crate) fn video_memory(&self) -> (&[u8], &[u8]) {
+        (&self.video_ram, &self.object_attribute_memory)
+    }
+
     pub(crate) fn video_ram_byte(&self, index: u16) -> u8 {
         self.video_ram[self.banked_video_ram_index(index) as usize]
     }

@@ -6,6 +6,7 @@ members = [
     "crates/nubo-logo",
     "crates/nubo-serializable-derive",
     "frontends/nubo",
+    "frontends/nubo-libretro",
     "tools/nubo-benchmark",
     "tools/nubo-headless",
     "tools/nubo-json-test-runner",

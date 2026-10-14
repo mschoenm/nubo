@@ -16,11 +16,12 @@ use crate::address_bus::constants::{
     RAM_BANK_SIZE, RAM_SIZE_ADDRESS, ROM_BANK_SIZE, ROM_SIZE_ADDRESS, SGB_SUPPORT_ADDRESS,
     TITLE_END_ADDRESS, TITLE_START_ADDRESS,
 };
+use crate::address_bus::effects::RtcClock;
 use crate::address_bus::effects::{CartridgeEffects, empty_cartridge_effects};
 use crate::address_bus::huc1::Huc1CartridgeMapper;
 use crate::address_bus::mbc1::Mbc1CartridgeMapper;
 use crate::address_bus::mbc2::{MBC2_RAM_SIZE, Mbc2CartridgeMapper};
-use crate::address_bus::mbc3::{Mbc3CartridgeMapper, rtc_time};
+use crate::address_bus::mbc3::{Mbc3CartridgeMapper, RtcState, clock_time, rtc_time};
 use crate::address_bus::mbc5::Mbc5CartridgeMapper;
 use crate::error::LoadRomError;
 use crate::serializable::{FieldWriter, Serializable, read_fields};
@@ -81,6 +82,10 @@ pub(crate) struct Cartridge {
     /// keeps the player's own save until the game writes the RAM again.
     #[serializable(skip)]
     ram_changed: bool,
+    /// How long the rumble motor was on since the frontend last asked
+    /// (`Cartridge::take_rumble_level`). Loading a save state restarts it.
+    #[serializable(skip)]
+    rumble: RumbleMeter,
 }
 
 impl Cartridge {
@@ -138,7 +143,10 @@ impl Cartridge {
             CartridgeMapper::Mbc3(mbc3) => {
                 mbc3.write_rom(address, value, || rtc_time(effects, elapsed_dots));
             }
-            CartridgeMapper::Mbc5(mbc5) => mbc5.write_rom(address, value),
+            CartridgeMapper::Mbc5(mbc5) => {
+                mbc5.write_rom(address, value);
+                self.rumble.switch(mbc5.is_rumbling(), elapsed_dots);
+            }
             CartridgeMapper::Huc1(huc1) => huc1.write_rom(address, value),
         }
     }
@@ -207,6 +215,114 @@ impl Cartridge {
         {
             self.effects.save_rtc_state(rtc);
         }
+    }
+
+    /// The state of the cartridge's real-time clock, expressed on `clock`, or
+    /// `None` without one. `elapsed_dots` is how many PPU dots have passed
+    /// since power-on.
+    pub fn rtc_state(&self, clock: RtcClock, elapsed_dots: u64) -> Option<RtcState> {
+        let CartridgeMapper::Mbc3(mbc3) = &self.mapper else {
+            return None;
+        };
+        let mut state = mbc3.rtc()?.clone();
+        let own_clock = self.effects.rtc_clock();
+        if clock != own_clock {
+            let now = |clock| clock_time(self.effects.as_ref(), clock, elapsed_dots);
+            state.rebase(now(own_clock), now(clock));
+        }
+        Some(state)
+    }
+
+    /// Replaces the state of the cartridge's real-time clock with `state`,
+    /// whose `base_timestamp` is a time on `clock`, as if the cartridge had
+    /// been inserted with it. Does nothing on a cartridge without a clock.
+    pub fn set_rtc_state(&mut self, mut state: RtcState, clock: RtcClock, elapsed_dots: u64) {
+        let own_clock = self.effects.rtc_clock();
+        if clock != own_clock {
+            let now = |clock| clock_time(self.effects.as_ref(), clock, elapsed_dots);
+            state.rebase(now(clock), now(own_clock));
+        }
+        if let CartridgeMapper::Mbc3(mbc3) = &mut self.mapper {
+            mbc3.set_rtc(state);
+        }
+    }
+
+    /// Moves a clock loaded from a save state made on the other
+    /// [`RtcClock`] over to the one this cartridge follows, keeping what it
+    /// shows.
+    pub fn finish_loading_save_state(&mut self, elapsed_dots: u64) {
+        match &mut self.mapper {
+            CartridgeMapper::Mbc3(mbc3) => {
+                let effects = self.effects.as_ref();
+                mbc3.follow_clock(effects.rtc_clock(), |clock| {
+                    clock_time(effects, clock, elapsed_dots)
+                });
+            }
+            CartridgeMapper::Mbc5(mbc5) => {
+                self.rumble = RumbleMeter::starting(mbc5.is_rumbling(), elapsed_dots);
+            }
+            _ => self.rumble = RumbleMeter::default(),
+        }
+    }
+
+    /// The share of the time since the last call, up to `elapsed_dots` PPU
+    /// dots since power-on, that the rumble motor was on: from 0.0 to 1.0.
+    /// Games pulse the motor many times a frame to rumble more gently.
+    pub fn take_rumble_level(&mut self, elapsed_dots: u64) -> f32 {
+        self.rumble.take_level(elapsed_dots)
+    }
+}
+
+/// Measures how long a rumble cartridge's motor is on, in PPU dots since
+/// power-on, between two calls to [`RumbleMeter::take_level`].
+#[derive(Debug, Default)]
+struct RumbleMeter {
+    /// When the current measurement started.
+    since: u64,
+    /// When the motor was switched on, while it is on.
+    on_since: Option<u64>,
+    /// How long the motor was on in the current measurement, not counting
+    /// the time since `on_since`.
+    on_dots: u64,
+}
+
+impl RumbleMeter {
+    /// A measurement starting at `now`, with the motor on or off.
+    fn starting(on: bool, now: u64) -> Self {
+        RumbleMeter {
+            since: now,
+            on_since: on.then_some(now),
+            on_dots: 0,
+        }
+    }
+
+    /// Notes that the motor is `on` (or still is) at `now`.
+    fn switch(&mut self, on: bool, now: u64) {
+        match (on, self.on_since) {
+            (true, None) => self.on_since = Some(now),
+            (false, Some(start)) => {
+                self.on_dots += now.saturating_sub(start.max(self.since));
+                self.on_since = None;
+            }
+            _ => {}
+        }
+    }
+
+    /// The share of the time from the start of the measurement to `now` the
+    /// motor was on, starting a new measurement at `now`.
+    fn take_level(&mut self, now: u64) -> f32 {
+        let total = now.saturating_sub(self.since);
+        let mut on = self.on_dots;
+        if let Some(start) = self.on_since {
+            on += now.saturating_sub(start.max(self.since));
+        }
+        let level = if total == 0 {
+            if self.on_since.is_some() { 1.0 } else { 0.0 }
+        } else {
+            (on as f64 / total as f64).min(1.0) as f32
+        };
+        *self = RumbleMeter::starting(self.on_since.is_some(), now);
+        level
     }
 }
 
@@ -328,6 +444,7 @@ impl MapperKind {
                 cartridge_type,
                 rom.len(),
                 ram_size,
+                effects.rtc_clock(),
                 effects.load_rtc_state(),
             )),
             Self::Mbc5 => CartridgeMapper::Mbc5(Mbc5CartridgeMapper::new(cartridge_type)),
@@ -346,6 +463,7 @@ pub(super) fn empty_cartridge() -> Cartridge {
         mapper: CartridgeMapper::RomOnly,
         effects: empty_cartridge_effects(),
         ram_changed: false,
+        rumble: RumbleMeter::default(),
     }
 }
 
@@ -510,6 +628,7 @@ pub(super) fn load_cartridge(
         mapper,
         effects,
         ram_changed: false,
+        rumble: RumbleMeter::default(),
     })
 }
 
@@ -550,7 +669,7 @@ pub(crate) mod test_utils {
     }
 
     /// Cartridge effects that count how often the RAM is saved.
-    pub(crate) struct RamSaveCounter(pub(crate) std::rc::Rc<std::cell::Cell<usize>>);
+    pub(crate) struct RamSaveCounter(pub(crate) crate::address_bus::effects::Shared<usize>);
 
     impl CartridgeEffects for RamSaveCounter {
         fn current_time_millis(&self) -> f64 {
@@ -568,12 +687,12 @@ pub(crate) mod test_utils {
     /// the emulator does at the end of two calls. Returns how often the RAM
     /// was passed to the frontend to save.
     pub(crate) fn ram_saves_after_writing(cartridge_type: u8, ram_enable: u8) -> usize {
-        let saves = std::rc::Rc::default();
+        let saves = crate::address_bus::effects::Shared::<usize>::default();
         let mut cartridge = build_cartridge_mapper_with_effects(
             cartridge_type,
             0x01,
             0x03,
-            Box::new(RamSaveCounter(std::rc::Rc::clone(&saves))),
+            Box::new(RamSaveCounter(saves.clone())),
         );
         cartridge.write_rom(0x0000, ram_enable);
         for address in 0x0000..0x2000 {
@@ -781,12 +900,12 @@ mod tests {
     /// itself (see `Emulator::load_state`).
     #[test]
     fn loading_a_save_state_does_not_save_the_ram() {
-        let saves = std::rc::Rc::default();
+        let saves = crate::address_bus::effects::Shared::<usize>::default();
         let mut cartridge = test_utils::build_cartridge_mapper_with_effects(
             CART_TYPE_MBC1_RAM_BATTERY,
             0x01,
             0x03,
-            Box::new(test_utils::RamSaveCounter(std::rc::Rc::clone(&saves))),
+            Box::new(test_utils::RamSaveCounter(saves.clone())),
         );
         let mut state = Vec::new();
         cartridge.serialize(&mut state).unwrap();

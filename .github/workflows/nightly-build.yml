@@ -1,8 +1,8 @@
 name: Nightly build
 
 # Once a scheduled (or hand-started) nightly run has passed every check,
-# publishes its Flatpaks as the "nightly" pre-release, replacing the one
-# before. Skipped when main hasn't changed since the last nightly build.
+# publishes its Flatpaks, Windows files and RetroArch cores as the "nightly"
+# pre-release, replacing the one before. Skipped when main hasn't changed since the last nightly build.
 # Pre-releases don't count as GitHub's latest release, so the stable version
 # stays the default download.
 on:
@@ -34,7 +34,7 @@ jobs:
       COMMIT: ${{ github.event.workflow_run.head_sha }}
     steps:
       # Publishing takes several API calls, so the tag alone doesn't prove the
-      # last one finished: it must also be a published release with all four
+      # last one finished: it must also be a published release with all eight
       # downloads, or this run publishes it again.
       - name: Check whether main changed since the last nightly build
         id: changed
@@ -43,14 +43,14 @@ jobs:
           release=$(gh release view nightly --json isDraft,assets \
             --jq '"\(.isDraft) \(.assets | length)"' \
             2>/dev/null || true)
-          if [ "$published" = "$COMMIT" ] && [ "$release" = "false 4" ]; then
+          if [ "$published" = "$COMMIT" ] && [ "$release" = "false 8" ]; then
             echo "The nightly build of $COMMIT is already published"
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Download the Flatpaks and the Windows files from the nightly run
+      - name: Download the Flatpaks, the Windows files and the cores from the nightly run
         if: steps.changed.outputs.changed == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -69,6 +69,9 @@ jobs:
           done
           cp artifacts/windows-x64/*-setup.exe "upload/Nubo-nightly-$date-windows-x64-setup.exe"
           cp artifacts/windows-x64/*.zip "upload/Nubo-nightly-$date-windows-x64.zip"
+          for platform in linux-x86_64 linux-aarch64 windows-x64 macos-universal; do
+            cp artifacts/libretro-$platform/*.zip "upload/Nubo-nightly-$date-libretro-$platform.zip"
+          done
           stable=$(gh release view --json tagName --jq .tagName 2>/dev/null || true)
           if [ -n "$stable" ]; then
             changes="[the changes since $stable](https://github.com/$GH_REPO/compare/$stable...$COMMIT)"
@@ -89,6 +92,8 @@ jobs:
           \`\`\`bash
           flatpak install --user --reinstall Nubo-nightly-$date-linux-x86_64.flatpak
           \`\`\`
+
+          **RetroArch:** unpack the \`libretro\` zip for your system, copy \`nubo_libretro\` (\`.so\`, \`.dll\` or \`.dylib\`) into RetroArch's \`cores\` folder and \`nubo_libretro.info\` into its \`info\` folder, replacing the ones there.
           EOF
           echo "date=$date" >> "$GITHUB_ENV"
 

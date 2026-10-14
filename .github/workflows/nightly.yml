@@ -231,6 +231,10 @@ jobs:
     name: Windows
     uses: ./.github/workflows/windows.yml
 
+  libretro:
+    name: RetroArch core
+    uses: ./.github/workflows/libretro.yml
+
   # Measures speed, instructions, battery use and the build sizes, and writes
   # them with every job's result to the metrics log in the repository's wiki
   # (`cargo xtask metrics`). It also picks the part of the code the nightly
@@ -246,7 +250,7 @@ jobs:
   metrics:
     name: Metrics
     if: always() && github.workflow == 'Nightly'
-    needs: [ci, advisories, tests, verify-boot, save-states, eager, flatpak, windows]
+    needs: [ci, advisories, tests, verify-boot, save-states, eager, flatpak, windows, libretro]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     # Two runs at once would both push to the wiki.

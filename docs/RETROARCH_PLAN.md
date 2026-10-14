@@ -15,6 +15,46 @@ only has to:
 - hand over frames, sound, battery saves and save states
 - offer a few options
 
+## Status
+
+**Phases 1 to 5 are built** (`frontends/nubo-libretro`, with its `AGENTS.md`); Phase 6 is left. The maintainer asked
+to build the core straight away, so Phase 0's review of this plan with Codex didn't happen as a pull request of its
+own: the plan's open review findings were handled in the code instead (see below), and the core's pull request is
+where the review happens.
+
+Checked in a real RetroArch (1.18, the Ubuntu package, headless): the core loads, plays, saves the battery RAM and
+the clock, saves and loads states (a loaded state goes on pixel for pixel like the run it was saved from), keeps
+run-ahead (one instance and two) and rewind on, applies the options, and RetroArch accepts its memory maps and
+achievements support. `.github/workflows/libretro.yml` repeats that check. Not checked yet, since they need a person
+with a screen, a controller or an account: playing by hand on Windows and macOS, achievements with a
+retroachievements.org account, and rumble on a controller.
+
+Where the code differs from the plan below:
+
+- **Run-ahead and netplay need `savestate_features = "deterministic"`.** RetroArch only offers them for such cores,
+  and turns rewind and run-ahead off for a core without an info file. The plan picked `"serialized"` because a clock
+  on real time reads the wall clock, but that would have turned run-ahead off for every game. Everything else is
+  deterministic, Gambatte (whose clock follows real time too) declares `"deterministic"`, and SameBoy declares
+  nothing, which RetroArch reads the same way; the Cartridge clock option tells netplay players to pick emulated
+  time.
+- **The clock's source is stored in save states** (`rtc_clock` in the MBC3's state; the clock of a state from before
+  loads as it is, on the loading emulator's clock, as it did before), and nubo-core does the rebasing: `Emulator::rtc_state(clock)` and `set_rtc_state(state, clock)` give
+  and take a clock state on either source, and loading a state made on the other source rebases it.
+- **Rumble is a level, not a hook:** `Emulator::take_rumble_level` is the share of the time the motor was on since the
+  last call, which games use to rumble more gently, and the core passes it on as the strength.
+- **Save states are padded to the first state's length plus 16 KiB.** No length bound is proven; a test measures how
+  much states vary (well under 2 KiB over thousands of states of busy test programs).
+- **Saving and loading got faster** for run-ahead: lists of bytes are written and read in one go, and the power-on
+  state a load starts from is made once per game. Saving went from about 1 ms to 60 µs and loading from 5-7 ms to
+  0.45 ms (a frame takes about 0.5 ms), with the same bytes stored.
+- **`CartridgeEffects: Send`**, so the emulator is `Send` and the core can keep it in a `static Mutex`.
+- **Pixel format:** when the frontend refuses XRGB8888, the core converts to the default 0RGB1555.
+- **Cheats:** setting a cheat first removes every code its index had, and a disabled cheat registers nothing (the
+  last review finding on mschoenm/nubo#37). A restart keeps the cheats.
+- **Restart** takes on the model and clock the options pick now (another finding there).
+
+Left: the AppStream release notes entry when the next version ships, and Phase 6.
+
 ## Decisions for the maintainer before starting
 
 1. **An exception to "no `unsafe` code".** A libretro core exports C functions
@@ -331,11 +371,10 @@ RetroArch with a test account, and a rumble cartridge game (such as Pokémon Pin
      `systemname`, `systemid = "game_boy"`, `database = "Nintendo - Game Boy|Nintendo - Game Boy Color"`,
      `supported_extensions = "gb|gbc"`.
    - **Licence and firmware:** `license = "GPLv3"`, `firmware_count = 0` (the boot ROMs are built in).
-   - **Features:** `savestate = "true"`, `savestate_features = "serialized"`, `cheats = "true"`,
+   - **Features:** `savestate = "true"`, `savestate_features = "deterministic"` (see Status), `cheats = "true"`,
      `input_descriptors = "true"`, `libretro_saves = "true"`, `core_options = "true"`,
      `needs_fullpath = "false"`, `is_experimental = "true"` at first.
-   - Not `"deterministic"`: with the default real-time clock, a loaded state can go on differently in
-     games with a clock (see `nubo_rtc` in Phase 3).
+   - `"deterministic"` rather than `"serialized"`: RetroArch offers run-ahead and netplay only then (see Status).
    - A short `description`.
 2. Add `cargo xtask libretro`. It builds the release library for the host and copies it to
    `target/bundle/` with RetroArch's file name, plus the info file and the license files
