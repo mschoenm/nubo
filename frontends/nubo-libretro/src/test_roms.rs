@@ -16,6 +16,8 @@ pub const MBC1_RAM_BATTERY: u8 = 0x03;
 pub const MBC3_TIMER_RAM_BATTERY: u8 = 0x10;
 /// An MBC5 cartridge with a rumble motor.
 pub const MBC5_RUMBLE: u8 = 0x1C;
+/// The header's RAM size for 2 KiB.
+pub const RAM_2_KIB: u8 = 0x01;
 /// The header's RAM size for 8 KiB.
 pub const RAM_8_KIB: u8 = 0x02;
 /// The header's RAM size for 32 KiB.

@@ -676,6 +676,30 @@ fn the_memory_map_points_at_buffers_that_hold_the_games_memory() {
         RETRO_MEMDESC_SYSTEM_RAM,
         "Game Boy Color banks 2-7"
     );
+    assert_eq!(flags(0xFF00), RETRO_MEMDESC_CONST, "the hardware registers");
+    finish();
+}
+
+#[test]
+fn what_retroarch_writes_through_its_pointers_reaches_the_game() {
+    let _turn = start(default_settings());
+    assert!(load_game(&cartridge(ROM_ONLY, 0, false, CHEATS)));
+    let maps = take_record().memory_maps;
+    run_frames(200);
+
+    // RETRO_MEMORY_SYSTEM_RAM, as RetroArch's memory editor writes it.
+    let system_ram = retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM).cast::<u8>();
+    // SAFETY: the core points to its work RAM, 8 KiB on a Game Boy.
+    unsafe { system_ram.add(0x100).write(0x42) };
+    run_frames(2);
+    assert_eq!(memory(RETRO_MEMORY_SYSTEM_RAM)[0], 0x42);
+
+    // The memory map, as cheats from RetroArch's memory search write it.
+    let &(_, start, _, _, pointer) = maps.iter().find(|map| map.1 == 0xC000).unwrap();
+    // SAFETY: the descriptor points to the work RAM's first 8 KiB.
+    unsafe { (pointer as *mut u8).add(0xC100 - start).write(0x43) };
+    run_frames(2);
+    assert_eq!(memory(RETRO_MEMORY_SYSTEM_RAM)[0], 0x43);
     finish();
 }
 

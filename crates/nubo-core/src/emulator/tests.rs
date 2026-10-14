@@ -946,3 +946,60 @@ fn a_state_from_before_the_clock_source_was_stored_loads_its_clock_as_it_is() {
         assert_eq!(loaded.rtc_state(clock), Some(state_clock), "{clock:?}");
     }
 }
+
+const CART_TYPE_MBC1_RAM: u8 = 0x02;
+
+/// A game that turns the screen off and enables cartridge RAM, then copies
+/// 0xC123, 0xFF90, 0x8010, 0xFE04 and 0xA000 to 0xC000-0xC004, forever.
+fn memory_reading_rom() -> Vec<u8> {
+    #[rustfmt::skip]
+    let program = [
+        0xAF, 0xE0, 0x40,                    // LCDC = 0, so VRAM and OAM can be read
+        0x3E, 0x0A, 0xEA, 0x00, 0x00,        // RAM enable = 0x0A
+        0xFA, 0x23, 0xC1, 0xEA, 0x00, 0xC0,  // loop: 0xC000 = (0xC123)
+        0xF0, 0x90, 0xEA, 0x01, 0xC0,        // 0xC001 = (0xFF90)
+        0xFA, 0x10, 0x80, 0xEA, 0x02, 0xC0,  // 0xC002 = (0x8010)
+        0xFA, 0x04, 0xFE, 0xEA, 0x03, 0xC0,  // 0xC003 = (0xFE04)
+        0xFA, 0x00, 0xA0, 0xEA, 0x04, 0xC0,  // 0xC004 = (0xA000)
+        0x18, 0xE1,                          // JR loop
+    ];
+    cartridge_rom(CART_TYPE_MBC1_RAM, &program)
+}
+
+#[test]
+fn memory_changed_directly_is_what_the_game_reads() {
+    for model in [Model::Dmg, Model::CgbE] {
+        let mut emulator = booted(model, &memory_reading_rom());
+        run_frames(&mut emulator, 2);
+
+        let memory = emulator.memory_mut();
+        assert_eq!(memory.work_ram.len(), 0x8000);
+        assert_eq!(memory.high_ram.len(), 0x7F);
+        assert_eq!(memory.video_ram.len(), 0x4000);
+        assert_eq!(memory.object_attribute_memory.len(), 0xA0);
+        assert_eq!(memory.cartridge_ram.len(), 0x8000);
+        memory.work_ram[0x123] = 0x11;
+        memory.high_ram[0x10] = 0x22;
+        memory.video_ram[0x10] = 0x33;
+        memory.object_attribute_memory[0x04] = 0x44;
+        memory.cartridge_ram[0] = 0x55;
+        run_frames(&mut emulator, 1);
+
+        assert_eq!(
+            emulator.work_ram()[..5],
+            [0x11, 0x22, 0x33, 0x44, 0x55],
+            "{model:?}"
+        );
+    }
+}
+
+#[test]
+fn memory_changed_directly_is_kept_in_save_states() {
+    let mut emulator = booted(Model::CgbE, &memory_reading_rom());
+    run_frames(&mut emulator, 2);
+    emulator.memory_mut().work_ram[0x5123] = 0x99;
+    let state = emulator.save_state();
+    emulator.memory_mut().work_ram[0x5123] = 0x00;
+    emulator.load_state(&state).unwrap();
+    assert_eq!(emulator.work_ram()[0x5123], 0x99);
+}

@@ -136,6 +136,11 @@ impl Gpu {
         (&self.video_ram, &self.object_attribute_memory)
     }
 
+    /// Video RAM and OAM, to change directly (see `AddressBus::memory_mut`).
+    pub(crate) fn video_memory_mut(&mut self) -> (&mut [u8], &mut [u8]) {
+        (&mut self.video_ram, &mut self.object_attribute_memory)
+    }
+
     pub(crate) fn video_ram_byte(&self, index: u16) -> u8 {
         self.video_ram[self.banked_video_ram_index(index) as usize]
     }

@@ -294,7 +294,7 @@ impl Core {
     /// [`Core::video`], the sound in [`Core::audio`] and the rumble in
     /// [`Core::rumble`].
     pub fn run(&mut self, buttons: u16) {
-        self.take_frontend_saves();
+        self.take_frontend_changes();
         self.press_buttons(buttons);
 
         self.left.clear();
@@ -313,7 +313,7 @@ impl Core {
     /// on, on the model the options pick now and with the clock they pick.
     /// The cartridge keeps what its battery keeps: its RAM and its clock.
     pub fn reset(&mut self) -> Result<(), LoadRomError> {
-        self.take_frontend_saves();
+        self.take_frontend_changes();
         let clock = self.emulator.rtc_state(RtcClock::WallClock);
         let mut emulator = start(&self.rom, &self.header, self.options, &self.requests)?;
         if self.header.has_battery {
@@ -329,6 +329,26 @@ impl Core {
         self.draw_frame();
         self.memory.update(&mut self.emulator);
         Ok(())
+    }
+
+    /// Takes everything RetroArch changed since the core last looked: the
+    /// battery saves first (a loaded `.srm`), then its memory writes, so a
+    /// write to cartridge RAM lands on the loaded save rather than the save
+    /// being overwritten with what the emulator held before.
+    fn take_frontend_changes(&mut self) {
+        self.take_frontend_saves();
+        self.take_frontend_memory_writes();
+    }
+
+    /// Writes what RetroArch wrote to the memory it can reach (its memory
+    /// editor, the cheats its memory search makes, `WRITE_CORE_MEMORY`)
+    /// into the emulator. A change to battery-backed cartridge RAM goes to
+    /// the save RAM buffer too, so RetroArch's `.srm` keeps it.
+    fn take_frontend_memory_writes(&mut self) {
+        if self.memory.apply(&mut self.emulator) && !self.save_ram.is_empty() {
+            copy_into(&mut self.save_ram, self.emulator.cartridge_ram());
+            self.save_ram_copy.copy_from_slice(&self.save_ram);
+        }
     }
 
     /// Copies the battery saves RetroArch changed since the last frame to
@@ -480,8 +500,11 @@ impl Core {
 
     /// Writes a save state into `buffer`: its length as a 4-byte
     /// little-endian number, the state, and zeros up to the end. Returns
-    /// false, leaving `buffer` alone, if it doesn't fit.
-    pub fn serialize(&self, buffer: &mut [u8]) -> bool {
+    /// false, leaving `buffer` alone, if it doesn't fit. The battery saves
+    /// and memory RetroArch changed go to the emulator first, so the state
+    /// holds them.
+    pub fn serialize(&mut self, buffer: &mut [u8]) -> bool {
+        self.take_frontend_changes();
         let state = self.emulator.save_state();
         let end = STATE_LENGTH_BYTES + state.len();
         let Ok(length) = u32::try_from(state.len()) else {
@@ -680,19 +703,30 @@ pub enum MemoryKind {
     SaveRam,
     /// Video RAM and OAM (`RETRO_MEMDESC_VIDEO_RAM`).
     VideoRam,
-    /// Hardware registers and high RAM, which have no flag.
+    /// The hardware registers, which RetroArch may only read
+    /// (`RETRO_MEMDESC_CONST`).
+    Registers,
+    /// High RAM, which has no flag.
     Other,
 }
 
 /// Copies of the Game Boy's memory, refreshed after every frame, which
-/// RetroAchievements reads. rcheevos only reads, so copies are as good as
-/// the emulator's own memory, and they keep pointers into the emulator out
-/// of RetroArch's hands. Each buffer is boxed, so it stays at one address.
+/// RetroAchievements reads and RetroArch's memory tools (its memory editor,
+/// the cheats its memory search makes, `WRITE_CORE_MEMORY`) read and write.
+/// Copies keep pointers into the emulator out of RetroArch's hands. Each
+/// buffer is boxed, so it stays at one address.
+///
+/// What RetroArch writes reaches the game through [`MemorySnapshot::apply`]
+/// before the next frame: `written` holds what the core last copied into
+/// the RAM buffers, so a byte that differs from it was written by RetroArch.
+/// ROM and the hardware registers are read-only (`RETRO_MEMDESC_CONST` for
+/// the registers too), and so is IE, the last byte of `high_ram`.
 struct MemorySnapshot {
     /// ROM banks 0 and 1, as 0x0000-0x7FFF shows them at power-on.
     rom: Box<[u8; 0x8000]>,
     video_ram: Box<[u8; VIDEO_RAM_SIZE]>,
-    /// Cartridge RAM, all banks, with zeros after the cartridge's own.
+    /// Cartridge RAM, all banks, with zeros after the cartridge's own; RAM
+    /// shorter than a bank repeats through the first (`cartridge_ram_index`).
     cartridge_ram: Box<[u8; CARTRIDGE_RAM_SIZE]>,
     work_ram: Box<[u8; WORK_RAM_SIZE]>,
     /// OAM at 0xFE00-0xFE9F and the unusable area after it, which reads 0.
@@ -701,8 +735,54 @@ struct MemorySnapshot {
     io: Box<[u8; 0x80]>,
     /// High RAM at 0xFF80-0xFFFE, then IE at 0xFFFF.
     high_ram: Box<[u8; 0x80]>,
+    /// What the core last copied into the buffers RetroArch may write.
+    written: Box<WrittenMemory>,
     /// Whether `rom` was filled.
     has_rom: bool,
+}
+
+/// What [`MemorySnapshot`] last copied into the buffers RetroArch may write,
+/// to tell its writes apart.
+struct WrittenMemory {
+    video_ram: [u8; VIDEO_RAM_SIZE],
+    cartridge_ram: [u8; CARTRIDGE_RAM_SIZE],
+    work_ram: [u8; WORK_RAM_SIZE],
+    oam: [u8; 0x100],
+    high_ram: [u8; 0x80],
+}
+
+/// Where byte `index` of the cartridge RAM buffer is in a cartridge RAM
+/// `length` bytes long. RAM shorter than one 8 KiB bank (MBC2's 512 cells, a
+/// 2 KiB chip) repeats through 0xA000-0xBFFF, as the game sees it.
+fn cartridge_ram_index(index: usize, length: usize) -> Option<usize> {
+    if index < length {
+        Some(index)
+    } else if length > 0 && index < 0x2000 {
+        Some(index % length)
+    } else {
+        None
+    }
+}
+
+/// Writes the bytes of `buffer` that differ from `written` into `target`,
+/// the emulator's own memory, at the index `target_index` gives (none skips
+/// the byte), except past `target`'s end. Returns whether it wrote any.
+fn write_changes(
+    buffer: &[u8],
+    written: &[u8],
+    target: &mut [u8],
+    target_index: impl Fn(usize) -> Option<usize>,
+) -> bool {
+    let mut changed = false;
+    for (index, (&byte, &before)) in buffer.iter().zip(written).enumerate() {
+        if byte != before
+            && let Some(target) = target_index(index).and_then(|index| target.get_mut(index))
+        {
+            *target = byte;
+            changed = true;
+        }
+    }
+    changed
 }
 
 impl MemorySnapshot {
@@ -715,8 +795,67 @@ impl MemorySnapshot {
             oam: Box::new([0; 0x100]),
             io: Box::new([0; 0x80]),
             high_ram: Box::new([0; 0x80]),
+            written: Box::new(WrittenMemory {
+                video_ram: [0; VIDEO_RAM_SIZE],
+                cartridge_ram: [0; CARTRIDGE_RAM_SIZE],
+                work_ram: [0; WORK_RAM_SIZE],
+                oam: [0; 0x100],
+                high_ram: [0; 0x80],
+            }),
             has_rom: false,
         }
+    }
+
+    /// Writes what RetroArch changed in the RAM buffers since the last
+    /// [`MemorySnapshot::update`] into the emulator. Returns whether the
+    /// cartridge RAM changed.
+    fn apply(&mut self, emulator: &mut Emulator) -> bool {
+        let written = &mut *self.written;
+        let changed = [
+            *self.work_ram != written.work_ram,
+            self.high_ram[..0x7F] != written.high_ram[..0x7F],
+            *self.video_ram != written.video_ram,
+            self.oam[..0xA0] != written.oam[..0xA0],
+            *self.cartridge_ram != written.cartridge_ram,
+        ];
+        if !changed.contains(&true) {
+            return false;
+        }
+        let memory = emulator.memory_mut();
+        write_changes(&self.work_ram[..], &written.work_ram, memory.work_ram, Some);
+        write_changes(
+            &self.high_ram[..0x7F],
+            &written.high_ram[..0x7F],
+            memory.high_ram,
+            Some,
+        );
+        write_changes(
+            &self.video_ram[..],
+            &written.video_ram,
+            memory.video_ram,
+            Some,
+        );
+        write_changes(
+            &self.oam[..0xA0],
+            &written.oam[..0xA0],
+            memory.object_attribute_memory,
+            Some,
+        );
+        let cartridge_length = memory.cartridge_ram.len();
+        let cartridge_changed = write_changes(
+            &self.cartridge_ram[..],
+            &written.cartridge_ram,
+            memory.cartridge_ram,
+            |index| cartridge_ram_index(index, cartridge_length),
+        );
+        written.work_ram.copy_from_slice(&self.work_ram[..]);
+        written.high_ram.copy_from_slice(&self.high_ram[..]);
+        written.video_ram.copy_from_slice(&self.video_ram[..]);
+        written.oam.copy_from_slice(&self.oam[..]);
+        written
+            .cartridge_ram
+            .copy_from_slice(&self.cartridge_ram[..]);
+        cartridge_changed
     }
 
     /// Copies the emulator's memory.
@@ -725,15 +864,24 @@ impl MemorySnapshot {
         copy_into(&mut self.high_ram[..0x7F], emulator.high_ram());
         self.high_ram[0x7F] = emulator.read_memory(0xFFFF);
         let cartridge_ram = emulator.cartridge_ram();
-        let length = cartridge_ram.len().min(CARTRIDGE_RAM_SIZE);
-        self.cartridge_ram[..length].copy_from_slice(&cartridge_ram[..length]);
-        self.cartridge_ram[length..].fill(0);
+        for (index, byte) in self.cartridge_ram.iter_mut().enumerate() {
+            *byte = cartridge_ram_index(index, cartridge_ram.len())
+                .map_or(0, |index| cartridge_ram[index]);
+        }
         for (offset, byte) in self.io.iter_mut().enumerate() {
             *byte = emulator.read_memory(0xFF00 + offset as u16);
         }
         let (video_ram, oam) = emulator.video_memory();
         copy_into(self.video_ram.as_mut_slice(), video_ram);
         copy_into(&mut self.oam[..], oam);
+        let written = &mut *self.written;
+        written.work_ram.copy_from_slice(&self.work_ram[..]);
+        written.high_ram.copy_from_slice(&self.high_ram[..]);
+        written.video_ram.copy_from_slice(&self.video_ram[..]);
+        written.oam.copy_from_slice(&self.oam[..]);
+        written
+            .cartridge_ram
+            .copy_from_slice(&self.cartridge_ram[..]);
     }
 
     /// The regions rcheevos reads, in the layout of its Game Boy and Game
@@ -754,6 +902,7 @@ impl MemorySnapshot {
             oam,
             io,
             high_ram,
+            written: _,
             has_rom: _,
         } = self;
         let (low_work_ram, high_work_ram) = work_ram.split_at_mut(DMG_WORK_RAM_SIZE);
@@ -770,7 +919,7 @@ impl MemorySnapshot {
             region(0xA000, cartridge_bank_zero, 0x2000, MemoryKind::SaveRam),
             region(0xC000, low_work_ram, 0x2000, MemoryKind::SystemRam),
             region(0xFE00, &mut oam[..], 0x100, MemoryKind::VideoRam),
-            region(0xFF00, &mut io[..], 0x80, MemoryKind::Other),
+            region(0xFF00, &mut io[..], 0x80, MemoryKind::Registers),
             region(0xFF80, &mut high_ram[..], 0x80, MemoryKind::Other),
         ];
         if is_cgb {

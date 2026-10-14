@@ -12,7 +12,9 @@
 //! `nubo_core::Model`, ...).
 
 pub use crate::address_bus::cheats::{validate_gamegenie_code, validate_gameshark_code};
-pub use crate::address_bus::{CartridgeEffects, CartridgeHeader, NoSaves, RtcClock, RtcState};
+pub use crate::address_bus::{
+    CartridgeEffects, CartridgeHeader, MemoryMut, NoSaves, RtcClock, RtcState,
+};
 pub use crate::controller::{ControllerButton, ControllerMapping, ControllerState};
 pub use crate::cpu::{BusActivityEntry, BusActivityKind, Registers};
 pub use crate::emulator::{BUILD_COMMIT, DOTS_PER_FRAME, Emulator, SaveStateHeader};
