@@ -3,15 +3,18 @@ name: RetroArch core
 # Builds the RetroArch core's zips with `cargo xtask libretro` on Linux
 # (x86_64 and ARM), Windows and macOS (universal), and on Linux x86_64 plays
 # a game in RetroArch itself, with run-ahead, rewind and an auto-saved state.
-# Runs on pull requests that change the core, how it is built or the crates
-# it is built from (Dependabot's updates), every night, and for releases,
-# which attach the zips it makes. It isn't one of the checks that pull
-# requests wait for.
+# Runs on pull requests that change the core, how it is built (the workspace's
+# manifest included) or the crates it is built from (Dependabot's updates),
+# every night, and for releases, which attach the zips it makes. It isn't one
+# of the checks that pull requests wait for. Changes to nubo-core and
+# nubo-frontend don't start it: CI builds and tests the core with them on
+# every pull request, on Linux, macOS and Windows.
 on:
   pull_request:
     paths:
       - .github/workflows/libretro.yml
       - Cargo.lock
+      - Cargo.toml
       - frontends/nubo-libretro/**
       - xtask/src/libretro.rs
       - xtask/src/licenses.rs

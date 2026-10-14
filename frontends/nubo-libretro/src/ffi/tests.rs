@@ -680,6 +680,32 @@ fn the_memory_map_points_at_buffers_that_hold_the_games_memory() {
 }
 
 #[test]
+fn a_restart_on_another_model_gives_retroarch_that_models_memory_map() {
+    let has_color_work_ram = |maps: &[(u64, usize, usize, usize, usize)]| {
+        maps.iter().any(|&(_, start, _, _, _)| start == 0x1_0000)
+    };
+    let _turn = start(default_settings());
+    assert!(load_game(&cartridge(ROM_ONLY, 0, false, JOYPAD)));
+    assert!(
+        !has_color_work_ram(&take_record().memory_maps),
+        "a Game Boy"
+    );
+
+    let mut settings = lock(&SETTINGS);
+    settings.variables = vec![(String::from("nubo_model"), CString::from(c"CGB-E"))];
+    settings.variables_updated = true;
+    drop(settings);
+    retro_run();
+    retro_reset();
+    assert!(
+        has_color_work_ram(&take_record().memory_maps),
+        "a Game Boy Color"
+    );
+    assert_eq!(retro_get_memory_size(RETRO_MEMORY_SYSTEM_RAM), 0x8000);
+    finish();
+}
+
+#[test]
 fn rumble_cartridges_rumble_until_the_game_is_unloaded() {
     let _turn = start(default_settings());
     assert!(load_game(&cartridge(MBC5_RUMBLE, 0, false, RUMBLE)));

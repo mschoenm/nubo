@@ -548,8 +548,9 @@ fn negotiate_pixel_format() -> PixelFormat {
     PixelFormat::Rgb1555
 }
 
-/// Tells RetroArch where the Game Boy's memory is, for RetroAchievements,
-/// and that the core supports them.
+/// Tells RetroArch where the Game Boy's memory is, for RetroAchievements.
+/// The map depends on the model (a Game Boy Color has more work RAM), so it
+/// is set again whenever a restart may have changed the model.
 fn set_memory_maps(core: &mut Core) {
     let descriptors: Vec<RetroMemoryDescriptor> = core
         .memory_regions()
@@ -576,11 +577,6 @@ fn set_memory_maps(core: &mut Core) {
         num_descriptors: c_uint::try_from(descriptors.len()).unwrap_or(0),
     };
     environment(RETRO_ENVIRONMENT_SET_MEMORY_MAPS, (&raw mut map).cast());
-    let mut supported = true;
-    environment(
-        RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS,
-        (&raw mut supported).cast(),
-    );
 }
 
 /// Reads which buttons the player holds on the first controller, one bit
@@ -801,13 +797,14 @@ pub extern "C" fn retro_set_controller_port_device(_port: c_uint, _device: c_uin
 #[unsafe(no_mangle)]
 pub extern "C" fn retro_reset() {
     guard("retro_reset", (), || {
-        if let Some(core) = lock(&CORE).as_mut()
-            && let Err(error) = core.reset()
-        {
-            log(
-                RETRO_LOG_ERROR,
-                &format!("the game didn't start again: {error}"),
-            );
+        if let Some(core) = lock(&CORE).as_mut() {
+            match core.reset() {
+                Ok(()) => set_memory_maps(core),
+                Err(error) => log(
+                    RETRO_LOG_ERROR,
+                    &format!("the game didn't start again: {error}"),
+                ),
+            }
         }
     });
 }
@@ -968,6 +965,12 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
             &format!("{} on {}", core.header().title, core.model().description()),
         );
         set_memory_maps(&mut core);
+        // Before the first `retro_run`, as libretro.h asks.
+        let mut supported = true;
+        environment(
+            RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS,
+            (&raw mut supported).cast(),
+        );
 
         let mut frontend = lock(&FRONTEND);
         frontend.input_bitmasks = false;
