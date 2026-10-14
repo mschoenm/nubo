@@ -22,9 +22,9 @@ fn other_colors_are_left_alone() {
 
 #[test]
 fn gray_changes_nothing() {
-    let mut pixels = vec![0xD3, 0xD3, 0xD3, 0xFF];
+    let mut pixels = vec![0xAA, 0xAA, 0xAA, 0xFF];
 
     DmgPalette::Gray.recolor(&mut pixels);
 
-    assert_eq!(pixels, [0xD3, 0xD3, 0xD3, 0xFF]);
+    assert_eq!(pixels, [0xAA, 0xAA, 0xAA, 0xFF]);
 }

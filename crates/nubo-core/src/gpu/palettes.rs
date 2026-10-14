@@ -14,8 +14,8 @@ use std::io::{Read, Write};
 pub(super) type Color = [u8; 4];
 
 pub(super) const BLACK: Color = [0x0, 0x0, 0x0, 0xFF];
-pub(super) const DARK_GRAY: Color = [0xA9, 0xA9, 0xA9, 0xFF];
-pub(super) const LIGHT_GRAY: Color = [0xD3, 0xD3, 0xD3, 0xFF];
+pub(super) const DARK_GRAY: Color = [0x55, 0x55, 0x55, 0xFF];
+pub(super) const LIGHT_GRAY: Color = [0xAA, 0xAA, 0xAA, 0xFF];
 pub(super) const WHITE: Color = [0xFF, 0xFF, 0xFF, 0xFF];
 
 const COLORS_PER_PALETTE: usize = 4;
@@ -27,8 +27,10 @@ const PALETTE_RAM_ADDRESS_MASK: u8 = 0b0011_1111;
 const AUTO_INCREMENT_BIT: u8 = 7;
 
 /// The four RGBA colors the emulator draws DMG frames in, lightest first: the shades 0 (white) to
-/// 3 (black) that the palette registers BGP, OBP0 and OBP1 pick for each color ID. Frontends that
-/// show DMG games in other colors, or compare frames with screenshots, look for these exact values.
+/// 3 (black) that the palette registers BGP, OBP0 and OBP1 pick for each color ID. They are evenly
+/// spaced grays (0xFF, 0xAA, 0x55, 0x00), the four equal steps of darkness of the DMG's screen and
+/// the grays test ROM screenshots use. Frontends that show DMG games in other colors, or compare
+/// frames with screenshots, look for these exact values.
 pub const DMG_SHADES: [Color; 4] = [WHITE, LIGHT_GRAY, DARK_GRAY, BLACK];
 
 /// The DMG palette registers and CGB palette RAM.

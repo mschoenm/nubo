@@ -11,6 +11,11 @@
 //! library folders, one played from elsewhere), their thumbnails, title
 //! screens and box art. These tests read all of it with this version, and
 //! check that saving the same things again writes the same bytes.
+//!
+//! Puzzle Time's title screen and thumbnail were redrawn in the evenly spaced
+//! grays when the emulator's own grays changed to them. The maintainer chose
+//! that over recognizing the old grays, since Nubo had no players yet whose
+//! pictures would be in them.
 
 #![cfg(feature = "desktop")]
 
@@ -103,9 +108,24 @@ fn puzzle_time_thumbnail() -> Vec<u8> {
     screen(|x, y| DMG_SHADES[((x / 8 + y / 8) % 4) as usize])
 }
 
+/// The shade of each pixel of Puzzle Time's title screen, 0 (white) to 3
+/// (black).
+fn puzzle_time_title_shade(x: u32) -> usize {
+    ((x / 4) % 4) as usize
+}
+
 /// The title screen of Puzzle Time, in the emulator's grays.
 fn puzzle_time_title_screen() -> Vec<u8> {
-    screen(|x, _| DMG_SHADES[((x / 4) % 4) as usize])
+    screen(|x, _| DMG_SHADES[puzzle_time_title_shade(x)])
+}
+
+/// The title screen of Puzzle Time as the library shows it in `palette`.
+fn puzzle_time_title_screen_in(palette: DmgPalette) -> Vec<u8> {
+    let colors = palette.colors();
+    screen(|x, _| {
+        let [red, green, blue] = colors[puzzle_time_title_shade(x)];
+        [red, green, blue, 0xFF]
+    })
 }
 
 /// The title screen of Color Quest.
@@ -341,14 +361,12 @@ fn the_library_pictures_read_the_same() {
     let box_art = library.box_art(Path::new(COLOR_QUEST)).unwrap();
     assert_eq!((box_art.width(), box_art.height()), (64, 80));
     assert_eq!(box_art.pixels(), &color_quest_box_art()[..]);
-    let mut title_screen = puzzle_time_title_screen();
-    DmgPalette::Pocket.recolor(&mut title_screen);
     assert_eq!(
         library
             .title_screen(Path::new(PUZZLE_TIME))
             .unwrap()
             .pixels(),
-        &title_screen[..]
+        &puzzle_time_title_screen_in(DmgPalette::Pocket)[..]
     );
     assert_eq!(
         library.thumbnail(Path::new(ROM_PATH)).unwrap().pixels(),

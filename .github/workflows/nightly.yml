@@ -87,7 +87,7 @@ jobs:
 
       # The runner counts every test in "  total   2412/2630", then Nubo's
       # score on the GB Emulator Shootout's published tests in "  shootout
-      # 251/264  rank 2  leader DocBoy 255  published 2026-06-04 72fd745" (the
+      # 258/264  rank 1  leader DocBoy 255  published 2026-06-04 72fd745" (the
       # leader's name can have spaces, such as "Beaten Dying Moon").
       - name: Count the passing tests
         id: count
