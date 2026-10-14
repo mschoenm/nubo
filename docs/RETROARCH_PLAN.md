@@ -27,7 +27,11 @@ the clock, saves and loads states (a loaded state goes on pixel for pixel like t
 run-ahead (one instance and two) and rewind on, applies the options, and RetroArch accepts its memory maps and
 achievements support. `.github/workflows/libretro.yml` repeats that check. Not checked yet, since they need a person
 with a screen, a controller or an account: playing by hand on Windows and macOS, achievements with a
-retroachievements.org account, and rumble on a controller.
+retroachievements.org account, and rumble on a controller. The maintainer has what these need and will test them
+by hand; when isn't set yet.
+
+**Phase 6 is on hold** until the maintainer picks it up, which they plan to do soon: nothing goes to RetroArch or
+libretro before then.
 
 Where the code differs from the plan below:
 
@@ -57,7 +61,8 @@ Where the code differs from the plan below:
   the emulator with `Emulator::memory_mut`, which catches the lazy components up first. Checked in RetroArch 1.18
   with a game-specific cheat file. The hardware registers stay read-only (`RETRO_MEMDESC_CONST`).
 
-Left: the AppStream release notes entry when the next version ships, and Phase 6.
+Left: the maintainer's tests by hand (above), the AppStream release notes entry when the next version ships (the
+`release` skill writes it), and Phase 6 (on hold).
 
 ## Decisions for the maintainer before starting
 
@@ -400,6 +405,8 @@ RetroArch with a test account, and a rumble cartridge game (such as Pokémon Pin
 works.
 
 ## Phase 6: RetroArch's own core downloader (with the maintainer)
+
+**On hold** until the maintainer picks it up (see Status).
 
 This is outward-facing: only do it once the maintainer says to go ahead.
 
