@@ -291,6 +291,13 @@ impl Joypad {
         self.update_buttons();
     }
 
+    /// Gives each player the buttons held now, after a loaded save state
+    /// changed how many players a Super Game Boy reads. The buttons held
+    /// aren't part of the state, so no interrupt follows.
+    pub(super) fn finish_loading_save_state(&mut self) {
+        self.combine_keys();
+    }
+
     /// Recomputes the button bits from the keyboard and controller keys, and
     /// requests the joypad interrupt when that pulls an input line low.
     fn update_buttons(&mut self) {
@@ -698,5 +705,29 @@ mod tests {
         joypad.write_byte(0x30);
         joypad.write_byte(0x10);
         assert!(joypad.interrupt());
+    }
+
+    #[test]
+    fn a_loaded_state_with_more_players_gives_each_controller_its_player() {
+        use crate::serializable::Serializable;
+
+        let mut saved = Joypad::new();
+        saved.write_byte_with_sgb_players(0x30, Some(2));
+        let mut bytes = Vec::new();
+        saved.serialize(&mut bytes).unwrap();
+
+        let mut joypad = Joypad::new();
+        joypad.set_controller_states(&[
+            ControllerState::new(),
+            controller_pressing(ControllerButton::East),
+        ]);
+        joypad.deserialize(&mut bytes.as_slice()).unwrap();
+        joypad.finish_loading_save_state();
+        joypad.write_byte(0x10);
+        assert_eq!(
+            joypad.read_byte() & 0x0F,
+            0x0F,
+            "the second controller isn't the first player's"
+        );
     }
 }

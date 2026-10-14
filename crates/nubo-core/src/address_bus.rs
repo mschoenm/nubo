@@ -1281,9 +1281,11 @@ impl AddressBus {
     }
 
     /// Sets up what a loaded save state doesn't hold: the views of the
-    /// cartridge's ROM, and the PPU and M-cycles caught up (see above).
+    /// cartridge's ROM, which player holds which controller's buttons, and
+    /// the PPU and M-cycles caught up (see above).
     pub(crate) fn finish_loading_save_state(&mut self) {
         self.cartridge.finish_loading_save_state(self.elapsed_dots);
+        self.joypad.finish_loading_save_state();
         self.update_rom_view();
         self.ppu_owed_dots = 0;
         self.ppu_quiet_dots = 0;
