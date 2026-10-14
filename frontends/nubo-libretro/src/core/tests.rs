@@ -208,6 +208,23 @@ fn held_buttons_reach_the_game() {
     assert_eq!(work_ram(&mut core, 0xC001) & 0x0F, 0x0F);
 }
 
+/// Save states leave out the buttons the player holds, so a button held
+/// across a load, as run-ahead and rewind do every frame, stays pressed.
+#[test]
+fn a_button_held_across_a_loaded_state_stays_pressed() {
+    let mut core = booted(ROM_ONLY, 0, JOYPAD);
+    let mut state = vec![0; core.serialize_size()];
+    assert!(core.serialize(&mut state), "saved with A released");
+    run_holding(&mut core, 1, buttons(&[A]));
+    assert!(core.unserialize(&state));
+    run_holding(&mut core, 2, buttons(&[A]));
+    assert_eq!(work_ram(&mut core, 0xC001) & 0x0F, 0b1110, "A");
+
+    assert!(core.unserialize(&state));
+    run(&mut core, 2);
+    assert_eq!(work_ram(&mut core, 0xC001) & 0x0F, 0x0F, "released");
+}
+
 #[test]
 fn every_game_boy_button_has_its_own_libretro_button() {
     let mut keys: Vec<_> = BUTTONS.iter().map(|(_, key, _)| *key).collect();
