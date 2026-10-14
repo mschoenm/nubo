@@ -342,8 +342,11 @@ impl App {
             subscriptions::controllers().map(Message::Controller),
             event::listen_with(window_events::message_for),
             system::theme_changes().map(|mode| WindowMessage::SystemThemeChanged(mode).into()),
-            subscriptions::library_changes(&self.settings.shared.library_folders)
-                .map(|event| LibraryMessage::Watch(event).into()),
+            subscriptions::library_changes(
+                &self.settings.shared.library_folders,
+                self.recent_games_elsewhere(),
+            )
+            .map(|event| LibraryMessage::Watch(event).into()),
             window::close_requests().map(|_| WindowMessage::CloseRequested.into()),
         ];
 

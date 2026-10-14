@@ -323,6 +323,37 @@ pub fn card(theme: &Theme, status: button::Status) -> button::Style {
     }
 }
 
+/// A small round button in the corner of a game card, such as the one that
+/// takes a game off "Continue playing": a floating card's colors, so it
+/// stands out on any picture, and the accent color when hovered.
+pub fn card_corner_button(theme: &Theme, status: button::Status) -> button::Style {
+    let palette = theme.extended_palette();
+    let (background, text_color) = match status {
+        button::Status::Hovered | button::Status::Pressed => {
+            (palette.primary.base.color, palette.primary.base.text)
+        }
+        button::Status::Active | button::Status::Disabled => (
+            palette.background.weakest.color,
+            palette.background.base.text,
+        ),
+    };
+
+    button::Style {
+        background: Some(background.into()),
+        text_color,
+        border: Border::default()
+            .rounded(999)
+            .width(1)
+            .color(palette.background.strong.color),
+        shadow: Shadow {
+            color: Color::BLACK.scale_alpha(0.25),
+            offset: Vector::new(0.0, 2.0),
+            blur_radius: 6.0,
+        },
+        ..button::Style::default()
+    }
+}
+
 /// Fills the picture area of a game card that has no thumbnail yet.
 pub fn thumbnail_placeholder(theme: &Theme) -> container::Style {
     container::Style {

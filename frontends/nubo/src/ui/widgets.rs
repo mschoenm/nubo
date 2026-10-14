@@ -65,7 +65,9 @@ pub fn toggle_icon_button<'a, Message: Clone + 'a>(
     with_tooltip(button, label, tooltip_position)
 }
 
-fn with_tooltip<'a, Message: 'a>(
+/// `content` with `label` shown in a small dark box next to it while the
+/// pointer is over it.
+pub fn with_tooltip<'a, Message: 'a>(
     content: impl Into<Element<'a, Message>>,
     label: String,
     position: tooltip::Position,
