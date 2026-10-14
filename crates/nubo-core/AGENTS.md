@@ -15,6 +15,7 @@ The emulator itself: a plain Rust library with no platform dependencies and no C
 | PPU | `gpu.rs`, `gpu/` | Line timeline, pixel pipeline (SameBoy port), bulk stretches (`steady.rs`), palettes |
 | APU | `apu.rs`, `apu/` | Four channels (SameBoy port), lazy catch-up (`catch_up.rs`), band-limited output |
 | Input, serial | `joypad.rs`, `controller.rs`, `serial.rs` | |
+| Super Game Boy | `sgb.rs`, `sgb/` | The Super Nintendo's side: commands sent through JOYP, colors, transfers, borders (SameBoy port). The PPU owns it and hands it each finished frame |
 | Boot ROMs | `bios.rs`, and their sources in `crates/nubo-core/boot_roms/` | Nubo's own, timed to the cycle like the ones they replaced |
 
 ## How Time Moves
@@ -50,6 +51,6 @@ Players must never lose a save state to an update. The format is in `emulator/sa
 
 ## Accuracy References
 
-- **SameBoy** (Expat license, notice in `apu.rs`) is the main reference, and several parts are ported from it: the pixel pipeline (`gpu/pipeline.rs`), the APU, write timing, DMA bus conflicts, the speed switch, STOP mode and the serial clock. For DMA bus conflicts, Gambatte's hardware tests win where they disagree with SameBoy.
+- **SameBoy** (Expat license, notice in `apu.rs`) is the main reference, and several parts are ported from it: the pixel pipeline (`gpu/pipeline.rs`), the APU, write timing, DMA bus conflicts, the speed switch, STOP mode, the serial clock and the Super Game Boy (`sgb.rs`). For DMA bus conflicts, Gambatte's hardware tests win where they disagree with SameBoy.
 - **Gambatte** is GPL-2.0-only: a reference only (its test ROMs, traces of a local build), never a source of code or tables. The PPU's line start and WY checks, and the freeze lengths of the speed switch, are fitted to its tests.
 - **Calibration:** the PPU's dot positions against the Mooneye PPU tests and an instrumented SameBoy; each model's post-boot state against Mooneye's boot tests, GBMicrotest's poweron tests and Gambatte's display_startstate and ch1_init_pos tests. Change any of them only together with `cargo test-roms`. `clone_with_rom_matches_a_real_boot` checks that the test runner's boot cache gives the same state as a real boot.

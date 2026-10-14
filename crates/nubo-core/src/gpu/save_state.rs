@@ -53,7 +53,7 @@ impl_serializable_with_check!(Gpu {
         wx, wy, ly, lyc, compared_lyc, stat, late_cleared_stat_sources, palettes, cgb_vbk, cgb_opri,
         key0, frame_buffer, video_ram, object_attribute_memory, timing, palette_ram_blocked,
         countdowns, stat_interrupt, vblank_interrupt, oam_dma_access, next_oam_dma_access,
-        pending_dma_oam_write, oam_scan_y_bus, oam_scan_x_bus, oam_scan_row;
+        pending_dma_oam_write, oam_scan_y_bus, oam_scan_x_bus, oam_scan_row, sgb;
     // The model is set when the emulator is made and the save state's header names it. The
     // finished frame and whether the frontend took it are the frontend's side of the hand-over:
     // they stay as they are until the loaded state finishes its next frame.

@@ -10,11 +10,11 @@
 //!
 //! - [`TESTS`] lists them as the Shootout's `main` branch has them at the
 //!   commit `download.rs` pins, with their IDs `shootout/<name>`. DMG tests run
-//!   on the DMG and CGB tests on the CGB-E, the models the harness class
-//!   starts (`docs/SHOOTOUT_PLAN.md`, Part 2). Super Game Boy tests are left
-//!   out, as Nubo doesn't emulate its commands and the Shootout counts them as
-//!   not run, and so are tests without a reference screenshot, which only
-//!   report what they find.
+//!   on the DMG, CGB tests on the CGB-E and SGB tests on the SGB, the models
+//!   the harness class starts (`docs/SHOOTOUT_PLAN.md`, Part 2), and are
+//!   compared on the Game Boy screen, which the class crops out of a Super
+//!   Game Boy's picture with its border. Tests without a reference screenshot
+//!   are left out: they only report what they find.
 //! - A match only counts once it has held for [`MATCH_HOLD_AUDIO_BUFFERS`]:
 //!   at [`HARNESS_SPEED`], the harness's 0.1 seconds between screenshots are
 //!   0.4 emulated seconds, so a screen shown for less than that might never be
@@ -45,7 +45,7 @@
 //! `shootout.sha256`. The collection and the Shootout are both pinned, so
 //! the checksums that matched when the table was made still match. Most of
 //! the collection's Mooneye, SameSuite and Blargg ROMs are other builds than
-//! the Shootout's, so only 53 of the 258 tests run the collection's copy.
+//! the Shootout's, so only 53 of the 261 tests run the collection's copy.
 
 use crate::suites::{AUDIO_BUFFERS_PER_SECOND, Check, Deadline, Model, Source, TestCase};
 use std::collections::{BTreeMap, BTreeSet};
@@ -82,6 +82,9 @@ const DMG: Model = Model::Dmg;
 /// The Shootout's `CGB` model, without a revision. The harness class starts
 /// Nubo with `--model cgb`, which is the CGB-E.
 const CGB: Model = Model::CgbE;
+/// The Shootout's `SGB` model. The harness class starts Nubo with
+/// `--model sgb`.
+const SGB: Model = Model::Sgb;
 
 /// One of the Shootout's tests, as its `Test(...)` in `testroms/*.py` gives it.
 pub(crate) struct ShootoutTest {

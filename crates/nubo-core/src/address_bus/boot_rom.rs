@@ -39,6 +39,12 @@ const SGB_POST_BOOT_JOYPAD_SELECT: u8 = 0x30;
 const SGB_POST_BOOT_SYSTEM_COUNTER_BASE: u16 = 0xDC84;
 /// The part of the cartridge header the SGB boot ROM sends to the SNES.
 const SGB_TRANSFERRED_HEADER: std::ops::Range<u16> = 0x0104..0x0150;
+/// Where the cartridge header says whether the game supports the Super Game
+/// Boy: 0x03 if it does.
+const SGB_FLAG_ADDRESS: u16 = 0x0146;
+/// Where the cartridge header has the old licensee code, which must be 0x33
+/// for the Super Game Boy's commands to work.
+const OLD_LICENSEE_CODE_ADDRESS: u16 = 0x014B;
 /// How many ticks each set bit in the transferred header moves the SGB system
 /// counter back.
 const SGB_HEADER_BIT_COUNTER_TICKS: u32 = 4;
@@ -95,6 +101,11 @@ impl AddressBus {
         if self.model.is_sgb() {
             self.joypad.write_byte(SGB_POST_BOOT_JOYPAD_SELECT);
             self.apu.silence_boot_sound();
+            let sgb_flag = self.cartridge.read_rom(SGB_FLAG_ADDRESS);
+            let old_licensee_code = self.cartridge.read_rom(OLD_LICENSEE_CODE_ADDRESS);
+            if let Some(sgb) = self.gpu.sgb_mut() {
+                sgb.start(sgb_flag, old_licensee_code);
+            }
         }
     }
 

@@ -564,6 +564,7 @@ pub(crate) fn discover(dirs: &RomDirs) -> Vec<TestCase> {
     tests.extend(screenshot_tests());
     tests.extend(mooneye_madness());
     tests.extend(shootout_rom_checks());
+    tests.extend(super_game_boy(root));
     tests.extend(shootout::test_cases());
     tests.sort_by_key(TestCase::id);
     tests
@@ -943,7 +944,7 @@ const SHOOTOUT_SECONDS_AFTER_BOOT: u32 = 1;
 /// Shootout's own judgement of them, in the colors the app shows, is in
 /// `shootout.rs`. Left out are
 /// `daid/rom_and_ram.gb`, which has no expected result, and
-/// `cpp/sgb-ext-test.gb`, which needs the Super Game Boy's packet protocol.
+/// `cpp/sgb-ext-test.gb`, which takes longer and runs in `super_game_boy`.
 const SHOOTOUT_ROM_CHECKS: [(&str, Model, &[&str]); 11] = [
     (
         "daid/ppu_scanline_bgp.gb",
@@ -1020,6 +1021,41 @@ fn shootout_rom_checks() -> Vec<TestCase> {
             )
         })
         .collect()
+}
+
+/// Seconds after the boot ROM at which `cpp/sgb-ext-test.gb` is checked: it
+/// sends 27 commands with long pauses between them, which takes about five
+/// seconds.
+const SGB_EXT_TEST_SECONDS_AFTER_BOOT: u32 = 8;
+
+/// The tests of the Super Game Boy's commands, on both Super Game Boys:
+/// SameSuite's `MLT_REQ` tests, which report through the registers, and
+/// CasualPokePlayer's `sgb-ext-test`, which tests the packet protocol and is
+/// checked against its screenshot in the Shootout's grays.
+fn super_game_boy(root: &Path) -> Vec<TestCase> {
+    let models = [Model::Sgb, Model::Sgb2];
+    let same_suite = roms_in(root, Path::new("same-suite/sgb"))
+        .into_iter()
+        .flat_map(|rom| {
+            models.map(|model| {
+                TestCase::new(
+                    rom.clone(),
+                    model,
+                    Check::Registers,
+                    Deadline::FromPowerOn(REGISTER_TIMEOUT_SECONDS),
+                )
+            })
+        });
+    let packet_protocol = models.map(|model| TestCase {
+        source: Source::Shootout,
+        ..TestCase::new(
+            PathBuf::from("cpp/sgb-ext-test.gb"),
+            model,
+            Check::GrayscaleScreen(vec![PathBuf::from("cpp/sgb-ext-test.png")]),
+            Deadline::AfterBoot(SGB_EXT_TEST_SECONDS_AFTER_BOOT),
+        )
+    });
+    same_suite.chain(packet_protocol).collect()
 }
 
 /// The path of a Mealybug reference screenshot, such as `m3_scx_low_3_bits_cgb_d.png`.

@@ -569,6 +569,21 @@ impl<T: Serializable + Default> Serializable for Vec<T> {
     }
 }
 
+/// A `Box` is stored as the value it holds.
+impl<T: Serializable> Serializable for Box<T> {
+    fn serialize(&self, writer: &mut dyn Write) -> Result<()> {
+        (**self).serialize(writer)
+    }
+
+    fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
+        (**self).deserialize(reader)
+    }
+
+    fn encoding() -> String {
+        T::encoding()
+    }
+}
+
 /// An `Option` is stored as a 0 byte for `None`, or a 1 byte followed by the value.
 impl<T: Serializable + Default> Serializable for Option<T> {
     fn serialize(&self, writer: &mut dyn Write) -> Result<()> {

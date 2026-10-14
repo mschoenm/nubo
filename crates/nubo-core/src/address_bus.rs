@@ -59,6 +59,7 @@ use crate::joypad::{Joypad, Key};
 use crate::model::Model;
 use crate::serial::Serial;
 use crate::serializable::{FieldWriter, Serializable, read_fields};
+use crate::sgb::Sgb;
 use std::fmt;
 use std::sync::Arc;
 
@@ -387,6 +388,22 @@ impl AddressBus {
             "the PPU is behind by more than its quiet dots"
         );
         self.gpu.completed_frame()
+    }
+
+    /// On a Super Game Boy, the most recent picture with its border (see
+    /// `Sgb::bordered_frame`), as complete as `completed_frame`.
+    pub(crate) fn completed_frame_with_border(&self) -> Option<&[u8]> {
+        self.gpu.sgb().map(Sgb::bordered_frame)
+    }
+
+    /// Whether the game screen in `completed_frame` uses only the four
+    /// `DMG_SHADES`: on the DMG family, until a Super Game Boy game sets
+    /// colors.
+    pub(crate) fn completed_frame_in_dmg_shades(&self) -> bool {
+        match self.gpu.sgb() {
+            Some(sgb) => !sgb.frame_colorized(),
+            None => !self.model.is_cgb(),
+        }
     }
 
     /// Whether a frame was finished since the last call.

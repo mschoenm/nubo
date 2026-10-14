@@ -6,6 +6,13 @@
 //! to choose a group and then reads the state of that group's buttons in the
 //! low four bits. Everything is active low: a 0 bit means "selected" or
 //! "pressed".
+//!
+//! On a Super Game Boy, JOYP is wired to the Super Nintendo, which can read up
+//! to four controllers through a multitap. Once a game asks for more than one
+//! player (the `MLT_REQ` command, see `sgb.rs`), deselecting both groups reads
+//! the current player's number, and selecting the action buttons and then
+//! deselecting them moves on to the next player (SameBoy's `GB_sgb_write` and
+//! `GB_update_joyp`).
 
 use crate::controller::{ControllerMapping, ControllerState};
 use getset::{CopyGetters, Setters};
@@ -64,6 +71,15 @@ pub struct Joypad {
     #[getset(get_copy = "pub(super)", set = "pub(super)")]
     interrupt: bool,
 
+    /// How many controllers a Super Game Boy reads, 1 to 4 (3 only when a
+    /// game asks for it, which real hardware doesn't expect). Other models
+    /// keep 1.
+    sgb_player_count: u8,
+    /// The controller a Super Game Boy reads now, counting from 0 for the
+    /// first player. Only the first player's buttons are connected; the
+    /// others read as released.
+    sgb_current_player: u8,
+
     /// Keys held on the keyboard, one bit per key as laid out by `key_mask`.
     #[serializable(skip)]
     keyboard_keys: u8,
@@ -112,6 +128,8 @@ impl Joypad {
             action_buttons: 0xF,
             directional_buttons: 0xF,
             interrupt: false,
+            sgb_player_count: 1,
+            sgb_current_player: 0,
             keyboard_keys: 0,
             controller_keys: 0,
             controller_mapping: ControllerMapping::default(),
@@ -122,9 +140,40 @@ impl Joypad {
     /// Selecting a group whose buttons are held pulls its lines low, which
     /// requests the interrupt just like pressing a button does.
     pub(super) fn write_byte(&mut self, value: u8) {
+        self.write_byte_with_sgb_players(value, None);
+    }
+
+    /// Handles a write to JOYP on a Super Game Boy. `requested_players` is
+    /// how many players an `MLT_REQ` command finished by this write asks for.
+    ///
+    /// With two or four players, deselecting the action buttons moves on to
+    /// the next player before the command takes effect. Asking for three
+    /// players moves on once more, a quirk of the Super Game Boy's program
+    /// (SameBoy).
+    pub(super) fn write_byte_with_sgb_players(&mut self, value: u8, requested_players: Option<u8>) {
         let previous_lines = self.input_lines();
+
+        let action_buttons_deselected = value & 0x20 != 0 && self.group_select & 0x20 == 0;
+        if action_buttons_deselected && self.sgb_player_count & 1 == 0 {
+            self.sgb_current_player = self.sgb_current_player.wrapping_add(1);
+            self.sgb_current_player &= self.sgb_player_mask();
+        }
+        if let Some(players) = requested_players {
+            self.sgb_player_count = players;
+            if players == 3 {
+                self.sgb_current_player = self.sgb_current_player.wrapping_add(1);
+            }
+            self.sgb_current_player &= self.sgb_player_mask();
+        }
+
         self.group_select = value & 0x30;
         self.request_interrupt_on_falling_lines(previous_lines);
+    }
+
+    /// The mask that keeps the current player's number below the player
+    /// count: 0, 1, 2 or 3 for one to four players.
+    fn sgb_player_mask(&self) -> u8 {
+        self.sgb_player_count.wrapping_sub(1) & 0x03
     }
 
     /// Handles a read of JOYP: the buttons of every selected group combined,
@@ -134,8 +183,17 @@ impl Joypad {
     }
 
     /// The four input lines in the low bits of JOYP: a line is 0 while a
-    /// button in a selected group is held on it.
+    /// button in a selected group is held on it. On a Super Game Boy reading
+    /// more than one controller, deselecting both groups reads 0xF minus the
+    /// current player's number.
     fn input_lines(&self) -> u8 {
+        let player = self.sgb_current_player & 0x03;
+        if self.group_select == 0x30 && self.sgb_player_count > 1 {
+            return 0x0F - player;
+        }
+        if player != 0 {
+            return 0x0F;
+        }
         let mut lines = 0x0F;
         if self.group_select & 0x10 == 0 {
             lines &= self.directional_buttons;
@@ -463,5 +521,53 @@ mod tests {
         joypad.set_interrupt(false);
         joypad.press_key(Key::Right);
         assert!(!joypad.interrupt());
+    }
+
+    #[test]
+    fn a_super_game_boy_with_two_players_reads_the_current_player() {
+        let mut joypad = Joypad::new();
+        joypad.write_byte_with_sgb_players(0x30, Some(2));
+        assert_eq!(joypad.read_byte() & 0x0F, 0x0F);
+
+        joypad.write_byte(0x10);
+        joypad.write_byte(0x30);
+        assert_eq!(joypad.read_byte() & 0x0F, 0x0E);
+
+        joypad.write_byte(0x10);
+        joypad.write_byte(0x30);
+        assert_eq!(joypad.read_byte() & 0x0F, 0x0F);
+    }
+
+    #[test]
+    fn other_players_buttons_read_as_released() {
+        let mut joypad = Joypad::new();
+        joypad.write_byte_with_sgb_players(0x30, Some(4));
+        joypad.press_key(Key::A);
+        joypad.write_byte(0x10);
+        assert_eq!(joypad.read_byte() & 0x0F, 0x0E);
+        joypad.write_byte(0x30);
+        joypad.write_byte(0x10);
+        assert_eq!(joypad.read_byte() & 0x0F, 0x0F);
+    }
+
+    #[test]
+    fn asking_for_three_players_moves_on_a_player() {
+        let mut joypad = Joypad::new();
+        joypad.write_byte_with_sgb_players(0x30, Some(2));
+        joypad.write_byte(0x10);
+        joypad.write_byte(0x30);
+        joypad.write_byte_with_sgb_players(0x30, Some(3));
+        assert_eq!(joypad.read_byte() & 0x0F, 0x0D);
+    }
+
+    #[test]
+    fn going_back_to_one_player_reads_the_first_players_buttons() {
+        let mut joypad = Joypad::new();
+        joypad.write_byte_with_sgb_players(0x30, Some(2));
+        joypad.write_byte(0x10);
+        joypad.write_byte_with_sgb_players(0x30, Some(1));
+        joypad.press_key(Key::B);
+        joypad.write_byte(0x10);
+        assert_eq!(joypad.read_byte() & 0x0F, 0x0D);
     }
 }

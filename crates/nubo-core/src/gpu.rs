@@ -19,6 +19,7 @@
 //! CPU's register reads and writes and the interrupt requests in both emulators.
 
 pub use crate::gpu::palettes::DMG_SHADES;
+pub(crate) use crate::gpu::palettes::rgb555_to_rgba;
 
 use crate::address_bus::MemoryMapped;
 use crate::address_bus::hdma::HdmaState;
@@ -28,6 +29,7 @@ use crate::gpu::palettes::{Color, Palettes, WHITE};
 use crate::gpu::pipeline::Pipeline;
 use crate::model::Model;
 use crate::serializable::{Serializable, read_name, unreadable_value, write_variant};
+use crate::sgb::Sgb;
 use crate::utils::is_bit_set;
 use nubo_serializable_derive::Serializable;
 use std::io::{Read, Write};
@@ -335,6 +337,10 @@ pub struct Gpu {
     /// The OAM byte offset the PPU is reading during OAM scan, or `NO_OAM_SCAN_ROW`. The OAM
     /// corruption bug (`oam_bug.rs`) uses it.
     oam_scan_row: u8,
+
+    /// The Super Nintendo around a Super Game Boy, which colors each finished frame and draws
+    /// its border (`sgb.rs`). Other models have none.
+    sgb: Option<Box<Sgb>>,
 }
 
 const HBLANK_MODE: u8 = 0;
@@ -496,12 +502,14 @@ impl Gpu {
             oam_scan_y_bus: 0,
             oam_scan_x_bus: 0,
             oam_scan_row: NO_OAM_SCAN_ROW,
+            sgb: None,
         }
     }
 
     /// Selects the hardware model, which decides the PPU's timing along with the CPU's speed.
     pub(super) fn set_model(&mut self, model: Model) {
         self.model = model;
+        self.sgb = model.is_sgb().then(|| Box::new(Sgb::new()));
         self.timing = if model.is_cgb() {
             TimingVariant::Cgb
         } else {
@@ -541,6 +549,15 @@ impl Gpu {
     /// The last finished frame, four RGBA bytes per pixel.
     pub(crate) fn completed_frame(&self) -> &[u8] {
         &self.completed_frame
+    }
+
+    /// The Super Game Boy's side of the console, on the Super Game Boy models.
+    pub(crate) fn sgb(&self) -> Option<&Sgb> {
+        self.sgb.as_deref()
+    }
+
+    pub(crate) fn sgb_mut(&mut self) -> Option<&mut Sgb> {
+        self.sgb.as_deref_mut()
     }
 
     /// Whether `completed_frame` holds a frame the frontend hasn't taken yet.
@@ -654,13 +671,23 @@ impl Gpu {
         } else if self.line == VBLANK_START_LINE {
             self.line_state = LineState::VBlank;
             let blank = std::mem::take(&mut self.first_frame_after_lcd_on);
-            self.publish_frame(blank);
+            self.publish_frame(blank, true);
         }
     }
 
     /// Hands the frame in `frame_buffer` to the frontend, or a white frame when `blank` is set.
-    fn publish_frame(&mut self, blank: bool) {
-        if blank {
+    /// `drawn` says whether the PPU drew it, rather than counting a frame's time with the LCD off
+    /// or stopped.
+    ///
+    /// On a Super Game Boy the Super Nintendo shows the frame instead, colored and with its
+    /// border. It is sent the pixels the PPU drew whether or not the LCD would show them (the
+    /// first frame after the LCD is switched on), and keeps showing the last one while none are
+    /// drawn (SameBoy).
+    fn publish_frame(&mut self, blank: bool, drawn: bool) {
+        if let Some(sgb) = &mut self.sgb {
+            let frame = drawn.then_some(self.frame_buffer.as_flattened());
+            sgb.finish_frame(frame, &mut self.completed_frame);
+        } else if blank {
             self.completed_frame.as_chunks_mut().0.fill(WHITE);
         } else {
             self.completed_frame
@@ -861,7 +888,7 @@ impl Gpu {
         self.idle_dots = self.idle_dots.wrapping_add(counted);
         if self.idle_dots == DOTS_PER_FRAME {
             self.idle_dots = 0;
-            self.publish_frame(blank);
+            self.publish_frame(blank, false);
         }
         counted
     }
