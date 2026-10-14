@@ -60,7 +60,6 @@ use crate::model::Model;
 use crate::serial::Serial;
 use crate::serializable::{FieldWriter, Serializable, read_fields};
 use std::fmt;
-
 use std::sync::Arc;
 
 pub use crate::address_bus::cartridge::CartridgeHeader;
@@ -163,7 +162,7 @@ pub struct AddressBus {
     working_ram: Box<[u8; WORKING_RAM_SIZE]>,
 
     /// High RAM (0xFF80-0xFFFE), 127 bytes the CPU can always reach.
-    zero_page_ram: [u8; 0x80],
+    high_ram: [u8; 0x80],
 
     /// SVBK (0xFF70): selects the CGB work RAM bank at 0xD000.
     svbk: u8,
@@ -279,7 +278,7 @@ impl AddressBus {
             in_boot_rom: true,
             boot_rom: vec![0; 0x100],
             working_ram: zeroed_memory(),
-            zero_page_ram: [0; 0x80],
+            high_ram: [0; 0x80],
             svbk: 0,
             cartridge: empty_cartridge(),
             rom: SharedRom::default(),
@@ -485,7 +484,7 @@ impl AddressBus {
             0xC000..=0xFDFF => self.working_ram[self.working_ram_index(address)],
             _ => {
                 debug_assert!(reads_plain_memory(address));
-                self.zero_page_ram[usize::from(address & 0x7F)]
+                self.high_ram[usize::from(address & 0x7F)]
             }
         };
         self.apply_cheats(address, byte)
@@ -499,7 +498,7 @@ impl AddressBus {
             self.working_ram[index] = value;
         } else {
             debug_assert!(writes_plain_memory(address));
-            self.zero_page_ram[usize::from(address & 0x7F)] = value;
+            self.high_ram[usize::from(address & 0x7F)] = value;
         }
     }
 
@@ -536,7 +535,7 @@ impl AddressBus {
             in_boot_rom: self.in_boot_rom,
             boot_rom: self.boot_rom.clone(),
             working_ram: self.working_ram.clone(),
-            zero_page_ram: self.zero_page_ram,
+            high_ram: self.high_ram,
             svbk: self.svbk,
             cartridge,
             rom,
@@ -1104,7 +1103,7 @@ impl AddressBus {
                 let mut bus = FieldWriter::new(writer);
                 bus.field("in_boot_rom", &self.in_boot_rom)?;
                 bus.field("work_ram", &*self.working_ram)?;
-                bus.field("high_ram", &self.zero_page_ram)?;
+                bus.field("high_ram", &self.high_ram)?;
                 bus.field("svbk", &self.svbk)?;
                 bus.field("interrupt_enable", &self.interrupt_enable)?;
                 bus.field("undocumented_registers", &self.undocumented_registers)?;
@@ -1146,7 +1145,7 @@ impl AddressBus {
                 match name {
                     "in_boot_rom" => self.in_boot_rom.deserialize(bytes)?,
                     "work_ram" => self.working_ram.deserialize(bytes)?,
-                    "high_ram" => self.zero_page_ram.deserialize(bytes)?,
+                    "high_ram" => self.high_ram.deserialize(bytes)?,
                     "svbk" => self.svbk.deserialize(bytes)?,
                     "interrupt_enable" => self.interrupt_enable.deserialize(bytes)?,
                     "undocumented_registers" => self.undocumented_registers.deserialize(bytes)?,
@@ -1196,16 +1195,19 @@ pub(crate) mod test_utils {
     use crate::address_bus::cartridge::*;
     use crate::address_bus::constants::*;
 
+    /// A blank ROM whose header names the cartridge type, ROM size and RAM
+    /// size given by their header codes, with as many 16 KiB banks as the ROM
+    /// size code says.
     pub(crate) fn build_rom(cartridge_type: u8, rom_size_index: u8, ram_size_index: u8) -> Vec<u8> {
-        let mut rom_buffer: Vec<u8> = Vec::new();
-        let number_of_banks = u32::from(rom_bank_count(rom_size_index));
-        rom_buffer.resize((0x4000 * number_of_banks) as usize, 0);
+        let number_of_banks = usize::from(rom_bank_count(rom_size_index));
+        let mut rom_buffer = vec![0; ROM_BANK_SIZE * number_of_banks];
         rom_buffer[CARTRIDGE_TYPE_ADDRESS] = cartridge_type;
         rom_buffer[ROM_SIZE_ADDRESS] = rom_size_index;
         rom_buffer[RAM_SIZE_ADDRESS] = ram_size_index;
         rom_buffer
     }
 
+    /// An address bus with no cartridge, outside processor test mode.
     pub(crate) fn initialize_test_address_bus() -> AddressBus {
         AddressBus::new(false)
     }

@@ -21,7 +21,8 @@ use std::fmt::Write;
 use std::fs;
 use std::path::Path;
 
-/// The nights the latest one is compared with, newest first.
+/// How many nights before the latest one each median covers, shortest
+/// window first.
 const MEDIAN_NIGHTS: [usize; 3] = [14, 90, 365];
 /// How many nights the history table shows.
 const HISTORY_NIGHTS: usize = 30;
@@ -308,6 +309,8 @@ fn numbers(night: &Value) -> Vec<(String, f64)> {
     found
 }
 
+/// Adds every number under `value` to `found`, named by its dotted path
+/// from `path`.
 fn collect_numbers(value: &Value, path: &str, found: &mut Vec<(String, f64)>) {
     match value {
         Value::Number(number) => {
