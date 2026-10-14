@@ -10,7 +10,9 @@ The work has five parts:
 - Parts 1 and 2 can be done in a cloud session.
 - Part 3 needs a Windows PC and is done by the maintainer.
 - Part 4 is a pull request to another project's repository. It waits until Nubo would land at the top
-  of the published table (Part 5 shows where it stands), and then for the maintainer's go.
+  of the published table (Part 5 shows where it stands), until the maintainer has reviewed Nubo
+  themselves and the app (its UI above all) is ready to go public, and then for the maintainer's go.
+  Don't open it, or prepare it in a fork, before then.
 - Part 5 adds the Shootout's tests to `cargo test-roms`, so CI and the nightly run check them, and the
   nightly metrics on the wiki show where Nubo would rank. It doesn't depend on the other parts and goes
   first, right after steps 1 and 2 of [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md). **Done**: Nubo passes
@@ -225,8 +227,11 @@ Part 5 is built, `cargo test-roms` does this properly and the dry run is no long
 
 ## Part 2: the harness class
 
-This is a draft for the Shootout's `emulators/nubo.py`. Adjust it to the options as merged, and
-calibrate `startup_time` with `--get-startuptime` in Part 3.
+This is the Shootout's `emulators/nubo.py`, ready to copy into a clone of the Shootout for Part 3.
+It was checked on 2026-10-14 against the options as merged (`frontends/nubo/src/command_line.rs`) and
+against the Shootout's `main` at `38b926b`, still its newest commit then: `downloadGithubRelease` takes
+`filter` and `require_asset`, and the window title still ends with "Nubo". Calibrate `startup_time` with
+`--get-startuptime` in Part 3.
 
 ```python
 from util import *
@@ -297,7 +302,9 @@ the Part 1 pull request or in this document; they don't belong in the Nubo crate
 ## Part 4: the pull request to the Shootout
 
 Wait until Part 5 shows Nubo ranking first on the published tests, and Part 3's run on Windows confirms
-it: the maintainer wants Nubo to enter the table at the top. Then, only once the maintainer says to go
+it: the maintainer wants Nubo to enter the table at the top. Wait as well until the maintainer has
+reviewed Nubo themselves and the app is ready to go public, the UI above all: the Shootout links to Nubo,
+so it is where many people will first see it. Then, only once the maintainer says to go
 ahead, open a pull request to `gbdev/GBEmulatorShootout` from the
 maintainer's fork with `emulators/nubo.py`, the `EMULATOR_SPECS` entry and the README line. Mention the
 Nubo version it was tested with and the local results. The Shootout's maintainers rerun the suite and
