@@ -23,7 +23,7 @@
 
 Nubo is a cycle-accurate Game Boy and Game Boy Color emulator. It emulates every model from the first Game Boy to the Game Boy Advance and is checked against thousands of hardware test ROMs.
 
-Nubo is written in safe Rust, apart from the few lines where RetroArch connects to its core. The app is built with [Iced](https://iced.rs), a user interface library written in Rust, and the same app compiles to WebAssembly to run in the browser. Building it needs only the standard Rust toolchain, plus the ALSA and udev development files on Linux.
+Nubo is written in safe Rust, apart from the few lines where RetroArch connects to its core. The app is built with [Iced](https://iced.rs), a user interface library written in Rust, and the same app compiles to WebAssembly to run in the browser. Building it needs only the standard Rust toolchain, plus `pkg-config` and the ALSA and udev development files on Linux.
 
 <p align="center">
   <img src="images/screenshots/super-game-boy.png" width="700" alt="Tobu Tobu Girl Deluxe in Nubo, inside the game's own illustrated Super Game Boy border">
@@ -165,7 +165,7 @@ If a game doesn't play correctly or something else is wrong, [open an issue](htt
 
 ## Building and Contributing
 
-Nubo is written in Rust. With a [Rust toolchain](https://rustup.rs) installed (plus the ALSA and udev development files on Linux), `cargo play` builds and runs the desktop app, and `cargo xtask web` the browser version. [BUILDING.md](BUILDING.md) has the other commands, the packages, the tests and a map of the code. Pull requests are welcome; [AGENTS.md](AGENTS.md) has the project's rules and the checks to run before you push.
+Nubo is written in Rust. With a [Rust toolchain](https://rustup.rs) installed (plus `pkg-config` and the ALSA and udev development files on Linux), `cargo play` builds and runs the desktop app, and `cargo xtask web` the browser version. [BUILDING.md](BUILDING.md) has the other commands, the packages, the tests and a map of the code. Pull requests are welcome; [AGENTS.md](AGENTS.md) has the project's rules and the checks to run before you push.
 
 ## Credits
 
