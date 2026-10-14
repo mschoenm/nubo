@@ -52,10 +52,18 @@ const BUTTONS: [(Button, ControllerButton); 16] = [
     (Button::RightThumb, ControllerButton::RightStick),
 ];
 
+/// A connected controller's identity, which stays the same while it is
+/// connected, even when a controller before it in the list disconnects: the
+/// number gilrs gives it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ControllerId(pub usize);
+
 /// What every connected controller is doing, in the order gilrs lists them
 /// (the order they connected in).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Controllers {
+    /// Each controller's identity, in the order of `each`.
+    ids: Vec<ControllerId>,
     each: Vec<ControllerState>,
 }
 
@@ -63,6 +71,17 @@ impl Controllers {
     /// The controllers' states, the first controller's first.
     pub fn each(&self) -> &[ControllerState] {
         &self.each
+    }
+
+    /// The controllers' identities, in the order of [`Controllers::each`].
+    pub fn ids(&self) -> &[ControllerId] {
+        &self.ids
+    }
+
+    /// The state of the controller `id`, if it is connected.
+    pub fn state(&self, id: ControllerId) -> Option<&ControllerState> {
+        let index = self.ids.iter().position(|&known| known == id)?;
+        self.each.get(index)
     }
 
     /// Every controller combined: a button counts as held if it is held on
@@ -94,9 +113,21 @@ impl Controllers {
     }
 }
 
+impl From<Vec<(ControllerId, ControllerState)>> for Controllers {
+    /// Controllers with these identities doing what their states say.
+    fn from(controllers: Vec<(ControllerId, ControllerState)>) -> Self {
+        let (ids, each) = controllers.into_iter().unzip();
+        Controllers { ids, each }
+    }
+}
+
 impl From<Vec<ControllerState>> for Controllers {
+    /// Controllers doing what `each` says, numbered from 0 in its order.
     fn from(each: Vec<ControllerState>) -> Self {
-        Controllers { each }
+        Controllers {
+            ids: (0..each.len()).map(ControllerId).collect(),
+            each,
+        }
     }
 }
 
@@ -187,10 +218,10 @@ impl Reader {
 
     /// Every connected controller's state.
     fn state(&self) -> Controllers {
-        let each = self
+        let (ids, each) = self
             .gilrs
             .gamepads()
-            .map(|(_, gamepad)| {
+            .map(|(id, gamepad)| {
                 let mut state = ControllerState::new();
                 for (button, controller_button) in BUTTONS {
                     if gamepad.is_pressed(button) {
@@ -201,10 +232,10 @@ impl Reader {
                     snap(gamepad.value(Axis::LeftStickX)),
                     snap(gamepad.value(Axis::LeftStickY)),
                 );
-                state
+                (ControllerId(id.into()), state)
             })
-            .collect();
-        Controllers { each }
+            .unzip();
+        Controllers { ids, each }
     }
 }
 

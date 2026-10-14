@@ -7,41 +7,47 @@
 //! Each controller's presses are held back on their own, since on a Super
 //! Game Boy each controller can play a player of its own: a button the
 //! second player still holds from the menus mustn't hide the same button
-//! from the first.
+//! from the first. They are kept by the controller's identity rather than
+//! its place in the list, which changes when a controller before it
+//! disconnects.
 
 use nubo_core::{ControllerButton, ControllerState, Key};
+use nubo_frontend::gamepads::{ControllerId, Controllers};
 
 /// The controller buttons and stick directions that went down on each
 /// controller while the game wasn't running and are still held.
 #[derive(Debug, Default)]
 pub struct MenuPresses {
-    /// What each controller holds back, the first controller's first.
-    each: Vec<HeldBack>,
+    /// What each connected controller holds back.
+    each: Vec<(ControllerId, HeldBack)>,
 }
 
 impl MenuPresses {
-    /// Notes how each controller went from `previous` to `states` (both the
-    /// first controller's first): what goes down while `in_menus` is held
-    /// back from the game, and whatever is released stops being held back.
-    /// A controller that wasn't there before counts as holding nothing.
-    pub fn update(
-        &mut self,
-        previous: &[ControllerState],
-        states: &[ControllerState],
-        in_menus: bool,
-    ) {
-        self.each.resize_with(states.len(), HeldBack::default);
+    /// Notes how each controller went from `previous` to `current`: what
+    /// goes down while `in_menus` is held back from the game, and whatever
+    /// is released stops being held back. A controller that wasn't there
+    /// before counts as holding nothing, and one that is gone is forgotten.
+    pub fn update(&mut self, previous: &Controllers, current: &Controllers, in_menus: bool) {
         let released = ControllerState::new();
-        for (index, (held_back, state)) in self.each.iter_mut().zip(states).enumerate() {
-            held_back.update(previous.get(index).unwrap_or(&released), state, in_menus);
+        let mut each = Vec::with_capacity(current.ids().len());
+        for (&id, state) in current.ids().iter().zip(current.each()) {
+            let mut held_back = self
+                .each
+                .iter()
+                .position(|(known, _)| *known == id)
+                .map(|index| self.each.swap_remove(index).1)
+                .unwrap_or_default();
+            held_back.update(previous.state(id).unwrap_or(&released), state, in_menus);
+            each.push((id, held_back));
         }
+        self.each = each;
     }
 
-    /// What the game gets to see of `state`, the state of the controller at
-    /// `index`: everything that controller doesn't hold back.
-    pub fn hide_from(&self, index: usize, state: &ControllerState) -> ControllerState {
-        match self.each.get(index) {
-            Some(held_back) => held_back.hide_from(state),
+    /// What the game gets to see of `state`, the state of the controller
+    /// `id`: everything that controller doesn't hold back.
+    pub fn hide_from(&self, id: ControllerId, state: &ControllerState) -> ControllerState {
+        match self.each.iter().find(|(known, _)| *known == id) {
+            Some((_, held_back)) => held_back.hide_from(state),
             None => *state,
         }
     }

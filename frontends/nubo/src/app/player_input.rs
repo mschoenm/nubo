@@ -15,11 +15,12 @@ impl App {
     /// What the game sees of each controller: everything but the buttons
     /// held back because they were pressed in the menus.
     pub(super) fn controller_states_for_game(&self) -> Vec<ControllerState> {
-        self.controller_states
-            .each()
+        let controllers = &self.controller_states;
+        controllers
+            .ids()
             .iter()
-            .enumerate()
-            .map(|(index, state)| self.menu_presses.hide_from(index, state))
+            .zip(controllers.each())
+            .map(|(&id, state)| self.menu_presses.hide_from(id, state))
             .collect()
     }
 
@@ -111,8 +112,8 @@ impl App {
                     .collect();
 
                 self.menu_presses.update(
-                    previous_states.each(),
-                    self.controller_states.each(),
+                    &previous_states,
+                    &self.controller_states,
                     self.in_menus(),
                 );
                 let states = self.controller_states_for_game();
