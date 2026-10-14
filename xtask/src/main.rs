@@ -49,8 +49,10 @@ Commands:
   bundle        Build Nubo.app, the macOS app with its icon, into target/bundle (macOS only)
   flatpak       Build the desktop app as a Flatpak, install it for this user and write it into
                 target/bundle as a .flatpak file to share (Linux with flatpak-builder only)
-  windows       Build the Windows installer (with Inno Setup 6) and a zip to run without
-                installing into target/bundle (Windows only)
+  windows [--nightly <YYYY-MM-DD>] [--version <x.y.z>]
+                Build the Windows installer (an MSI, with the WiX Toolset) and a zip to run
+                without installing into target/bundle (Windows only); --nightly names them as
+                that night's nightly build, --version gives them another version (to test updates)
   libretro      Build the RetroArch core for this computer into target/bundle as a folder and a
                 zip: the core under RetroArch's file name, its info file and the licenses
   icon <path>   Write the Nubo logo to <path>: an SVG if it ends in .svg, a Windows icon if it
@@ -331,7 +333,7 @@ fn main() -> ExitCode {
                 bundle.display()
             );
         }),
-        Some("windows") => windows::build_windows_downloads().map(|(installer, zip)| {
+        Some("windows") => windows::build_windows_downloads(&options).map(|(installer, zip)| {
             println!(
                 "Built {}, which installs Nubo for the current user, and {}, which runs without \
                  installing.",

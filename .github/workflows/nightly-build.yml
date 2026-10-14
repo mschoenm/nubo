@@ -61,13 +61,21 @@ jobs:
       - name: Name the files and write the notes
         if: steps.changed.outputs.changed == 'true'
         run: |
-          date=$(TZ=Europe/Amsterdam date +%Y-%m-%d)
+          # The night's date, which the Windows build put in the installer's
+          # name and in the name Windows shows for the installed app.
+          msi=$(basename artifacts/windows-x64/*.msi)
+          date=${msi#Nubo-nightly-}
+          date=${date%-windows-x64.msi}
+          if ! [[ $date =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+            echo "::error::$msi isn't named as a nightly build"
+            exit 1
+          fi
           short=${COMMIT::7}
           mkdir upload
           for arch in x86_64 aarch64; do
             cp artifacts/flatpak-$arch/*.flatpak "upload/Nubo-nightly-$date-linux-$arch.flatpak"
           done
-          cp artifacts/windows-x64/*-setup.exe "upload/Nubo-nightly-$date-windows-x64-setup.exe"
+          cp artifacts/windows-x64/*.msi "upload/Nubo-nightly-$date-windows-x64.msi"
           cp artifacts/windows-x64/*.zip "upload/Nubo-nightly-$date-windows-x64.zip"
           for platform in linux-x86_64 linux-aarch64 windows-x64 macos-universal; do
             cp artifacts/libretro-$platform/*.zip "upload/Nubo-nightly-$date-libretro-$platform.zip"
@@ -85,7 +93,7 @@ jobs:
 
           A nightly build replaces the Nubo you have installed, keeping your saves and settings. Save states made with a nightly build may not load in a release if their format changed. To go back to the release, install it the same way.
 
-          **Windows:** run \`Nubo-nightly-$date-windows-x64-setup.exe\`, or unpack \`Nubo-nightly-$date-windows-x64.zip\` to run Nubo without installing. The files aren't signed yet, so Windows may say it protected your PC: choose *More info* and then *Run anyway*.
+          **Windows:** run \`Nubo-nightly-$date-windows-x64.msi\`, or unpack \`Nubo-nightly-$date-windows-x64.zip\` to run Nubo without installing. The files aren't signed yet, so Windows may say it protected your PC: choose *More info* and then *Run anyway*.
 
           **Linux:** download the \`.flatpak\` file for your computer (\`x86_64\` for most PCs, \`aarch64\` for ARM) and run:
 

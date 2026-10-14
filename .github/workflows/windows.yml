@@ -1,8 +1,8 @@
 name: Windows
 
-# Builds the Windows installer and zip with `cargo xtask windows` (Inno Setup
-# comes with GitHub's Windows runners) and plays a game from each. Runs on
-# pull requests that change
+# Builds the Windows installer (an MSI, with the WiX Toolset) and zip with
+# `cargo xtask windows`, plays a game from each and tests installing,
+# updating, downgrading and uninstalling. Runs on pull requests that change
 # how they are built or the crates they are built from (Dependabot's
 # updates), every night, and for releases, which attach the files it makes.
 # It isn't one of the checks that pull requests wait for.
@@ -17,6 +17,11 @@ on:
       - frontends/nubo/build.rs
       - crates/nubo-logo/**
   workflow_call:
+    inputs:
+      nightly:
+        description: Name the files and the installed app as tonight's nightly build
+        type: boolean
+        default: false
   workflow_dispatch:
 
 permissions:
@@ -40,15 +45,43 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
+      # The newest WiX, like every tool here. WiX 7 needs its Open Source
+      # Maintenance Fee agreement accepted, which the maintainer did on
+      # 2026-10-14 (Nubo makes no money, so it owes no fee; see docs/CI.md).
+      # A new major version asks again under a new name, so the nightly run
+      # fails here until the maintainer has read and accepted that one.
+      - name: Install the WiX Toolset
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix
+          $tools = Join-Path $env:USERPROFILE ".dotnet\tools"
+          Add-Content $env:GITHUB_PATH $tools
+          & (Join-Path $tools "wix.exe") eula accept wix7
+          if ($LASTEXITCODE -ne 0) { throw "Accepting the WiX license failed" }
+
+      # A nightly build carries tonight's Amsterdam date, as the nightly
+      # pre-release names it (nightly-build.yml reads it from the file names).
       - name: Build the installer and the zip
-        run: cargo xtask windows
+        shell: pwsh
+        run: |
+          $options = @()
+          if ($env:NIGHTLY -eq "true") {
+            $amsterdam = [TimeZoneInfo]::FindSystemTimeZoneById("W. Europe Standard Time")
+            $date = [TimeZoneInfo]::ConvertTimeFromUtc([DateTime]::UtcNow, $amsterdam).ToString("yyyy-MM-dd")
+            $options = @("--nightly", $date)
+          }
+          cargo xtask windows @options
+          if ($LASTEXITCODE -ne 0) { throw "cargo xtask windows failed" }
+        env:
+          NIGHTLY: ${{ inputs.nightly }}
 
       # The zip and the installer are what Windows users get: the release
       # build, which opens no console window, with its license files. Each is
       # unpacked or installed here as a player would, and plays a game with
       # the app's efficiency harness, which needs no window or sound and
-      # fails unless the game ran and made frames. The installed Nubo is then
-      # uninstalled, which must remove it again.
+      # fails unless the game ran and made frames. Every install here is
+      # quiet (/qn), as winget and scripts install; the installer's pages
+      # aren't shown on a runner.
       - name: Play a game from the zip and from the installer
         shell: pwsh
         run: |
@@ -87,25 +120,139 @@ jobs:
           Expand-Archive -Path (Get-Item target/bundle/*-windows-x64.zip).FullName -DestinationPath $unpacked
           Test-Nubo (Join-Path $unpacked "Nubo")
 
-          $silent = @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART")
-          $exitCode = Invoke-Program (Get-Item target/bundle/*-windows-x64-setup.exe).FullName $silent
-          if ($exitCode -ne 0) { throw "The installer exited with $exitCode" }
-          $installed = Join-Path $env:LOCALAPPDATA "Programs\Nubo"
-          Test-Nubo $installed
+          $msi = (Get-Item target/bundle/*-windows-x64.msi).FullName
+          # Windows Installer's own consistency checks (ICEs).
+          wix msi validate $msi
+          if ($LASTEXITCODE -ne 0) { throw "The MSI failed validation" }
 
-          # The uninstaller hands over to a copy of itself and returns at once.
-          $exitCode = Invoke-Program (Join-Path $installed "unins000.exe") $silent
-          if ($exitCode -ne 0) { throw "The uninstaller exited with $exitCode" }
-          for ($second = 0; (Test-Path (Join-Path $installed "nubo.exe")) -and $second -lt 60; $second++) {
-            Start-Sleep -Seconds 1
+          # Windows Installer's COM objects have no type information for
+          # PowerShell, so their members are called by name.
+          $installer = New-Object -ComObject WindowsInstaller.Installer
+          function Get-ComMember($object, $name, [object[]] $arguments = @()) {
+            $object.GetType().InvokeMember($name, [Reflection.BindingFlags]::GetProperty, $null, $object, $arguments)
           }
-          if (Test-Path (Join-Path $installed "nubo.exe")) { throw "The uninstaller left nubo.exe behind" }
+          function Get-MsiProperty($path, $name) {
+            $database = $installer.GetType().InvokeMember("OpenDatabase", [Reflection.BindingFlags]::InvokeMethod, $null, $installer, @($path, 0))
+            $view = $database.GetType().InvokeMember("OpenView", [Reflection.BindingFlags]::InvokeMethod, $null, $database, @("SELECT Value FROM Property WHERE Property = '$name'"))
+            $null = $view.GetType().InvokeMember("Execute", [Reflection.BindingFlags]::InvokeMethod, $null, $view, $null)
+            $record = $view.GetType().InvokeMember("Fetch", [Reflection.BindingFlags]::InvokeMethod, $null, $view, $null)
+            Get-ComMember $record "StringData" @(1)
+            # Lets go of the file before msiexec opens it.
+            $null = $view.GetType().InvokeMember("Close", [Reflection.BindingFlags]::InvokeMethod, $null, $view, $null)
+            foreach ($object in $record, $view, $database) {
+              $null = [Runtime.InteropServices.Marshal]::ReleaseComObject($object)
+            }
+          }
+
+          # The runner is an administrator, so installing here can't show
+          # whether players get an administrator prompt. The MSI's summary
+          # (its Word Count, property 15) says so instead: 8 means it needs
+          # no elevated rights, which a per-user package gets.
+          $summary = Get-ComMember $installer "SummaryInformation" @($msi, 0)
+          $wordCount = Get-ComMember $summary "Property" @(15)
+          $null = [Runtime.InteropServices.Marshal]::ReleaseComObject($summary)
+          if (($wordCount -band 8) -eq 0) { throw "The MSI asks for administrator rights (Word Count $wordCount)" }
+
+          # The installed Nubos, found by the UpgradeCode that every Nubo MSI
+          # shares.
+          $upgradeCode = Get-MsiProperty $msi "UpgradeCode"
+          # PowerShell unrolls the list of product codes into strings.
+          function Get-InstalledNubo {
+            foreach ($code in @(Get-ComMember $installer "RelatedProducts" @($upgradeCode))) {
+              [pscustomobject]@{
+                Code = $code
+                Version = Get-ComMember $installer "ProductInfo" @($code, "VersionString")
+                Name = Get-ComMember $installer "ProductInfo" @($code, "ProductName")
+              }
+            }
+          }
+
+          function Invoke-Msiexec($action, $target, [string[]] $properties = @()) {
+            $log = Join-Path $env:RUNNER_TEMP "msiexec.log"
+            $exitCode = Invoke-Program "msiexec.exe" (@($action, "`"$target`"", "/qn", "/l*v", "`"$log`"") + $properties)
+            if ($exitCode -ne 0) {
+              Get-Content $log -Tail 100
+              throw "msiexec $action $target $properties exited with $exitCode"
+            }
+          }
+
+          $installed = Join-Path $env:LOCALAPPDATA "Programs\Nubo"
+          $startMenuEntry = Join-Path ([Environment]::GetFolderPath("Programs")) "Nubo.lnk"
+          $desktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "Nubo.lnk"
+          function Test-OpenWith {
+            $null -ne (Get-ItemProperty "HKCU:\Software\Classes\.gb\OpenWithProgids" -Name "Nubo.Rom" -ErrorAction SilentlyContinue)
+          }
+
+          # Exactly one Nubo is installed, of this version and name, with
+          # these choices.
+          function Test-Installed($version, $name, $openWith, $desktop) {
+            $nubos = @(Get-InstalledNubo)
+            if ($nubos.Count -ne 1) { throw "Expected one installed Nubo, found $($nubos.Count): $($nubos | Out-String)" }
+            if ($nubos[0].Version -ne $version -or $nubos[0].Name -ne $name) {
+              throw "Expected $name $version installed, found $($nubos[0].Name) $($nubos[0].Version)"
+            }
+            if (-not (Test-Path (Join-Path $installed "nubo.exe"))) { throw "nubo.exe isn't installed" }
+            if (-not (Test-Path $startMenuEntry)) { throw "The Start menu entry is missing" }
+            if ((Test-OpenWith) -ne $openWith) { throw "Open with Nubo is $(Test-OpenWith), expected $openWith" }
+            if ((Test-Path $desktopShortcut) -ne $desktop) { throw "The desktop shortcut is $(Test-Path $desktopShortcut), expected $desktop" }
+          }
+
+          # Uninstalling leaves nothing of Nubo behind.
+          function Remove-Nubo {
+            foreach ($nubo in @(Get-InstalledNubo)) { Invoke-Msiexec "/x" $nubo.Code }
+            if (@(Get-InstalledNubo).Count -ne 0) { throw "Nubo is still installed" }
+            if (Test-Path $installed) { throw "Uninstalling left $installed behind" }
+            if (Test-Path $startMenuEntry) { throw "Uninstalling left the Start menu entry behind" }
+            if (Test-Path $desktopShortcut) { throw "Uninstalling left the desktop shortcut behind" }
+            if (Test-OpenWith) { throw "Uninstalling left Open with Nubo behind" }
+            if (Test-Path "HKCU:\Software\Classes\Nubo.Rom") { throw "Uninstalling left Nubo.Rom behind" }
+            if (Test-Path "HKCU:\Software\Nubo\Installer") { throw "Uninstalling left the saved choices behind" }
+          }
+
+          $version = Get-MsiProperty $msi "ProductVersion"
+          $name = Get-MsiProperty $msi "ProductName"
+
+          # A first install takes the defaults: Open with Nubo, no desktop
+          # shortcut.
+          Invoke-Msiexec "/i" $msi
+          Test-Installed $version $name $true $false
+          Test-Nubo $installed
+          Remove-Nubo
+
+          # An older and a newer Nubo (a nightly build), to update from and
+          # to, and to downgrade from.
+          $versions = Join-Path $env:RUNNER_TEMP "versions"
+          New-Item -ItemType Directory $versions | Out-Null
+          foreach ($options in @(@("--version", "0.0.1"), @("--version", "255.0.0", "--nightly", "2001-01-01"))) {
+            cargo xtask windows @options
+            if ($LASTEXITCODE -ne 0) { throw "cargo xtask windows $options failed" }
+          }
+          Move-Item target/bundle/Nubo-0.0.1-* $versions
+          Move-Item target/bundle/Nubo-nightly-2001-01-01-* $versions
+          $older = (Get-Item (Join-Path $versions "Nubo-0.0.1-windows-x64.msi")).FullName
+          $newer = (Get-Item (Join-Path $versions "Nubo-nightly-2001-01-01-windows-x64.msi")).FullName
+
+          # Choices given on the command line, then kept by updates without
+          # asking again.
+          Invoke-Msiexec "/i" $older @("ASSOCIATE_FILES=0", "DESKTOP_SHORTCUT=1")
+          Test-Installed "0.0.1" "Nubo" $false $true
+          Invoke-Msiexec "/i" $msi
+          Test-Installed $version $name $false $true
+          Invoke-Msiexec "/i" $newer
+          Test-Installed "255.0.0" "Nubo (nightly 2001-01-01)" $false $true
+
+          # A quiet downgrade goes ahead without asking, and a choice given
+          # on the command line still wins over the kept one.
+          Invoke-Msiexec "/i" $msi @("ASSOCIATE_FILES=1")
+          Test-Installed $version $name $true $true
+          Test-Nubo $installed
+          Remove-Nubo
 
       - name: Upload them
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-x64
           path: |
-            target/bundle/*-windows-x64-setup.exe
+            target/bundle/*-windows-x64.msi
             target/bundle/*-windows-x64.zip
           if-no-files-found: error

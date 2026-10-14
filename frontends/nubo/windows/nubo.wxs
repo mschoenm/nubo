@@ -1,0 +1,406 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Windows installer, an MSI built with WiX 7 by `cargo xtask windows`,
+  which passes the version, the names, the folder of files to install, the
+  icon and the banner as defines (-d).
+
+  It installs Nubo for the current user only (no administrator rights), in
+  %LOCALAPPDATA%\Programs\Nubo, with a Start menu entry. Windows Installer
+  itself uninstalls it, so there is no uninstaller program of Nubo's own.
+  Saves and settings live in %APPDATA%\Nubo and stay when Nubo is
+  uninstalled.
+
+  Every build replaces any installed Nubo, older, the same version (another
+  nightly build) or newer: a newer one only after a warning page, or without
+  asking in a quiet install. The two choices, "Open with Nubo" (on unless
+  chosen otherwise) and a desktop shortcut (off), are asked on the first
+  install, kept by updates and can be given on the command line as
+  ASSOCIATE_FILES=0/1 and DESKTOP_SHORTCUT=0/1.
+
+  The dialogs are Nubo's own rather than WiX's WixUI sets, so that the MSI
+  holds nothing but Nubo's files and this script.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <!-- The UpgradeCode identifies Nubo to Windows Installer: never change it,
+       or installers stop recognizing an installed Nubo. -->
+  <Package
+    Name="$(ProductName)"
+    Manufacturer="Michel Schoenmakers"
+    Version="$(Version)"
+    UpgradeCode="E2ACFD90-07AA-4CF7-AE5A-9BF10F8F49AD"
+    Scope="perUser"
+    Language="1033">
+    <SummaryInformation Description="$(ProductName)" />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="Nubo.ico" SourceFile="Nubo.ico" />
+    <Property Id="ARPPRODUCTICON" Value="Nubo.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/mschoenm/nubo" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/mschoenm/nubo/issues" />
+    <Property Id="ARPURLUPDATEINFO" Value="https://github.com/mschoenm/nubo/releases" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+    <Upgrade Id="E2ACFD90-07AA-4CF7-AE5A-9BF10F8F49AD">
+      <UpgradeVersion
+        Property="OLDERVERSIONFOUND"
+        Minimum="0.0.0"
+        IncludeMinimum="yes"
+        Maximum="$(Version)"
+        IncludeMaximum="yes"
+        MigrateFeatures="yes" />
+      <UpgradeVersion
+        Property="NEWERVERSIONFOUND"
+        Minimum="$(Version)"
+        IncludeMinimum="no"
+        MigrateFeatures="yes" />
+    </Upgrade>
+    <InstallExecuteSequence>
+      <RemoveExistingProducts After="InstallInitialize" />
+    </InstallExecuteSequence>
+
+    <!-- The choices the installed Nubo was installed with, and its version
+         for the update and downgrade pages. A choice given on the command
+         line wins, then the installed one, then the default. -->
+    <Property Id="SAVED_ASSOCIATE_FILES">
+      <RegistrySearch Root="HKCU" Key="Software\Nubo\Installer" Name="AssociateFiles" Type="raw" />
+    </Property>
+    <Property Id="SAVED_DESKTOP_SHORTCUT">
+      <RegistrySearch Root="HKCU" Key="Software\Nubo\Installer" Name="DesktopShortcut" Type="raw" />
+    </Property>
+    <Property Id="INSTALLED_VERSION">
+      <RegistrySearch Root="HKCU" Key="Software\Nubo\Installer" Name="Version" Type="raw" />
+    </Property>
+    <SetProperty
+      Action="RestoreAssociateFiles"
+      Id="ASSOCIATE_FILES"
+      Value="[SAVED_ASSOCIATE_FILES]"
+      After="AppSearch"
+      Sequence="both"
+      Condition="NOT ASSOCIATE_FILES AND SAVED_ASSOCIATE_FILES" />
+    <SetProperty
+      Action="DefaultAssociateFiles"
+      Id="ASSOCIATE_FILES"
+      Value="1"
+      After="RestoreAssociateFiles"
+      Sequence="both"
+      Condition="NOT ASSOCIATE_FILES" />
+    <SetProperty
+      Action="RestoreDesktopShortcut"
+      Id="DESKTOP_SHORTCUT"
+      Value="[SAVED_DESKTOP_SHORTCUT]"
+      After="DefaultAssociateFiles"
+      Sequence="both"
+      Condition="NOT DESKTOP_SHORTCUT AND SAVED_DESKTOP_SHORTCUT" />
+    <SetProperty
+      Action="DefaultDesktopShortcut"
+      Id="DESKTOP_SHORTCUT"
+      Value="0"
+      After="RestoreDesktopShortcut"
+      Sequence="both"
+      Condition="NOT DESKTOP_SHORTCUT" />
+
+    <!-- The checkboxes of the first page start as the choices above. -->
+    <SetProperty
+      Action="CheckAssociateFiles"
+      Id="ASSOCIATE_CHECKBOX"
+      Value="1"
+      After="DefaultDesktopShortcut"
+      Sequence="ui"
+      Condition="ASSOCIATE_FILES = &quot;1&quot;" />
+    <SetProperty
+      Action="CheckDesktopShortcut"
+      Id="DESKTOP_CHECKBOX"
+      Value="1"
+      After="CheckAssociateFiles"
+      Sequence="ui"
+      Condition="DESKTOP_SHORTCUT = &quot;1&quot;" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="LocalProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="Nubo" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Files in the user's profile are kept by a registry value rather
+         than a file, as Windows Installer wants for per-user installs. -->
+    <Feature Id="Nubo" Title="Nubo">
+      <Component Id="Program" Directory="INSTALLFOLDER" Guid="5AC27591-90DC-4D88-8326-25DCB8E88901">
+        <File Id="NuboExe" Source="nubo.exe" />
+        <File Id="License" Source="LICENSE.txt" />
+        <File Id="LicenseApache" Source="LICENSE-APACHE.txt" />
+        <File Id="Notice" Source="NOTICE.txt" />
+        <File Id="ThirdPartyLicenses" Source="THIRD_PARTY_LICENSES.txt" />
+        <RegistryValue Root="HKCU" Key="Software\Nubo\Installer" Name="Version" Value="$(VersionText)" Type="string" KeyPath="yes" />
+        <RegistryValue Root="HKCU" Key="Software\Nubo\Installer" Name="AssociateFiles" Value="[ASSOCIATE_FILES]" Type="string" />
+        <RegistryValue Root="HKCU" Key="Software\Nubo\Installer" Name="DesktopShortcut" Value="[DESKTOP_SHORTCUT]" Type="string" />
+        <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+        <RemoveFolder Id="RemoveLocalProgramsFolder" Directory="LocalProgramsFolder" On="uninstall" />
+      </Component>
+
+      <Component Id="StartMenuShortcut" Directory="ProgramMenuFolder">
+        <Shortcut Id="StartMenuShortcut" Name="Nubo" Target="[#NuboExe]" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="Software\Nubo\Installer" Name="StartMenuEntryCreated" Value="1" Type="integer" KeyPath="yes" />
+      </Component>
+
+      <Component Id="DesktopShortcut" Directory="DesktopFolder" Condition="DESKTOP_SHORTCUT = &quot;1&quot;">
+        <Shortcut Id="DesktopShortcut" Name="Nubo" Target="[#NuboExe]" WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="Software\Nubo\Installer" Name="DesktopShortcutCreated" Value="1" Type="integer" KeyPath="yes" />
+      </Component>
+
+      <!-- Offers Nubo in "Open with" for ROMs. Windows asks the player which
+           app to use the first time, so this never takes the files away from
+           another app. -->
+      <Component Id="OpenWith" Directory="INSTALLFOLDER" Condition="ASSOCIATE_FILES = &quot;1&quot;">
+        <RegistryValue Root="HKCU" Key="Software\Classes\Nubo.Rom" Value="Game Boy game" Type="string" KeyPath="yes" />
+        <RegistryValue Root="HKCU" Key="Software\Classes\Nubo.Rom\DefaultIcon" Value="[#NuboExe],0" Type="string" />
+        <RegistryValue Root="HKCU" Key="Software\Classes\Nubo.Rom\shell\open\command" Value="&quot;[#NuboExe]&quot; &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKCU" Key="Software\Classes\.gb\OpenWithProgids" Name="Nubo.Rom" Value="" Type="string" />
+        <RegistryValue Root="HKCU" Key="Software\Classes\.gbc\OpenWithProgids" Name="Nubo.Rom" Value="" Type="string" />
+      </Component>
+    </Feature>
+
+    <!-- Started by the last page's Finish button when its checkbox is
+         checked. Quiet installs show no pages, so they never start Nubo. -->
+    <Property Id="LAUNCH_NUBO" Value="1" />
+    <CustomAction Id="LaunchNubo" Directory="INSTALLFOLDER" ExeCommand="&quot;[#NuboExe]&quot;" Return="asyncNoWait" />
+
+    <UI Id="NuboUI">
+      <TextStyle Id="NuboNormal" FaceName="Segoe UI" Size="9" />
+      <TextStyle Id="NuboTitle" FaceName="Segoe UI" Size="9" Bold="yes" />
+      <Property Id="DefaultUIFont" Value="NuboNormal" />
+      <Property Id="ErrorDialog" Value="ErrorDlg" />
+      <Binary Id="NuboBanner" SourceFile="Banner.bmp" />
+
+      <InstallUISequence>
+        <Show Dialog="InstallDlg" Before="ProgressDlg" Condition="NOT Installed AND NOT OLDERVERSIONFOUND AND NOT NEWERVERSIONFOUND" />
+        <Show Dialog="UpdateDlg" Before="ProgressDlg" Condition="NOT Installed AND OLDERVERSIONFOUND AND NOT NEWERVERSIONFOUND" />
+        <Show Dialog="DowngradeDlg" Before="ProgressDlg" Condition="NOT Installed AND NEWERVERSIONFOUND" />
+        <Show Dialog="MaintenanceDlg" Before="ProgressDlg" Condition="Installed AND NOT RESUME AND NOT Preselected" />
+        <Show Dialog="ProgressDlg" Before="ExecuteAction" />
+        <Show Dialog="ExitDlg" OnExit="success" />
+        <Show Dialog="UserExitDlg" OnExit="cancel" />
+        <Show Dialog="FatalErrorDlg" OnExit="error" />
+      </InstallUISequence>
+
+      <!-- An administrative install (msiexec /a) only unpacks the files;
+           it shows the same last pages. -->
+      <AdminUISequence>
+        <Show Dialog="ExitDlg" OnExit="success" />
+        <Show Dialog="UserExitDlg" OnExit="cancel" />
+        <Show Dialog="FatalErrorDlg" OnExit="error" />
+      </AdminUISequence>
+
+      <Dialog Id="InstallDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Banner" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="NuboBanner" />
+        <Control Id="Title" Type="Text" X="15" Y="8" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\NuboTitle}Install Nubo" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Nubo $(VersionText), for your user only." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="Text" Type="Text" X="25" Y="60" Width="320" Height="40" NoPrefix="yes" Text="Nubo will be installed in [INSTALLFOLDER]. No administrator rights are needed." />
+        <Control Id="AssociateCheckBox" Type="CheckBox" X="25" Y="105" Width="320" Height="17" Property="ASSOCIATE_CHECKBOX" CheckBoxValue="1" Text="Open Game Boy games (.gb and .gbc files) with Nubo" />
+        <Control Id="DesktopCheckBox" Type="CheckBox" X="25" Y="125" Width="320" Height="17" Property="DESKTOP_CHECKBOX" CheckBoxValue="1" Text="Create a desktop shortcut" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Disabled="yes" Text="&amp;Back" />
+        <Control Id="Install" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="&amp;Install">
+          <Publish Property="ASSOCIATE_FILES" Value="1" Condition="ASSOCIATE_CHECKBOX" Order="1" />
+          <Publish Property="ASSOCIATE_FILES" Value="0" Condition="NOT ASSOCIATE_CHECKBOX" Order="2" />
+          <Publish Property="DESKTOP_SHORTCUT" Value="1" Condition="DESKTOP_CHECKBOX" Order="3" />
+          <Publish Property="DESKTOP_SHORTCUT" Value="0" Condition="NOT DESKTOP_CHECKBOX" Order="4" />
+          <Publish Event="EndDialog" Value="Return" Order="5" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <Dialog Id="UpdateDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Banner" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="NuboBanner" />
+        <Control Id="Title" Type="Text" X="15" Y="8" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\NuboTitle}Update Nubo" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="This installer updates the Nubo you have installed." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="Text" Type="Text" X="25" Y="60" Width="320" Height="60" NoPrefix="yes" Text="Nubo [INSTALLED_VERSION] is installed. Installing replaces it with Nubo $(VersionText).&#xD;&#xA;&#xD;&#xA;Your battery saves, save states and settings are kept, and so are your choices for opening games with Nubo and the desktop shortcut." />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Disabled="yes" Text="&amp;Back" />
+        <Control Id="Update" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="&amp;Update">
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <Dialog Id="DowngradeDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Banner" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="NuboBanner" />
+        <Control Id="Title" Type="Text" X="15" Y="8" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\NuboTitle}Older version of Nubo" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="This installer replaces a newer Nubo." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="Text" Type="Text" X="25" Y="60" Width="320" Height="30" NoPrefix="yes" Text="Nubo [INSTALLED_VERSION] is installed, which is newer than this installer ($(VersionText)). Installing replaces it with the older version." />
+        <Control Id="Saves" Type="Text" X="25" Y="95" Width="320" Height="15" NoPrefix="yes" Text="•  Your battery saves and save states are kept." />
+        <Control Id="Settings" Type="Text" X="25" Y="112" Width="320" Height="15" NoPrefix="yes" Text="•  Settings that only the newer version has may be reset." />
+        <Control Id="States" Type="Text" X="25" Y="129" Width="320" Height="25" NoPrefix="yes" Text="•  Save states made with the newer version may not load, or may play differently." />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="166" Y="243" Width="56" Height="17" Disabled="yes" Text="&amp;Back" />
+        <Control Id="Install" Type="PushButton" X="222" Y="243" Width="76" Height="17" Text="&amp;Install $(Version)">
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Default="yes" Cancel="yes" Text="Cancel">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <!-- Running the installer of the Nubo that is installed. -->
+      <Dialog Id="MaintenanceDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Banner" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="NuboBanner" />
+        <Control Id="Title" Type="Text" X="15" Y="8" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\NuboTitle}Nubo is installed" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Nubo $(VersionText) is already installed." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="Text" Type="Text" X="25" Y="60" Width="320" Height="45" NoPrefix="yes" Text="Repair puts back Nubo's files and Start menu entry. Remove uninstalls Nubo; your battery saves, save states and settings stay in [AppDataFolder]Nubo." />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Repair" Type="PushButton" X="168" Y="243" Width="64" Height="17" Text="&amp;Repair">
+          <Publish Property="NUBO_MAINTENANCE" Value="Repair" Order="1" />
+          <Publish Event="Reinstall" Value="All" Order="2" />
+          <Publish Event="ReinstallMode" Value="ecmus" Order="3" />
+          <Publish Event="EndDialog" Value="Return" Order="4" />
+        </Control>
+        <Control Id="Remove" Type="PushButton" X="236" Y="243" Width="64" Height="17" Text="Re&amp;move">
+          <Publish Property="NUBO_MAINTENANCE" Value="Remove" Order="1" />
+          <Publish Event="Remove" Value="All" Order="2" />
+          <Publish Event="EndDialog" Value="Return" Order="3" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Default="yes" Cancel="yes" Text="Cancel">
+          <Publish Event="EndDialog" Value="Exit" />
+        </Control>
+      </Dialog>
+
+      <Dialog Id="ProgressDlg" Width="370" Height="270" Title="[ProductName] Setup" Modeless="yes">
+        <Control Id="Banner" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="NuboBanner" />
+        <Control Id="InstallingTitle" Type="Text" X="15" Y="8" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="NOT Installed" Text="{\NuboTitle}Installing Nubo" />
+        <Control Id="RepairingTitle" Type="Text" X="15" Y="8" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="Installed AND NUBO_MAINTENANCE = &quot;Repair&quot;" Text="{\NuboTitle}Repairing Nubo" />
+        <Control Id="RemovingTitle" Type="Text" X="15" Y="8" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Hidden="yes" ShowCondition="Installed AND NUBO_MAINTENANCE &lt;&gt; &quot;Repair&quot;" Text="{\NuboTitle}Removing Nubo" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="This takes a few moments." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="ActionText" Type="Text" X="25" Y="70" Width="320" Height="15" NoPrefix="yes">
+          <Subscribe Event="ActionText" Attribute="Text" />
+        </Control>
+        <Control Id="ProgressBar" Type="ProgressBar" X="25" Y="90" Width="320" Height="10" ProgressBlocks="yes" Text="Progress done">
+          <Subscribe Event="SetProgress" Attribute="Progress" />
+        </Control>
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Disabled="yes" Text="&amp;Back" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Disabled="yes" Text="&amp;Next" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Default="yes" Cancel="yes" Text="Cancel">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <Dialog Id="ExitDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Banner" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="NuboBanner" />
+        <Control Id="Title" Type="Text" X="15" Y="8" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\NuboTitle}Done" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="InstalledText" Type="Text" X="25" Y="60" Width="320" Height="30" NoPrefix="yes" Hidden="yes" ShowCondition="NOT Installed" Text="Nubo $(VersionText) is installed. You find it in the Start menu." />
+        <Control Id="RepairedText" Type="Text" X="25" Y="60" Width="320" Height="30" NoPrefix="yes" Hidden="yes" ShowCondition="Installed AND NUBO_MAINTENANCE = &quot;Repair&quot;" Text="Nubo has been repaired." />
+        <Control Id="RemovedText" Type="Text" X="25" Y="60" Width="320" Height="30" NoPrefix="yes" Hidden="yes" ShowCondition="Installed AND NUBO_MAINTENANCE &lt;&gt; &quot;Repair&quot;" Text="Nubo has been removed. Your battery saves, save states and settings stay in [AppDataFolder]Nubo." />
+        <Control Id="LaunchCheckBox" Type="CheckBox" X="25" Y="100" Width="320" Height="17" Property="LAUNCH_NUBO" CheckBoxValue="1" Hidden="yes" ShowCondition="NOT Installed" Text="Launch Nubo" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Disabled="yes" Text="&amp;Back" />
+        <Control Id="Finish" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Cancel="yes" Text="&amp;Finish">
+          <Publish Event="DoAction" Value="LaunchNubo" Condition="LAUNCH_NUBO AND NOT Installed" Order="1" />
+          <Publish Event="EndDialog" Value="Return" Order="2" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Disabled="yes" Text="Cancel" />
+      </Dialog>
+
+      <Dialog Id="UserExitDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Banner" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="NuboBanner" />
+        <Control Id="Title" Type="Text" X="15" Y="8" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\NuboTitle}Setup cancelled" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="Text" Type="Text" X="25" Y="60" Width="320" Height="30" NoPrefix="yes" Text="Nothing was changed. Run the installer again to install Nubo later." />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Disabled="yes" Text="&amp;Back" />
+        <Control Id="Finish" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Cancel="yes" Text="&amp;Finish">
+          <Publish Event="EndDialog" Value="Exit" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Disabled="yes" Text="Cancel" />
+      </Dialog>
+
+      <Dialog Id="FatalErrorDlg" Width="370" Height="270" Title="[ProductName] Setup">
+        <Control Id="Banner" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="NuboBanner" />
+        <Control Id="Title" Type="Text" X="15" Y="8" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="{\NuboTitle}Setup failed" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="Text" Type="Text" X="25" Y="60" Width="320" Height="45" NoPrefix="yes" Text="Nubo couldn't be installed because of an error, and nothing was changed. To find out why, run the installer from a command prompt with msiexec /i and /l*v setup.log, which writes what happened to setup.log." />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Disabled="yes" Text="&amp;Back" />
+        <Control Id="Finish" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Cancel="yes" Text="&amp;Finish">
+          <Publish Event="EndDialog" Value="Exit" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Disabled="yes" Text="Cancel" />
+      </Dialog>
+
+      <Dialog Id="CancelDlg" Width="260" Height="85" Title="[ProductName] Setup" NoMinimize="yes">
+        <Control Id="Text" Type="Text" X="15" Y="15" Width="230" Height="30" NoPrefix="yes" Text="Are you sure you want to cancel the Nubo setup?" />
+        <Control Id="Yes" Type="PushButton" X="72" Y="57" Width="56" Height="17" Text="&amp;Yes">
+          <Publish Event="EndDialog" Value="Exit" />
+        </Control>
+        <Control Id="No" Type="PushButton" X="132" Y="57" Width="56" Height="17" Default="yes" Cancel="yes" Text="&amp;No">
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+      </Dialog>
+
+      <!-- Windows Installer shows this when Nubo is running while it is
+           updated or removed, and closes it when the player continues. -->
+      <Dialog Id="MsiRMFilesInUse" Width="300" Height="160" Title="[ProductName] Setup" KeepModeless="yes">
+        <Control Id="Text" Type="Text" X="15" Y="12" Width="270" Height="30" NoPrefix="yes" Text="Nubo is running. Setup closes it to continue." />
+        <Control Id="List" Type="ListBox" X="15" Y="45" Width="270" Height="70" Property="FileInUseProcess" Sunken="yes" Sorted="yes" TabSkip="yes" />
+        <Control Id="Continue" Type="PushButton" X="160" Y="132" Width="64" Height="17" Default="yes" Text="&amp;Close Nubo">
+          <Publish Event="RMShutdownAndRestart" Value="0" Order="1" />
+          <Publish Event="EndDialog" Value="Return" Order="2" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="229" Y="132" Width="56" Height="17" Cancel="yes" Text="Cancel">
+          <Publish Event="EndDialog" Value="Exit" />
+        </Control>
+      </Dialog>
+
+      <!-- What Windows Installer shows instead when it can't close Nubo
+           itself. -->
+      <Dialog Id="FilesInUse" Width="300" Height="160" Title="[ProductName] Setup" KeepModeless="yes">
+        <Control Id="Text" Type="Text" X="15" Y="12" Width="270" Height="30" NoPrefix="yes" Text="Nubo is running. Close it, then choose Retry." />
+        <Control Id="List" Type="ListBox" X="15" Y="45" Width="270" Height="70" Property="FileInUseProcess" Sunken="yes" Sorted="yes" TabSkip="yes" />
+        <Control Id="Retry" Type="PushButton" X="96" Y="132" Width="56" Height="17" Default="yes" Text="&amp;Retry">
+          <Publish Event="EndDialog" Value="Retry" />
+        </Control>
+        <Control Id="Ignore" Type="PushButton" X="162" Y="132" Width="56" Height="17" Text="&amp;Ignore">
+          <Publish Event="EndDialog" Value="Ignore" />
+        </Control>
+        <Control Id="Exit" Type="PushButton" X="229" Y="132" Width="56" Height="17" Cancel="yes" Text="Cancel">
+          <Publish Event="EndDialog" Value="Exit" />
+        </Control>
+      </Dialog>
+
+      <!-- Windows Installer's own messages; it shows only the buttons a
+           message needs. -->
+      <Dialog Id="ErrorDlg" Width="270" Height="105" Title="[ProductName] Setup" ErrorDialog="yes">
+        <Control Id="ErrorText" Type="Text" X="15" Y="15" Width="240" Height="60" TabSkip="no" NoPrefix="yes" Text="Information text" />
+        <Control Id="Y" Type="PushButton" X="100" Y="80" Width="56" Height="17" TabSkip="yes" Text="&amp;Yes">
+          <Publish Event="EndDialog" Value="ErrorYes" />
+        </Control>
+        <Control Id="A" Type="PushButton" X="100" Y="80" Width="56" Height="17" TabSkip="yes" Text="Cancel">
+          <Publish Event="EndDialog" Value="ErrorAbort" />
+        </Control>
+        <Control Id="C" Type="PushButton" X="100" Y="80" Width="56" Height="17" TabSkip="yes" Text="Cancel">
+          <Publish Event="EndDialog" Value="ErrorCancel" />
+        </Control>
+        <Control Id="I" Type="PushButton" X="100" Y="80" Width="56" Height="17" TabSkip="yes" Text="&amp;Ignore">
+          <Publish Event="EndDialog" Value="ErrorIgnore" />
+        </Control>
+        <Control Id="N" Type="PushButton" X="100" Y="80" Width="56" Height="17" TabSkip="yes" Text="&amp;No">
+          <Publish Event="EndDialog" Value="ErrorNo" />
+        </Control>
+        <Control Id="O" Type="PushButton" X="100" Y="80" Width="56" Height="17" TabSkip="yes" Text="OK">
+          <Publish Event="EndDialog" Value="ErrorOk" />
+        </Control>
+        <Control Id="R" Type="PushButton" X="100" Y="80" Width="56" Height="17" TabSkip="yes" Text="&amp;Retry">
+          <Publish Event="EndDialog" Value="ErrorRetry" />
+        </Control>
+      </Dialog>
+    </UI>
+  </Package>
+</Wix>

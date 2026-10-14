@@ -12,7 +12,7 @@ Nubo is a cycle-accurate Game Boy emulator written in Rust. It runs as a native 
 
 | Platform | Download |
 | -------- | -------- |
-| Windows | [Installer](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64-setup.exe) · [Zip](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.zip) (runs without installing) |
+| Windows | [Installer](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.msi) · [Zip](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.zip) (runs without installing) |
 | Linux | [Flatpak for x86_64](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-x86_64.flatpak) (most PCs) · [Flatpak for ARM](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-aarch64.flatpak) |
 | macOS | Not available yet; build `Nubo.app` with `cargo xtask bundle` (see [Desktop App](#desktop-app)) |
 | Browser | [Play in the browser](https://mschoenm.github.io/nubo/) |
@@ -52,7 +52,7 @@ cargo play path/to/rom.gb --scale 2 --fresh --speed 4  # Only the screen at 2×,
 cargo xtask web                     # Build the app for the browser and serve it at http://127.0.0.1:8080
 cargo xtask bundle                  # Build Nubo.app with its icon into target/bundle/ (macOS)
 cargo xtask flatpak                 # Build the app as a Flatpak, install it for your user and write a .flatpak file into target/bundle/
-cargo xtask windows                 # Build the Windows installer and a zip into target/bundle/ (Windows, needs Inno Setup 6)
+cargo xtask windows                 # Build the Windows installer (an MSI) and a zip into target/bundle/ (Windows, needs the WiX Toolset)
 cargo screenshot path/to/rom.gb 10  # Run headless for 10 emulated seconds and save a screenshot to target/screenshots/
 cargo test                          # Run the test suite
 cargo test-roms                     # Download and run the test ROM suites
@@ -64,7 +64,7 @@ On Linux, audio and controller support need the ALSA and udev development files,
 
 The app lives in the `frontends/nubo` folder and draws with [Iced](https://iced.rs); everything it does besides drawing (settings, saves, the library, running a game) is in `crates/nubo-frontend`, next to the emulator in `crates/nubo-core`, and the developer tools (the test ROM runner, the benchmark and the others) are in `tools/`. Add your ROM folders under Settings > Library to fill the library, or open a single ROM. Everything it keeps (settings, the library, in-game saves, save states, cheats and pictures) goes in the user's data folder: `~/Library/Application Support/Nubo` on macOS, `%APPDATA%\Nubo` on Windows and `~/.local/share/nubo` (or `$XDG_DATA_HOME/nubo`) on Linux, with settings in `~/.config/nubo` on Linux.
 
-On Windows, `cargo xtask windows` builds `Nubo-<version>-windows-x64-setup.exe` in `target/bundle/`, which installs Nubo for your user (no administrator rights) with a Start menu entry and an uninstaller, and can offer Nubo for opening `.gb` and `.gbc` files, plus a zip of the same files to run Nubo without installing. It needs [Inno Setup 6](https://jrsoftware.org/isinfo.php). Each release has both files (as `Nubo-windows-x64-setup.exe` and `Nubo-windows-x64.zip`), and so does the `nightly` pre-release. They aren't signed yet, so Windows SmartScreen may warn the first time: choose More info and then Run anyway.
+On Windows, `cargo xtask windows` builds `Nubo-<version>-windows-x64.msi` in `target/bundle/`, which installs Nubo for your user (no administrator rights) with a Start menu entry, and can offer Nubo for opening `.gb` and `.gbc` files and add a desktop shortcut, plus a zip of the same files to run Nubo without installing. Running it over an installed Nubo updates it, keeping those choices; over a newer one it warns before going back. Nubo is uninstalled from Settings > Apps, like any app. It needs the [WiX Toolset](https://wixtoolset.org) (`dotnet tool install --global wix`, then `wix eula accept wix7` to accept its license; Nubo owes no fee). Each release has both files (as `Nubo-windows-x64.msi` and `Nubo-windows-x64.zip`), and so does the `nightly` pre-release, whose installed app shows as "Nubo (nightly <date>)". They aren't signed yet, so Windows SmartScreen may warn the first time: choose More info and then Run anyway. To install from a script or the command line, without any questions and without starting Nubo afterwards, run `msiexec /i Nubo-windows-x64.msi /qn`, adding `ASSOCIATE_FILES=0` (don't offer Nubo for ROMs) or `DESKTOP_SHORTCUT=1` (add a desktop shortcut) to choose; `/passive` shows only a progress bar.
 
 On macOS, `cargo xtask bundle` builds `Nubo.app` in `target/bundle/`, with its own icon in the Dock. Drag it to the Applications folder to install it.
 

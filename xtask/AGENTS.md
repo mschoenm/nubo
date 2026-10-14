@@ -11,7 +11,7 @@ cargo xtask build-web --quick # Much faster to build, bigger and slower to run (
 # Packages and the logo
 cargo xtask bundle            # Nubo.app into target/bundle/ (macOS)
 cargo xtask flatpak           # Build, install for this user and export target/bundle/Nubo-<version>-linux-<arch>.flatpak (Linux, needs flatpak-builder)
-cargo xtask windows           # The installer and a zip into target/bundle/ (Windows, needs Inno Setup 6)
+cargo xtask windows           # The installer (an MSI) and a zip into target/bundle/ (Windows, needs the WiX Toolset); --nightly <date> names them as a nightly build
 cargo xtask libretro          # The RetroArch core's zip into target/bundle/ (Linux, Windows; universal on macOS)
 cargo xtask icon <path.png|path.svg|path.ico>   # Write the logo (images/icon.png and images/icon.svg in the README)
 cargo xtask licenses <folder> # LICENSE, NOTICE and every crate's license for the desktop app
@@ -35,7 +35,7 @@ cargo xtask shootout-scoreboard <commit>   # Read its gh-pages branch at <commit
 
 - `wasm-bindgen` and `wasm-bindgen-cli-support` are pinned to the same exact version in the root `Cargo.toml`; upgrade them together.
 - The Flatpak is built with the freedesktop SDK's Rust and Flathub's newest runtime, as Flathub would build it; when either moves on, `rust-version` in the root `Cargo.toml` and `RUNTIME_VERSION` in `flatpak.rs` are raised by hand (see `docs/CI.md`).
-- `APP_ID` (`io.github.mschoenm.nubo`) names the Linux files, the macOS bundle and the window; the Windows installer's `AppId` in `frontends/nubo/windows/nubo.iss` must never change.
+- `APP_ID` (`io.github.mschoenm.nubo`) names the Linux files, the macOS bundle and the window; the Windows installer's `UpgradeCode` in `frontends/nubo/windows/nubo.wxs` must never change.
 - Every package carries `LICENSE`, `LICENSE-APACHE`, `NOTICE` and `THIRD_PARTY_LICENSES.txt`; the licenses task fails when a crate has no license text it can use.
 - The RetroArch core's zip (`libretro.rs`) holds the core under the file name RetroArch looks for, `nubo_libretro.<so|dll|dylib>`, next to `nubo_libretro.info`; `.github/workflows/libretro.yml` builds it on every platform for the nightly build and releases.
 - The other emulators of `compare-emulators` are only built and run locally, never distributed or ported from (Gambatte is GPL-2.0-only).

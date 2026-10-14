@@ -88,7 +88,7 @@ Everything below about the Shootout was read from its repository,
 What already works:
 
 - Releases have a Windows zip, `Nubo-windows-x64.zip`. It unpacks into a `Nubo` folder, so the program
-  is `Nubo/nubo.exe` (`xtask/src/windows.rs`). The release also has `Nubo-windows-x64-setup.exe`, which
+  is `Nubo/nubo.exe` (`xtask/src/windows.rs`). The release also has `Nubo-windows-x64.msi`, which
   `downloadGithubRelease`'s default filter (`"win" in name`) would match too, so the harness class
   must filter on the zip's name.
 - `nubo.exe <rom> --model dmg|cgb` (`frontends/nubo/src/main.rs`, `parse_args`). `dmg` is `Model::Dmg`

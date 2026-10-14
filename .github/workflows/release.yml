@@ -91,7 +91,7 @@ jobs:
           for arch in x86_64 aarch64; do
             cp artifacts/flatpak-$arch/*.flatpak "upload/Nubo-linux-$arch.flatpak"
           done
-          cp artifacts/windows-x64/*-setup.exe upload/Nubo-windows-x64-setup.exe
+          cp artifacts/windows-x64/*.msi upload/Nubo-windows-x64.msi
           cp artifacts/windows-x64/*.zip upload/Nubo-windows-x64.zip
           for platform in linux-x86_64 linux-aarch64 windows-x64 macos-universal; do
             cp artifacts/libretro-$platform/*.zip "upload/Nubo-libretro-$platform.zip"
