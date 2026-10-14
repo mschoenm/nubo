@@ -190,6 +190,23 @@ fn games_taken_off_or_forgotten_during_a_scan_stay_that_way() {
     assert_eq!(merged, [taken_off]);
 }
 
+#[test]
+fn a_game_forgotten_while_a_scan_finds_it_in_a_new_folder_stays_among_all_games() {
+    let mut found_in_folder = LibraryEntry::example("/games/Mario.gb");
+    found_in_folder.last_played = Some(2_000);
+    let checked = std::collections::HashSet::from([found_in_folder.path.clone()]);
+
+    let merged = merge_scan(&[], vec![found_in_folder.clone()], &checked);
+
+    assert_eq!(
+        merged,
+        [LibraryEntry {
+            last_played: None,
+            ..found_in_folder
+        }]
+    );
+}
+
 /// A library kept in a new temporary folder, with one game in a library
 /// folder and one opened from elsewhere, both played.
 #[cfg(feature = "desktop")]

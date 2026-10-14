@@ -626,7 +626,9 @@ pub enum WatchEvent {
 /// it, and games taken off the recently played ones stay off), games
 /// started for the first time while the scan ran (so not among the
 /// `checked` games it knew about) are kept, and games forgotten while it
-/// ran stay forgotten. Games it checked and left out are gone.
+/// ran stay forgotten, unless the scan found them in a library folder (one
+/// added while it ran): those stay among all games, without a play time.
+/// Games it checked and left out are gone.
 fn merge_scan(
     current: &[LibraryEntry],
     mut scanned: Vec<LibraryEntry>,
@@ -642,7 +644,10 @@ fn merge_scan(
             entry.last_played = current.last_played;
             true
         }
-        None => !checked.contains(&entry.path),
+        None => {
+            entry.last_played = None;
+            entry.in_folder || !checked.contains(&entry.path)
+        }
     });
 
     for entry in current {
