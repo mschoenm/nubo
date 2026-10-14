@@ -124,9 +124,9 @@ impl Session {
 
     /// Emulates the frames that have come due by the screen's latest
     /// refresh, and writes battery saves once they stop changing. The app
-    /// calls it on each frame tick. When the screen refreshed comes from the
-    /// session's own clock (see `refresh_clock.rs`), not from the app,
-    /// whose ticks come too unevenly. To fast forward, it emulates the
+    /// calls it on each frame tick. The time of the screen's latest refresh
+    /// comes from the session's own clock (see `refresh_clock.rs`), not from
+    /// the app's ticks, which come too unevenly. To fast forward, it emulates the
     /// speed's multiplier of frames for every one due, and only plays the
     /// sound of the last.
     pub fn run_due_frames(&mut self) {

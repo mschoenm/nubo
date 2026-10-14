@@ -64,7 +64,7 @@ pub fn library_changes(_folders: &[LibraryFolder]) -> Subscription<WatchEvent> {
 }
 
 /// Produces an item whenever the running game's emulator finishes a new
-/// frame (see `Session::frame_listener`). Each game session is a
+/// frame (see `GameSession::frame_listener`). Each game session is a
 /// subscription of its own.
 ///
 /// The session calls back on the emulator thread for each new frame, and

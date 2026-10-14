@@ -1,5 +1,6 @@
-//! Sound output with cpal: the desktop's sound with the `desktop` feature,
-//! the browser's (WebAudio) with the `web` feature. Samples wait in a queue that the sound card's
+//! Sound output with cpal: the sound card's on the desktop, WebAudio in the
+//! browser build (cpal picks its backend by the target, and the `desktop` or
+//! `web` feature brings cpal). Samples wait in a queue that the sound card's
 //! callback drains; the emulator watches the queue's length to know when to
 //! produce more, which keeps emulation running at real-time speed. On the
 //! desktop the callback also wakes the emulator thread when the queue runs

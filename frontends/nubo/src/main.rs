@@ -1,6 +1,7 @@
 //! Desktop frontend built with Iced. The game runs in
 //! `nubo_frontend::session` (on a thread of its own on the desktop, on each
-//! frame tick in the browser build) and the window shows the latest frame. Run it with `cargo play [rom] [--cgb] [--model <name>]`.
+//! frame tick in the browser build) and the window shows the latest frame.
+//! Run it with `cargo play [rom] [--cgb] [--model <name>]`.
 
 // Release builds are Windows apps rather than console programs, so no empty
 // console window opens next to Nubo. Debug builds keep the console for
