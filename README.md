@@ -58,7 +58,7 @@ Point it at your ROM folder and your games appear in a library with their title 
 <table>
   <tr>
     <td align="center"><img src="images/screenshots/big2small.png" width="400" alt="Big2Small's colorful forest map"><br><sub>Big2Small, a Game Boy Color puzzle adventure</sub></td>
-    <td align="center"><img src="images/screenshots/rebound.png" width="400" alt="Rebound, a blue blob on grassy steps under a blue sky, with coins"><br><sub>Rebound, a Game Boy Color platformer</sub></td>
+    <td align="center"><img src="images/screenshots/rebound.png" width="400" alt="Rebound, a blue blob jumping toward a row of coins over grassy hills"><br><sub>Rebound, a Game Boy Color platformer</sub></td>
   </tr>
   <tr>
     <td align="center"><img src="images/screenshots/moki.png" width="400" alt="Moki the Monster Kid waking up in a warm orange bedroom"><br><sub>Moki the Monster Kid, a Game Boy Color adventure</sub></td>
