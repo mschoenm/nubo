@@ -310,7 +310,7 @@ pub(crate) struct Standing {
 }
 
 impl fmt::Display for Standing {
-    /// The line the nightly run reads, such as `shootout  250/264  rank 4
+    /// The line the nightly run reads, such as `shootout  251/264  rank 2
     /// leader DocBoy 255  published 2026-06-04 72fd745`.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
