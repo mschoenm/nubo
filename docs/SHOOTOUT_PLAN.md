@@ -8,7 +8,8 @@ of Phase 1 (measuring other emulators on the same tests).
 The work has five parts:
 
 - Parts 1 and 2 can be done in a cloud session.
-- Part 3 needs a Windows PC and is done by the maintainer.
+- Part 3 needs a Windows PC and is done by the maintainer. **Done** with 0.6.0: all 261 tests
+  the harness judges pass (see "What Part 3 found").
 - Part 4 is a pull request to another project's repository. It waits until Nubo would land at the top
   of the published table (Part 5 shows where it stands), until the maintainer has reviewed Nubo
   themselves and the app (its UI above all) is ready to go public, and then for the maintainer's go.
@@ -18,9 +19,9 @@ The work has five parts:
   first, right after steps 1 and 2 of [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md). **Done**: Nubo passes
   261 of the 264 published tests, which would rank it first, ahead of DocBoy's 255: 258 since it draws
   evenly spaced grays (see "What Part 5 found"), and the three Super Game Boy tests since it emulates
-  the Super Game Boy (`crates/nubo-core/src/sgb.rs`). The other three only report information. Parts 1 to 3 follow
-  once the restructuring is finished. **Part 1 is built** (see "What Part 1 found"); it waits for the
-  maintainer's check on Windows and a release. That plan's "Order and dependencies" has the whole order the
+  the Super Game Boy (`crates/nubo-core/src/sgb.rs`). The other three only report information. Parts 1 to 3 followed
+  once the restructuring was finished, and are done: Part 1's options shipped in 0.6.0, and Part 3's run
+  on Windows confirmed the 261 with that release. That plan's "Order and dependencies" has the whole order the
   maintainer agreed to.
 
 ## Where the code lives
@@ -207,7 +208,8 @@ the build differs from the steps above, and what was checked:
   included, which used to be ignored. With `--scale`, a ROM that can't be read or started stops the
   app with exit code 1 before the window opens, since the window has nowhere to show why.
 
-Still to do: the maintainer's check of the window on Windows (above), then a release.
+Checked on Windows with 0.6.0 in Part 3: at 100% display scaling the inside of the window is
+exactly 160×144 (the harness's `--get-startuptime` compares it pixel for pixel).
 
 **Done when:** the three options are merged and documented, and a screenshot taken by hand shows a
 160×144 window with only the game in it.
@@ -231,8 +233,10 @@ Part 5 is built, `cargo test-roms` does this properly and the dry run is no long
 This is the Shootout's `emulators/nubo.py`, ready to copy into a clone of the Shootout for Part 3.
 It was checked on 2026-10-14 against the options as merged (`frontends/nubo/src/command_line.rs`) and
 against the Shootout's `main` at `38b926b`, still its newest commit then: `downloadGithubRelease` takes
-`filter` and `require_asset`, and the window title still ends with "Nubo". Calibrate `startup_time` with
-`--get-startuptime` in Part 3.
+`filter` and `require_asset`, and the window title still ends with "Nubo". Part 3 ran it on Windows
+with 0.6.0 and fixed two mistakes in the first draft (see "What Part 3 found"), and set `startup_time`
+from `--get-startuptime`. The test ROM runner's `HARNESS_SPEED` and `HARNESS_STARTUP_MILLISECONDS`
+(`tools/nubo-test-rom-runner/src/shootout.rs`) must stay this class's `speed` and `startup_time`.
 
 ```python
 from util import *
@@ -243,15 +247,16 @@ import os
 
 class Nubo(Emulator):
     def __init__(self):
-        super().__init__("Nubo", "https://github.com/mschoenm/nubo", startup_time=1.0, features=(PCM,))
+        super().__init__("Nubo", "https://github.com/mschoenm/nubo", startup_time=1.5, features=(PCM,))
         # While a game runs the title is "<game> — Nubo".
         self.title_check = lambda title: title.endswith("Nubo")
         self.speed = 4.0
 
     def setup(self):
-        # The release also has a setup .exe, which the default filter would pick.
+        # The release also has a setup .exe and the RetroArch core's zip, which a looser filter
+        # would pick.
         downloadGithubRelease("mschoenm/nubo", "downloads/nubo.zip",
-                              filter=lambda name: name.endswith("-windows-x64.zip"), require_asset=True)
+                              filter=lambda name: name == "Nubo-windows-x64.zip", require_asset=True)
         extract("downloads/nubo.zip", "emu/nubo")
         setDPIScaling("emu/nubo/Nubo/nubo.exe")
 
@@ -260,7 +265,8 @@ class Nubo(Emulator):
         if model is None:
             return None
         return subprocess.Popen([
-            "emu/nubo/Nubo/nubo.exe", os.path.abspath(rom),
+            # Windows doesn't find a relative program path once cwd is set.
+            os.path.abspath("emu/nubo/Nubo/nubo.exe"), os.path.abspath(rom),
             "--model", model, "--scale", "1", "--fresh", "--speed", "4",
         ], cwd="emu/nubo/Nubo")
 
@@ -295,10 +301,11 @@ the Part 1 pull request or in this document; they don't belong in the Nubo crate
 
 ## Part 3: a local run on Windows (maintainer)
 
-1. Install Python 3 and 7-Zip. Clone `gbdev/GBEmulatorShootout`, then run
+1. Install Python 3 (and 7-Zip, which only other emulators' downloads need). Clone `gbdev/GBEmulatorShootout`, then run
    `python -m pip install -r requirements-core.txt -r requirements.txt`.
-2. Add the files from Part 2. Until a release has `--scale`, `--fresh`, `--speed` and the Super Game
-   Boy, put a build of `main` (`cargo xtask windows` makes the zip) in `emu/nubo/` by hand, so
+2. Add the files from Part 2. Releases from 0.6.0 on have `--scale`, `--fresh`, `--speed` and the
+   Super Game Boy, so the harness downloads the latest one. To test an unreleased change, put a build
+   of `main` (`cargo xtask windows` makes the zip) in `emu/nubo/` by hand, so
    `downloadGithubRelease` and `extract` leave it alone (see "How the Shootout tests an emulator").
 3. Run a quick subset first: `python main.py --emulator nubo --test daid`. Then measure startup time
    with `python main.py --emulator nubo --get-startuptime` and set `startup_time` from it.
@@ -311,6 +318,33 @@ the Part 1 pull request or in this document; they don't belong in the Nubo crate
    timing, window title). Fix Nubo bugs here as usual, and keep FAILING_TESTS.md up to date.
 
 **Done when:** a full run whose failures are all explained.
+
+### What Part 3 found
+
+Run on 2026-10-14 on Windows 11 at 100% display scaling, with Python 3.14, the Shootout's `main` at
+`38b926b` and Nubo 0.6.0 as the harness downloads it (the latest release, with Part 1's options and the
+Super Game Boy). Only Nubo was run, not the other emulators (step 5).
+
+- **All 261 tests the harness judges pass**, the number Part 5 counts, which would rank Nubo first ahead
+  of DocBoy's 255. The other three: `which.gb` on DMG and CGB only reports (no reference image), and
+  `daid/rom_and_ram.gb` doesn't run, since Nubo refuses its cartridge type (0x08, ROM with RAM and no
+  MBC) and exits; it has no reference image either, so it counts for no emulator.
+- **The first full run had four failures that weren't Nubo's**: SameSuite's `channel_2_duty`,
+  `channel_3_freq_change_delay`, `channel_3_restart_delay` and `channel_4_lfsr` ran to their deadline,
+  and their screenshots showed another window on top of Nubo's, which the harness captured instead.
+  Rerun with nothing on top, all four passed in about 1.3 seconds. Check the screenshots in
+  `nubo.json` before believing a failure.
+- **Two mistakes in the first draft of the harness class**, fixed in Part 2:
+  - Its download filter, `name.endswith("-windows-x64.zip")`, matched the RetroArch core's
+    `Nubo-libretro-windows-x64.zip` first, so the harness unpacked the core instead of the app. It now
+    asks for `Nubo-windows-x64.zip` by name.
+  - Started with the relative path `emu/nubo/Nubo/nubo.exe` and `cwd` set, the program wasn't found
+    (`FileNotFoundError`), so every test failed to run. It now passes the absolute path.
+- **Startup time** (`--get-startuptime`): 1.41 s on DMG, 1.32 s on CGB and 1.35 s on SGB, so the class's
+  `startup_time` is 1.5. The test showed the window's inside is exactly 160×144.
+- **7-Zip isn't needed for Nubo**: `extract` unpacks a `.zip` with Python's `zipfile`. Only other
+  emulators' downloads need it.
+- With nearly every test passing early, the whole run took about 7 minutes.
 
 ## Part 4: the pull request to the Shootout
 
@@ -462,7 +496,7 @@ CPU time is the steadier number):
 - On their own (`cargo test-roms shootout`) they take 3.5 to 4.5 seconds, and 9 seconds with
   `--verify-boot`, which runs the boot ROM for each of them.
 - Every test passes long before its deadline, so the longer deadline below costs nothing unless tests
-  start failing; a failing test then runs for its `runtime` plus 24 emulated seconds.
+  start failing; a failing test then runs for its `runtime` plus 26 emulated seconds.
 
 **Done when:**
 - `cargo test-roms` runs the Shootout's tests in CI and at night, and prints the summary line.
@@ -487,8 +521,8 @@ differs from the steps above, and why:
 - **Deadline.** "The `runtime` plus 2 seconds from power-on" failed 100 of the 258 tests that pass
   with more time: the CGB boot ROM alone takes 3.1 seconds and the DMG's 1.7, and some tests need up
   to 8.5 seconds more than their `runtime`. The runner uses the harness's own deadline instead,
-  `runtime / speed + startup_time + 5` seconds of real time, which at speed 4 with the draft's
-  `startup_time` of 1 second is the `runtime` plus 24 emulated seconds.
+  `runtime / speed + startup_time + 5` seconds of real time, which at speed 4 with the class's
+  `startup_time` of 1.5 seconds (1 in the first draft) is the `runtime` plus 26 emulated seconds.
 - **Seven failing tests, all for the colors.** None of the plan's expected failures happen: the
   revision tests aren't in the list, and Nubo passes the Shootout's build of Bully on DMG. But the
   harness compares a screenshot of the app, so the runner compares the frame in the colors the app

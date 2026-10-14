@@ -1,6 +1,6 @@
 # Plan: restructuring the repository
 
-**Status: signed off by the maintainer on 2026-10-13, and done on 2026-10-14: all seven steps are merged.** What is left from "Order and dependencies" below is Parts 1 to 3 of the Shootout plan, then the RetroArch core.
+**Status: signed off by the maintainer on 2026-10-13, and done on 2026-10-14: all seven steps are merged.** Parts 1 to 3 of the Shootout plan are done too (Part 3's run on Windows on 2026-10-14), and the RetroArch core is built; what is left from "Order and dependencies" below is its item 7.
 
 ## What is planned and what is only kept possible
 
@@ -419,7 +419,7 @@ The order of all three plans, agreed with the maintainer on 2026-10-13:
    the score and rank on the wiki. Done.
 4. Restructuring steps 3 to 6, then step 7.
 5. Parts 1 to 3 of the Shootout plan: the app's options, the harness class, and the maintainer's run on
-   Windows.
+   Windows. Done.
 6. Phases 0 to 5 of [RETROARCH_PLAN.md](RETROARCH_PLAN.md), starting with a review of that plan
    with Codex. The maintainer moved the core ahead of the Shootout's Parts 1 to 3 and asked for it
    straight away; Phases 1 to 5 are built (see that plan's Status).
