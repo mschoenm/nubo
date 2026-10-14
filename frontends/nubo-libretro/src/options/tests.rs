@@ -43,15 +43,29 @@ fn the_values_set_the_settings_they_name() {
     assert!(options.set(RTC, "emulated"));
     assert!(options.set(MODEL, "CGB-C"));
     assert!(options.set(SGB_BORDER, "disabled"));
+    assert!(options.set(SGB_COLORS, "green"));
     assert_eq!(
         options,
         Options {
             model: ModelPreference::Fixed(Model::CgbC),
             palette: DmgPalette::Pocket,
+            sgb_colors: SgbColors::Preset(DmgPalette::Green),
             sgb_border: false,
+            nubo_border: false,
             rtc_clock: RtcClock::EmulatedTime,
         }
     );
+}
+
+#[test]
+fn the_border_option_picks_the_games_nubos_or_none() {
+    let mut options = Options::default();
+    assert!(options.set(SGB_BORDER, "nubo"));
+    assert!(options.sgb_border && options.nubo_border);
+    assert!(options.set(SGB_BORDER, "enabled"));
+    assert!(options.sgb_border && !options.nubo_border);
+    assert!(options.set(SGB_COLORS, "game"));
+    assert_eq!(options.sgb_colors, SgbColors::Game);
 }
 
 #[test]

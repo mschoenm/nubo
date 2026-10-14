@@ -81,9 +81,14 @@ Left: the maintainer's tests by hand (above), the AppStream release notes entry 
    (Phase 5). Getting it into RetroArch's own core downloader (Phase 6) means working with the libretro
    team and keeping a build on their CI. It is worth it, but it is outward-facing and long-term.
 3. **Options and defaults.** By default the model follows the desktop app (Game Boy Color games on
-   CGB-E, Super Game Boy games on SGB, others on DMG), with a gray palette, the Super Game Boy's
-   border shown (the picture is then 256×224, and RetroArch is told whenever its size changes) and the
-   cartridge clock on real time. Ports 2 to 4 play a Super Game Boy's second to fourth players. Change these if needed.
+   CGB-E, Super Game Boy games on SGB, others on DMG), with a gray palette, the Super Game Boy games'
+   own colors and border (Nubo's for games that bring none; the picture is then 256×224, and
+   RetroArch is told whenever its size changes) and the cartridge clock on real time. The Super Game
+   Boy options offer what its menu does: one palette for the whole screen, and Nubo's border or
+   none. They reach the emulator as its menu's choices, which save states keep: a loaded state shows
+   the colors and border it was made with until the option changes again, and netplay needs the same
+   choices on every side. Re-applying the options after each load would undo a game taking its colors
+   back (`PAL_PRI`), since run-ahead loads a state every frame. Ports 2 to 4 play a Super Game Boy's second to fourth players. Change these if needed.
 
 ## References
 

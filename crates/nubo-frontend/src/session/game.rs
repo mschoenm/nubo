@@ -14,7 +14,8 @@ use crate::picture::{Frame, Picture};
 use crate::rom::Rom;
 use crate::save_states::{self, SaveState, Slot, SlotInfo};
 use crate::settings::{FastForwardSpeed, Settings};
-use nubo_core::{CartridgeHeader, ControllerState, Key, Model};
+use crate::sgb_menu::SgbMenu;
+use nubo_core::{CartridgeHeader, ControllerState, Key, Model, SgbBorder};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -244,6 +245,30 @@ impl GameSession {
     /// not, showing the frame on screen again.
     pub fn set_sgb_border(&mut self, border: bool) {
         self.screen.set_border(border);
+    }
+
+    /// On a Super Game Boy, what its menu's choices are, as the frame on
+    /// screen was drawn with them; `None` on other models.
+    pub fn sgb_menu(&self) -> Option<SgbMenu> {
+        self.screen.raw.as_ref()?.sgb_menu
+    }
+
+    /// On a Super Game Boy, colors the screen with `palette` (RGB555,
+    /// lightest first), or with the game's colors for `None`. The emulator
+    /// shows it on a new frame at once, even while the game is paused: in
+    /// the browser the command has run by the time this returns, and on the
+    /// desktop the frame comes through the frame listener.
+    pub fn set_sgb_player_palette(&mut self, palette: Option<[u16; 4]>) {
+        self.session.send(Command::SetSgbPlayerPalette(palette));
+        self.refresh_screen();
+    }
+
+    /// On a Super Game Boy, picks the border around the screen: the game's
+    /// or Nubo's. Whether a border shows at all is
+    /// [`GameSession::set_sgb_border`].
+    pub fn choose_sgb_border(&mut self, border: SgbBorder) {
+        self.session.send(Command::SetSgbBorder(border));
+        self.refresh_screen();
     }
 
     /// Whether the game fast forwards: the key is held, or fast forward is

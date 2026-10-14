@@ -349,11 +349,12 @@ impl App {
 
         #[cfg(not(target_arch = "wasm32"))]
         {
-            if let Some(game) = self
-                .game
-                .as_ref()
-                .filter(|_| self.is_running() && !self.minimized)
-            {
+            // The Super Game Boy page recolors the paused game, which the
+            // emulator shows as a new frame.
+            if let Some(game) = self.game.as_ref().filter(|game| {
+                (self.is_running() || game.menu() == Some(PauseMenu::SuperGameBoy))
+                    && !self.minimized
+            }) {
                 subscriptions.push(subscriptions::new_frames(game).map(|()| Message::Tick));
             }
             if let Some(interval) = self.check_interval() {
@@ -398,9 +399,9 @@ impl App {
             let page = match game.menu() {
                 None => Some(PauseMenu::Main),
                 Some(PauseMenu::Main) => None,
-                Some(PauseMenu::Save | PauseMenu::Load | PauseMenu::Cheats) => {
-                    Some(PauseMenu::Main)
-                }
+                Some(
+                    PauseMenu::Save | PauseMenu::Load | PauseMenu::Cheats | PauseMenu::SuperGameBoy,
+                ) => Some(PauseMenu::Main),
             };
             game.show_menu(page);
         }

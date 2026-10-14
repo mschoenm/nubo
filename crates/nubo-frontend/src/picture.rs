@@ -7,6 +7,7 @@
 //! form with the picture, so it is made once and not again on every redraw.
 
 use crate::palettes::DmgPalette;
+use crate::sgb_menu::SgbMenu;
 use nubo_core::{Emulator, SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH, SGB_SCREEN_POSITION};
 use std::any::Any;
 use std::fmt;
@@ -33,6 +34,9 @@ pub struct Frame {
     /// Whether the Game Boy screen is in the emulator's grays
     /// (`nubo_core::DMG_SHADES`), which a [`DmgPalette`] repaints.
     pub in_dmg_shades: bool,
+    /// On a Super Game Boy, what its menu's choices were as the frame was
+    /// drawn.
+    pub sgb_menu: Option<SgbMenu>,
 }
 
 impl Frame {
@@ -56,7 +60,12 @@ impl Frame {
             None => (emulator.frame_buffer(), SCREEN_WIDTH, SCREEN_HEIGHT, (0, 0)),
         };
         let in_dmg_shades = emulator.frame_in_dmg_shades();
-        if self.pixels == pixels && self.width == width && self.in_dmg_shades == in_dmg_shades {
+        let sgb_menu = SgbMenu::of(emulator);
+        if self.pixels == pixels
+            && self.width == width
+            && self.in_dmg_shades == in_dmg_shades
+            && self.sgb_menu == sgb_menu
+        {
             return false;
         }
         self.pixels.clear();
@@ -65,6 +74,7 @@ impl Frame {
         self.height = height;
         self.screen_position = screen_position;
         self.in_dmg_shades = in_dmg_shades;
+        self.sgb_menu = sgb_menu;
         true
     }
 

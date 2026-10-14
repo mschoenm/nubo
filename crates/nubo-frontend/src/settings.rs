@@ -13,6 +13,7 @@
 use crate::controls::Controls;
 use crate::model::ModelPreference;
 use crate::palettes::DmgPalette;
+use crate::sgb_menu::DEFAULT_OWN_PALETTE;
 use crate::storage::{Entry, Storage};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -61,6 +62,20 @@ pub struct Settings {
     /// without it write back unchanged.
     #[serde(skip_serializing_if = "is_true")]
     pub sgb_border: bool,
+    /// The player's own palette for Super Game Boy games, four RGB555
+    /// colors from the lightest shade to the darkest, which they edit on the
+    /// pause menu's Super Game Boy page. Only saved once it differs from
+    /// [`DEFAULT_OWN_PALETTE`].
+    #[serde(skip_serializing_if = "is_default_own_palette")]
+    pub sgb_own_palette: [u16; 4],
+}
+
+/// Whether `palette` is the player's own palette as it starts. serde's
+/// skip_serializing_if passes a reference to the array, which this takes as
+/// a slice: a reference to an array of this size trips a Clippy lint in some
+/// builds and not others, so no single `expect` fits.
+fn is_default_own_palette(palette: &[u16]) -> bool {
+    palette == DEFAULT_OWN_PALETTE
 }
 
 /// Whether `value` is true, for settings saved only when they are off.
@@ -85,6 +100,7 @@ impl Default for Settings {
             controls: Controls::default(),
             dmg_palette: DmgPalette::default(),
             sgb_border: true,
+            sgb_own_palette: DEFAULT_OWN_PALETTE,
         }
     }
 }

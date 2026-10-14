@@ -71,7 +71,13 @@ fn machine() -> Machine {
 }
 
 fn save_state(machine: &mut Machine) -> Vec<u8> {
-    ask(|command| machine.handle(command), Command::SaveState).unwrap()
+    ask(
+        |command| {
+            machine.handle(command);
+        },
+        Command::SaveState,
+    )
+    .unwrap()
 }
 
 #[test]
@@ -84,7 +90,9 @@ fn a_loaded_state_takes_the_machine_back_to_when_it_was_saved() {
     machine.skip_buffer();
     let state = saved.clone();
     ask(
-        |command| machine.handle(command),
+        |command| {
+            machine.handle(command);
+        },
         |reply| Command::LoadState(state, reply),
     )
     .unwrap()
@@ -98,7 +106,9 @@ fn a_state_that_isnt_one_is_refused() {
     let mut machine = machine();
 
     let result = ask(
-        |command| machine.handle(command),
+        |command| {
+            machine.handle(command);
+        },
         |reply| Command::LoadState(vec![1, 2, 3], reply),
     )
     .unwrap();

@@ -29,6 +29,7 @@ use crate::time::Duration;
 use audio::AudioOutput;
 use nubo_core::{
     CartridgeEffects, ControllerMapping, ControllerState, Emulator, Key, Model, NoSaves, RtcClock,
+    SgbBorder,
 };
 use std::path::Path;
 use std::sync::Arc;
@@ -128,6 +129,11 @@ pub enum Command {
     SaveState(Sender<Vec<u8>>),
     /// Restores a save state and sends back whether that worked.
     LoadState(Vec<u8>, Sender<Result<(), String>>),
+    /// On a Super Game Boy, colors the screen with the player's palette, or
+    /// with the game's colors for `None` (see `sgb_menu`).
+    SetSgbPlayerPalette(Option<[u16; 4]>),
+    /// On a Super Game Boy, picks the border around the screen.
+    SetSgbBorder(SgbBorder),
 }
 
 /// The emulated Game Boy with its sound output and battery saves, playing
@@ -185,8 +191,10 @@ impl Machine {
         })
     }
 
-    /// Carries out a command from the UI.
-    fn handle(&mut self, command: Command) {
+    /// Carries out a command from the UI. Returns whether it changed the
+    /// frame on screen, which the app then has to be shown even while the
+    /// game is paused.
+    fn handle(&mut self, command: Command) -> bool {
         match command {
             Command::Press(key) => self.emulator.press_key(key),
             Command::Release(key) => self.emulator.release_key(key),
@@ -204,7 +212,16 @@ impl Machine {
                     .map_err(|error| error.to_string());
                 let _ = reply.send(result);
             }
+            Command::SetSgbPlayerPalette(palette) => {
+                self.emulator.set_sgb_player_palette(palette);
+                return true;
+            }
+            Command::SetSgbBorder(border) => {
+                self.emulator.set_sgb_border(border);
+                return true;
+            }
         }
+        false
     }
 
     /// Plays as `playback` says from now on. Pausing also writes the battery

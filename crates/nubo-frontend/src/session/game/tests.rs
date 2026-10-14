@@ -20,6 +20,7 @@ fn screen_frame(in_dmg_shades: bool) -> Frame {
         height: SCREEN_HEIGHT,
         screen_position: (0, 0),
         in_dmg_shades,
+        sgb_menu: None,
     }
 }
 
@@ -38,6 +39,7 @@ fn bordered_frame() -> Frame {
         height,
         screen_position: (48, 40),
         in_dmg_shades: true,
+        sgb_menu: None,
     }
 }
 

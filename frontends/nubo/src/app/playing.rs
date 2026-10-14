@@ -2,11 +2,12 @@
 //! with its save states and cheats, and opening ROMs.
 
 use super::{App, Message};
-use crate::game::{Game, PauseMenu};
+use crate::game::{Game, PauseMenu, SgbBorderChoice};
 use crate::rom_picker;
 use crate::views;
 use iced::Task;
-use nubo_core::{CartridgeHeader, Emulator, Model};
+use iced::widget::{self, scrollable::RelativeOffset};
+use nubo_core::{CartridgeHeader, Emulator, Model, SgbBorder};
 use nubo_frontend::cheats;
 use nubo_frontend::controls::Action;
 use nubo_frontend::picture::Picture;
@@ -14,6 +15,7 @@ use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states::{self, Slot};
 use nubo_frontend::screenshots;
 use nubo_frontend::session::{GameSession, StartOptions};
+use nubo_frontend::sgb_menu::{ColorChannel, SgbColors};
 use std::path::{Path, PathBuf};
 
 /// What the player can do with games: open one, and control the one that
@@ -40,6 +42,18 @@ pub enum GameMessage {
     AddCheat,
     CheatToggled(usize, bool),
     RemoveCheat(usize),
+    /// Colors a Super Game Boy game with these colors.
+    SgbColorsPicked(SgbColors),
+    /// A channel of one of the player's own Super Game Boy colors (shade 0
+    /// to 3, lightest first) was dragged to this value.
+    SgbOwnColorChanged(usize, ColorChannel, u8),
+    /// The player let go of a channel's slider.
+    SgbOwnColorReleased,
+    /// A channel of one of the player's own colors went down or up by this
+    /// much with the D-pad.
+    SgbOwnColorStepped(usize, ColorChannel, i8),
+    /// Shows this border around a Super Game Boy game.
+    SgbBorderPicked(SgbBorderChoice),
     /// The pictures of the save state slots a pause menu page lists were
     /// read, for this opening of the page (see
     /// `GameSession::thumbnails_to_load`).
@@ -127,6 +141,42 @@ impl App {
                     && let Err(error) = game.session.remove_cheat(index)
                 {
                     self.toasts.error(error);
+                }
+            }
+            GameMessage::SgbColorsPicked(colors) => {
+                let own = self.settings.shared.sgb_own_palette;
+                if let Some(game) = &mut self.game {
+                    game.session.set_sgb_player_palette(colors.palette(own));
+                }
+            }
+            GameMessage::SgbOwnColorChanged(shade, channel, value) => {
+                self.set_sgb_own_color(shade, channel, value);
+            }
+            GameMessage::SgbOwnColorReleased => self.change_settings(|_| {}),
+            GameMessage::SgbOwnColorStepped(shade, channel, step) => {
+                if let Some(&color) = self.settings.shared.sgb_own_palette.get(shade) {
+                    let value = channel
+                        .of(color)
+                        .saturating_add_signed(step)
+                        .min(ColorChannel::MAX);
+                    if value != channel.of(color) {
+                        self.set_sgb_own_color(shade, channel, value);
+                        self.change_settings(|_| {});
+                    }
+                }
+            }
+            GameMessage::SgbBorderPicked(choice) => {
+                let shown = choice != SgbBorderChoice::None;
+                if shown != self.settings.shared.sgb_border {
+                    self.change_settings(|settings| settings.shared.sgb_border = shown);
+                }
+                if let Some(game) = &mut self.game {
+                    game.session.set_sgb_border(shown);
+                    match choice {
+                        SgbBorderChoice::Game => game.session.choose_sgb_border(SgbBorder::Game),
+                        SgbBorderChoice::Nubo => game.session.choose_sgb_border(SgbBorder::Nubo),
+                        SgbBorderChoice::None => {}
+                    }
                 }
             }
         }
@@ -387,6 +437,19 @@ impl App {
         }
     }
 
+    /// Sets a channel of one of the player's own Super Game Boy colors (not
+    /// saved yet), and colors the game with them.
+    fn set_sgb_own_color(&mut self, shade: usize, channel: ColorChannel, value: u8) {
+        let Some(color) = self.settings.shared.sgb_own_palette.get_mut(shade) else {
+            return;
+        };
+        *color = channel.with(*color, value);
+        let own = self.settings.shared.sgb_own_palette;
+        if let Some(game) = &mut self.game {
+            game.session.set_sgb_player_palette(Some(own));
+        }
+    }
+
     /// Moves through the pause menu: up and down move between its rows, A
     /// or Start picks one, and B steps back.
     pub(super) fn navigate_pause_menu(&mut self, action: Action) -> Task<Message> {
@@ -404,11 +467,25 @@ impl App {
             }
             PauseMenu::Save | PauseMenu::Load => views::game::listed_slots(game, saving).len(),
             PauseMenu::Cheats => game.session.cheats().len(),
+            PauseMenu::SuperGameBoy => views::game::sgb::rows(game).len(),
         };
 
         match action {
-            Action::Up => game.move_menu_selection(-1, rows),
-            Action::Down => game.move_menu_selection(1, rows),
+            Action::Up | Action::Down => {
+                game.move_menu_selection(if action == Action::Up { -1 } else { 1 }, rows);
+                if page == PauseMenu::SuperGameBoy {
+                    return scroll_pause_menu(game.menu_selection(), rows);
+                }
+            }
+            Action::Left | Action::Right if page == PauseMenu::SuperGameBoy => {
+                let step = if action == Action::Left { -1 } else { 1 };
+                let message = views::game::sgb::rows(game)
+                    .get(game.menu_selection())
+                    .and_then(|&row| views::game::sgb::adjust(row, step));
+                if let Some(message) = message {
+                    return self.update(message);
+                }
+            }
             Action::B => self.escape(),
             Action::A | Action::Start => {
                 let selection = game.menu_selection();
@@ -427,6 +504,9 @@ impl App {
                             GameMessage::CheatToggled(selection, !cheat.enabled).into()
                         })
                     }
+                    PauseMenu::SuperGameBoy => views::game::sgb::rows(game)
+                        .get(selection)
+                        .and_then(|&row| views::game::sgb::pick(row)),
                 };
 
                 if let Some(message) = message {
@@ -438,6 +518,23 @@ impl App {
 
         Task::none()
     }
+}
+
+/// Scrolls the pause menu so row `index` of `count` is roughly in view, as
+/// the settings window does (rows are spread fairly evenly over the page).
+fn scroll_pause_menu(index: usize, count: usize) -> Task<Message> {
+    let fraction = if count > 1 {
+        index as f32 / (count - 1) as f32
+    } else {
+        0.0
+    };
+    widget::operation::snap_to(
+        views::game::pause_scroll_id(),
+        RelativeOffset {
+            x: None,
+            y: Some(fraction),
+        },
+    )
 }
 
 /// Reads the ROM at `path` in the background.

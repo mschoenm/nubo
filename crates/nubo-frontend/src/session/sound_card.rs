@@ -264,7 +264,9 @@ impl EmulatorThread {
     fn run(mut self) {
         while self.running.load(Ordering::Relaxed) {
             for command in self.commands.try_iter() {
-                self.machine.handle(command);
+                if self.machine.handle(command) {
+                    publish_frame(&self.frame, &self.machine.emulator);
+                }
             }
             self.step();
         }
