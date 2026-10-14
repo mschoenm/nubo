@@ -84,6 +84,8 @@ Claude Code and Codex both read these `AGENTS.md` files; keep them the only inst
 
 - `BUILDING.md`: building, running and packaging Nubo, and where the code is, for people; the `README.md` is for players first. Keep both true when commands, packages or folders change.
 - `tools/nubo-test-rom-runner/FAILING_TESTS.md`: every test that still fails, what was tried and what to try next.
+- `docs/ACCURACY.md`: the test ROM results suite by suite, and the tests that aren't run; the README keeps the summary.
+- `docs/RETROARCH.md`: installing and using the RetroArch core, for players; the README keeps the short version.
 - `docs/ACCURACY_PLAN.md`: the plan towards the most accurate emulator; update it when a phase moves on.
 - `docs/SHOOTOUT_PLAN.md` and `docs/RESTRUCTURE_PLAN.md` (a shared `nubo-frontend` crate and a `tools/` folder, signed off, with the order of the work): plans for work not done yet; update them as their parts get done.
 - `docs/RETROARCH_PLAN.md`: the RetroArch core, what was built and what is left (getting it into RetroArch's core downloader).

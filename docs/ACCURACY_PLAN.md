@@ -68,7 +68,7 @@ What is missing or unproven:
   sequence itself isn't Nintendo's, and post-boot state comes from calibration, not from running the
   real code.
 - **Test suites not run.** Some suites aren't run because nothing checks them automatically or they need
-  hardware Nubo doesn't emulate (listed in the README's Test ROMs section).
+  hardware Nubo doesn't emulate (listed in `docs/ACCURACY.md`).
 
 ## Phase 1: measure other emulators on the same tests
 
