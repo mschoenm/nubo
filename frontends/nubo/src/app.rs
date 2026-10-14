@@ -24,7 +24,7 @@ use iced::{Element, Subscription, Task, Theme, event, keyboard, system, window};
 use nubo_core::{CartridgeHeader, ControllerState, Model};
 use nubo_frontend::background;
 use nubo_frontend::controls::{Action, Device};
-use nubo_frontend::gamepads::ControllerEvent;
+use nubo_frontend::gamepads::{ControllerEvent, Controllers};
 use nubo_frontend::library::Library;
 use nubo_frontend::library::box_art::GameList;
 use nubo_frontend::notices::Notices;
@@ -95,9 +95,11 @@ pub struct App {
     notices: Notices,
     /// The names of the connected controllers.
     controllers: Vec<String>,
-    /// What the controllers did last, to tell which buttons were just
-    /// pressed or released.
+    /// What the controllers did last, all combined, to tell which buttons
+    /// were just pressed or released.
     controller_state: ControllerState,
+    /// What each controller did last, which the game gets.
+    controller_states: Controllers,
     /// The controller buttons pressed in the menus, which the game doesn't
     /// see until they are released.
     menu_presses: MenuPresses,
@@ -177,6 +179,7 @@ impl App {
             notices: Notices::default(),
             controllers: Vec::new(),
             controller_state: ControllerState::new(),
+            controller_states: Controllers::default(),
             menu_presses: MenuPresses::default(),
             controls_device: Device::Keyboard,
             capture: None,

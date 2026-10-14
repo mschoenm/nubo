@@ -6,12 +6,22 @@ use super::{App, GameMessage, Message};
 use crate::input::{self, KeyInput};
 use iced::Task;
 use iced::keyboard::{self, key::Named};
-use nubo_core::{ControllerButton, Key};
+use nubo_core::{ControllerButton, ControllerState, Key};
 use nubo_frontend::controls::{Action, Device, PadButton};
 use nubo_frontend::gamepads::ControllerEvent;
 use nubo_frontend::save_states::Slot;
 
 impl App {
+    /// What the game sees of each controller: everything but the buttons
+    /// held back because they were pressed in the menus.
+    pub(super) fn controller_states_for_game(&self) -> Vec<ControllerState> {
+        self.controller_states
+            .each()
+            .iter()
+            .map(|state| self.menu_presses.hide_from(state))
+            .collect()
+    }
+
     /// Handles a key going down or up: picking a key in the settings, the
     /// fixed shortcuts, and then the player's controls. A window that shows
     /// only the game (`--scale`) has no shortcuts.
@@ -89,7 +99,9 @@ impl App {
                     .error(format!("Controllers can't be used: {error}"));
                 Task::none()
             }
-            ControllerEvent::Changed(state) => {
+            ControllerEvent::Changed(controllers) => {
+                let state = controllers.combined();
+                self.controller_states = controllers;
                 let previous = std::mem::replace(&mut self.controller_state, state);
                 let changed: Vec<(ControllerButton, bool)> = ControllerButton::ALL
                     .into_iter()
@@ -98,9 +110,9 @@ impl App {
                     .collect();
 
                 self.menu_presses.update(&previous, &state, self.in_menus());
+                let states = self.controller_states_for_game();
                 if let Some(game) = &mut self.game {
-                    game.session
-                        .set_controller_state(self.menu_presses.hide_from(&state));
+                    game.session.set_controller_states(states);
                 }
 
                 if let Some((device, action)) = self.capture {

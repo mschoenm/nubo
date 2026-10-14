@@ -249,7 +249,7 @@ impl App {
                 Err(error) => self.toasts.error(error),
             }
         }
-        session.set_controller_state(self.menu_presses.hide_from(&self.controller_state));
+        session.set_controller_states(self.controller_states_for_game());
         Ok(Game::new(session, !self.fresh))
     }
 

@@ -978,8 +978,12 @@ impl AddressBus {
         self.joypad.release_key(key);
     }
 
-    pub(crate) fn set_controller_state(&mut self, state: &ControllerState) {
-        self.joypad.set_controller_state(state);
+    pub(crate) fn set_controller_states(&mut self, states: &[ControllerState]) {
+        self.joypad.set_controller_states(states);
+    }
+
+    pub(crate) fn set_player_keys(&mut self, player: u8, keys: &[Key]) {
+        self.joypad.set_player_keys(player, keys);
     }
 
     pub(crate) fn set_controller_mapping(&mut self, mapping: ControllerMapping) {

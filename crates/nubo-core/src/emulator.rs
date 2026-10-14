@@ -377,9 +377,29 @@ impl Emulator {
         self.address_bus_mut().release_key(key);
     }
 
-    /// Updates which controller buttons are held and where the stick points.
+    /// Updates which controller buttons are held and where the stick points,
+    /// for a frontend with one controller (or all of them combined).
     pub fn set_controller_state(&mut self, state: &ControllerState) {
-        self.address_bus_mut().set_controller_state(state);
+        self.set_controller_states(std::slice::from_ref(state));
+    }
+
+    /// Updates which buttons are held and where the sticks point on each
+    /// controller, the first controller's first. They all play as the first
+    /// player, until a Super Game Boy game asks for more players: then the
+    /// first controller plays the first player, the second the second, and
+    /// so on up to four. The keyboard keys ([`Emulator::press_key`]) always
+    /// play the first player.
+    pub fn set_controller_states(&mut self, states: &[ControllerState]) {
+        self.address_bus_mut().set_controller_states(states);
+    }
+
+    /// Holds `keys` for the second, third or fourth `player` of a Super Game
+    /// Boy's multitap (2 to 4; other numbers are ignored), for a frontend
+    /// that reads them as players rather than as controllers, such as
+    /// RetroArch's ports. A game only reads them once it asks for more than
+    /// one player.
+    pub fn set_player_keys(&mut self, player: u8, keys: &[Key]) {
+        self.address_bus_mut().set_player_keys(player, keys);
     }
 
     /// Chooses which controller buttons act as which Game Boy buttons.

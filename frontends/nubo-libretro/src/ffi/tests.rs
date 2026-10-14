@@ -28,7 +28,10 @@ struct Settings {
 #[derive(Default)]
 struct Record {
     pixel_formats: Vec<c_int>,
+    /// The first player's input descriptors: each button's id and name.
     input_descriptors: Vec<(c_uint, String)>,
+    /// The port of every input descriptor.
+    descriptor_ports: Vec<c_uint>,
     /// `RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2` and `_SET_CORE_OPTIONS`: each
     /// option's key, default and values.
     options: Vec<(String, String, Vec<String>)>,
@@ -56,7 +59,7 @@ static SETTINGS: Mutex<Settings> = Mutex::new(Settings {
 });
 static RECORD: Mutex<Option<Record>> = Mutex::new(None);
 /// The buttons the pretend player holds, one bit per libretro button.
-static HELD: Mutex<u16> = Mutex::new(0);
+static HELD: Mutex<[u16; 4]> = Mutex::new([0; 4]);
 
 fn record<T>(change: impl FnOnce(&mut Record) -> T) -> T {
     change(lock(&RECORD).get_or_insert_with(Record::default))
@@ -95,8 +98,11 @@ unsafe extern "C" fn test_environment(cmd: c_uint, data: *mut c_void) -> bool {
             RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS => {
                 let mut descriptor = data.cast::<RetroInputDescriptor>().cast_const();
                 while !(*descriptor).description.is_null() {
-                    let entry = ((*descriptor).id, text((*descriptor).description));
-                    record(|record| record.input_descriptors.push(entry));
+                    if (*descriptor).port == 0 {
+                        let entry = ((*descriptor).id, text((*descriptor).description));
+                        record(|record| record.input_descriptors.push(entry));
+                    }
+                    record(|record| record.descriptor_ports.push((*descriptor).port));
                     descriptor = descriptor.add(1);
                 }
                 true
@@ -245,8 +251,9 @@ unsafe extern "C" fn test_input_state(
     index: c_uint,
     id: c_uint,
 ) -> i16 {
-    assert_eq!((port, device, index), (0, RETRO_DEVICE_JOYPAD, 0));
-    let held = *lock(&HELD);
+    assert!(port < 4, "only four players");
+    assert_eq!((device, index), (RETRO_DEVICE_JOYPAD, 0));
+    let held = lock(&HELD)[port as usize];
     if id == RETRO_DEVICE_ID_JOYPAD_MASK {
         assert!(lock(&SETTINGS).bitmasks);
         held as i16
@@ -267,7 +274,7 @@ fn start(settings: Settings) -> MutexGuard<'static, ()> {
     let turn = lock(&TURN);
     *lock(&SETTINGS) = settings;
     *lock(&RECORD) = None;
-    *lock(&HELD) = 0;
+    *lock(&HELD) = [0; 4];
     retro_set_environment(Some(test_environment));
     retro_set_video_refresh(Some(test_video_refresh));
     retro_set_audio_sample(Some(test_audio_sample));
@@ -426,6 +433,17 @@ fn a_game_plays_in_retroarchs_order_with_one_frame_and_its_sound_per_run() {
             "A"
         ]
     );
+    for port in 0..4 {
+        assert_eq!(
+            record
+                .descriptor_ports
+                .iter()
+                .filter(|&&p| p == port)
+                .count(),
+            8,
+            "the buttons of port {port}"
+        );
+    }
     assert_eq!(record.achievements, Some(true));
     assert!(!record.memory_maps.is_empty());
 
@@ -474,7 +492,7 @@ fn buttons_reach_the_game_with_and_without_bitmasks() {
         });
         assert!(load_game(&cartridge(ROM_ONLY, 0, false, JOYPAD)));
         run_frames(200);
-        *lock(&HELD) = 1 << 7 | 1 << 8; // right and A
+        lock(&HELD)[0] = 1 << 7 | 1 << 8; // right and A
         run_frames(2);
         let work_ram = memory(RETRO_MEMORY_SYSTEM_RAM);
         assert_eq!(work_ram.len(), 0x2000);
@@ -845,4 +863,19 @@ fn what_isnt_a_game_does_not_load() {
 fn a_panic_fails_the_call_instead_of_crossing_into_c() {
     assert_eq!(guard("test", 7, || panic!("on purpose")), 7);
     assert_eq!(guard("test", 7, || 8), 8);
+}
+
+#[test]
+fn the_second_port_plays_the_second_player_of_a_super_game_boy() {
+    let variable = |key: &str, value: &CStr| (String::from(key), CString::from(value));
+    let _turn = start(Settings {
+        variables: vec![variable("nubo_model", c"SGB")],
+        ..default_settings()
+    });
+    assert!(load_game(&cartridge(ROM_ONLY, 0, false, JOYPAD)));
+    lock(&HELD)[1] = 1 << 8; // A on the second port
+    retro_run();
+    let held = lock(&CORE).as_ref().map(Core::other_players_held_for_tests);
+    assert_eq!(held, Some([1 << 8, 0, 0]));
+    finish();
 }
