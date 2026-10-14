@@ -11,6 +11,7 @@
         "owner": "rustc",
         "pattern": { "regexp": "^$" },
         "background": {
+          "activeOnStart": true,
           "beginsPattern": "Compiling|Finished",
           "endsPattern": "Serving the Iced frontend"
         }
