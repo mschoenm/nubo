@@ -49,3 +49,20 @@ fn file_names_are_percent_encoded() {
         "visualboyadvance-m.json"
     );
 }
+
+#[test]
+fn only_plain_file_names_are_downloaded() {
+    assert!(is_plain_file_name("no$gmb.json"));
+    assert!(is_plain_file_name("Beaten Dying Moon.json"));
+    for name in [
+        "",
+        ".",
+        "..",
+        "../Cargo.toml",
+        "results/sameboy.json",
+        "a\\b.json",
+        "C:x.json",
+    ] {
+        assert!(!is_plain_file_name(name), "{name:?}");
+    }
+}
