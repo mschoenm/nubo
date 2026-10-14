@@ -58,7 +58,10 @@ What is missing or unproven:
   be linked, and the Game Boy Printer isn't emulated.
 - **Infrared.** The CGB's RP register (0xFF56) isn't emulated. HuC1's infrared port always sees no light.
 - **Cartridge types.** ROM only, MBC1, MBC2, MBC3, MBC30 (the MBC3 with an 8-bit ROM bank register and
-  8 RAM banks, used by the Japanese Pokémon Crystal), MBC5 (with rumble) and HuC1 are emulated. MBC6,
+  8 RAM banks, used by the Japanese Pokémon Crystal), MBC5 (with rumble) and HuC1 are emulated. So is
+  ROM with RAM and no MBC (types 0x08 and 0x09), which no licensed game uses: its RAM is always on and
+  repeats when smaller than 8 KiB, as daid's `rom_and_ram.gb` suggests, but that isn't checked on
+  hardware yet (Phase 3 step 2). MBC6,
   MBC7, HuC3, MMM01, TAMA5 and the Pocket Camera are not.
 - **Boot ROMs.** Nubo boots with its own boot ROMs (based on Bootix and SameBoy's), which keep the
   timing and end state of the ones they replaced. The original boot ROMs can't be used, so the boot
