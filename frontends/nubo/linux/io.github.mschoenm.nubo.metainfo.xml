@@ -59,6 +59,20 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.6.0" date="2026-10-14">
+      <description>
+        <p>Nubo now runs in RetroArch, the original Game Boy's grays are drawn as the hardware shows them, and test programs can run Nubo from the command line.</p>
+        <ul>
+          <li>A RetroArch core for Windows, Linux and macOS, with save states, rewind, run-ahead, netplay, cheats, RetroAchievements and rumble. It is experimental and installed by hand</li>
+          <li>The original Game Boy's four shades are now evenly spaced, as on the hardware, so dark gray is no longer too light. The Gray palette shows them as they are; the other palettes still recolor them</li>
+          <li>New command-line options for test programs such as the GB Emulator Shootout: --scale shows only the game screen at a whole multiple of its size, --fresh starts like a new install and leaves nothing behind, and --speed starts fast forwarding</li>
+          <li>A mistake on the command line, including an unknown --model, now stops Nubo with a message instead of being ignored</li>
+          <li>Save states save about 15 times and load about 10 times faster</li>
+          <li>A damaged save state that could upset the picture's timing is now refused</li>
+          <li>Save states made by Nubo 0.4.0 and 0.5.0 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.5.0" date="2026-10-13">
       <description>
         <p>Games on MBC3 cartridges, such as Pokémon Gold, Silver and Crystal, now switch banks and read their clock as real cartridges do, and two picture glitches are fixed.</p>
