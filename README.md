@@ -1,66 +1,32 @@
 <p align="center">
-  <img src="images/icon.png" width="128px" height="128px" alt="Nubo's logo, a cloud">
+  <img src="images/icon.png" width="128" height="128" alt="Nubo's logo, a cloud">
 </p>
 
 <h1 align="center">Nubo</h1>
 
 <p align="center">
-  <strong>Game Boy and Game Boy Color games, played exactly as the real hardware plays them.</strong><br>
-  On Windows and Linux, in RetroArch, or right in your browser.
+  <strong>A Game Boy and Game Boy Color emulator that runs games as the real consoles do, cycle by cycle.</strong><br>
+  For Windows and Linux, in the browser, and as a RetroArch core.
 </p>
 
 <p align="center">
-  <a href="https://github.com/mschoenm/nubo/releases/latest"><img src="https://img.shields.io/github/v/release/mschoenm/nubo?label=download" alt="Latest release"></a>
-  <a href="https://mschoenm.github.io/nubo/"><img src="https://img.shields.io/badge/play-in_the_browser-5b8def" alt="Play in the browser"></a>
+  <a href="#download"><img src="images/buttons/download.svg" width="210" alt="Download"></a>
+  &nbsp;
+  <a href="https://mschoenm.github.io/nubo/"><img src="images/buttons/play-in-your-browser.svg" width="210" alt="Play in your browser"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/mschoenm/nubo/releases/latest"><img src="https://img.shields.io/github/v/release/mschoenm/nubo?label=latest%20release" alt="Latest release"></a>
   <a href="https://github.com/mschoenm/nubo/actions/workflows/ci.yml"><img src="https://github.com/mschoenm/nubo/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/mschoenm/nubo" alt="License: GPL-3.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/mschoenm/nubo" alt="License: GPL-3.0 or later"></a>
 </p>
 
-<p align="center">
-  <img src="images/screenshots/super-game-boy.png" width="700" alt="Tobu Tobu Girl Deluxe in Nubo, inside the game's own illustrated Super Game Boy border">
-</p>
+Nubo plays your Game Boy and Game Boy Color games the way you remember them. It recreates the console one cycle at a time, so the picture, the sound and the tricks some games and demos play on the hardware come out just as they did on the real thing.
+
+Point it at your ROM folder and your games appear in a library with their title screens, the ones you played last up front. Save anywhere with a save state, pick up right where you left off, play with a keyboard or a controller, and see Super Game Boy games in their own colors and borders, as they looked on a TV.
 
 <p align="center">
-  <a href="#download"><strong>Download</strong></a> &nbsp;·&nbsp;
-  <a href="https://mschoenm.github.io/nubo/"><strong>Play in your browser</strong></a> &nbsp;·&nbsp;
-  <a href="#features"><strong>Features</strong></a> &nbsp;·&nbsp;
-  <a href="#getting-started"><strong>Getting started</strong></a>
-</p>
-
-Nubo rebuilds the Game Boy one clock cycle at a time: the processor, the picture and the sound all run in step, just as they do inside the console. Games and demos that push the hardware to its limits, changing the picture halfway down the screen or timing their sound to the cycle, look and sound just as they did on the real console. Nubo passes 261 of the 264 tests of the [GB Emulator Shootout](https://gbdev.io/GBEmulatorShootout/), more than any emulator in its published table.
-
-Accuracy is only half of it. Nubo keeps your games in a library with their title screens, saves your progress with a picture of the moment, shows Super Game Boy games in their own colors and borders, and plays just as well with a controller as with a keyboard.
-
-## Features
-
-- **True to the hardware.** The processor, the picture and the sound, emulated cycle by cycle and checked against thousands of test ROMs on every change. [How accurate Nubo is](#accuracy).
-- **Every Game Boy there is.** The original Game Boy, the Game Boy Pocket, the Super Game Boy 1 and 2, every revision of the Game Boy Color, and the Game Boy Advance playing Game Boy games. Nubo picks the right one for each game, and you can always choose another.
-- **Super Game Boy, as it looked on your TV.** Games made for it start in their own colors and borders, with up to four players on four controllers. Games without a border of their own get Nubo's: leave the controller alone for seven minutes and its clouds start to drift.
-- **Your collection at a glance.** Point Nubo at your ROM folders and it builds a library with each game's title screen or box art, a search box, and a Continue playing row with the games you played last.
-- **Never lose your progress.** Save states come with a picture, quick save and quick load take one key, and Nubo can open each game right where you stopped. In-game saves are kept just as the cartridge's battery kept them.
-- **Play your way.** Keyboard or controller, with every button yours to change and menus you can use from the controller. Fast forward through the slow parts, go fullscreen, take screenshots.
-- **Colors you like.** Gray, green or Pocket screens for Game Boy games, Super Game Boy palettes with a color editor, and a light or dark look that can follow your system.
-- **Cheats.** GameShark and Game Genie codes, kept for each game.
-- **The cartridges nearly every game uses.** MBC1, MBC2, MBC3 with its real-time clock (and the MBC30 of 4 MB games), MBC5, HuC1, and plain ROM with or without RAM. Games load from `.gb`, `.gbc` and `.zip` files.
-
-<table>
-  <tr>
-    <td align="center"><img src="images/screenshots/big2small.png" width="400" alt="Big2Small's colorful forest map"><br><sub>Big2Small, a Game Boy Color puzzle adventure</sub></td>
-    <td align="center"><img src="images/screenshots/rebound.png" width="400" alt="Rebound, a blue blob on grassy steps under a blue sky, with coins"><br><sub>Rebound, a Game Boy Color platformer</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="images/screenshots/moki.png" width="400" alt="Moki the Monster Kid waking up in a warm orange bedroom"><br><sub>Moki the Monster Kid, a Game Boy Color adventure</sub></td>
-    <td align="center"><img src="images/screenshots/rhythm-land.png" width="400" alt="Rhythm Land's skateboarder on a street, in Game Boy Pocket colors"><br><sub>Rhythm Land, a Game Boy game, in Pocket colors</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="images/screenshots/pause-menu.png" width="400" alt="Nubo's pause menu over El Dueloroso: resume, save state, load state, cheats, fullscreen, reset, settings and back to library"><br><sub>The pause menu: save states, cheats and more</sub></td>
-    <td align="center"><img src="images/screenshots/super-game-boy-colors.png" width="400" alt="The pause menu's Super Game Boy page over Tobu Tobu Girl Deluxe's border, with the game's colors, gray, green, Pocket and your own colors"><br><sub>Super Game Boy colors, including your own</sub></td>
-  </tr>
-</table>
-
-<p align="center">
-  <img src="images/screenshots/palettes.png" width="820" alt="El Dueloroso's saloon three times: in green, in Pocket colors and in gray"><br>
-  <sub>One Game Boy game in Nubo's green, Pocket and gray screens</sub>
+  <img src="images/screenshots/super-game-boy.png" width="700" alt="Tobu Tobu Girl Deluxe being played in Nubo: the girl jumps toward a crab over pink mountains, inside the game's own illustrated Super Game Boy border">
 </p>
 
 ## Download
@@ -71,24 +37,51 @@ Accuracy is only half of it. Nubo keeps your games in a library with their title
 | Linux | [Flatpak for x86_64](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-x86_64.flatpak) (most PCs) · [Flatpak for ARM](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-aarch64.flatpak) |
 | Browser | [Play in your browser](https://mschoenm.github.io/nubo/), nothing to install |
 | RetroArch | The core for Windows, Linux and macOS is in each [release](https://github.com/mschoenm/nubo/releases/latest) ([how to install it](#retroarch-core)) |
-| macOS | No download yet: [build it yourself](BUILDING.md#macos) |
+| macOS | No app download yet: [build it yourself](BUILDING.md#macos), or use the RetroArch core |
 
 - **Windows:** the files aren't signed yet, so SmartScreen may warn you the first time. Choose More info, then Run anyway.
-- **Linux:** open the `.flatpak` file with your software center, or run `flatpak install --user Nubo-linux-x86_64.flatpak`. Flatpak fetches the runtime Nubo needs from Flathub the first time.
-- **Browser:** plays one game at a time, keeping its in-game saves in the browser. The library, save states, cheats and screenshots are in the desktop app.
-- **Want the newest changes?** The [nightly build](https://github.com/mschoenm/nubo/releases/tag/nightly) has everything that passed every check, ahead of the next release.
+- **Linux:** open the `.flatpak` file with your software center, or run `flatpak install --user Nubo-linux-x86_64.flatpak` (`Nubo-linux-aarch64.flatpak` on ARM). Flatpak fetches the runtime Nubo needs from Flathub the first time.
+- **Browser:** plays one game at a time and keeps its in-game saves in the browser. The library, save states, cheats and screenshots are in the desktop app.
+- **Nightly build:** the [nightly build](https://github.com/mschoenm/nubo/releases/tag/nightly) has the newest changes that passed every check.
+
+## Features
+
+- **Models:** the original Game Boy, the Game Boy Pocket, the Super Game Boy 1 and 2, every revision of the Game Boy Color, and the Game Boy Advance playing Game Boy games. Nubo picks a model for each game, and you can choose another in the settings.
+- **Super Game Boy:** games made for it show their own colors and border, and games for several players can be played by up to four, each on their own controller. The pause menu lets you pick other colors, your own included, and another border.
+- **Library:** built from your ROM folders, with each game's title screen or box art, search, and a Continue playing row with the games you played last.
+- **Saves:** save states with a picture, quick save and quick load, and continuing games where you left off. In-game saves are plain `.sav` files that move between the app and the [RetroArch core](#retroarch-core).
+- **Controls:** keyboard and controller, with buttons you can change and menus that work with a controller. Fast forward, fullscreen and screenshots.
+- **Colors:** gray, green or Pocket screens for Game Boy games, Super Game Boy palettes with an editor for your own, and light and dark themes that can follow your system.
+- **Cheats:** GameShark and Game Genie codes, kept for each game.
+- **Cartridges:** the cartridge types almost all games use: cartridges without a mapper, MBC1, MBC2, MBC3 with its clock (as in Pokémon Gold, Silver and Crystal, including the larger MBC30 of the Japanese Crystal), MBC5 and HuC1. Games load from `.gb`, `.gbc` and `.zip` files.
+
+<table>
+  <tr>
+    <td align="center"><img src="images/screenshots/big2small.png" width="400" alt="Big2Small's colorful forest map"><br><sub>Big2Small, a Game Boy Color puzzle adventure</sub></td>
+    <td align="center"><img src="images/screenshots/rebound.png" width="400" alt="Rebound, a blue blob on grassy steps under a blue sky, with coins"><br><sub>Rebound, a Game Boy Color platformer</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="images/screenshots/moki.png" width="400" alt="Moki the Monster Kid waking up in a warm orange bedroom"><br><sub>Moki the Monster Kid, a Game Boy Color adventure</sub></td>
+    <td align="center"><img src="images/screenshots/rhythm-land.png" width="400" alt="Rhythm Land's skateboarder on a street, in Game Boy Pocket colors"><br><sub>Rhythm Land, a Game Boy game, in Pocket colors</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="images/screenshots/palettes.png" width="820" alt="El Dueloroso's saloon three times: in green, in Pocket colors and in gray"><br>
+  <sub>A Game Boy game in Nubo's green, Pocket and gray screens</sub>
+</p>
 
 ## Getting Started
 
-Nubo doesn't come with any games. Play the cartridges you own, or start with free homebrew games such as [Tobu Tobu Girl Deluxe](https://tangramgames.itch.io/tobu-tobu-girl-deluxe), [µCity](https://github.com/AntonioND/ucity) or the hundreds on [Homebrew Hub](https://hh.gbdev.io).
+Nubo doesn't come with any games. Use games you own, or free homebrew games such as [Tobu Tobu Girl Deluxe](https://tangramgames.itch.io/tobu-tobu-girl-deluxe), [µCity](https://github.com/AntonioND/ucity) or the ones on [Homebrew Hub](https://hh.gbdev.io).
 
-Open a single game, or add your ROM folders under Settings > Library and let Nubo fill the library:
+Open a game with Open ROM in the library (Ctrl+O) or by dropping a `.gb`, `.gbc` or `.zip` file onto the window. To fill the library, add your ROM folders under Settings > Library:
 
 <p align="center">
   <img src="images/screenshots/library.png" width="760" alt="Nubo's game library in the light theme: a Continue playing row with Moki the Monster Kid, Big2Small, Froggy Kong and Dawn Will Come, above all the games, each shown with its title screen">
 </p>
 
-These are the default controls. All of them but Esc can be changed under Settings > Controls.
+These are the default keys. All of them but Esc can be changed under Settings > Controls.
 
 | Keyboard | Game Boy |
 | -------- | -------- |
@@ -106,9 +99,14 @@ These are the default controls. All of them but Esc can be changed under Setting
 | F11 | Fullscreen |
 | F12 | Screenshot |
 
-Double-clicking the game also switches between fullscreen and a window, and right-clicking it opens the pause menu, which a click on the game outside it closes again.
+Ctrl+O opens a game, Ctrl+P pauses and resumes, Ctrl+R resets and Ctrl+, opens the settings (⌘ instead of Ctrl on macOS). Double-clicking the game screen switches between fullscreen and a window, and right-clicking it opens the pause menu, which a click on the game outside it closes again.
 
-On a controller, the D-pad or left stick moves, the right face button (B on Xbox, ○ on PlayStation) is A, the bottom face button (A on Xbox, ✕ on PlayStation) is B, L1 opens the pause menu and R1 fast forwards.
+On a controller, the D-pad or left stick moves, and A and B sit where they are on a Game Boy: the right face button (B on Xbox, ○ on PlayStation) is A, and the bottom one (A on Xbox, ✕ on PlayStation) is B. L1 opens the pause menu, R1 fast forwards, and L2 and R2 are quick load and quick save.
+
+<p align="center">
+  <img src="images/screenshots/pause-menu.png" width="600" alt="Nubo's pause menu over El Dueloroso: resume, save state, load state, cheats, fullscreen, reset, settings and back to library"><br>
+  <sub>The pause menu, with save states, cheats and the settings</sub>
+</p>
 
 <details>
 <summary><strong>Where your saves are</strong></summary>
@@ -130,31 +128,30 @@ Screenshots go to your Pictures folder, in `Pictures/Nubo`.
 <summary><strong>Installing, updating and removing</strong></summary>
 
 - **Windows:** the installer installs Nubo for your user, without administrator rights, with a Start menu entry; it can also offer Nubo for opening `.gb` and `.gbc` files and add a desktop shortcut. Running a newer installer updates Nubo and keeps those choices. Uninstall Nubo from Settings > Apps, like any app. To install without questions from a script, run `msiexec /i Nubo-windows-x64.msi /qn`, adding `ASSOCIATE_FILES=0` (don't offer Nubo for ROMs) or `DESKTOP_SHORTCUT=1` (add a desktop shortcut); `/passive` shows only a progress bar.
-- **Linux:** the Flatpak adds Nubo to your app grid; it can read ROM folders in your home folder and on external drives. Start it from a terminal with `flatpak run io.github.mschoenm.nubo`, and remove it with `flatpak uninstall --user io.github.mschoenm.nubo` or your software center. To update, install the newer file with `--reinstall` added; your saves and settings stay.
+- **Linux:** the Flatpak adds Nubo to your app grid; it can read ROM folders in your home folder and on external drives. Start it from a terminal with `flatpak run io.github.mschoenm.nubo`. To update, install the newer file over the old one with `flatpak install --user --reinstall Nubo-linux-x86_64.flatpak` (`Nubo-linux-aarch64.flatpak` on ARM); your saves and settings stay. Remove Nubo with `flatpak uninstall --user io.github.mschoenm.nubo` or your software center.
 
 </details>
 
 ## Not Supported Yet
 
-- A download for macOS (you can [build it](BUILDING.md#macos)), and Android or iOS.
+- A download of the app for macOS (you can [build it](BUILDING.md#macos)), and Android or iOS.
 - Linking two games with the link cable.
 - Rumble in the desktop app and the browser (the [RetroArch core](#retroarch-core) has it).
 - The Pocket Camera, and the cartridges with an MBC6, MBC7 (Kirby Tilt 'n' Tumble), MMM01, HuC3 or TAMA5.
 
 ## Accuracy
 
-Every change to Nubo is checked against thousands of test ROMs: small programs that each test one detail of the hardware against what the real consoles do. A change that breaks one doesn't get in.
+Every change to Nubo is tested against thousands of test ROMs: small programs that each check one detail of the hardware against what real consoles do. Every pull request runs them all, and fails if a test that passed stops passing.
 
-- **[GB Emulator Shootout](https://gbdev.io/GBEmulatorShootout/):** 261 of its 264 tests pass, counted on the table published on 2026-06-04. That would put Nubo first; the leader there, DocBoy, passes 255.
-- **The test ROM suites:** 6,793 of 6,824 test runs pass on the 12 hardware models Nubo emulates, from Blargg's tests, Mooneye, the acid tests, SameSuite and Mealybug Tearoom to Gambatte's thousands.
-- **The processor:** every instruction is checked cycle by cycle against the [JSON CPU tests](https://github.com/adtennant/GameboyCPUTests), and all of them pass.
-- **Still fast:** being exact costs speed, yet Nubo runs games 50 to 125 times as fast as a real Game Boy on a single core of a modest cloud server, and 3 to 6 times as fast as SameBoy, which also draws the screen dot by dot.
+- **The test ROM suites:** 6,793 of 6,824 test runs pass, each test on the models it was written for, across the 12 models Nubo emulates. The suites include Blargg's tests, Mooneye, the acid tests, SameSuite, Mealybug Tearoom and Gambatte's.
+- **The processor:** all [JSON CPU tests](https://github.com/adtennant/GameboyCPUTests) pass, which check every instruction cycle by cycle.
+- **Speed:** being exact costs speed, but on one core of a shared 2.1 GHz cloud server Nubo still runs games about 50 to 125 times as fast as a real Game Boy, so playing at normal speed takes only a small share of one processor core.
 
-[The results suite by suite](docs/ACCURACY.md), [the tests that still fail and why](tools/nubo-test-rom-runner/FAILING_TESTS.md), and [the speed comparison](docs/EMULATOR_COMPARISON.md).
+[The results suite by suite](docs/ACCURACY.md) and [the tests that still fail, and why](tools/nubo-test-rom-runner/FAILING_TESTS.md).
 
 ## RetroArch Core
 
-Already playing in [RetroArch](https://www.retroarch.com/)? Nubo runs there too, with everything RetroArch adds: rewind, run-ahead, netplay, shaders, RetroAchievements and recording. The boot ROMs are built in, so no BIOS files are needed. The core isn't in RetroArch's core downloader yet, so you install it by hand:
+Nubo also runs in [RetroArch](https://www.retroarch.com/) as a core, with what RetroArch adds: rewind, run-ahead, netplay, shaders, RetroAchievements and recording. The boot ROMs are built in, so no BIOS files are needed. The core isn't in RetroArch's core downloader yet, so it is installed by hand:
 
 1. Download `Nubo-libretro-<system>.zip` for your system from the [latest release](https://github.com/mschoenm/nubo/releases/latest).
 2. Copy the core (`nubo_libretro.so`, `.dll` or `.dylib`) into RetroArch's `cores` folder and `nubo_libretro.info` into its `info` folder. Settings > Directory in RetroArch shows where they are.
@@ -164,11 +161,13 @@ Already playing in [RetroArch](https://www.retroarch.com/)? Nubo runs there too,
 
 ## Help and Feedback
 
-Found a game that doesn't play right, or something that could be better? [Open an issue](https://github.com/mschoenm/nubo/issues), with the game's name and, if you chose one, the Game Boy model you played it on.
+If a game doesn't play correctly or something else is wrong, [open an issue](https://github.com/mschoenm/nubo/issues) with the game's name, the Nubo version (Settings > General, under About), your system and, if you chose one, the Game Boy model you played it on.
 
 ## Building and Contributing
 
-Nubo is written in Rust. With a [Rust toolchain](https://rustup.rs) installed (plus the ALSA and udev development files on Linux), `cargo play` builds and runs the desktop app, and `cargo xtask web` the browser version. [BUILDING.md](BUILDING.md) has the other commands, the packages, the tests and a map of the code. Pull requests are welcome; [AGENTS.md](AGENTS.md) has the project's rules and the checks to run before you push.
+Nubo is written in Rust, with no `unsafe` code outside the RetroArch core's C interface. The app is built with [Iced](https://iced.rs), a user interface library written in Rust, and the same app compiles to WebAssembly to run in the browser.
+
+With a [Rust toolchain](https://rustup.rs) installed (plus `pkg-config` and the ALSA and udev development files on Linux), `cargo play` builds and runs the desktop app, and `cargo xtask web` the browser version. [BUILDING.md](BUILDING.md) has the other commands, the packages, the tests and a map of the code. Pull requests are welcome; [AGENTS.md](AGENTS.md) has the project's rules and the checks to run before you push.
 
 ## Credits
 
@@ -181,12 +180,16 @@ Much of its accuracy comes from other people's research and code:
 - [Gambatte](https://github.com/pokemon-speedrunning/gambatte-core) by sinamas: a reference for the timing of double speed and the window, worked out by running the same test ROMs in Gambatte and Nubo and studying where they differ. Gambatte's GPL-2.0-only license can't be combined with Nubo's, so no code comes from it.
 - [Pan Docs](https://gbdev.io/pandocs/) and the [gbdev](https://gbdev.io) community: the reference for nearly every hardware register.
 - [SonoSooS's Game Boy CPU notes](https://gist.github.com/SonoSooS/c0055300670d678b5ae8433e20bea595): the fetch, decode and execute overlap of the CPU.
+
+<details>
+<summary><strong>The test ROMs, fonts, icons, box art and the games in the screenshots</strong></summary>
+
 - The authors of the test ROMs that keep the emulator honest, linked in [the results table](docs/ACCURACY.md#test-roms): Blargg, Joonas Javanainen (Mooneye), Wilbert Pol, Matt Currie (the acid tests and Mealybug Tearoom), Lior Halphon (SameSuite), sinamas (Gambatte), Austin Appleby (GBMicrotest), c-sp (AGE, and the [Game Boy test ROM collection](https://github.com/c-sp/game-boy-test-roms) that packages them), ax6 (rtc3test), Hacktix (Bully, Strikethrough and Scribbltests), Brian Jia (TurtleTests), Damian Yerrick (little-things-gb), Eric Kirschenmann (MBC3 Tester), daid, CasualPokePlayer and the gbdev community (the GB Emulator Shootout), and adtennant (the [JSON CPU tests](https://github.com/adtennant/GameboyCPUTests)).
 - [Fira Sans](https://github.com/mozilla/Fira): the web version's font, bundled by Iced (SIL Open Font License).
 - The [libretro thumbnail collection](https://github.com/libretro-thumbnails/libretro-thumbnails) and the No-Intro game lists of the [libretro database](https://github.com/libretro/libretro-database): the box art the desktop app can download.
 - [Lucide](https://lucide.dev): the icons of the desktop app (ISC License, see [NOTICE](NOTICE)).
 - [libretro.h](https://github.com/libretro/libretro-common) by the RetroArch team: the libretro API the RetroArch core's bindings are written from (MIT License, see [NOTICE](NOTICE)). [SameBoy's libretro core](https://github.com/LIJI32/SameBoy) and [rcheevos](https://github.com/RetroAchievements/rcheevos) showed how a Game Boy core lays out its memory for RetroAchievements.
-- [Tobu Tobu Girl Deluxe](https://tangramgames.itch.io/tobu-tobu-girl-deluxe) by Tangram Games: the game in the Super Game Boy screenshots and the Flatpak's screenshot (`images/`), and in some of the save states every version is checked against (`save-states/`), whose graphics are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- [Tobu Tobu Girl Deluxe](https://tangramgames.itch.io/tobu-tobu-girl-deluxe) by Tangram Games: the game in the Super Game Boy screenshot and the Flatpak's screenshot (`images/`), and in some of the save states every version is checked against (`save-states/`), whose graphics are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 - The other homebrew games in the screenshots (`images/screenshots/`), each under its own license: [Big2Small](https://github.com/mdsteele/big2small) by Matthew D. Steele (GPL-3.0-or-later), [Rebound](https://github.com/DevEd2/ReboundGB) by DevEd (MIT), [Moki the Monster Kid](https://github.com/sleepingpandagames/moki-the-monster-kid) by Sleeping Panda Games (MPL-2.0), [Rhythm Land](https://github.com/sinusoid-studios/rhythm-land) by Sinusoid Studios (MIT) and [El Dueloroso](https://github.com/ajgalan/el-dueloroso) by Adrián JG (GPL-3.0), and in the library [Airaki](https://github.com/furrtek/Airaki) by furrtek (GPL-3.0), [Dawn Will Come](https://github.com/eishiya/DawnWillCome) by eishiya, with art by H0lyhandgrenade and eishiya and music by Kezia Salmon (code MIT, art and music [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), [Europa Rescue](https://github.com/godai78/europa) by godai ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)), [Froggy Kong](https://github.com/videogamestorytime/FroggyKong) by videogamestorytime (GPL-3.0) and [Sushi Nights](https://github.com/Zal0/SushiNights) by Zalo, Kirblue, MaikelOrtega_ and sergiodeprado (MIT).
 - [µCity](https://github.com/AntonioND/ucity) and [Geometrix](https://github.com/AntonioND/geometrix) by Antonio Niño Díaz: Geometrix is in the library screenshot (`images/screenshots/`), and both are in the save states every version is checked against (`save-states/`), licensed under the GPL, version 3 or later.
 
@@ -197,6 +200,8 @@ The original project was built with the help of these resources:
 3. [Blargg's Test ROM Collection](https://github.com/retrio/gb-test-roms)
 4. [Gameboy Doctor](https://github.com/robert/gameboy-doctor)
 5. [Imran Nazar's Gameboy Emulator Tutorial](https://imrannazar.com/series/gameboy-emulation-in-javascript)
+
+</details>
 
 ## License
 

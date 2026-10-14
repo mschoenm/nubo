@@ -29,40 +29,28 @@ pub fn icon_button<'a, Message: Clone + 'a>(
     label: String,
     on_press: Option<Message>,
 ) -> Element<'a, Message> {
-    icon_button_at(icon, label, on_press, tooltip::Position::Bottom)
-}
-
-/// An icon button with its tooltip on the given side, such as above it in a
-/// bar along the bottom of the screen.
-pub fn icon_button_at<'a, Message: Clone + 'a>(
-    icon: Icon,
-    label: String,
-    on_press: Option<Message>,
-    tooltip_position: tooltip::Position,
-) -> Element<'a, Message> {
     let button = button(icons::icon(icon))
         .padding(8)
         .style(theme::icon_button)
         .on_press_maybe(on_press);
 
-    with_tooltip(button, label, tooltip_position)
+    with_tooltip(button, label, tooltip::Position::Bottom)
 }
 
 /// An icon button that stays highlighted while its feature is on, such as
-/// fast forward.
+/// fast forward, with its tooltip below it.
 pub fn toggle_icon_button<'a, Message: Clone + 'a>(
     icon: Icon,
     label: String,
     active: bool,
     on_press: Message,
-    tooltip_position: tooltip::Position,
 ) -> Element<'a, Message> {
     let button = button(icons::icon(icon))
         .padding(8)
         .style(theme::segment(active))
         .on_press(on_press);
 
-    with_tooltip(button, label, tooltip_position)
+    with_tooltip(button, label, tooltip::Position::Bottom)
 }
 
 /// `content` with `label` shown in a small dark box next to it while the
@@ -172,13 +160,6 @@ where
 /// The bar along the top of a screen, with a thin line under it.
 pub fn top_bar<'a, Message: 'a>(content: iced::widget::Row<'a, Message>) -> Element<'a, Message> {
     column![bar_body(content), divider()].into()
-}
-
-/// A bar along the bottom of the screen, with a thin line above it.
-pub fn bottom_bar<'a, Message: 'a>(
-    content: iced::widget::Row<'a, Message>,
-) -> Element<'a, Message> {
-    column![divider(), bar_body(content)].into()
 }
 
 fn bar_body<'a, Message: 'a>(content: iced::widget::Row<'a, Message>) -> Element<'a, Message> {
