@@ -12,12 +12,12 @@ use crate::ui::pictures;
 use crate::ui::theme;
 use crate::ui::widgets::{
     icon_button, keycap, primary_button, secondary_button, shortcut, top_bar, truncated_text,
-    whole_step_screen,
+    whole_step_screen, with_tooltip,
 };
 use crate::views::settings::SettingsTab;
 use iced::widget::{
-    Column, Row, button, center, column, container, grid, image, row, scrollable, space, text,
-    text_input,
+    Column, Row, button, center, column, container, grid, hover, image, row, scrollable, space,
+    text, text_input, tooltip,
 };
 use iced::{Alignment, ContentFit, Element, Fill, widget};
 use nubo_frontend::controls::Action;
@@ -37,7 +37,7 @@ const CONTROLS: [(&[Action], &str); 5] = [
 ];
 
 /// How many games "Continue playing" shows.
-const RECENT_LIMIT: usize = 4;
+pub const RECENT_LIMIT: usize = 4;
 /// Cards are at most this wide; the grid fits as many columns as it can.
 const CARD_MAX_WIDTH: f32 = 210.0;
 const CARD_SPACING: f32 = 16.0;
@@ -213,6 +213,7 @@ pub fn view<'a>(
                 settings.shared.download_box_art,
                 0,
                 selection,
+                true,
             ))
             .push(space().height(SHELF_GAP));
     }
@@ -240,6 +241,7 @@ pub fn view<'a>(
             settings.shared.download_box_art,
             recent_count,
             selection,
+            false,
         ))
     } else if !search.is_empty() {
         content.push(notice("No games match your search.", None))
@@ -494,20 +496,27 @@ impl CardPicture {
 
 /// The games as a grid of cards that fits as many columns as the window
 /// allows. `first_index` is the first card's place across both shelves, to
-/// find the selected one.
+/// find the selected one. With `removable`, for "Continue playing", each
+/// card can be taken off it.
 fn card_grid<'a>(
     library: &'a Library,
     games: Vec<&'a LibraryEntry>,
     show_box_art: bool,
     first_index: usize,
     selection: Option<usize>,
+    removable: bool,
 ) -> Element<'a, Message> {
     grid(games.into_iter().enumerate().map(|(index, entry)| {
-        card(
+        let card = card(
             entry,
             CardPicture::of(library, entry, show_box_art),
             selection == Some(first_index + index),
-        )
+        );
+        if removable {
+            hover(card, remove_button(entry))
+        } else {
+            card
+        }
     }))
     .fluid(CARD_MAX_WIDTH)
     .spacing(CARD_SPACING)
@@ -546,6 +555,27 @@ fn card(entry: &LibraryEntry, picture: CardPicture, selected: bool) -> Element<'
         .style(theme::selectable_card(selected))
         .on_press(Message::Game(GameMessage::PlayGame(entry.path.clone())))
         .into()
+}
+
+/// The button in the corner of a "Continue playing" card that takes the
+/// game off it, shown while the pointer is over the card.
+fn remove_button(entry: &LibraryEntry) -> Element<'_, Message> {
+    let button = button(icon(Icon::X).size(14))
+        .padding(4)
+        .style(theme::card_corner_button)
+        .on_press(Message::Library(LibraryMessage::RemoveRecent(
+            entry.path.clone(),
+        )));
+
+    container(with_tooltip(
+        button,
+        String::from("Remove from Continue playing"),
+        tooltip::Position::Bottom,
+    ))
+    .padding(14)
+    .width(Fill)
+    .align_x(Alignment::End)
+    .into()
 }
 
 /// A picture of the Game Boy screen on a dark frame, grown by the largest

@@ -37,6 +37,8 @@ pub enum LibraryMessage {
     RemoveFolder(usize),
     IncludeSubfolders(usize, bool),
     Rescan,
+    /// The player took this game off "Continue playing".
+    RemoveRecent(PathBuf),
     Scanned(ScanResult),
     /// The quick startup look at whether the games' files still exist is
     /// done.
@@ -111,6 +113,12 @@ impl App {
             }
             LibraryMessage::Rescan | LibraryMessage::Watch(WatchEvent::Changed) => {
                 return self.rescan();
+            }
+            LibraryMessage::RemoveRecent(path) => {
+                if let Err(error) = self.library.forget_played(&path) {
+                    self.toasts.error(error);
+                }
+                self.library_selection = None;
             }
             LibraryMessage::Watch(WatchEvent::Failed(error)) => self.toasts.error(format!(
                 "New games won't show up by themselves ({error}). Use the Rescan button instead."
@@ -309,6 +317,22 @@ impl App {
             ),
             |pictures| LibraryMessage::PicturesLoaded(pictures).into(),
         )
+    }
+
+    /// The games "Continue playing" shows that aren't in a library folder,
+    /// whose files the folder watcher watches too, so a deleted one leaves
+    /// the list right away.
+    pub(super) fn recent_games_elsewhere(&self) -> Vec<PathBuf> {
+        if !self.keeps_library() {
+            return Vec::new();
+        }
+
+        self.library
+            .recently_played(views::library::RECENT_LIMIT)
+            .into_iter()
+            .filter(|entry| !entry.in_folder)
+            .map(|entry| entry.path.clone())
+            .collect()
     }
 
     /// Starts a quick background look at whether the games' files still

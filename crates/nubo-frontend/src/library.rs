@@ -574,6 +574,23 @@ impl Library {
         self.save()
     }
 
+    /// Takes the game at `path` off the recently played games, for a player
+    /// who doesn't want it there. A game in a library folder stays among
+    /// all games; one opened from elsewhere is forgotten, since the library
+    /// only knows it because it was played.
+    pub fn forget_played(&mut self, path: &Path) -> Result<(), String> {
+        let Some(index) = self.entries.iter().position(|entry| entry.path == path) else {
+            return Ok(());
+        };
+
+        if self.entries[index].in_folder {
+            self.entries[index].last_played = None;
+        } else {
+            self.entries.remove(index);
+        }
+        self.save()
+    }
+
     /// Keeps `pixels`, the last frame of the game at `path`, as its thumbnail.
     pub fn set_thumbnail(&mut self, path: &Path, pixels: Vec<u8>) -> Result<(), String> {
         let saved = store::save_thumbnail(&self.cache, path, &pixels);
@@ -604,24 +621,29 @@ pub enum WatchEvent {
 }
 
 /// Combines a scan's `scanned` games with the library's `current` ones.
-/// Games keep the latest play time of either, and games started for the
-/// first time while the scan ran (so not among the `checked` games it knew
-/// about) are kept. Games it checked and left out are gone.
+/// The library changed while the scan ran, so what it says now wins: games
+/// keep their play time as it is now (so games played during the scan keep
+/// it, and games taken off the recently played ones stay off), games
+/// started for the first time while the scan ran (so not among the
+/// `checked` games it knew about) are kept, and games forgotten while it
+/// ran stay forgotten. Games it checked and left out are gone.
 fn merge_scan(
     current: &[LibraryEntry],
     mut scanned: Vec<LibraryEntry>,
     checked: &HashSet<PathBuf>,
 ) -> Vec<LibraryEntry> {
-    let last_played: HashMap<&Path, u64> = current
+    let now: HashMap<&Path, &LibraryEntry> = current
         .iter()
-        .filter_map(|entry| Some((entry.path.as_path(), entry.last_played?)))
+        .map(|entry| (entry.path.as_path(), entry))
         .collect();
 
-    for entry in &mut scanned {
-        if let Some(&played) = last_played.get(entry.path.as_path()) {
-            entry.last_played = entry.last_played.max(Some(played));
+    scanned.retain_mut(|entry| match now.get(entry.path.as_path()) {
+        Some(current) => {
+            entry.last_played = current.last_played;
+            true
         }
-    }
+        None => !checked.contains(&entry.path),
+    });
 
     for entry in current {
         if !checked.contains(&entry.path) && !scanned.iter().any(|new| new.path == entry.path) {

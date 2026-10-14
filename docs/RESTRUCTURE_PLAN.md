@@ -312,7 +312,8 @@ with the new build. Test this by hand on the desktop and in the browser.
   stay in the player's data folder). The work the app runs in the background
   for a game's title screen or box art (the saved picture if it is still current, else capture or
   download it) moved with it as `Cache::title_screen` and `Cache::box_art`.
-- **Watcher:** `library::watch(folders, report)` calls `report` only on the watcher's own thread with
+- **Watcher:** `library::watch(folders, games, report)` (`games`, added later, are the recently
+  played games outside the folders, whose files it watches too) calls `report` only on the watcher's own thread with
   each `WatchEvent`, and returns `Watching`: a `Watcher` that watches until it is dropped (`None` if
   watching can't start) and the failures from starting, which the caller passes on itself. So
   `report` may block until the app takes the event, while the subscription that empties the channel

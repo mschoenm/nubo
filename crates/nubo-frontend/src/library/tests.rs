@@ -166,6 +166,89 @@ fn games_started_during_a_scan_are_kept() {
 }
 
 #[test]
+fn games_taken_off_or_forgotten_during_a_scan_stay_that_way() {
+    let mut played_in_folder = LibraryEntry::example("/games/Tetris.gb");
+    played_in_folder.last_played = Some(1_000);
+    let mut played_elsewhere = LibraryEntry::example("/elsewhere/Mario.gb");
+    played_elsewhere.in_folder = false;
+    played_elsewhere.last_played = Some(2_000);
+    let checked = std::collections::HashSet::from([
+        played_in_folder.path.clone(),
+        played_elsewhere.path.clone(),
+    ]);
+    let taken_off = LibraryEntry {
+        last_played: None,
+        ..played_in_folder.clone()
+    };
+
+    let merged = merge_scan(
+        std::slice::from_ref(&taken_off),
+        vec![played_in_folder, played_elsewhere],
+        &checked,
+    );
+
+    assert_eq!(merged, [taken_off]);
+}
+
+/// A library kept in a new temporary folder, with one game in a library
+/// folder and one opened from elsewhere, both played.
+#[cfg(feature = "desktop")]
+fn library_with_two_played_games(name: &str) -> Library {
+    let mut in_folder = LibraryEntry::example("/games/Tetris.gb");
+    in_folder.last_played = Some(1_000);
+    let mut elsewhere = LibraryEntry::example("/elsewhere/Mario.gb");
+    elsewhere.in_folder = false;
+    elsewhere.last_played = Some(2_000);
+
+    let mut library = Library {
+        cache: Cache::in_folder(temporary_folder(name)),
+        ..Library::default()
+    };
+    library.replace_entries(vec![in_folder, elsewhere]);
+    library
+}
+
+#[cfg(feature = "desktop")]
+#[test]
+fn a_game_in_a_library_folder_taken_off_the_recently_played_stays_among_all_games() {
+    let mut library = library_with_two_played_games("forget-in-folder");
+
+    library
+        .forget_played(Path::new("/games/Tetris.gb"))
+        .unwrap();
+
+    let recent: Vec<_> = library
+        .recently_played(4)
+        .iter()
+        .map(|e| e.name())
+        .collect();
+    let games: Vec<_> = library.games("").map(LibraryEntry::name).collect();
+    assert_eq!(recent, ["Mario"]);
+    assert_eq!(games, ["Tetris"]);
+}
+
+#[cfg(feature = "desktop")]
+#[test]
+fn a_game_from_elsewhere_taken_off_the_recently_played_is_forgotten() {
+    let mut library = library_with_two_played_games("forget-elsewhere");
+
+    library
+        .forget_played(Path::new("/elsewhere/Mario.gb"))
+        .unwrap();
+
+    let recent: Vec<_> = library
+        .recently_played(4)
+        .iter()
+        .map(|e| e.name())
+        .collect();
+    assert_eq!(recent, ["Tetris"]);
+    assert_eq!(library.entries.len(), 1);
+    let (reloaded, error) = Library::load_from(library.cache.clone());
+    assert_eq!(error, None);
+    assert_eq!(reloaded.entries, library.entries);
+}
+
+#[test]
 fn the_quick_check_tells_deleted_games_from_unreachable_ones() {
     let root = temporary_folder("check");
     let library_folder = root.join("library");
