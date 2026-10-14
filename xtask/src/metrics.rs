@@ -11,7 +11,7 @@
 //!
 //! Its `shootout` holds Nubo's score on the GB Emulator Shootout's published
 //! tests and the rank it would have there, with the publication it was
-//! counted against: `{"passed": 251, "total": 264, "rank": 2, "leader":
+//! counted against: `{"passed": 258, "total": 264, "rank": 1, "leader":
 //! "DocBoy", "leader_passed": 255, "published": "2026-06-04",
 //! "published_commit": "72fd745"}`. The page's first lines show it.
 
