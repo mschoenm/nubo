@@ -84,7 +84,11 @@ fn notes_for(metainfo: &str, version: &str) -> Result<String> {
          \n\
          Flatpak downloads the runtime Nubo needs from Flathub. To replace a Nubo you installed \
          from an earlier file or a nightly build, add `--reinstall`; your saves and settings \
-         stay.\n",
+         stay.\n\
+         \n\
+         **RetroArch:** download the core for your system (`Nubo-libretro-<system>.zip`), \
+         then copy the core into RetroArch's `cores` folder and `nubo_libretro.info` into its \
+         `info` folder. The README's RetroArch Core section has the details.\n",
     );
     Ok(notes)
 }
@@ -185,6 +189,7 @@ mod tests {
         ));
         assert!(notes.contains("flatpak install --user Nubo-linux-x86_64.flatpak"));
         assert!(notes.contains("`Nubo-windows-x64-setup.exe`"));
+        assert!(notes.contains("`Nubo-libretro-<system>.zip`"));
     }
 
     #[test]
