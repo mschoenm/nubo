@@ -1,0 +1,147 @@
+name: Shootout
+
+# Runs the GB Emulator Shootout's own harness on Nubo's Windows zip, as the
+# Shootout would (docs/SHOOTOUT_PLAN.md): a checkout of the Shootout at the
+# commit the test ROM runner pins, with Nubo's harness class
+# (.github/shootout/nubo.py) added, starts the real nubo.exe for every test
+# and compares screenshots of its window with the reference pictures. It
+# fails unless every Shootout test that `cargo test-roms` passes
+# (tools/nubo-test-rom-runner/passing.txt) passes here too, so it catches
+# what only the app shows: the window's title and size, settings or saves
+# kept between tests, and the start-up time. The run's results, with a
+# screenshot of each test, are kept as its artifact. The nightly run, which
+# releases run too, tests the zip its Windows job built, the one a release
+# publishes and the Shootout downloads; pull requests that change this
+# workflow or the harness class, and runs started by hand, build their own
+# with the Windows workflow. It isn't one of the checks that pull requests
+# wait for.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/shootout.yml
+      - .github/shootout/**
+  workflow_call:
+    inputs:
+      windows-artifact:
+        description: The artifact with the Windows zip to test; without one, the Windows workflow builds it here
+        type: string
+        default: ""
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  # Without a zip from the caller, the Windows workflow builds one, as it
+  # builds them for players (with its own checks of the zip and the MSI).
+  windows:
+    name: Windows
+    if: inputs.windows-artifact == ''
+    uses: ./.github/workflows/windows.yml
+
+  shootout:
+    name: GB Emulator Shootout (Windows)
+    needs: windows
+    if: ${{ !cancelled() && (needs.windows.result == 'success' || needs.windows.result == 'skipped') }}
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download the zip
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ inputs.windows-artifact || 'windows-x64' }}
+          path: target/bundle
+
+      # The test ROM runner's pin, so both run the same tests.
+      - name: Read the Shootout commit the test ROM runner pins
+        id: pin
+        shell: pwsh
+        run: |
+          $line = Select-String -Path tools/nubo-test-rom-runner/src/download.rs -Pattern 'const SHOOTOUT_COMMIT: &str = "([0-9a-f]{40})"'
+          if (-not $line) { throw "SHOOTOUT_COMMIT not found in download.rs" }
+          "commit=$($line.Matches[0].Groups[1].Value)" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gbdev/GBEmulatorShootout
+          ref: ${{ steps.pin.outputs.commit }}
+          path: shootout
+          persist-credentials: false
+
+      # pywin32 and Pillow need wheels for the Python version.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      # The zip goes where the class's setup() would download the latest
+      # release to, so it unpacks this build instead.
+      - name: Add Nubo to the Shootout
+        shell: pwsh
+        working-directory: shootout
+        run: |
+          python -m pip install -r requirements-core.txt -r requirements.txt
+          Copy-Item ../.github/shootout/nubo.py emulators/nubo.py
+          $entry = @'
+          EMULATOR_SPECS = [
+              {
+                  'factory': lambda: _new_instance("emulators.nubo", "Nubo"),
+                  'keywords': ["Nubo", "nubo"],
+                  'name': "Nubo",
+                  'url': "https://github.com/mschoenm/nubo",
+              },
+          '@
+          $main = Get-Content main.py -Raw
+          if (-not $main.Contains("EMULATOR_SPECS = [")) { throw "EMULATOR_SPECS not found in main.py" }
+          Set-Content main.py $main.Replace("EMULATOR_SPECS = [", $entry.TrimEnd()) -NoNewline
+          New-Item -ItemType Directory downloads | Out-Null
+          Copy-Item (Get-Item ../target/bundle/*-windows-x64.zip).FullName downloads/nubo.zip
+
+      # Shows the screen as the harness sees it and how long Nubo takes to
+      # show its first frame, which the class's startup_time should cover.
+      - name: Measure the start-up time
+        shell: pwsh
+        working-directory: shootout
+        run: python main.py --emulator nubo --get-startuptime
+
+      - name: Run the Shootout's tests
+        shell: pwsh
+        working-directory: shootout
+        run: python main.py --emulator nubo 2>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/shootout.log"
+
+      # A test that crashed or never opened a window is missing from
+      # nubo.json, so it counts as failed too.
+      - name: Compare with the tests `cargo test-roms` passes
+        shell: pwsh
+        run: |
+          if (-not (Test-Path shootout/nubo.json)) { throw "The Shootout wrote no results" }
+          $results = (Get-Content shootout/nubo.json -Raw | ConvertFrom-Json).tests
+          $expected = Get-Content tools/nubo-test-rom-runner/passing.txt |
+            Where-Object { $_.StartsWith("shootout/") } |
+            ForEach-Object { $_.Substring("shootout/".Length) }
+          $failed = foreach ($name in $expected) {
+            $test = $results.PSObject.Properties[$name]
+            $result = if ($test) { $test.Value.result } else { "not run" }
+            if ($result -ne "PASS") { "$name`: $result" }
+          }
+          $passed = @($results.PSObject.Properties | Where-Object { $_.Value.result -eq "PASS" }).Count
+          $summary = "Shootout harness: $passed passed, $(@($failed).Count) of the $(@($expected).Count) expected passes missing"
+          $summary
+          "### $summary" >> $env:GITHUB_STEP_SUMMARY
+          foreach ($line in $failed) { "- $line" >> $env:GITHUB_STEP_SUMMARY; "::error::$line" }
+          if ($failed) { exit 1 }
+
+      - name: Upload the results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shootout-results
+          path: |
+            shootout/nubo.json
+            shootout/startuptime.html
+            ${{ runner.temp }}/shootout.log
+          if-no-files-found: ignore

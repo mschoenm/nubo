@@ -9,7 +9,8 @@ The work has five parts:
 
 - Parts 1 and 2 can be done in a cloud session.
 - Part 3 needs a Windows PC and is done by the maintainer. **Done** with 0.6.0: all 261 tests
-  the harness judges pass (see "What Part 3 found").
+  the harness judges pass (see "What Part 3 found"). Every nightly run, and so every release, now
+  runs the harness again on a GitHub Windows machine (see "Part 3 in CI").
 - Part 4 is a pull request to another project's repository. It waits until Nubo would land at the top
   of the published table (Part 5 shows where it stands), until the maintainer has reviewed Nubo
   themselves and the app (its UI above all) is ready to go public, and then for the maintainer's go.
@@ -36,8 +37,9 @@ The work has five parts:
     before step 3 of that plan or after step 6, not in the middle.
 - **In the Shootout's repository (`gbdev/GBEmulatorShootout`).** The harness class
   `emulators/nubo.py`, its entry in `main.py` and the README line belong to that project and go in
-  through a pull request from the maintainer's fork (Part 4). Until then their draft lives in this
-  document (Part 2), never in the Nubo crates: ACCURACY_PLAN.md keeps harnesses for other emulators
+  through a pull request from the maintainer's fork (Part 4). Until then the class's draft lives in
+  `.github/shootout/nubo.py` and the `EMULATOR_SPECS` entry in `.github/workflows/shootout.yml`, which
+  CI runs (Part 3), never in the Nubo crates: ACCURACY_PLAN.md keeps harnesses for other emulators
   out of them.
 - **In the test ROM runner (`tools/nubo-test-rom-runner`), the nightly workflow and `cargo xtask metrics`.** Part 5 runs
   the Shootout's tests headless with its reference images and tolerance, and compares the result with
@@ -230,83 +232,38 @@ Part 5 is built, `cargo test-roms` does this properly and the dry run is no long
 
 ## Part 2: the harness class
 
-This is the Shootout's `emulators/nubo.py`, ready to copy into a clone of the Shootout for Part 3.
-It was checked on 2026-10-14 against the options as merged (`frontends/nubo/src/command_line.rs`) and
+The Shootout's `emulators/nubo.py` is `.github/shootout/nubo.py`, ready to copy into a clone of the
+Shootout for Part 3; the nightly run uses the same file, so it stays the one copy. It was checked on 2026-10-14 against the options as merged (`frontends/nubo/src/command_line.rs`) and
 against the Shootout's `main` at `38b926b`, still its newest commit then: `downloadGithubRelease` takes
 `filter` and `require_asset`, and the window title still ends with "Nubo". Part 3 ran it on Windows
 with 0.6.0 and fixed two mistakes in the first draft (see "What Part 3 found"), and set `startup_time`
 from `--get-startuptime`. The test ROM runner's `HARNESS_SPEED` and `HARNESS_STARTUP_MILLISECONDS`
 (`tools/nubo-test-rom-runner/src/shootout.rs`) must stay this class's `speed` and `startup_time`.
 
-```python
-from util import *
-from emulator import Emulator
-from test import *
-import os
-
-
-class Nubo(Emulator):
-    def __init__(self):
-        super().__init__("Nubo", "https://github.com/mschoenm/nubo", startup_time=1.5, features=(PCM,))
-        # While a game runs the title is "<game> — Nubo".
-        self.title_check = lambda title: title.endswith("Nubo")
-        self.speed = 4.0
-
-    def setup(self):
-        # The release also has a setup .exe and the RetroArch core's zip, which a looser filter
-        # would pick.
-        downloadGithubRelease("mschoenm/nubo", "downloads/nubo.zip",
-                              filter=lambda name: name == "Nubo-windows-x64.zip", require_asset=True)
-        extract("downloads/nubo.zip", "emu/nubo")
-        setDPIScaling("emu/nubo/Nubo/nubo.exe")
-
-    def startProcess(self, rom, *, model, required_features):
-        model = {DMG: "dmg", CGB: "cgb", SGB: "sgb"}.get(model)
-        if model is None:
-            return None
-        return subprocess.Popen([
-            # Windows doesn't find a relative program path once cwd is set.
-            os.path.abspath("emu/nubo/Nubo/nubo.exe"), os.path.abspath(rom),
-            "--model", model, "--scale", "1", "--fresh", "--speed", "4",
-        ], cwd="emu/nubo/Nubo")
-
-    def getScreenshot(self):
-        screenshot = getScreenshot(self.title_check)
-        if screenshot is not None and screenshot.size == (256, 224):
-            # A Super Game Boy shows the Game Boy screen inside its border.
-            return screenshot.crop((48, 40, 48 + 160, 40 + 144))
-        return screenshot
-```
+It downloads the latest release's `Nubo-windows-x64.zip` and starts
+`nubo.exe <rom> --model dmg|cgb|sgb --scale 1 --fresh --speed 4`.
 
 On a Super Game Boy, `--scale 1` makes the window 256×224, the TV picture with the border around the
 Game Boy screen at (48, 40), as mGBA's and NO$GMB's classes expect too; `getScreenshot` crops the
 screen out of it.
 
-It also needs this entry in `EMULATOR_SPECS` in `main.py`:
-
-```python
-    {
-        'factory': lambda: _new_instance("emulators.nubo", "Nubo"),
-        'keywords': ["Nubo", "nubo"],
-        'name': "Nubo",
-        'url': "https://github.com/mschoenm/nubo",
-    },
-```
+It also needs an entry in `EMULATOR_SPECS` in `main.py`, which the "Add Nubo to the Shootout" step of
+`.github/workflows/shootout.yml` adds, ready to copy.
 
 It also needs a line in the README's "Tested emulators" list, in alphabetical order (between NO$GMB and
 PyBoy).
 
-**Done when:** the files are ready to copy into a clone of the Shootout. They can live in a comment on
-the Part 1 pull request or in this document; they don't belong in the Nubo crates.
+**Done when:** the files are ready to copy into a clone of the Shootout; they don't belong in the Nubo
+crates. **Done**: `.github/shootout/nubo.py` and the workflow's `EMULATOR_SPECS` entry.
 
 ## Part 3: a local run on Windows (maintainer)
 
 1. Install Python 3 (and 7-Zip, which only other emulators' downloads need). Clone `gbdev/GBEmulatorShootout`, then run
    `python -m pip install -r requirements-core.txt -r requirements.txt`.
 2. Add the files from Part 2. Releases from 0.6.0 on have `--scale`, `--fresh`, `--speed` and the
-   Super Game Boy, so the harness downloads the latest one. To test an unreleased change, put a build
-   of `main` (`cargo xtask windows` makes the zip) in `emu/nubo/` by hand, so
-   `downloadGithubRelease` and `extract` leave it alone (see "How the Shootout tests an emulator").
+   Super Game Boy, so the harness downloads the latest one. To test an unreleased change, copy a
+   build of `main` (`cargo xtask windows` makes the zip) to `downloads/nubo.zip`, as CI does, so
+   `downloadGithubRelease` leaves it alone and `extract` unpacks it.
 3. Run a quick subset first: `python main.py --emulator nubo --test daid`. Then measure startup time
    with `python main.py --emulator nubo --get-startuptime` and set `startup_time` from it.
 4. Run everything for Nubo: `python main.py --emulator nubo`. Use 100% display scaling, and don't touch
@@ -328,7 +285,9 @@ Super Game Boy). Only Nubo was run, not the other emulators (step 5).
 - **All 261 tests the harness judges pass**, the number Part 5 counts, which would rank Nubo first ahead
   of DocBoy's 255. The other three: `which.gb` on DMG and CGB only reports (no reference image), and
   `daid/rom_and_ram.gb` doesn't run, since Nubo refuses its cartridge type (0x08, ROM with RAM and no
-  MBC) and exits; it has no reference image either, so it counts for no emulator.
+  MBC) and exits; it has no reference image either, so it counts for no emulator. Nubo runs these
+  cartridges now (`CartridgeMapper::RomRam`, after 0.7.0), so the test starts and shows what it finds
+  (`FAILING_TESTS.md`).
 - **The first full run had four failures that weren't Nubo's**: SameSuite's `channel_2_duty`,
   `channel_3_freq_change_delay`, `channel_3_restart_delay` and `channel_4_lfsr` ran to their deadline,
   and their screenshots showed another window on top of Nubo's, which the harness captured instead.
@@ -346,6 +305,26 @@ Super Game Boy). Only Nubo was run, not the other emulators (step 5).
   emulators' downloads need it.
 - With nearly every test passing early, the whole run took about 7 minutes.
 
+### Part 3 in CI
+
+`.github/workflows/shootout.yml` runs the same harness on a GitHub Windows machine. The nightly run,
+which every release runs before it publishes anything, runs it after its Windows job, on the zip that
+job built: the file a release publishes and the Shootout downloads. It copies the zip to
+`downloads/nubo.zip` in a checkout of the Shootout at the commit the test ROM runner pins, adds the
+class and its `EMULATOR_SPECS` entry, measures the startup time and runs every test. It fails unless
+every Shootout test in `passing.txt` passes there too, counting a test that crashed or never opened a
+window as failed, and keeps `nubo.json` (with each test's last screenshot), the startup measurement and
+the log as its artifact. Pull requests that change the workflow or the class, and runs started by hand
+from the Actions tab, build their own zip with the Windows workflow.
+
+The first CI run, on 2026-10-14 with a build of `main` before 0.7.0, matched the run above: all 261
+tests passed in about 4.5 minutes, `which.gb` ran to its deadline on both models, and
+`daid/rom_and_ram.gb` exited before its window opened, as it did above (Nubo runs that cartridge type
+now). GitHub's Windows machines have no graphics card and no sound device; the app draws and keeps
+time without them, and nothing covers its window. The
+startup time measured 2.5 s for the first start (DMG) and 0.8 s and 0.9 s after it (CGB, SGB); the
+class's 1.5 s only lengthens each test's deadline, and every test passed long before it.
+
 ## Part 4: the pull request to the Shootout
 
 Wait until Part 5 shows Nubo ranking first on the published tests, and Part 3's run on Windows confirms
@@ -357,8 +336,9 @@ maintainer's fork with `emulators/nubo.py`, the `EMULATOR_SPECS` entry and the R
 Nubo version it was tested with and the local results. The Shootout's maintainers rerun the suite and
 publish the table at gbdev.io/GBEmulatorShootout.
 
-Afterwards, mark Phase 6 step 2 as done in ACCURACY_PLAN.md. Rerun the Shootout locally for releases
-that change accuracy, so the published row doesn't fall behind.
+Afterwards, mark Phase 6 step 2 as done in ACCURACY_PLAN.md. CI runs the harness on every release
+(Part 3), so a release that would lose a row fails before it is published; when one gains rows, ask the
+Shootout's maintainers to rerun, so the published row doesn't fall behind.
 
 **Done when:** Nubo appears in the published table.
 

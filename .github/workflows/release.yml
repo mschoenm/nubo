@@ -65,7 +65,8 @@ jobs:
           path: ${{ runner.temp }}/notes.md
 
   # Includes CI, the test ROMs with --verify-boot, the Flatpaks, the
-  # Windows installer and the RetroArch core.
+  # Windows installer, the GB Emulator Shootout's harness on the Windows zip
+  # and the RetroArch core.
   nightly:
     name: Nightly
     needs: notes

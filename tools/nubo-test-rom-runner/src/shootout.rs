@@ -11,7 +11,7 @@
 //! - [`TESTS`] lists them as the Shootout's `main` branch has them at the
 //!   commit `download.rs` pins, with their IDs `shootout/<name>`. DMG tests run
 //!   on the DMG, CGB tests on the CGB-E and SGB tests on the SGB, the models
-//!   the harness class starts (`docs/SHOOTOUT_PLAN.md`, Part 2), and are
+//!   the harness class starts (`.github/shootout/nubo.py`), and are
 //!   compared on the Game Boy screen, which the class crops out of a Super
 //!   Game Boy's picture with its border. Tests without a reference screenshot
 //!   are left out: they only report what they find.
@@ -54,8 +54,8 @@ use std::path::{Path, PathBuf};
 
 use list::TESTS;
 
-/// The speed the harness class runs Nubo at (`--speed 4` in the Shootout's
-/// `emulators/nubo.py`).
+/// The speed the harness class runs Nubo at (`--speed 4` in
+/// `.github/shootout/nubo.py`, the draft of the Shootout's `emulators/nubo.py`).
 const HARNESS_SPEED: u32 = 4;
 /// How often the harness takes a screenshot, in milliseconds of real time.
 const SCREENSHOT_INTERVAL_MILLISECONDS: u32 = 100;
@@ -66,7 +66,7 @@ pub(crate) const MATCH_HOLD_AUDIO_BUFFERS: u32 =
     (SCREENSHOT_INTERVAL_MILLISECONDS * HARNESS_SPEED * AUDIO_BUFFERS_PER_SECOND).div_ceil(1000);
 /// The time the harness gives the emulator to start before its deadline
 /// starts counting, in milliseconds of real time: `startup_time` in the
-/// harness class (`docs/SHOOTOUT_PLAN.md`, Part 2).
+/// harness class (`.github/shootout/nubo.py`).
 const HARNESS_STARTUP_MILLISECONDS: u32 = 1500;
 /// The time the harness waits after a test's `runtime` and the startup time
 /// before the test fails, in milliseconds of real time (`Emulator.run` in the
