@@ -8,7 +8,7 @@ name: RetroArch core
 # every night, and for releases, which attach the zips it makes. It isn't one
 # of the checks that pull requests wait for. Changes to nubo-core and
 # nubo-frontend don't start it: CI builds and tests the core with them on
-# every pull request, on Linux, macOS and Windows.
+# every pull request, on Linux (and the nightly run on macOS and Windows).
 on:
   pull_request:
     paths:
