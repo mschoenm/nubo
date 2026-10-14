@@ -2,7 +2,6 @@
 //! the state of the controls drawn over it (the top bar, the pause menu and
 //! fast forward).
 
-use crate::app::{SCREEN_HEIGHT, SCREEN_WIDTH};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::emulation::FrameListener;
 use crate::emulation::{Command, Playback, Session};
@@ -12,7 +11,7 @@ use nubo_frontend::cheats::{self, Cheat};
 use nubo_frontend::controls::Controls;
 use nubo_frontend::notices::Notices;
 use nubo_frontend::palettes::DmgPalette;
-use nubo_frontend::picture::Picture;
+use nubo_frontend::picture::{Picture, SCREEN_HEIGHT, SCREEN_WIDTH};
 use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states::{self, SaveState, Slot, SlotInfo};
 use nubo_frontend::time::{Duration, Instant};

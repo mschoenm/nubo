@@ -1,7 +1,7 @@
 //! Tests for picking a title screen.
 
 use super::*;
-use crate::app::{SCREEN_HEIGHT, SCREEN_WIDTH};
+use nubo_frontend::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
 
 const FRAME_SIZE: usize = (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize;
 

@@ -8,12 +8,12 @@
 //! PNG files in the `title_screens` and `thumbnails` folders next to it.
 //! The browser build has no folders to scan, so its library stays empty.
 
-use crate::app::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use jobs::Jobs;
 use nubo_core::CartridgeHeader;
 use nubo_frontend::background;
 use nubo_frontend::palettes::DmgPalette;
 use nubo_frontend::picture::Picture;
+use nubo_frontend::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use nubo_frontend::time::SystemTime;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
