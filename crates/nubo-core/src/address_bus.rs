@@ -142,6 +142,13 @@ impl fmt::Debug for SharedRom {
 /// frame boundary (`Emulator::run_frame`) could overflow.
 const MAX_ELAPSED_DOTS: u64 = 1 << 62;
 
+/// The dots a save state's `ppu_dot_debt` may hold. Every M-cycle settles the
+/// debt, and a register write then leaves at most two dots owed (one landing
+/// two dots early) or one dot run ahead (one landing a dot late), see
+/// `write_timing.rs`. A value outside could overflow or trip the checks in
+/// `take_cycle_dots`.
+const PPU_DOT_DEBT_RANGE: std::ops::RangeInclusive<i16> = -1..=2;
+
 /// The memory map and the hardware components connected to it.
 ///
 /// Its `Debug` output is part of the emulator's, which test runners compare to
@@ -225,7 +232,8 @@ pub struct AddressBus {
     /// unsigned everywhere else. Usually 0 between calls into the emulator,
     /// but not always: the byte after a HALT that an HBlank DMA block
     /// interrupted is fetched again without an M-cycle, so a write it makes
-    /// in its last M-cycle can end a step. Save states keep it.
+    /// in its last M-cycle can end a step. Save states keep it, and a loaded
+    /// value outside `PPU_DOT_DEBT_RANGE` fails the load.
     ppu_dot_debt: i16,
 
     /// The source address and byte of the VRAM DMA (HDMA) copy in progress,
@@ -1182,7 +1190,15 @@ impl AddressBus {
                             ));
                         }
                     }
-                    "ppu_dot_debt" => self.ppu_dot_debt.deserialize(bytes)?,
+                    "ppu_dot_debt" => {
+                        self.ppu_dot_debt.deserialize(bytes)?;
+                        if !PPU_DOT_DEBT_RANGE.contains(&self.ppu_dot_debt) {
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::InvalidData,
+                                "PPU dot debt out of range",
+                            ));
+                        }
+                    }
                     _ => return Ok(false),
                 }
                 Ok(true)
