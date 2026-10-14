@@ -1,12 +1,13 @@
-//! Game controllers, read with gilrs and combined into one controller
-//! state. The app hears about them through a subscription (see
-//! `subscriptions.rs`), so controllers work on every screen: to play, to use
-//! shortcuts such as the pause menu, and to pick buttons in the settings.
+//! Game controllers (gamepads), read with gilrs and combined into one
+//! controller state (the `gamepads` feature). The app hears about them
+//! whatever it shows (Nubo's app turns them into an Iced subscription), so
+//! controllers work on every screen: to play, to use shortcuts such as the
+//! pause menu, and to pick buttons in the settings.
 //!
 //! The desktop build reads them on a thread of its own, which sleeps until
-//! a controller has something to report and sends it over a channel
-//! (`read_on_thread`). The browser build has no threads, so there the app
-//! reads them on every frame (`next_event`).
+//! a controller has something to report and sends it over a `futures`
+//! channel (`read_on_thread`). The browser build has no threads, so there
+//! the app reads them on every frame (`next_event`).
 //!
 //! How much that thread sleeps depends on the system. On Linux (epoll) and
 //! macOS, gilrs blocks until a controller sends something. On Windows its
@@ -51,7 +52,10 @@ const BUTTONS: [(Button, ControllerButton); 16] = [
 /// News about the controllers.
 #[derive(Debug, Clone)]
 pub enum ControllerEvent {
+    /// A controller with this name was connected, or was there when
+    /// reading started.
     Connected(String),
+    /// The controller with this name was disconnected.
     Disconnected(String),
     /// The buttons held or the stick direction changed, on any controller.
     Changed(ControllerState),
@@ -153,6 +157,7 @@ impl Reader {
     }
 }
 
+/// The name the controller gives itself, for the player to see.
 fn name(gamepad: &Gamepad<'_>) -> String {
     gamepad.name().to_owned()
 }

@@ -3,12 +3,12 @@
 
 use super::window_events::toggle_fullscreen;
 use super::{App, GameMessage, Message};
-use crate::controllers::ControllerEvent;
 use crate::input::{self, KeyInput};
 use iced::Task;
 use iced::keyboard::{self, key::Named};
 use nubo_core::{ControllerButton, Key};
 use nubo_frontend::controls::{Action, Device, PadButton};
+use nubo_frontend::gamepads::ControllerEvent;
 use nubo_frontend::save_states::Slot;
 
 impl App {
@@ -98,7 +98,8 @@ impl App {
 
                 self.menu_presses.update(&previous, &state, self.in_menus());
                 if let Some(game) = &mut self.game {
-                    game.set_controller_state(self.menu_presses.hide_from(&state));
+                    game.session
+                        .set_controller_state(self.menu_presses.hide_from(&state));
                 }
 
                 if let Some((device, action)) = self.capture {
@@ -197,9 +198,9 @@ impl App {
             let running = self.is_running();
             if let Some(game) = &mut self.game {
                 if !pressed {
-                    game.release(key);
+                    game.session.release(key);
                 } else if running {
-                    game.press(key);
+                    game.session.press(key);
                 }
             }
             return Task::none();
@@ -207,7 +208,7 @@ impl App {
 
         if action == Action::FastForward {
             if let Some(game) = &mut self.game {
-                game.hold_fast_forward(pressed);
+                game.session.hold_fast_forward(pressed);
             }
             return Task::none();
         }

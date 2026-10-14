@@ -13,6 +13,7 @@ use nubo_frontend::picture::Picture;
 use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states::{self, Slot};
 use nubo_frontend::screenshots;
+use nubo_frontend::session::GameSession;
 use std::path::{Path, PathBuf};
 
 /// What the player can do with games: open one, and control the one that
@@ -40,7 +41,8 @@ pub enum GameMessage {
     CheatToggled(usize, bool),
     RemoveCheat(usize),
     /// The pictures of the save state slots a pause menu page lists were
-    /// read, for this opening of the page (see `Game::thumbnails_to_load`).
+    /// read, for this opening of the page (see
+    /// `GameSession::thumbnails_to_load`).
     ThumbnailsLoaded(u64, Vec<(Slot, Option<Picture>)>),
 }
 
@@ -62,7 +64,7 @@ impl App {
             GameMessage::PlayGame(path) => return read_rom(path),
             GameMessage::Reset => {
                 if let Some(game) = &self.game {
-                    let rom = game.rom().clone();
+                    let rom = game.session.rom().clone();
                     self.start_game(rom, false);
                 }
             }
@@ -84,14 +86,14 @@ impl App {
             }
             GameMessage::ThumbnailsLoaded(slot_listing, thumbnails) => {
                 if let Some(game) = &mut self.game {
-                    game.set_thumbnails(slot_listing, thumbnails);
+                    game.session.set_thumbnails(slot_listing, thumbnails);
                 }
             }
             GameMessage::SaveState(slot) => self.save_state(slot),
             GameMessage::LoadState(slot) => self.load_state(slot),
             GameMessage::ToggleFastForward => {
                 if let Some(game) = &mut self.game {
-                    game.toggle_fast_forward();
+                    game.session.toggle_fast_forward();
                 }
             }
             GameMessage::Screenshot => self.take_screenshot(),
@@ -115,14 +117,14 @@ impl App {
             }
             GameMessage::CheatToggled(index, enabled) => {
                 if let Some(game) = &mut self.game
-                    && let Err(error) = game.set_cheat_enabled(index, enabled)
+                    && let Err(error) = game.session.set_cheat_enabled(index, enabled)
                 {
                     self.toasts.error(error);
                 }
             }
             GameMessage::RemoveCheat(index) => {
                 if let Some(game) = &mut self.game
-                    && let Err(error) = game.remove_cheat(index)
+                    && let Err(error) = game.session.remove_cheat(index)
                 {
                     self.toasts.error(error);
                 }
@@ -162,7 +164,7 @@ impl App {
         if self
             .game
             .as_ref()
-            .is_some_and(|game| game.rom().path == rom.path)
+            .is_some_and(|game| game.session.rom().path == rom.path)
         {
             self.stop_game();
         }
@@ -184,7 +186,7 @@ impl App {
         match self.start_session(rom, header, model, true) {
             Ok(mut game) => {
                 if let Some(state) = resume_state {
-                    match game.load(state.data) {
+                    match game.session.load(state.data) {
                         Ok(()) => self.toasts.info("Continuing where you left off"),
                         Err(error) => self.keep_unloadable_state(
                             &path,
@@ -196,7 +198,7 @@ impl App {
 
                 self.stop_game();
 
-                if let Err(error) = self.library.record_played(&path, game.header()) {
+                if let Err(error) = self.library.record_played(&path, game.session.header()) {
                     self.toasts.error(error);
                 }
 
@@ -221,15 +223,22 @@ impl App {
         model: Model,
         running: bool,
     ) -> Result<Game, String> {
-        let mut game = Game::start(rom, header, model, &self.notices, running, &self.settings)?;
-        game.set_controls(&self.settings.shared.controls);
-        game.set_palette(self.settings.shared.dmg_palette);
-        match cheats::load(&game.rom().path) {
-            Ok(cheats) => game.set_cheats(cheats),
+        let mut session = GameSession::start(
+            rom,
+            header,
+            model,
+            &self.notices,
+            running,
+            &self.settings.shared,
+        )?;
+        session.set_controls(&self.settings.shared.controls);
+        session.set_palette(self.settings.shared.dmg_palette);
+        match cheats::load(&session.rom().path) {
+            Ok(cheats) => session.set_cheats(cheats),
             Err(error) => self.toasts.error(error),
         }
-        game.set_controller_state(self.menu_presses.hide_from(&self.controller_state));
-        Ok(game)
+        session.set_controller_state(self.menu_presses.hide_from(&self.controller_state));
+        Ok(Game::new(session))
     }
 
     /// Stops the running game. It saves where the player left off (if the
@@ -241,15 +250,15 @@ impl App {
 
         if self.settings.shared.resume_games
             && save_states::AVAILABLE
-            && let Err(error) = game.save(Slot::Resume)
+            && let Err(error) = game.session.save(Slot::Resume)
         {
             self.toasts.error(error);
         }
 
-        if let Some(pixels) = game.last_frame()
+        if let Some(pixels) = game.session.last_frame()
             && let Err(error) = self
                 .library
-                .set_thumbnail(&game.rom().path, pixels.to_vec())
+                .set_thumbnail(&game.session.rom().path, pixels.to_vec())
         {
             self.toasts.error(error);
         }
@@ -261,7 +270,7 @@ impl App {
             return;
         };
 
-        match game.save(slot) {
+        match game.session.save(slot) {
             Ok(()) => {
                 game.show_menu(None);
                 self.toasts.info(format!("Saved to {slot}"));
@@ -279,7 +288,7 @@ impl App {
             return;
         };
 
-        let rom_path = game.rom().path.clone();
+        let rom_path = game.session.rom().path.clone();
         let state = match save_states::load(&rom_path, slot) {
             Ok(Some(state)) => state,
             Ok(None) => {
@@ -292,8 +301,8 @@ impl App {
             }
         };
 
-        if state.model != game.model() {
-            let (rom, header) = (game.rom().clone(), game.header().clone());
+        if state.model != game.session.model() {
+            let (rom, header) = (game.session.rom().clone(), game.session.header().clone());
             self.game = None;
             // The game resumes once the state has loaded, unless the
             // settings are open.
@@ -311,7 +320,7 @@ impl App {
             return;
         };
 
-        match game.load(state.data) {
+        match game.session.load(state.data) {
             Ok(()) => {
                 game.show_menu(None);
                 self.toasts.info(format!("Loaded {slot}"));
@@ -348,12 +357,12 @@ impl App {
         };
         // A controller can ask for this while the window is minimized and
         // doesn't show new frames.
-        game.refresh_screen();
-        let Some(pixels) = game.last_frame() else {
+        game.session.refresh_screen();
+        let Some(pixels) = game.session.last_frame() else {
             return;
         };
 
-        match screenshots::save(&game.name(), pixels) {
+        match screenshots::save(&game.session.name(), pixels) {
             Ok(path) => self.toasts.info(format!(
                 "Screenshot saved as {}",
                 path.file_name().unwrap_or_default().to_string_lossy()
@@ -376,7 +385,7 @@ impl App {
         let rows = match page {
             PauseMenu::Main => views::game::main_entries(&self.settings, self.fullscreen).len(),
             PauseMenu::Save | PauseMenu::Load => views::game::listed_slots(game, saving).len(),
-            PauseMenu::Cheats => game.cheats().len(),
+            PauseMenu::Cheats => game.session.cheats().len(),
         };
 
         match action {
@@ -393,10 +402,11 @@ impl App {
                     PauseMenu::Save | PauseMenu::Load => views::game::listed_slots(game, saving)
                         .get(selection)
                         .and_then(|info| views::game::slot_message(info, saving)),
-                    PauseMenu::Cheats => game
-                        .cheats()
-                        .get(selection)
-                        .map(|cheat| GameMessage::CheatToggled(selection, !cheat.enabled).into()),
+                    PauseMenu::Cheats => {
+                        game.session.cheats().get(selection).map(|cheat| {
+                            GameMessage::CheatToggled(selection, !cheat.enabled).into()
+                        })
+                    }
                 };
 
                 if let Some(message) = message {

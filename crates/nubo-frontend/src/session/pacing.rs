@@ -1,6 +1,7 @@
-//! Decides when the browser session emulates a frame and how many sound
-//! samples it makes per emulated second (see `emulation/web.rs`). Kept apart
-//! from the session so it can be tested without a browser.
+//! Decides when the session paced by the screen's refreshes (the browser's,
+//! `session/screen_refresh.rs`) emulates a frame and how many sound samples
+//! it makes per emulated second. Kept apart from the session so it can be
+//! tested without a browser.
 //!
 //! On screens that refresh about 60, 120 or 240 times a second, frames are
 //! locked to the refreshes: one frame every one, two or four of them, so
@@ -15,7 +16,7 @@
 //! samples are made, never when a frame runs, so the queue's jumps by a
 //! whole sound buffer don't move frames.
 
-use nubo_frontend::time::Duration;
+use crate::time::Duration;
 
 /// How long the Game Boy takes to draw a frame: 70,224 clock ticks at
 /// 4,194,304 Hz, about 59.73 frames a second.

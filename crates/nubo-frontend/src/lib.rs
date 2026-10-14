@@ -15,26 +15,38 @@
 //!   screenshots ([`screenshots`]), and the ROM files themselves ([`rom`]);
 //! - the game library ([`library`]): the games in the player's folders,
 //!   scanned in the background and cached between runs with pictures of
-//!   their title screens, their last screen played and their box art.
+//!   their title screens, their last screen played and their box art;
+//! - running a game (`session`): the emulator with its sound, paced by the
+//!   sound card on the desktop and by the screen's refreshes in the
+//!   browser, and what an app shows and keeps of the game (playback,
+//!   cheats, palette, save state slots and the picture on screen);
+//! - game controllers (`gamepads`), combined into one controller state.
 //!
 //! # Features
 //!
-//! Each platform's storage is behind a feature, so a build only takes the
-//! dependencies it can use:
+//! Each platform's storage and sound, and the controllers, are behind
+//! features, so a build only takes the dependencies it can use:
 //!
-//! - **`desktop`**: files in the user's folders (`storage::files`). Save
-//!   states, cheats, screenshots and the library are only kept with it,
-//!   and only it watches the library folders and downloads box art.
+//! - **`desktop`**: files in the user's folders (`storage::files`) and the
+//!   desktop's sound (cpal). Save states, cheats, screenshots and the
+//!   library are only kept with it, and only it watches the library
+//!   folders and downloads box art.
 //! - **`web`**: the browser's localStorage (`storage::local_storage`), which
-//!   keeps the settings and battery saves.
+//!   keeps the settings and battery saves, and the browser's sound (cpal's
+//!   WebAudio backend).
+//! - **`gamepads`**: game controllers, read with gilrs.
 //!
-//! Without either, nothing is kept ([`storage::NoStorage`]); the RetroArch
-//! core builds it that way. With both, `desktop` wins.
+//! Without `desktop` or `web`, nothing is kept ([`storage::NoStorage`]) and
+//! there is no `session`, since it needs a sound output; the RetroArch core
+//! builds it that way, without any feature. With both, `desktop` wins for
+//! storage.
 
 pub mod background;
 pub mod battery;
 pub mod cheats;
 pub mod controls;
+#[cfg(feature = "gamepads")]
+pub mod gamepads;
 pub mod library;
 pub mod model;
 pub mod notices;
@@ -43,6 +55,8 @@ pub mod picture;
 pub mod rom;
 pub mod save_states;
 pub mod screenshots;
+#[cfg(any(feature = "desktop", feature = "web"))]
+pub mod session;
 pub mod settings;
 pub mod storage;
 pub mod time;

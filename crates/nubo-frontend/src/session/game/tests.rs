@@ -2,7 +2,7 @@
 //! for showing frames in the chosen palette.
 
 use super::*;
-use nubo_frontend::settings::FastForwardSpeed;
+use crate::settings::FastForwardSpeed;
 
 /// A whole frame in the lightest of `palette`'s colors.
 fn frame_in(palette: DmgPalette) -> Vec<u8> {
@@ -65,8 +65,10 @@ fn pausing_is_sent_once() {
 
 #[test]
 fn fast_forward_runs_at_the_speed_the_settings_pick() {
-    let mut settings = Settings::default();
-    settings.shared.fast_forward_speed = FastForwardSpeed::ALL[0];
+    let settings = Settings {
+        fast_forward_speed: FastForwardSpeed::ALL[0],
+        ..Settings::default()
+    };
     let mut control = PlaybackControl::new(true, &settings);
 
     control.fast_forward_held = true;
@@ -80,8 +82,10 @@ fn fast_forward_runs_at_the_speed_the_settings_pick() {
 
 #[test]
 fn a_new_game_starts_muted_when_the_player_muted_the_sound() {
-    let mut settings = Settings::default();
-    settings.shared.muted = true;
+    let settings = Settings {
+        muted: true,
+        ..Settings::default()
+    };
 
     let control = PlaybackControl::new(false, &settings);
 
