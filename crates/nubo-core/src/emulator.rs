@@ -417,12 +417,12 @@ impl Emulator {
     /// the game's own colors for `None`. The palette stays until the player
     /// changes it, or, if the game asks for that, until the game sets new
     /// colors. Does nothing while the game doesn't allow it
-    /// ([`Emulator::sgb_player_palette_allowed`]). Save states keep it, as
-    /// they keep the rest of the Super Game Boy.
+    /// ([`Emulator::sgb_player_palette_allowed`]). The last frame shows it
+    /// at once, so a paused game shows it too. Save states keep it, as they
+    /// keep the rest of the Super Game Boy.
     pub fn set_sgb_player_palette(&mut self, palette: Option<[u16; 4]>) {
-        if let Some(sgb) = self.address_bus_mut().sgb_mut_for_menu() {
-            sgb.set_player_palette(palette);
-        }
+        self.address_bus_mut()
+            .change_sgb_menu(|sgb| sgb.set_player_palette(palette));
     }
 
     /// Whether the game lets the player pick a palette from the Super Game
@@ -442,12 +442,12 @@ impl Emulator {
     }
 
     /// On the Super Game Boy models, picks the border around the screen in
-    /// [`Emulator::frame_with_border`]: the game's own, or Nubo's. Save states
+    /// [`Emulator::frame_with_border`]: the game's own, or Nubo's. The last
+    /// frame shows it at once, so a paused game shows it too. Save states
     /// keep it, as they keep the rest of the Super Game Boy.
     pub fn set_sgb_border(&mut self, border: SgbBorder) {
-        if let Some(sgb) = self.address_bus_mut().sgb_mut_for_menu() {
-            sgb.set_border_choice(border);
-        }
+        self.address_bus_mut()
+            .change_sgb_menu(|sgb| sgb.set_border_choice(border));
     }
 
     /// Chooses which controller buttons act as which Game Boy buttons.

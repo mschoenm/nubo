@@ -1098,3 +1098,17 @@ fn the_super_game_boy_sees_the_buttons_the_player_holds() {
     loaded.load_state(&state).unwrap();
     assert!(held(&loaded));
 }
+
+#[test]
+fn a_super_game_boy_menu_change_shows_on_the_last_frame_at_once() {
+    let rom = program_rom(Model::Sgb, &[0x18, 0xFE]);
+    let mut emulator = booted(Model::Sgb, &rom);
+    // Past the intro, which shows instead of the game.
+    let (mut left, mut right) = (Vec::new(), Vec::new());
+    for _ in 0..220 {
+        emulator.run_frame(&mut left, &mut right);
+    }
+    emulator.set_sgb_player_palette(Some([0x001F; 4]));
+    assert_eq!(&emulator.frame_buffer()[..4], &[0xFF, 0x00, 0x00, 0xFF]);
+    assert!(!emulator.frame_in_dmg_shades());
+}

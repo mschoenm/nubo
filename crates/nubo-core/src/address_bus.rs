@@ -1016,13 +1016,19 @@ impl AddressBus {
         self.gpu.sgb()
     }
 
-    /// Lets the menu settings of a Super Game Boy change, on the Super Game
-    /// Boy models: catches the PPU up first, as for any change to what it
-    /// draws.
-    pub(crate) fn sgb_mut_for_menu(&mut self) -> Option<&mut Sgb> {
-        self.gpu.sgb()?;
+    /// On the Super Game Boy models, changes the menu's settings with
+    /// `change` and draws the last picture again with them, so a paused
+    /// frontend shows the change. The PPU catches up first, as for any change
+    /// to what it draws.
+    pub(crate) fn change_sgb_menu(&mut self, change: impl FnOnce(&mut Sgb)) {
+        if self.gpu.sgb().is_none() {
+            return;
+        }
         self.catch_up_ppu_before_change();
-        self.gpu.sgb_mut()
+        if let Some(sgb) = self.gpu.sgb_mut() {
+            change(sgb);
+        }
+        self.gpu.redraw_sgb_picture();
     }
 
     pub(crate) fn set_controller_mapping(&mut self, mapping: ControllerMapping) {

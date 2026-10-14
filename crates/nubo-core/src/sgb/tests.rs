@@ -509,3 +509,31 @@ fn save_states_keep_the_menu_settings() {
     assert!(loaded.sgb.attraction_disabled);
     assert_eq!(loaded.sgb.idle_frames, 1);
 }
+
+#[test]
+fn a_redraw_shows_the_menus_settings_without_moving_time_on() {
+    let mut console = Console::new();
+    let mut game_screen = console.frame_of_shade(1);
+    assert_eq!(pixel(&game_screen, 0, 0), DMG_SHADES[1]);
+    let idle_frames = console.sgb.idle_frames;
+
+    console.sgb.set_player_palette(Some(PLAYER_PALETTE));
+    console.sgb.redraw(&mut game_screen);
+    assert_eq!(pixel(&game_screen, 0, 0), [0xFF, 0x00, 0x00, 0xFF]);
+    assert!(console.sgb.frame_colorized());
+    assert_eq!(console.sgb.idle_frames, idle_frames);
+
+    let mut redrawn = game_screen.clone();
+    console.sgb.redraw(&mut redrawn);
+    assert_eq!(redrawn, game_screen);
+}
+
+#[test]
+fn a_redraw_leaves_the_intro_alone() {
+    let mut console = Console::new();
+    console.sgb = Sgb::new();
+    let mut game_screen = console.frame_of_shade(3);
+    let intro = game_screen.clone();
+    console.sgb.redraw(&mut game_screen);
+    assert_eq!(game_screen, intro);
+}

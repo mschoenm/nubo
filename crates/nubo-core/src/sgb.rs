@@ -270,6 +270,13 @@ pub(crate) struct Sgb {
     /// than in the Game Boy's grays.
     #[serializable(skip)]
     frame_colorized: bool,
+    /// Whether the last picture was a frame of the intro.
+    #[serializable(skip)]
+    showed_intro: bool,
+    /// How much darker the border's fade made the last picture's border, in
+    /// steps of 1/31 of full brightness (`next_border_fade`).
+    #[serializable(skip)]
+    shown_border_fade: u8,
     /// The last picture with its border, 256×224 RGBA.
     #[serializable(skip)]
     bordered_frame: Vec<u8>,
@@ -318,6 +325,8 @@ impl Sgb {
             nubo_border: NuboBorder::new(),
             border_cache: BorderCache::default(),
             frame_colorized: false,
+            showed_intro: false,
+            shown_border_fade: 0,
             bordered_frame: vec![0; BORDERED_WIDTH * BORDERED_HEIGHT * 4],
         }
     }
@@ -744,6 +753,7 @@ impl Sgb {
         }
 
         let in_intro = self.intro_frames < INTRO_FRAMES;
+        self.showed_intro = in_intro;
         let colors = self.colors();
         if in_intro {
             self.intro_frames += 1;
@@ -758,7 +768,21 @@ impl Sgb {
             self.draw_game_screen(&colors, game_screen);
             self.frame_colorized = self.colorized || self.player_palette_active;
         }
+        self.shown_border_fade = self.next_border_fade();
         self.draw_border(&colors, game_screen, in_intro);
+    }
+
+    /// Draws the last picture again with the menu's settings as they are
+    /// now, without moving time on, so a change made from the menu shows
+    /// while the game is paused. The intro is left as it is.
+    pub(crate) fn redraw(&mut self, game_screen: &mut [u8]) {
+        if self.showed_intro {
+            return;
+        }
+        let colors = self.colors();
+        self.draw_game_screen(&colors, game_screen);
+        self.frame_colorized = self.colorized || self.player_palette_active;
+        self.draw_border(&colors, game_screen, false);
     }
 
     /// Reads the screen as tile data into the transfer's destination: each
@@ -847,10 +871,9 @@ impl Sgb {
         // (SameBoy), and so does Nubo's border when the player picked it over
         // the game's.
         let fade = if in_intro || self.border_choice == SgbBorder::Nubo {
-            self.next_border_fade();
             0
         } else {
-            self.next_border_fade()
+            self.shown_border_fade
         };
         let source = if self.border.from_game && self.border_choice == SgbBorder::Game {
             BorderSource::Game(&self.border)
