@@ -1,7 +1,7 @@
 //! Game controllers (gamepads), read with gilrs (the `gamepads` feature).
-//! Each controller's state is reported in the order they connected
-//! ([`Controllers`]): the game gives each one to its own player when a Super
-//! Game Boy game asks for more than one, and menus and shortcuts use them
+//! Each controller's state is reported in the order of gilrs's numbers for
+//! them ([`Controllers`]): the game gives each one to its own player when a
+//! Super Game Boy game asks for more than one, and menus and shortcuts use them
 //! all combined. The app hears about them
 //! whatever it shows (Nubo's app turns them into an Iced subscription), so
 //! controllers work on every screen: to play, to use shortcuts such as the
@@ -58,8 +58,11 @@ const BUTTONS: [(Button, ControllerButton); 16] = [
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ControllerId(pub usize);
 
-/// What every connected controller is doing, in the order gilrs lists them
-/// (the order they connected in).
+/// What every connected controller is doing, in the order gilrs lists them:
+/// by the number gilrs gives each, the lowest first. A controller that
+/// disconnects and comes back gets its number back, so it takes its old
+/// place (and Super Game Boy player) again, rather than moving behind the
+/// controllers that were connected meanwhile.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Controllers {
     /// Each controller's identity, in the order of `each`.

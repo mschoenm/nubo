@@ -155,7 +155,8 @@ Largest phase, but each part stands alone:
    - **Done:** controllers for players 2 to 4 (the Super Nintendo's multitap). The core takes each
      controller's state (`Emulator::set_controller_states`) and other players' keys
      (`Emulator::set_player_keys`); once a game asks for more players, the app's controllers play
-     in the order they connected and RetroArch's ports 2 to 4 play players 2 to 4.
+     in the order of gilrs's numbers for them (a controller that reconnects takes its old place
+     back) and RetroArch's ports 2 to 4 play players 2 to 4.
    - **Nothing to do:** border sprites (`OBJ_TRN`) and the speed test (`TEST_EN`) do nothing on any
      retail Super Game Boy, only on prototypes (Pan Docs, "Removed Commands"), so Nubo ignores them
      as the retail units do.
