@@ -27,11 +27,14 @@ use crate::rom::Rom;
 use crate::settings::FastForwardSpeed;
 use crate::time::Duration;
 use audio::AudioOutput;
-use nubo_core::{ControllerMapping, ControllerState, Emulator, Key, Model};
+use nubo_core::{
+    CartridgeEffects, ControllerMapping, ControllerState, Emulator, Key, Model, NoSaves, RtcClock,
+};
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::mpsc::{self, Sender};
 
-pub use game::GameSession;
+pub use game::{GameSession, StartOptions};
 #[cfg(target_arch = "wasm32")]
 pub use screen_refresh::Session;
 #[cfg(not(target_arch = "wasm32"))]
@@ -54,6 +57,55 @@ impl Playback {
     /// the others is dropped, so it keeps its pitch.
     pub fn buffers_per_played(self) -> u32 {
         self.fast_forward.map_or(1, FastForwardSpeed::multiplier)
+    }
+}
+
+/// Where a game keeps its battery saves.
+#[derive(Clone)]
+pub enum Saves {
+    /// In these battery saves, with the cartridge clock on the wall clock.
+    Kept(Arc<BatterySaves>),
+    /// Nowhere: the game starts without save data and keeps none, and its
+    /// cartridge clock follows emulated time, so every run is the same. For
+    /// runs that must leave nothing behind, such as the GB Emulator
+    /// Shootout's.
+    Discarded,
+}
+
+impl Saves {
+    /// The battery saves of the ROM at `rom_path` in this build's storage
+    /// (see [`BatterySaves::for_rom`]), or none without `keep`.
+    pub fn for_rom(rom_path: &Path, keep: bool, notices: &Notices) -> Saves {
+        if keep {
+            Saves::Kept(BatterySaves::for_rom(rom_path, notices.clone()))
+        } else {
+            Saves::Discarded
+        }
+    }
+
+    /// What connects the emulated cartridge to these saves.
+    fn cartridge_effects(&self) -> Box<dyn CartridgeEffects> {
+        match self {
+            Saves::Kept(saves) => Box::new(BatteryCartridgeEffects::new(saves.clone())),
+            Saves::Discarded => Box::new(NoSaves {
+                rtc_clock: RtcClock::EmulatedTime,
+            }),
+        }
+    }
+
+    /// Writes the saves the game has stopped writing to for a moment (see
+    /// [`BatterySaves::flush_when_settled`]).
+    fn flush_when_settled(&self) {
+        if let Saves::Kept(saves) = self {
+            saves.flush_when_settled();
+        }
+    }
+
+    /// Writes the saves still waiting.
+    fn flush(&self) {
+        if let Saves::Kept(saves) = self {
+            saves.flush();
+        }
     }
 }
 
@@ -84,34 +136,19 @@ pub enum Command {
 struct Machine {
     emulator: Emulator,
     audio: AudioOutput,
-    saves: Arc<BatterySaves>,
+    saves: Saves,
     playback: Playback,
 }
 
 impl Machine {
     /// Opens the sound output and loads `rom` on `model` with its battery
-    /// saves, returning the load error if it couldn't. It plays as
-    /// `playback` says from the start, so a muted player hears nothing.
-    /// Problems while it runs, such as a missing sound device, go to
-    /// `notices`.
-    #[cfg(target_arch = "wasm32")]
+    /// saves kept in `saves`, returning the load error if it couldn't. It
+    /// plays as `playback` says from the start, so a muted player hears
+    /// nothing. Problems while it runs, such as a missing sound device, go
+    /// to `notices`.
     fn start(
         rom: &Rom,
-        model: Model,
-        playback: Playback,
-        notices: &Notices,
-    ) -> Result<Machine, String> {
-        let saves = BatterySaves::for_rom(&rom.path, notices.clone());
-        Machine::start_with_saves(rom, saves, model, playback, notices)
-    }
-
-    /// Opens the sound output and loads `rom` on `model` with its battery
-    /// saves kept in `saves`, returning the load error if it couldn't. It
-    /// plays as `playback` says from the start. Problems while it runs go to
-    /// `notices`.
-    fn start_with_saves(
-        rom: &Rom,
-        saves: Arc<BatterySaves>,
+        saves: Saves,
         model: Model,
         playback: Playback,
         notices: &Notices,
@@ -124,7 +161,7 @@ impl Machine {
     /// keeping its battery saves in `saves`.
     fn new(
         rom: &[u8],
-        saves: Arc<BatterySaves>,
+        saves: Saves,
         mut audio: AudioOutput,
         model: Model,
         playback: Playback,
@@ -137,7 +174,7 @@ impl Machine {
         let mut emulator = Emulator::new(model);
         emulator.set_sample_rate(audio.sample_rate());
         emulator
-            .load_rom(rom, Box::new(BatteryCartridgeEffects::new(saves.clone())))
+            .load_rom(rom, saves.cartridge_effects())
             .map_err(|error| error.to_string())?;
 
         Ok(Machine {

@@ -43,9 +43,21 @@ impl Toast {
 #[derive(Debug, Default)]
 pub struct Toasts {
     toasts: Vec<Toast>,
+    /// Whether messages are printed on stderr instead of shown, for a
+    /// window that shows only the game or a run that keeps nothing (see
+    /// `command_line`).
+    printed: bool,
 }
 
 impl Toasts {
+    /// Toasts that are printed on stderr instead of shown.
+    pub fn printed() -> Self {
+        Toasts {
+            toasts: Vec::new(),
+            printed: true,
+        }
+    }
+
     pub fn info(&mut self, message: impl Into<String>) {
         self.push(ToastKind::Info, message.into());
     }
@@ -54,10 +66,18 @@ impl Toasts {
         self.push(ToastKind::Error, message.into());
     }
 
-    /// Shows a toast. A message that is already on screen is not repeated;
-    /// its timer starts again instead, so a problem reported every second
-    /// shows up once.
+    /// Shows a toast, or prints it. A message that is already on screen is
+    /// not repeated; its timer starts again instead, so a problem reported
+    /// every second shows up once.
     fn push(&mut self, kind: ToastKind, message: String) {
+        if self.printed {
+            match kind {
+                ToastKind::Info => eprintln!("{message}"),
+                ToastKind::Error => eprintln!("error: {message}"),
+            }
+            return;
+        }
+
         let now = Instant::now();
 
         if let Some(existing) = self

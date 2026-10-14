@@ -8,6 +8,7 @@
 //! the window itself (`app/window_events.rs`), and keys and controller
 //! buttons (`app/player_input.rs`).
 
+use crate::command_line::Options;
 use crate::game::{Game, PauseMenu};
 use crate::input::{self, KeyInput};
 use crate::menu_presses::MenuPresses;
@@ -29,13 +30,14 @@ use nubo_frontend::library::box_art::GameList;
 use nubo_frontend::notices::Notices;
 use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states;
+use nubo_frontend::settings::FastForwardSpeed;
 use std::sync::Arc;
 
 pub use library_screen::LibraryMessage;
 pub use nubo_frontend::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
 pub use playing::GameMessage;
 pub use settings_window::SettingsMessage;
-pub use window_events::WindowMessage;
+pub use window_events::{WindowMessage, screen_only_size};
 
 /// How often the desktop build checks for toasts to take down and for the
 /// fullscreen bar to hide, while there are any.
@@ -55,6 +57,15 @@ pub struct App {
     /// A model picked on the command line, used instead of the settings
     /// until the user picks one in the settings.
     model_override: Option<Model>,
+    /// With `--scale`: the window shows only the game screen, this many
+    /// times its size, and nothing else can be brought up (see
+    /// `command_line`).
+    screen_scale: Option<u32>,
+    /// With `--fresh`: the app reads and writes nothing kept between runs,
+    /// like a new install (see `command_line`).
+    fresh: bool,
+    /// With `--speed`: games start fast forwarding at this speed.
+    speed: Option<FastForwardSpeed>,
     library: Library,
     /// The text in the library's search field.
     search: String,
@@ -124,17 +135,33 @@ pub enum Message {
 }
 
 impl App {
-    /// Creates the application with the saved settings and library, starting
-    /// the ROM given on the command line if there is one. `model` overrides
-    /// the saved model for this run.
-    pub fn new(rom: Option<Result<Rom, String>>, model: Option<Model>) -> (Self, Task<Message>) {
-        let (settings, settings_error) = Settings::load();
-        let (library, library_error) = Library::load();
+    /// Creates the application with the saved settings and library (or the
+    /// defaults and an empty library with `--fresh`), starting the ROM given
+    /// on the command line if there is one, as the other `options` say.
+    pub fn new(rom: Option<Result<Rom, String>>, options: &Options) -> (Self, Task<Message>) {
+        let (settings, settings_error) = if options.fresh {
+            (Settings::default(), None)
+        } else {
+            Settings::load()
+        };
+        let (library, library_error) = if options.fresh {
+            (Library::default(), None)
+        } else {
+            Library::load()
+        };
+        let toasts = if options.fresh || options.scale.is_some() {
+            Toasts::printed()
+        } else {
+            Toasts::default()
+        };
 
         let mut app = App {
             settings,
             system_mode: Mode::None,
-            model_override: model,
+            model_override: options.model,
+            screen_scale: options.scale,
+            fresh: options.fresh,
+            speed: options.speed,
             library,
             search: String::new(),
             game: None,
@@ -146,7 +173,7 @@ impl App {
             minimized: false,
             library_selection: None,
             library_scroll: (0.0, 0.0),
-            toasts: Toasts::default(),
+            toasts,
             notices: Notices::default(),
             controllers: Vec::new(),
             controller_state: ControllerState::new(),
@@ -249,8 +276,12 @@ impl App {
     }
 
     /// The current screen with the settings, drop target and notifications
-    /// layered on top.
+    /// layered on top, or the game screen alone with `--scale`.
     pub fn view(&self) -> Element<'_, Message> {
+        if self.screen_scale.is_some() {
+            return views::game::screen_only(self.game.as_ref());
+        }
+
         let mut layers = vec![match &self.game {
             Some(game) => views::game::view(game, &self.settings, self.fullscreen),
             None => views::library::view(
@@ -402,11 +433,14 @@ impl App {
         }
     }
 
-    /// Changes the settings and saves them.
+    /// Changes the settings and saves them, unless the app keeps nothing
+    /// (`--fresh`).
     fn change_settings(&mut self, change: impl FnOnce(&mut Settings)) {
         change(&mut self.settings);
 
-        if let Err(error) = self.settings.save() {
+        if !self.fresh
+            && let Err(error) = self.settings.save()
+        {
             self.toasts.error(error);
         }
     }

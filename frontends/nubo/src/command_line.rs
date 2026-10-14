@@ -1,0 +1,99 @@
+//! The options the app takes on the command line:
+//!
+//! ```text
+//! nubo [rom] [--cgb | --model <name>] [--scale <n>] [--fresh] [--speed <n>]
+//! ```
+//!
+//! - `--cgb` and `--model <name>` start the game on that hardware model
+//!   instead of the one the settings pick.
+//! - `--scale <n>` shows only the game screen, `n` times its size (1 to 8),
+//!   in a window whose inside is exactly 160·n × 144·n pixels of the
+//!   display, whatever its scaling. Nothing else can be brought up in it.
+//!   It needs a ROM.
+//! - `--fresh` starts like a new install and leaves nothing behind: default
+//!   settings, no library, no battery saves, save states, cheats or
+//!   screenshots, a cartridge clock that follows emulated time, and
+//!   problems printed on stderr.
+//! - `--speed <n>` starts the game fast forwarding at `n` times real time,
+//!   one of the fast forward speeds the settings offer.
+//!
+//! `--scale`, `--fresh` and `--speed` are what the GB Emulator Shootout's
+//! harness runs the app with (`docs/SHOOTOUT_PLAN.md`). The browser build
+//! gets no command line, so it starts without any of them.
+
+use nubo_core::Model;
+use nubo_frontend::settings::FastForwardSpeed;
+use std::path::PathBuf;
+
+/// How to use the options, printed with a mistake in them.
+pub const USAGE: &str =
+    "usage: nubo [rom] [--cgb | --model <name>] [--scale <1-8>] [--fresh] [--speed <2|3|4|8>]";
+
+/// The largest `--scale`.
+const MAX_SCALE: u32 = 8;
+
+/// What the command line asked for.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Options {
+    /// The ROM to start.
+    pub rom_path: Option<PathBuf>,
+    /// The model to run games on instead of the one the settings pick.
+    pub model: Option<Model>,
+    /// With `--scale`: show only the game screen, this many times its size.
+    pub scale: Option<u32>,
+    /// With `--fresh`: keep nothing and read nothing kept, like a new
+    /// install.
+    pub fresh: bool,
+    /// With `--speed`: start the game fast forwarding at this speed.
+    pub speed: Option<FastForwardSpeed>,
+}
+
+/// Reads the options from the command line's arguments, without the
+/// program's name. Returns what is wrong with them, such as a missing or
+/// invalid value or an unknown option.
+pub fn parse(args: impl IntoIterator<Item = String>) -> Result<Options, String> {
+    let mut options = Options::default();
+
+    let mut args = args.into_iter();
+    while let Some(arg) = args.next() {
+        let mut value = || args.next().ok_or_else(|| format!("{arg} needs a value"));
+
+        match arg.as_str() {
+            "--cgb" => options.model = Some(Model::CgbE),
+            "--model" => options.model = Some(value()?.parse()?),
+            "--scale" => options.scale = Some(parse_scale(&value()?)?),
+            "--fresh" => options.fresh = true,
+            "--speed" => options.speed = Some(parse_speed(&value()?)?),
+            option if option.starts_with("--") => {
+                return Err(format!("{option} isn't an option"));
+            }
+            _ => options.rom_path = Some(PathBuf::from(arg)),
+        }
+    }
+
+    if options.scale.is_some() && options.rom_path.is_none() {
+        return Err(String::from("--scale needs a ROM to show"));
+    }
+
+    Ok(options)
+}
+
+/// Reads the value of `--scale`: a whole number from 1 to `MAX_SCALE`.
+fn parse_scale(value: &str) -> Result<u32, String> {
+    value
+        .parse()
+        .ok()
+        .filter(|scale| (1..=MAX_SCALE).contains(scale))
+        .ok_or_else(|| format!("--scale needs a whole number from 1 to {MAX_SCALE}, not {value}"))
+}
+
+/// Reads the value of `--speed`: one of the fast forward speeds.
+fn parse_speed(value: &str) -> Result<FastForwardSpeed, String> {
+    let multiplier: u32 = value
+        .parse()
+        .map_err(|_| format!("--speed needs a number, not {value}"))?;
+    FastForwardSpeed::try_from(multiplier)
+}
+
+#[cfg(test)]
+mod tests;
