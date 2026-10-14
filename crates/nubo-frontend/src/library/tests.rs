@@ -166,45 +166,30 @@ fn games_started_during_a_scan_are_kept() {
 }
 
 #[test]
-fn games_taken_off_or_forgotten_during_a_scan_stay_that_way() {
-    let mut played_in_folder = LibraryEntry::example("/games/Tetris.gb");
-    played_in_folder.last_played = Some(1_000);
-    let mut played_elsewhere = LibraryEntry::example("/elsewhere/Mario.gb");
-    played_elsewhere.in_folder = false;
-    played_elsewhere.last_played = Some(2_000);
-    let checked = std::collections::HashSet::from([
-        played_in_folder.path.clone(),
-        played_elsewhere.path.clone(),
-    ]);
+fn games_taken_off_the_recently_played_during_a_scan_stay_off() {
+    let mut played = LibraryEntry::example("/games/Tetris.gb");
+    played.last_played = Some(1_000);
+    let checked = std::collections::HashSet::from([played.path.clone()]);
     let taken_off = LibraryEntry {
         last_played: None,
-        ..played_in_folder.clone()
+        ..played.clone()
     };
 
-    let merged = merge_scan(
-        std::slice::from_ref(&taken_off),
-        vec![played_in_folder, played_elsewhere],
-        &checked,
-    );
+    let merged = merge_scan(std::slice::from_ref(&taken_off), vec![played], &checked);
 
     assert_eq!(merged, [taken_off]);
 }
 
 #[test]
-fn a_game_forgotten_while_a_scan_finds_it_in_a_new_folder_stays_among_all_games() {
-    let mut found_in_folder = LibraryEntry::example("/games/Mario.gb");
-    found_in_folder.last_played = Some(2_000);
-    let checked = std::collections::HashSet::from([found_in_folder.path.clone()]);
+fn a_game_the_scan_found_stays_although_the_library_dropped_it_meanwhile() {
+    let mut found = LibraryEntry::example("/elsewhere/Mario.gb");
+    found.in_folder = false;
+    found.last_played = Some(2_000);
+    let checked = std::collections::HashSet::from([found.path.clone()]);
 
-    let merged = merge_scan(&[], vec![found_in_folder.clone()], &checked);
+    let merged = merge_scan(&[], vec![found.clone()], &checked);
 
-    assert_eq!(
-        merged,
-        [LibraryEntry {
-            last_played: None,
-            ..found_in_folder
-        }]
-    );
+    assert_eq!(merged, [found]);
 }
 
 /// A library kept in a new temporary folder, with one game in a library
@@ -246,23 +231,24 @@ fn a_game_in_a_library_folder_taken_off_the_recently_played_stays_among_all_game
 
 #[cfg(feature = "desktop")]
 #[test]
-fn a_game_from_elsewhere_taken_off_the_recently_played_is_forgotten() {
-    let mut library = library_with_two_played_games("forget-elsewhere");
+fn a_game_from_elsewhere_taken_off_the_recently_played_is_forgotten_at_the_next_scan() {
+    let root = temporary_folder("forget-elsewhere-scan");
+    let rom = root.join("elsewhere").join("Mario.gb");
+    write_rom(&rom, "MARIO", false);
+    let mut library = Library {
+        cache: Cache::in_folder(root.join("data")),
+        ..Library::default()
+    };
+    let mut known = scan::scan(1, &[folder(rom.parent().unwrap(), false)], Vec::new()).entries;
+    known[0].in_folder = false;
+    known[0].last_played = Some(1_000);
+    library.replace_entries(known);
 
-    library
-        .forget_played(Path::new("/elsewhere/Mario.gb"))
-        .unwrap();
+    library.forget_played(&rom).unwrap();
 
-    let recent: Vec<_> = library
-        .recently_played(4)
-        .iter()
-        .map(|e| e.name())
-        .collect();
-    assert_eq!(recent, ["Tetris"]);
-    assert_eq!(library.entries.len(), 1);
-    let (reloaded, error) = Library::load_from(library.cache.clone());
-    assert_eq!(error, None);
-    assert_eq!(reloaded.entries, library.entries);
+    assert!(library.recently_played(4).is_empty());
+    let result = scan::scan(2, &[], library.entries.clone());
+    assert!(result.entries.is_empty());
 }
 
 #[test]
