@@ -62,6 +62,7 @@ const RETRO_ENVIRONMENT_SET_VARIABLES: c_uint = 16;
 const RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE: c_uint = 17;
 const RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE: c_uint = 23;
 const RETRO_ENVIRONMENT_GET_LOG_INTERFACE: c_uint = 27;
+const RETRO_ENVIRONMENT_SET_CONTROLLER_INFO: c_uint = 35;
 const RETRO_ENVIRONMENT_SET_MEMORY_MAPS: c_uint = 36 | RETRO_ENVIRONMENT_EXPERIMENTAL;
 const RETRO_ENVIRONMENT_SET_GEOMETRY: c_uint = 37;
 const RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS: c_uint = 42 | RETRO_ENVIRONMENT_EXPERIMENTAL;
@@ -157,6 +158,20 @@ struct RetroInputDescriptor {
     index: c_uint,
     id: c_uint,
     description: *const c_char,
+}
+
+/// `struct retro_controller_description`
+#[repr(C)]
+struct RetroControllerDescription {
+    desc: *const c_char,
+    id: c_uint,
+}
+
+/// `struct retro_controller_info`
+#[repr(C)]
+struct RetroControllerInfo {
+    types: *const RetroControllerDescription,
+    num_types: c_uint,
 }
 
 /// `struct retro_log_callback`
@@ -782,7 +797,35 @@ pub extern "C" fn retro_set_environment(callback: Option<RetroEnvironment>) {
             lock(&FRONTEND).log = log_callback.log;
         }
         set_core_options();
+        set_controller_info();
     });
+}
+
+/// Declares the core's four controller ports, each a Game Boy's buttons: the
+/// first player's, and the other players of a Super Game Boy's multitap.
+fn set_controller_info() {
+    let joypad = [RetroControllerDescription {
+        desc: c"Game Boy".as_ptr(),
+        id: RETRO_DEVICE_JOYPAD,
+    }];
+    let port = || RetroControllerInfo {
+        types: joypad.as_ptr(),
+        num_types: 1,
+    };
+    let mut ports = [
+        port(),
+        port(),
+        port(),
+        port(),
+        RetroControllerInfo {
+            types: ptr::null(),
+            num_types: 0,
+        },
+    ];
+    environment(
+        RETRO_ENVIRONMENT_SET_CONTROLLER_INFO,
+        ports.as_mut_ptr().cast(),
+    );
 }
 
 /// Keeps the callback that shows frames.

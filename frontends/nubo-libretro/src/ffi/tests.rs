@@ -32,6 +32,9 @@ struct Record {
     input_descriptors: Vec<(c_uint, String)>,
     /// The port of every input descriptor.
     descriptor_ports: Vec<c_uint>,
+    /// `RETRO_ENVIRONMENT_SET_CONTROLLER_INFO`: the device ids each port
+    /// offers.
+    controller_ports: Vec<Vec<c_uint>>,
     /// `RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2` and `_SET_CORE_OPTIONS`: each
     /// option's key, default and values.
     options: Vec<(String, String, Vec<String>)>,
@@ -94,6 +97,18 @@ unsafe extern "C" fn test_environment(cmd: c_uint, data: *mut c_void) -> bool {
                 let format = *data.cast::<c_int>();
                 record(|record| record.pixel_formats.push(format));
                 format == RETRO_PIXEL_FORMAT_0RGB1555 || settings.accepts_xrgb8888
+            }
+            RETRO_ENVIRONMENT_SET_CONTROLLER_INFO => {
+                let mut port = data.cast::<RetroControllerInfo>().cast_const();
+                let mut ports = Vec::new();
+                while !(*port).types.is_null() {
+                    let types =
+                        std::slice::from_raw_parts((*port).types, (*port).num_types as usize);
+                    ports.push(types.iter().map(|device| device.id).collect());
+                    port = port.add(1);
+                }
+                record(|record| record.controller_ports = ports);
+                true
             }
             RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS => {
                 let mut descriptor = data.cast::<RetroInputDescriptor>().cast_const();
@@ -392,6 +407,11 @@ fn the_core_describes_itself() {
     assert_eq!(av_info.timing.sample_rate, 48_000.0);
 
     let record = take_record();
+    assert_eq!(
+        record.controller_ports,
+        vec![vec![RETRO_DEVICE_JOYPAD]; 4],
+        "four ports, each a Game Boy's buttons"
+    );
     let keys: Vec<&str> = record
         .options
         .iter()
