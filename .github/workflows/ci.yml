@@ -83,8 +83,8 @@ jobs:
         run: cargo deny --locked check licenses bans sources
 
   # Linux only, so pull requests get their answer in a minute or two.
-  # platforms.yml tests on macOS and Windows next to it without holding up
-  # merges, and the nightly workflow, which releases run, calls it too.
+  # The nightly workflow, which releases run, tests on macOS and Windows with
+  # platforms.yml.
   test:
     name: Tests
     runs-on: ubuntu-latest

@@ -6,7 +6,7 @@ What runs where, and why. The checks to run yourself before pushing are listed i
 
 - CI (`.github/workflows/ci.yml`) runs `cargo test-roms`, together with `cargo cpu-tests` and `cargo save-states` (with the games cached), on every pull request and push to main, next to `cargo fmt --check`, both clippy runs (`--workspace --all-targets` and `-p nubo --target wasm32-unknown-unknown`) and `cargo doc` with warnings as errors, `cargo deny check licenses bans sources` (`deny.toml` allows only GPLv3-compatible licenses), `cargo test --workspace` on Linux and `cargo xtask build-web --quick`.
 - Pull requests should get their answer in a minute or two, so every CI job is meant to take about a minute, and anything slower goes in the nightly workflow, which every release runs too: a problem may reach main, but never a release.
-- `.github/workflows/platforms.yml` runs `cargo test --workspace` on macOS and Windows on every pull request next to CI, but "CI passed" doesn't wait for it, so it never holds up a merge: a failure shows on the pull request, and GitHub notifies whoever started the run.
+- `.github/workflows/platforms.yml`, `cargo test --workspace` on macOS and Windows, doesn't run on pull requests: the same tests on Linux catch nearly everything, so it runs nightly (below), and by hand (`workflow_dispatch`) when a change needs it sooner, such as one to file paths, line endings or the build.
 - A push to main that passes CI is built with the optimized `wasm-release` profile and published to GitHub Pages (`.github/workflows/deploy.yml`, a workflow of its own so pull requests don't list a deploy job that is always skipped for them).
 - Branch protection only requires the "CI passed" job, which needs all the others.
 

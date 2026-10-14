@@ -28,7 +28,7 @@ Each package goes into `target/bundle/`. Releases and the nightly build make the
 
 ### macOS
 
-`cargo xtask bundle` builds `Nubo.app`, with its own icon in the Dock. Drag it to the Applications folder to install it.
+`cargo xtask macos` builds `Nubo.app`, with its own icon in the Dock. Drag it to the Applications folder to install it.
 
 ### Windows
 
