@@ -44,7 +44,7 @@ pub struct Settings {
     /// Library tab of the settings.
     pub download_box_art: bool,
     /// Whether leaving a game saves its state, so it continues there the
-    /// next time it starts. Off until the player turns it on, in the
+    /// next time it starts. On until the player turns it off, in the
     /// Playing section of the settings' General tab.
     pub resume_games: bool,
     /// How fast fast forward runs.
@@ -122,7 +122,7 @@ impl Default for Settings {
             model: ModelPreference::default(),
             library_folders: Vec::new(),
             download_box_art: true,
-            resume_games: false,
+            resume_games: true,
             fast_forward_speed: FastForwardSpeed::default(),
             volume: 1.0,
             muted: false,

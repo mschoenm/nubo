@@ -50,7 +50,7 @@ fn missing_fields_get_their_defaults() {
     assert!(settings.muted);
     assert_eq!(settings.model, ModelPreference::Automatic);
     assert!(settings.library_folders.is_empty());
-    assert!(!settings.resume_games);
+    assert!(settings.resume_games);
     assert_eq!(settings.fast_forward_speed.multiplier(), 4);
 }
 
