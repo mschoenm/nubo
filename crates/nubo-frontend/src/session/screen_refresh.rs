@@ -15,6 +15,7 @@
 use super::pacing::{FRAME_DURATION, Lock, RefreshRate, SampleRateControl};
 use super::{Command, Machine, Playback, Saves, ask};
 use crate::notices::Notices;
+use crate::picture::Frame;
 use crate::rom::Rom;
 use nubo_core::Model;
 use refresh_clock::RefreshClock;
@@ -115,13 +116,9 @@ impl Session {
 
     /// Returns the newest frame and its sequence number, or `None` if it is
     /// still the frame with the given sequence number.
-    pub fn frame_since(&mut self, sequence: u64) -> Option<(u64, Vec<u8>)> {
-        (self.frame_sequence != sequence).then(|| {
-            (
-                self.frame_sequence,
-                self.machine.emulator.frame_buffer().to_vec(),
-            )
-        })
+    pub fn frame_since(&mut self, sequence: u64) -> Option<(u64, Frame)> {
+        (self.frame_sequence != sequence)
+            .then(|| (self.frame_sequence, Frame::latest(&self.machine.emulator)))
     }
 
     /// Emulates the frames that have come due by the screen's latest
@@ -214,12 +211,12 @@ impl Session {
     fn run_frame(&mut self, play: bool) {
         self.screen_off_credit += FRAME_DURATION.as_secs_f64();
         loop {
-            let (playing_time, frame) = if play {
+            let (playing_time, new_frame) = if play {
                 self.machine.play_buffer()
             } else {
                 self.machine.skip_buffer()
             };
-            if frame.is_some() {
+            if new_frame {
                 self.frame_sequence += 1;
                 self.screen_off_credit = 0.0;
                 return;

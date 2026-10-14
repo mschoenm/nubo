@@ -144,8 +144,34 @@ fn pixels_convert_to_xrgb8888_and_0rgb1555() {
             u16::from(red >> 3) << 10 | u16::from(green >> 3) << 5 | u16::from(blue >> 3)
         );
     }
-    assert_eq!(PixelFormat::Xrgb8888.pitch(), 640);
-    assert_eq!(PixelFormat::Rgb1555.pitch(), 320);
+    assert_eq!(PixelFormat::Xrgb8888.pitch(SCREEN_WIDTH), 640);
+    assert_eq!(PixelFormat::Rgb1555.pitch(SCREEN_WIDTH), 320);
+    assert_eq!(xrgb.pitch(), 640);
+}
+
+#[test]
+fn a_super_game_boy_shows_its_border_unless_it_is_hidden() {
+    let options = Options {
+        model: ModelPreference::Fixed(Model::Sgb),
+        ..Options::default()
+    };
+    let mut core = Core::load(
+        &cartridge(ROM_ONLY, 0, false, JOYPAD),
+        options,
+        PixelFormat::Xrgb8888,
+    )
+    .unwrap();
+    core.run(0);
+    assert_eq!(core.video_size(), (MAX_WIDTH, MAX_HEIGHT));
+    assert_eq!(frame(&core).len(), MAX_WIDTH * MAX_HEIGHT);
+    assert_eq!(core.pitch(), MAX_WIDTH * 4);
+
+    core.set_options(Options {
+        sgb_border: false,
+        ..options
+    });
+    assert_eq!(core.video_size(), (SCREEN_WIDTH, SCREEN_HEIGHT));
+    assert_eq!(frame(&core).len(), SCREEN_WIDTH * SCREEN_HEIGHT);
 }
 
 #[test]

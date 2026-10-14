@@ -2,7 +2,9 @@
 //! library folders as cards, with the recently played ones on top. Without
 //! any games yet it welcomes the user and offers to add a folder.
 
-use crate::app::{GameMessage, LibraryMessage, Message, SettingsMessage};
+use crate::app::{
+    GameMessage, LibraryMessage, Message, SCREEN_HEIGHT, SCREEN_WIDTH, SettingsMessage,
+};
 use crate::settings::Settings;
 use crate::ui::icons::{self, Icon, icon};
 use crate::ui::logo::logo;
@@ -550,7 +552,7 @@ fn card(entry: &LibraryEntry, picture: CardPicture, selected: bool) -> Element<'
 /// whole factor that fits so every pixel is the same size, like the game
 /// screen with sharp pixels on.
 fn screen_picture<'a>(handle: image::Handle) -> Element<'a, Message> {
-    container(whole_step_screen(handle))
+    container(whole_step_screen(handle, (SCREEN_WIDTH, SCREEN_HEIGHT)))
         .width(Fill)
         .height(Fill)
         .clip(true)

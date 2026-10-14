@@ -10,7 +10,7 @@ use crate::cheats::{self, Cheat};
 use crate::controls::Controls;
 use crate::notices::Notices;
 use crate::palettes::DmgPalette;
-use crate::picture::{Picture, SCREEN_HEIGHT, SCREEN_WIDTH};
+use crate::picture::{Frame, Picture};
 use crate::rom::Rom;
 use crate::save_states::{self, SaveState, Slot, SlotInfo};
 use crate::settings::{FastForwardSpeed, Settings};
@@ -82,7 +82,7 @@ impl GameSession {
             rom,
             header,
             model,
-            screen: Screen::new(!model.is_cgb()),
+            screen: Screen::new(),
             slots: Vec::new(),
             slot_listing: 0,
             thumbnails_requested: false,
@@ -119,14 +119,17 @@ impl GameSession {
         self.session.frame_listener()
     }
 
-    /// The picture on screen: the newest frame, in the chosen palette.
+    /// The picture on screen: the newest frame, in the chosen palette, with
+    /// a Super Game Boy's border unless it is switched off.
     pub fn screen(&self) -> Option<&Picture> {
         self.screen.picture.as_ref()
     }
 
-    /// The pixels on screen, in the chosen palette.
-    pub fn last_frame(&self) -> Option<&[u8]> {
-        self.screen.pixels()
+    /// The Game Boy screen alone (160×144 RGBA pixels), in the chosen
+    /// palette and without any border, for pictures of the game such as a
+    /// save state's.
+    pub fn last_frame(&self) -> Option<Vec<u8>> {
+        self.screen.screen_pixels()
     }
 
     /// Lists `slots` with what is saved in them, read from disk, such as for
@@ -237,6 +240,12 @@ impl GameSession {
         self.screen.set_palette(palette);
     }
 
+    /// Shows a Super Game Boy's border around the screen from now on, or
+    /// not, showing the frame on screen again.
+    pub fn set_sgb_border(&mut self, border: bool) {
+        self.screen.set_border(border);
+    }
+
     /// Whether the game fast forwards: the key is held, or fast forward is
     /// switched on.
     pub fn is_fast_forwarding(&self) -> bool {
@@ -310,7 +319,7 @@ impl GameSession {
             model: self.model,
             data: self.session.save_state()?,
         };
-        save_states::save(&self.rom.path, slot, &state, self.last_frame())
+        save_states::save(&self.rom.path, slot, &state, self.last_frame().as_deref())
     }
 
     /// Restores a save state made on this game's model.
@@ -327,79 +336,77 @@ impl GameSession {
 
     /// Replaces the picture on screen if the emulator finished a new frame.
     pub fn refresh_screen(&mut self) {
-        if let Some((sequence, pixels)) = self.session.frame_since(self.screen.sequence) {
+        if let Some((sequence, frame)) = self.session.frame_since(self.screen.sequence) {
             self.screen.sequence = sequence;
-            self.screen.show(pixels);
+            self.screen.show(frame);
         }
     }
 }
 
 /// The game's picture as an app shows it: the newest frame, in the
-/// chosen palette.
+/// chosen palette, with or without a Super Game Boy's border.
 #[derive(Debug)]
 struct Screen {
-    /// The picture. Its pixels also go into thumbnails, save states and
-    /// screenshots.
+    /// The picture. Screenshots save it as it is.
     picture: Option<Picture>,
-    /// The newest frame as the emulator drew it, kept to repaint it when the
-    /// palette changes, while the palette repaints it. Otherwise `picture`
-    /// has the same pixels.
-    raw: Option<Vec<u8>>,
+    /// The newest frame as the emulator drew it, kept to show it again when
+    /// the palette or the border setting changes.
+    raw: Option<Frame>,
     /// The colors original Game Boy games are shown in.
     palette: DmgPalette,
-    /// Whether the game runs on an original Game Boy, whose grays the
-    /// palette repaints.
-    repaintable: bool,
+    /// Whether a Super Game Boy's border shows around the screen.
+    border: bool,
     /// The sequence number of the frame shown, to skip unchanged frames.
     sequence: u64,
 }
 
 impl Screen {
-    fn new(repaintable: bool) -> Self {
+    fn new() -> Self {
         Screen {
             picture: None,
             raw: None,
             palette: DmgPalette::default(),
-            repaintable,
+            border: true,
             sequence: 0,
         }
     }
 
-    fn pixels(&self) -> Option<&[u8]> {
-        self.picture.as_ref().map(Picture::pixels)
+    /// The Game Boy screen alone (160×144) as shown, in the chosen palette,
+    /// without any border. Save states and the library keep it as their
+    /// picture.
+    fn screen_pixels(&self) -> Option<Vec<u8>> {
+        let raw = self.raw.as_ref()?;
+        let picture = raw.shown(self.palette, false);
+        Some(picture.pixels().to_vec())
     }
 
-    /// Shows a frame as the emulator drew it, in the chosen palette. Only a
-    /// frame that is repainted keeps a copy as the emulator drew it.
-    fn show(&mut self, pixels: Vec<u8>) {
-        let shown = if self.repaintable && self.palette != DmgPalette::Gray {
-            let mut repainted = pixels.clone();
-            self.palette.recolor(&mut repainted);
-            self.raw = Some(pixels);
-            repainted
-        } else {
-            self.raw = None;
-            pixels
-        };
-
-        self.picture = Some(Picture::new(SCREEN_WIDTH, SCREEN_HEIGHT, shown));
+    /// Shows a frame as the emulator drew it, in the chosen palette.
+    fn show(&mut self, frame: Frame) {
+        self.picture = Some(frame.shown(self.palette, self.border));
+        self.raw = Some(frame);
     }
 
     /// Shows original Game Boy games in `palette` from now on, repainting
     /// the frame on screen.
     fn set_palette(&mut self, palette: DmgPalette) {
-        if palette == self.palette {
-            return;
+        if palette != self.palette {
+            self.palette = palette;
+            self.show_again();
         }
+    }
 
-        let raw = self
-            .raw
-            .take()
-            .or_else(|| self.pixels().map(<[u8]>::to_vec));
-        self.palette = palette;
-        if self.repaintable
-            && let Some(raw) = raw
-        {
+    /// Shows a Super Game Boy's border around the screen from now on, or
+    /// not.
+    fn set_border(&mut self, border: bool) {
+        if border != self.border {
+            self.border = border;
+            self.show_again();
+        }
+    }
+
+    /// Shows the newest frame again, after a setting changed.
+    fn show_again(&mut self) {
+        if let Some(raw) = self.raw.take() {
             self.show(raw);
         }
     }

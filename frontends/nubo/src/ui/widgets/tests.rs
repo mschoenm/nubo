@@ -6,13 +6,18 @@ use iced::Size;
 
 #[test]
 fn the_screen_grows_by_the_largest_whole_factor_that_fits() {
-    assert_eq!(whole_step_factor(Size::new(700.0, 600.0)), 4.0);
-    assert_eq!(whole_step_factor(Size::new(1000.0, 300.0)), 2.0);
+    assert_eq!(whole_step_factor(Size::new(700.0, 600.0), 160, 144), 4.0);
+    assert_eq!(whole_step_factor(Size::new(1000.0, 300.0), 160, 144), 2.0);
+}
+
+#[test]
+fn a_super_game_boy_picture_with_its_border_grows_by_its_own_size() {
+    assert_eq!(whole_step_factor(Size::new(700.0, 600.0), 256, 224), 2.0);
 }
 
 #[test]
 fn the_screen_never_shrinks_below_its_own_size() {
-    assert_eq!(whole_step_factor(Size::new(100.0, 100.0)), 1.0);
+    assert_eq!(whole_step_factor(Size::new(100.0, 100.0), 160, 144), 1.0);
 }
 
 #[test]

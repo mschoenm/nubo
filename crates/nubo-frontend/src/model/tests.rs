@@ -4,8 +4,14 @@ use super::*;
 
 /// A header for a game that does or doesn't use Game Boy Color features.
 fn header(supports_cgb: bool) -> CartridgeHeader {
+    sgb_header(supports_cgb, false)
+}
+
+/// A header for a game that does or doesn't use Game Boy Color and Super
+/// Game Boy features.
+fn sgb_header(supports_cgb: bool, supports_sgb: bool) -> CartridgeHeader {
     CartridgeHeader {
-        supports_sgb: false,
+        supports_sgb,
         cartridge_type: 0,
         rom_bank_count: 2,
         ram_bank_count: 0,
@@ -28,6 +34,18 @@ fn automatic_picks_the_model_from_the_header() {
     assert_eq!(
         ModelPreference::Fixed(Model::Mgb).model_for(&header(true)),
         Model::Mgb
+    );
+}
+
+#[test]
+fn automatic_starts_super_game_boy_games_on_one_unless_they_have_color() {
+    assert_eq!(
+        ModelPreference::Automatic.model_for(&sgb_header(false, true)),
+        Model::Sgb
+    );
+    assert_eq!(
+        ModelPreference::Automatic.model_for(&sgb_header(true, true)),
+        Model::CgbE
     );
 }
 

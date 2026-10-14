@@ -119,7 +119,7 @@ fn default_window() -> iced::window::Settings {
 /// (`app::screen_only_size`).
 fn screen_only_window(scale: u32) -> iced::window::Settings {
     iced::window::Settings {
-        size: app::screen_only_size(scale, 1.0),
+        size: app::screen_only_size(scale, 1.0, (app::SCREEN_WIDTH, app::SCREEN_HEIGHT)),
         resizable: false,
         ..window_settings()
     }

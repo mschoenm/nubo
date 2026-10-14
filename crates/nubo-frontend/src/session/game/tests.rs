@@ -2,46 +2,117 @@
 //! for showing frames in the chosen palette.
 
 use super::*;
+use crate::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::settings::FastForwardSpeed;
 
-/// A whole frame in the lightest of `palette`'s colors.
-fn frame_in(palette: DmgPalette) -> Vec<u8> {
+/// A whole Game Boy screen in the lightest of `palette`'s colors.
+fn pixels_in(palette: DmgPalette) -> Vec<u8> {
     let [red, green, blue] = palette.colors()[0];
     [red, green, blue, 0xFF].repeat((SCREEN_WIDTH * SCREEN_HEIGHT) as usize)
 }
 
+/// A frame of the Game Boy screen in the lightest gray, in the emulator's
+/// grays or not.
+fn screen_frame(in_dmg_shades: bool) -> Frame {
+    Frame {
+        pixels: pixels_in(DmgPalette::Gray),
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
+        screen_position: (0, 0),
+        in_dmg_shades,
+    }
+}
+
+/// A Super Game Boy frame: a black border around a screen in the lightest
+/// gray.
+fn bordered_frame() -> Frame {
+    let (width, height) = (256, 224);
+    let mut pixels = [0, 0, 0, 0xFF].repeat((width * height) as usize);
+    for row in 40..40 + SCREEN_HEIGHT as usize {
+        let start = (row * width as usize + 48) * 4;
+        pixels[start..start + SCREEN_WIDTH as usize * 4].fill(0xFF);
+    }
+    Frame {
+        pixels,
+        width,
+        height,
+        screen_position: (48, 40),
+        in_dmg_shades: true,
+    }
+}
+
+impl Screen {
+    fn pixels(&self) -> Option<&[u8]> {
+        self.picture.as_ref().map(Picture::pixels)
+    }
+}
+
 #[test]
 fn an_original_game_boy_frame_is_shown_in_the_palette() {
-    let mut screen = Screen::new(true);
+    let mut screen = Screen::new();
     screen.set_palette(DmgPalette::Green);
 
-    screen.show(frame_in(DmgPalette::Gray));
+    screen.show(screen_frame(true));
 
-    assert_eq!(screen.pixels(), Some(&frame_in(DmgPalette::Green)[..]));
+    assert_eq!(screen.pixels(), Some(&pixels_in(DmgPalette::Green)[..]));
 }
 
 #[test]
 fn changing_the_palette_repaints_the_frame_on_screen() {
-    let mut screen = Screen::new(true);
-    screen.show(frame_in(DmgPalette::Gray));
+    let mut screen = Screen::new();
+    screen.show(screen_frame(true));
 
     screen.set_palette(DmgPalette::Green);
-    assert_eq!(screen.pixels(), Some(&frame_in(DmgPalette::Green)[..]));
+    assert_eq!(screen.pixels(), Some(&pixels_in(DmgPalette::Green)[..]));
     screen.set_palette(DmgPalette::Pocket);
-    assert_eq!(screen.pixels(), Some(&frame_in(DmgPalette::Pocket)[..]));
+    assert_eq!(screen.pixels(), Some(&pixels_in(DmgPalette::Pocket)[..]));
     screen.set_palette(DmgPalette::Gray);
-    assert_eq!(screen.pixels(), Some(&frame_in(DmgPalette::Gray)[..]));
+    assert_eq!(screen.pixels(), Some(&pixels_in(DmgPalette::Gray)[..]));
 }
 
 #[test]
-fn a_color_game_keeps_its_colors_and_no_second_copy() {
-    let mut screen = Screen::new(false);
+fn a_color_game_keeps_its_colors() {
+    let mut screen = Screen::new();
     screen.set_palette(DmgPalette::Green);
 
-    screen.show(frame_in(DmgPalette::Gray));
+    screen.show(screen_frame(false));
 
-    assert_eq!(screen.pixels(), Some(&frame_in(DmgPalette::Gray)[..]));
-    assert!(screen.raw.is_none());
+    assert_eq!(screen.pixels(), Some(&pixels_in(DmgPalette::Gray)[..]));
+}
+
+#[test]
+fn a_super_game_boy_border_shows_unless_it_is_switched_off() {
+    let mut screen = Screen::new();
+    screen.show(bordered_frame());
+    let picture = screen.picture.clone().unwrap();
+    assert_eq!((picture.width(), picture.height()), (256, 224));
+
+    screen.set_border(false);
+    let picture = screen.picture.clone().unwrap();
+    assert_eq!(
+        (picture.width(), picture.height()),
+        (SCREEN_WIDTH, SCREEN_HEIGHT)
+    );
+    assert_eq!(picture.pixels(), &pixels_in(DmgPalette::Gray)[..]);
+}
+
+#[test]
+fn the_palette_repaints_only_the_screen_inside_a_border() {
+    let mut screen = Screen::new();
+    screen.set_palette(DmgPalette::Green);
+    screen.show(bordered_frame());
+
+    let pixels = screen.pixels().unwrap();
+    assert_eq!(&pixels[..4], &[0, 0, 0, 0xFF]);
+    let inside = (40 * 256 + 48) * 4;
+    assert_eq!(
+        &pixels[inside..inside + 4],
+        &pixels_in(DmgPalette::Green)[..4]
+    );
+    assert_eq!(
+        screen.screen_pixels().unwrap(),
+        pixels_in(DmgPalette::Green)
+    );
 }
 
 #[test]

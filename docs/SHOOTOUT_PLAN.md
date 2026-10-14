@@ -16,8 +16,9 @@ The work has five parts:
 - Part 5 adds the Shootout's tests to `cargo test-roms`, so CI and the nightly run check them, and the
   nightly metrics on the wiki show where Nubo would rank. It doesn't depend on the other parts and goes
   first, right after steps 1 and 2 of [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md). **Done**: Nubo passes
-  258 of the 264 published tests, which would rank it first, ahead of DocBoy's 255, now that it draws
-  evenly spaced grays (see "What Part 5 found"). Parts 1 to 3 follow
+  261 of the 264 published tests, which would rank it first, ahead of DocBoy's 255: 258 since it draws
+  evenly spaced grays (see "What Part 5 found"), and the three Super Game Boy tests since it emulates
+  the Super Game Boy (`crates/nubo-core/src/sgb.rs`). The other three only report information. Parts 1 to 3 follow
   once the restructuring is finished. **Part 1 is built** (see "What Part 1 found"); it waits for the
   maintainer's check on Windows and a release. That plan's "Order and dependencies" has the whole order the
   maintainer agreed to.
@@ -115,9 +116,9 @@ What was missing before Part 1 (which added all three):
 
 ## Expected results
 
-Part 5 replaced this estimate with a real count: all 258 tests the harness class would run pass. The
-other six are the three Super Game Boy tests and the three that only report information (see "What
-Part 5 found"). The estimate as it was:
+Part 5 replaced this estimate with a real count: all 261 tests the harness class would run pass,
+the three Super Game Boy tests included since Nubo emulates the Super Game Boy. The other three only
+report information (see "What Part 5 found"). The estimate as it was:
 
 This is an estimate: each Shootout test was matched by ROM file name and model against
 `tools/nubo-test-rom-runner/passing.txt`. Nubo's own runner checks registers exactly where the
@@ -135,8 +136,8 @@ Shootout checks screenshots, so a real run may differ.
 | Ashiepaws | 3 | 2 | The Shootout runs Bully on DMG; Nubo's runner only runs it on CGB because real DMGs fail it too |
 | Mealybug | generated | most | The Shootout runs both its CGB-C and CGB-D references on one CGB model; as CGB-E, Nubo should match the CGB-D ones |
 
-Nubo doesn't emulate Super Game Boy commands, borders or palettes, so the class returns `None` for
-`SGB` and those tests count as not run.
+The estimate assumed Nubo didn't emulate the Super Game Boy, so the class would return `None` for
+`SGB` and those tests would count as not run. It now does, and the class starts it with `--model sgb`.
 
 ## Part 1: command-line options in the desktop app
 
@@ -255,15 +256,25 @@ class Nubo(Emulator):
         setDPIScaling("emu/nubo/Nubo/nubo.exe")
 
     def startProcess(self, rom, *, model, required_features):
-        model = {DMG: "dmg", CGB: "cgb"}.get(model)
+        model = {DMG: "dmg", CGB: "cgb", SGB: "sgb"}.get(model)
         if model is None:
-            # No Super Game Boy commands, borders or palettes.
             return None
         return subprocess.Popen([
             "emu/nubo/Nubo/nubo.exe", os.path.abspath(rom),
             "--model", model, "--scale", "1", "--fresh", "--speed", "4",
         ], cwd="emu/nubo/Nubo")
+
+    def getScreenshot(self):
+        screenshot = getScreenshot(self.title_check)
+        if screenshot is not None and screenshot.size == (256, 224):
+            # A Super Game Boy shows the Game Boy screen inside its border.
+            return screenshot.crop((48, 40, 48 + 160, 40 + 144))
+        return screenshot
 ```
+
+On a Super Game Boy, `--scale 1` makes the window 256×224, the TV picture with the border around the
+Game Boy screen at (48, 40), as mGBA's and NO$GMB's classes expect too; `getScreenshot` crops the
+screen out of it.
 
 It also needs this entry in `EMULATOR_SPECS` in `main.py`:
 
@@ -286,7 +297,9 @@ the Part 1 pull request or in this document; they don't belong in the Nubo crate
 
 1. Install Python 3 and 7-Zip. Clone `gbdev/GBEmulatorShootout`, then run
    `python -m pip install -r requirements-core.txt -r requirements.txt`.
-2. Add the files from Part 2.
+2. Add the files from Part 2. Until a release has `--scale`, `--fresh`, `--speed` and the Super Game
+   Boy, put a build of `main` (`cargo xtask windows` makes the zip) in `emu/nubo/` by hand, so
+   `downloadGithubRelease` and `extract` leave it alone (see "How the Shootout tests an emulator").
 3. Run a quick subset first: `python main.py --emulator nubo --test daid`. Then measure startup time
    with `python main.py --emulator nubo --get-startuptime` and set `startup_time` from it.
 4. Run everything for Nubo: `python main.py --emulator nubo`. Use 100% display scaling, and don't touch

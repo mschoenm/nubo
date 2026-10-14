@@ -31,16 +31,20 @@ const SLOT_THUMBNAIL_WIDTH: f32 = 80.0;
 const SLOT_THUMBNAIL_HEIGHT: f32 = 72.0;
 
 pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<'a, Message> {
-    let picture: Element<'a, Message> = match game.session.screen().map(pictures::handle) {
-        Some(handle) if settings.integer_scaling => whole_step_screen(handle),
-        Some(handle) => image(handle)
-            .filter_method(image::FilterMethod::Nearest)
-            .content_fit(ContentFit::Contain)
-            .width(Fill)
-            .height(Fill)
-            .into(),
-        None => space().into(),
-    };
+    let screen = game.session.screen();
+    let picture: Element<'a, Message> =
+        match screen.map(|screen| (pictures::handle(screen), screen)) {
+            Some((handle, screen)) if settings.integer_scaling => {
+                whole_step_screen(handle, (screen.width(), screen.height()))
+            }
+            Some((handle, _)) => image(handle)
+                .filter_method(image::FilterMethod::Nearest)
+                .content_fit(ContentFit::Contain)
+                .width(Fill)
+                .height(Fill)
+                .into(),
+            None => space().into(),
+        };
 
     let mut layers: Vec<Element<'a, Message>> = vec![
         container(picture)
@@ -75,8 +79,9 @@ pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Ele
 
 /// The game screen alone, filling the window, for `--scale` (see
 /// `command_line`): nothing is drawn over it, and the window is sized to show
-/// it at a whole multiple of its size (see `app::screen_only_size`). Black
-/// until the game shows its first frame.
+/// it at a whole multiple of its size (see `app::screen_only_size`), with a
+/// Super Game Boy's border unless the settings hide it. Black until the game
+/// shows its first frame.
 pub fn screen_only(game: Option<&Game>) -> Element<'_, Message> {
     match game
         .and_then(|game| game.session.screen())

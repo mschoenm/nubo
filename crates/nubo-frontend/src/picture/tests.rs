@@ -49,3 +49,41 @@ fn the_shared_pixels_outlive_the_picture() {
 
     assert_eq!(shared.as_ref(), &[1, 2, 3, 4, 5, 6, 7, 8]);
 }
+
+#[test]
+fn a_frame_of_an_original_game_boy_is_its_screen() {
+    let emulator = nubo_core::Emulator::new(nubo_core::Model::Dmg);
+    let frame = Frame::latest(&emulator);
+    assert_eq!((frame.width, frame.height), (SCREEN_WIDTH, SCREEN_HEIGHT));
+    assert!(!frame.has_border());
+    assert!(frame.in_dmg_shades);
+    assert_eq!(frame.screen_pixels(), frame.pixels);
+}
+
+#[test]
+fn a_super_game_boy_frame_has_its_border_around_the_screen() {
+    let emulator = nubo_core::Emulator::new(nubo_core::Model::Sgb);
+    let mut frame = Frame::latest(&emulator);
+    assert_eq!((frame.width, frame.height), (256, 224));
+    assert_eq!(frame.screen_position, (48, 40));
+    assert!(frame.has_border());
+    assert!(!frame.update(&emulator), "an unchanged frame isn't new");
+
+    let shown = frame.shown(DmgPalette::Gray, false);
+    assert_eq!(
+        (shown.width(), shown.height()),
+        (SCREEN_WIDTH, SCREEN_HEIGHT)
+    );
+    assert_eq!(shown.pixels(), &frame.screen_pixels()[..]);
+}
+
+#[test]
+fn a_color_game_boy_frame_is_never_repainted() {
+    let emulator = nubo_core::Emulator::new(nubo_core::Model::CgbE);
+    let frame = Frame::latest(&emulator);
+    assert!(!frame.in_dmg_shades);
+    assert_eq!(
+        frame.shown(DmgPalette::Green, true).pixels(),
+        &frame.pixels[..]
+    );
+}

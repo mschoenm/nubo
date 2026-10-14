@@ -32,8 +32,8 @@
 )]
 
 use crate::core::{
-    BUTTONS, Core, FRAMES_PER_SECOND, MemoryKind, PixelFormat, SAMPLE_RATE, SCREEN_HEIGHT,
-    SCREEN_WIDTH, Video,
+    BUTTONS, Core, FRAMES_PER_SECOND, MAX_HEIGHT, MAX_WIDTH, MemoryKind, PixelFormat, SAMPLE_RATE,
+    SCREEN_HEIGHT, SCREEN_WIDTH, Video,
 };
 use crate::options::{self, OptionDefinition, Options};
 use std::ffi::{CStr, CString, c_char, c_int, c_uint, c_void};
@@ -63,6 +63,7 @@ const RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE: c_uint = 17;
 const RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE: c_uint = 23;
 const RETRO_ENVIRONMENT_GET_LOG_INTERFACE: c_uint = 27;
 const RETRO_ENVIRONMENT_SET_MEMORY_MAPS: c_uint = 36 | RETRO_ENVIRONMENT_EXPERIMENTAL;
+const RETRO_ENVIRONMENT_SET_GEOMETRY: c_uint = 37;
 const RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS: c_uint = 42 | RETRO_ENVIRONMENT_EXPERIMENTAL;
 const RETRO_ENVIRONMENT_GET_INPUT_BITMASKS: c_uint = 51 | RETRO_ENVIRONMENT_EXPERIMENTAL;
 const RETRO_ENVIRONMENT_GET_CORE_OPTIONS_VERSION: c_uint = 52;
@@ -279,6 +280,9 @@ impl Frontend {
 
 static FRONTEND: Mutex<Frontend> = Mutex::new(Frontend::NONE);
 static CORE: Mutex<Option<Core>> = Mutex::new(None);
+/// The picture size RetroArch was last told about, in `retro_get_system_av_info`
+/// or with `RETRO_ENVIRONMENT_SET_GEOMETRY`.
+static GEOMETRY: Mutex<(usize, usize)> = Mutex::new((SCREEN_WIDTH, SCREEN_HEIGHT));
 
 /// Locks `mutex`. A panic while it was held, which `catch_unwind` caught,
 /// leaves nothing half-written that matters more than going on, so a
@@ -598,25 +602,43 @@ fn read_buttons(frontend: &Frontend) -> u16 {
     })
 }
 
+/// The geometry of a picture `width` by `height` pixels, which may grow to
+/// a Super Game Boy's picture with its border.
+fn geometry((width, height): (usize, usize)) -> RetroGameGeometry {
+    RetroGameGeometry {
+        base_width: width as c_uint,
+        base_height: height as c_uint,
+        max_width: MAX_WIDTH as c_uint,
+        max_height: MAX_HEIGHT as c_uint,
+        aspect_ratio: width as f32 / height as f32,
+    }
+}
+
 /// Hands RetroArch the frame, the sound and the rumble of the frame `core`
-/// just ran.
+/// just ran. When the picture's size changed (a Super Game Boy's border
+/// shown or hidden), RetroArch is told its new size and shape first.
 fn present(core: &Core) {
     let frontend = frontend();
+    let size = core.video_size();
+    let mut reported = lock(&GEOMETRY);
+    if *reported != size {
+        let mut new_geometry = geometry(size);
+        environment(
+            RETRO_ENVIRONMENT_SET_GEOMETRY,
+            (&raw mut new_geometry).cast(),
+        );
+        *reported = size;
+    }
+    drop(reported);
     if let Some(video_refresh) = frontend.video_refresh {
         let data: *const c_void = match core.video() {
             Video::Xrgb8888(pixels) => pixels.as_ptr().cast(),
             Video::Rgb1555(pixels) => pixels.as_ptr().cast(),
         };
-        // SAFETY: `data` points to SCREEN_WIDTH × SCREEN_HEIGHT pixels of the
-        // negotiated format, `pitch` bytes apart, which stay valid during
-        // the call.
+        // SAFETY: `data` points to `size` pixels of the negotiated format,
+        // `pitch` bytes apart, which stay valid during the call.
         unsafe {
-            video_refresh(
-                data,
-                SCREEN_WIDTH as c_uint,
-                SCREEN_HEIGHT as c_uint,
-                core.pixel_format().pitch(),
-            );
+            video_refresh(data, size.0 as c_uint, size.1 as c_uint, core.pitch());
         }
     }
 
@@ -712,8 +734,8 @@ pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
     });
 }
 
-/// Describes the picture and the sound: 160×144 pixels at about 59.73
-/// frames per second, and the sample rate.
+/// Describes the picture and the sound: 160×144 pixels (256×224 with a Super
+/// Game Boy's border) at about 59.73 frames per second, and the sample rate.
 ///
 /// # Safety
 ///
@@ -724,16 +746,14 @@ pub unsafe extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) 
         if info.is_null() {
             return;
         }
+        let size = lock(&CORE)
+            .as_ref()
+            .map_or((SCREEN_WIDTH, SCREEN_HEIGHT), Core::video_size);
+        *lock(&GEOMETRY) = size;
         // SAFETY: RetroArch passes a struct to fill in.
         unsafe {
             info.write(RetroSystemAvInfo {
-                geometry: RetroGameGeometry {
-                    base_width: SCREEN_WIDTH as c_uint,
-                    base_height: SCREEN_HEIGHT as c_uint,
-                    max_width: SCREEN_WIDTH as c_uint,
-                    max_height: SCREEN_HEIGHT as c_uint,
-                    aspect_ratio: SCREEN_WIDTH as f32 / SCREEN_HEIGHT as f32,
-                },
+                geometry: geometry(size),
                 timing: RetroSystemTiming {
                     fps: FRAMES_PER_SECOND,
                     sample_rate: f64::from(SAMPLE_RATE),

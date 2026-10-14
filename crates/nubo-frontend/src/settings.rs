@@ -56,6 +56,20 @@ pub struct Settings {
     pub controls: Controls,
     /// The colors original Game Boy games are shown in.
     pub dmg_palette: DmgPalette,
+    /// Whether a Super Game Boy's border shows around the screen. On until
+    /// the player turns it off, and only saved then, so files from versions
+    /// without it write back unchanged.
+    #[serde(skip_serializing_if = "is_true")]
+    pub sgb_border: bool,
+}
+
+/// Whether `value` is true, for settings saved only when they are off.
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde's skip_serializing_if passes a reference"
+)]
+fn is_true(value: &bool) -> bool {
+    *value
 }
 
 impl Default for Settings {
@@ -70,6 +84,7 @@ impl Default for Settings {
             muted: false,
             controls: Controls::default(),
             dmg_palette: DmgPalette::default(),
+            sgb_border: true,
         }
     }
 }

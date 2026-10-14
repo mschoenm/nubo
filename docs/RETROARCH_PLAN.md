@@ -76,8 +76,9 @@ Left: the AppStream release notes entry when the next version ships, and Phase 6
    (Phase 5). Getting it into RetroArch's own core downloader (Phase 6) means working with the libretro
    team and keeping a build on their CI. It is worth it, but it is outward-facing and long-term.
 3. **Options and defaults.** By default the model follows the desktop app (Game Boy Color games on
-   CGB-E, others on DMG), with a gray palette and the cartridge clock on real time. Change these if
-   needed.
+   CGB-E, Super Game Boy games on SGB, others on DMG), with a gray palette, the Super Game Boy's
+   border shown (the picture is then 256×224, and RetroArch is told whenever its size changes) and the
+   cartridge clock on real time. Change these if needed.
 
 ## References
 

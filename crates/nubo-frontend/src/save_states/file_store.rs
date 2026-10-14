@@ -6,7 +6,7 @@
 //! keep loading in other versions of Nubo, the same on every platform.
 
 use super::{SaveState, Slot, SlotInfo};
-use crate::picture::Picture;
+use crate::picture::{Picture, SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::storage::files::{decode_png, encode_png, project_directories, write_atomically};
 use nubo_core::{SaveStateError, SaveStateHeader};
 use std::fs;
@@ -55,7 +55,8 @@ pub fn save_in(
     let picture = slot_path(directory, rom_path, slot, "png");
     match pixels {
         Some(pixels) => {
-            write_atomically(&picture, &encode_png(pixels)?).map_err(|error| error.to_string())
+            write_atomically(&picture, &encode_png(SCREEN_WIDTH, SCREEN_HEIGHT, pixels)?)
+                .map_err(|error| error.to_string())
         }
         None => match fs::remove_file(picture) {
             Err(error) if error.kind() != ErrorKind::NotFound => Err(error.to_string()),

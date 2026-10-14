@@ -7,8 +7,9 @@
 
 use super::{Command, Machine, Playback, Saves, ask, stopped_error};
 use crate::notices::Notices;
+use crate::picture::Frame;
 use crate::rom::Rom;
-use nubo_core::Model;
+use nubo_core::{Emulator, Model};
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -27,7 +28,7 @@ struct SharedFrame {
     /// Goes up by one for every new frame that differs from the one before,
     /// so readers can tell whether the pixels changed since they last looked.
     sequence: u64,
-    pixels: Vec<u8>,
+    frame: Frame,
     /// Called for every new frame while the app listens (see
     /// [`FrameListener::listen`]).
     on_frame: Option<Box<dyn FnMut() + Send>>,
@@ -215,9 +216,9 @@ impl Session {
 
     /// Returns the newest frame and its sequence number, or `None` if it is
     /// still the frame with the given sequence number.
-    pub fn frame_since(&self, sequence: u64) -> Option<(u64, Vec<u8>)> {
+    pub fn frame_since(&self, sequence: u64) -> Option<(u64, Frame)> {
         let frame = self.frame.lock().ok()?;
-        (frame.sequence != sequence).then(|| (frame.sequence, frame.pixels.clone()))
+        (frame.sequence != sequence).then(|| (frame.sequence, frame.frame.clone()))
     }
 
     /// What the emulator thread has done since the session started.
@@ -297,9 +298,9 @@ impl EmulatorThread {
             }
 
             self.activity.buffers.fetch_add(1, Ordering::Relaxed);
-            let (playing_time, pixels) = self.machine.play_buffer();
-            if let Some(pixels) = pixels {
-                publish_frame(&self.frame, pixels);
+            let (playing_time, new_frame) = self.machine.play_buffer();
+            if new_frame {
+                publish_frame(&self.frame, &self.machine.emulator);
             }
             let unplayed = self.machine.playback.buffers_per_played() - 1;
             self.fast_forward.spread(unplayed, playing_time);
@@ -325,8 +326,8 @@ impl EmulatorThread {
     /// Emulates one audio buffer without playing it, for fast forward.
     fn skip_buffer(&mut self) {
         self.activity.buffers.fetch_add(1, Ordering::Relaxed);
-        if let Some(pixels) = self.machine.skip_buffer().1 {
-            publish_frame(&self.frame, pixels);
+        if self.machine.skip_buffer().1 {
+            publish_frame(&self.frame, &self.machine.emulator);
         }
     }
 }
@@ -380,18 +381,22 @@ impl FastForward {
     }
 }
 
-/// Copies a finished frame into the shared buffer for the app, and calls
+/// Copies the emulator's finished frame into the shared buffer for the app, and calls
 /// the app's callback if it listens. A call the app hasn't handled yet
 /// already covers this frame, since the app always takes the newest one. A frame
 /// exactly like the one before is skipped, so still screens such as menus
 /// and text boxes don't redraw the window at all.
-fn publish_frame(frame: &Mutex<SharedFrame>, pixels: &[u8]) {
+fn publish_frame(frame: &Mutex<SharedFrame>, emulator: &Emulator) {
+    publish(frame, |latest| latest.update(emulator));
+}
+
+/// Lets `update` change the shared frame, and if it says it did, counts a new
+/// frame and calls the app's callback.
+fn publish(frame: &Mutex<SharedFrame>, update: impl FnOnce(&mut Frame) -> bool) {
     if let Ok(mut shared) = frame.lock() {
-        if shared.pixels == pixels {
+        if !update(&mut shared.frame) {
             return;
         }
-        shared.pixels.clear();
-        shared.pixels.extend_from_slice(pixels);
         shared.sequence += 1;
         if let Some(on_frame) = &mut shared.on_frame {
             on_frame();
