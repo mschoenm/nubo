@@ -2,8 +2,8 @@
 //! `Emulator::read_rom_header`.
 
 use super::LibraryEntry;
+use crate::settings::LibraryFolder;
 use nubo_core::{CartridgeHeader, Emulator};
-use nubo_frontend::settings::LibraryFolder;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -19,6 +19,8 @@ const MAX_FILE_SIZE: u64 = 16 * 1024 * 1024;
 pub struct ScanResult {
     /// The scan's number, see `Library::scan_generation`.
     pub generation: u64,
+    /// The games found, and the known ones kept although they can't be
+    /// reached.
     pub entries: Vec<LibraryEntry>,
     /// Library folders that don't exist (any more).
     pub missing_folders: Vec<PathBuf>,
@@ -45,7 +47,7 @@ impl ScanResult {
 }
 
 /// What a quick look at the library's files found, without scanning the
-/// folders; see [`check`].
+/// folders; see [`Library::start_check`](super::Library::start_check).
 #[derive(Debug, Clone, Default)]
 pub struct FileCheck {
     /// Games whose file was deleted: their folder is there, the file isn't.

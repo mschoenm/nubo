@@ -12,7 +12,10 @@
 //! - what an app keeps between runs, through [`storage`]: the settings
 //!   ([`settings`], with the key bindings of [`controls`]), battery saves
 //!   ([`battery`]), save states ([`save_states`]), cheats ([`cheats`]) and
-//!   screenshots ([`screenshots`]), and the ROM files themselves ([`rom`]).
+//!   screenshots ([`screenshots`]), and the ROM files themselves ([`rom`]);
+//! - the game library ([`library`]): the games in the player's folders,
+//!   scanned in the background and cached between runs with pictures of
+//!   their title screens, their last screen played and their box art.
 //!
 //! # Features
 //!
@@ -20,7 +23,8 @@
 //! dependencies it can use:
 //!
 //! - **`desktop`**: files in the user's folders (`storage::files`). Save
-//!   states, cheats and screenshots are only kept with it.
+//!   states, cheats, screenshots and the library are only kept with it,
+//!   and only it watches the library folders and downloads box art.
 //! - **`web`**: the browser's localStorage (`storage::local_storage`), which
 //!   keeps the settings and battery saves.
 //!
@@ -31,6 +35,7 @@ pub mod background;
 pub mod battery;
 pub mod cheats;
 pub mod controls;
+pub mod library;
 pub mod model;
 pub mod notices;
 pub mod palettes;
