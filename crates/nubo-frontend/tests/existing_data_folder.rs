@@ -11,6 +11,10 @@
 //! library folders, one played from elsewhere), their thumbnails, title
 //! screens and box art. These tests read all of it with this version, and
 //! check that saving the same things again writes the same bytes.
+//!
+//! Puzzle Time's title screen and thumbnail were redrawn in the evenly spaced
+//! grays when the emulator's own grays changed to them, before Nubo had
+//! players whose pictures would be in the old ones.
 
 #![cfg(feature = "desktop")]
 

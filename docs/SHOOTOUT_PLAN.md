@@ -14,8 +14,8 @@ The work has five parts:
 - Part 5 adds the Shootout's tests to `cargo test-roms`, so CI and the nightly run check them, and the
   nightly metrics on the wiki show where Nubo would rank. It doesn't depend on the other parts and goes
   first, right after steps 1 and 2 of [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md). **Done**: Nubo passes
-  251 of the 264 published tests, which would rank it second, level with Emulicious; the seven DMG
-  tests it misses only need darker middle grays on screen (see "What Part 5 found"). Parts 1 to 3 follow
+  258 of the 264 published tests, which would rank it first, ahead of DocBoy's 255, now that it draws
+  evenly spaced grays (see "What Part 5 found"). Parts 1 to 3 follow
   once the restructuring is finished. That plan's "Order and dependencies" has the whole order the
   maintainer agreed to.
 
@@ -91,10 +91,8 @@ What already works:
   and `cgb` is `Model::CgbE` (`crates/nubo-core/src/model.rs`).
 - While a game runs, the window title is `<game> — Nubo` (`App::title` in `frontends/nubo/src/app.rs`).
   The class's `title_check` has to be `title.endswith("Nubo")`.
-- The default palette for original Game Boy games is plain gray (`DmgPalette::Gray`). Its middle grays
-  (0xD3 and 0xA9) aren't the references' evenly spaced ones (0xAA and 0x55): the light gray is within
-  the harness's tolerance of 50, but the dark gray is 84 away, so seven DMG tests with dark gray in
-  their screenshots fail (see "What Part 5 found").
+- The default palette for original Game Boy games is plain gray (`DmgPalette::Gray`): the emulator's
+  evenly spaced grays (white, 0xAA, 0x55, black, `DMG_SHADES`), the same as the references'.
 - Nubo has its own boot ROMs, so the harness doesn't need to download any.
 
 What's missing:
@@ -114,10 +112,9 @@ What's missing:
 
 ## Expected results
 
-Part 5 replaced this estimate with a real count: 251 of the 258 tests the harness class would run
-pass. The seven that fail are DMG tests whose screenshots have a darker middle gray than Nubo shows,
-and the other six are the three Super Game Boy tests and the three that only report information (see
-"What Part 5 found"). The estimate as it was:
+Part 5 replaced this estimate with a real count: all 258 tests the harness class would run pass. The
+other six are the three Super Game Boy tests and the three that only report information (see "What
+Part 5 found"). The estimate as it was:
 
 This is an estimate: each Shootout test was matched by ROM file name and model against
 `tools/nubo-test-rom-runner/passing.txt`. Nubo's own runner checks registers exactly where the
@@ -425,7 +422,8 @@ CPU time is the steadier number):
 ### What Part 5 found
 
 Done on 2026-10-13. `cargo test-roms` prints
-`  shootout  251/264  rank 2  leader DocBoy 255  published 2026-06-04 72fd745`. Where the build
+`  shootout  251/264  rank 2  leader DocBoy 255  published 2026-06-04 72fd745`; with evenly spaced
+grays (below), `258/264  rank 1`. Where the build
 differs from the steps above, and why:
 
 - **Files.** Only 53 of the 258 tests' ROMs are in the c-sp collection with the Shootout's SHA-256
@@ -446,8 +444,9 @@ differs from the steps above, and why:
   shows, not mapped to the screenshots' grays as the other screenshot checks are. Nubo's dark gray
   (0xA9) is 84 steps of brightness from the screenshots' (0x55), more than the 50 the comparison
   allows, so the seven DMG tests with dark gray in their screenshots fail. `FAILING_TESTS.md` lists
-  them with what to try, and explains the six published tests that aren't counted. Making the middle
-  grays evenly spaced (on screen, in the default palette or under `--fresh`) is a decision for Part 1.
+  them with what to try, and explains the six published tests that aren't counted. The maintainer
+  chose to make the emulator's own grays evenly spaced (white, 0xAA, 0x55, black), so the default
+  palette shows them too: the seven pass, and Nubo passes 258 of 264, which would rank it first.
 - **daid's and CasualPokePlayer's tests run twice.** Since the two comparisons now judge different
   things (the emulation, in the screenshots' grays, and what the harness would see), their old
   checks under their own IDs stay, next to the `shootout/` ones.
