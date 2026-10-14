@@ -1,6 +1,6 @@
 # Plan: restructuring the repository
 
-**Status: signed off by the maintainer on 2026-10-13. Steps 1 to 6 are done.**
+**Status: signed off by the maintainer on 2026-10-13, and done on 2026-10-14: all seven steps are merged.** What is left from "Order and dependencies" below is Parts 1 to 3 of the Shootout plan, then the RetroArch core.
 
 ## What is planned and what is only kept possible
 
@@ -395,6 +395,11 @@ must not add wake-ups, buffers or frames.
 - The Iced crate holds only UI: views, theme, input translation, subscriptions and the overlay.
 
 ### Step 7: finish the docs
+
+**Done.** `crates/nubo-frontend` has an `AGENTS.md` of its own (how it fits together, the feature
+combinations to check, and the fixtures that keep players' data readable); the root `AGENTS.md` points
+to it and states the `unsafe` rule with its one planned exception; the README says where the app,
+`nubo-frontend` and the tools live; `docs/NIGHTLY_REVIEW.md` names the new folder.
 
 Each step keeps AGENTS.md true as it goes. This step checks the whole picture:
 
