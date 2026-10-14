@@ -14,7 +14,7 @@ Nubo is a cycle-accurate Game Boy emulator written in Rust. It runs as a native 
 | -------- | -------- |
 | Windows | [Installer](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.msi) · [Zip](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.zip) (runs without installing) |
 | Linux | [Flatpak for x86_64](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-x86_64.flatpak) (most PCs) · [Flatpak for ARM](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-aarch64.flatpak) |
-| macOS | Not available yet; build `Nubo.app` with `cargo xtask bundle` (see [Desktop App](#desktop-app)) |
+| macOS | Not available yet; build `Nubo.app` with `cargo xtask macos` (see [Desktop App](#desktop-app)) |
 | Browser | [Play in the browser](https://mschoenm.github.io/nubo/) |
 | RetroArch | Zips of the core for Windows, Linux (x86_64 and ARM) and macOS in the [nightly build](https://github.com/mschoenm/nubo/releases/tag/nightly), and in every release after 0.5.0 (see [RetroArch Core](#retroarch-core)) |
 
@@ -50,7 +50,7 @@ cargo play path/to/rom.gbc --cgb    # Run in Game Boy Color mode
 cargo play path/to/rom.gb --model mgb  # Run on another model: dmg-0, dmg, mgb, sgb, sgb2, cgb-0 to cgb-e, agb
 cargo play path/to/rom.gb --scale 2 --fresh --speed 4  # Only the screen at 2×, keeping nothing, fast forwarding at 4× (for test harnesses)
 cargo xtask web                     # Build the app for the browser and serve it at http://127.0.0.1:8080
-cargo xtask bundle                  # Build Nubo.app with its icon into target/bundle/ (macOS)
+cargo xtask macos                   # Build Nubo.app with its icon into target/bundle/ (macOS)
 cargo xtask flatpak                 # Build the app as a Flatpak, install it for your user and write a .flatpak file into target/bundle/
 cargo xtask windows                 # Build the Windows installer (an MSI) and a zip into target/bundle/ (Windows, needs the WiX Toolset)
 cargo screenshot path/to/rom.gb 10  # Run headless for 10 emulated seconds and save a screenshot to target/screenshots/
@@ -66,7 +66,7 @@ The app lives in the `frontends/nubo` folder and draws with [Iced](https://iced.
 
 On Windows, `cargo xtask windows` builds `Nubo-<version>-windows-x64.msi` in `target/bundle/`, which installs Nubo for your user (no administrator rights) with a Start menu entry, and can offer Nubo for opening `.gb` and `.gbc` files and add a desktop shortcut, plus a zip of the same files to run Nubo without installing. Running it over an installed Nubo updates it, keeping those choices; over a newer one it warns before going back. Nubo is uninstalled from Settings > Apps, like any app. It needs the [WiX Toolset](https://wixtoolset.org) (`dotnet tool install --global wix`, then `wix eula accept wix7` to accept its license; Nubo owes no fee). Each release has both files (as `Nubo-windows-x64.msi` and `Nubo-windows-x64.zip`), and so does the `nightly` pre-release, whose installed app shows as "Nubo (nightly <date>)". They aren't signed yet, so Windows SmartScreen may warn the first time: choose More info and then Run anyway. To install from a script or the command line, without any questions and without starting Nubo afterwards, run `msiexec /i Nubo-windows-x64.msi /qn`, adding `ASSOCIATE_FILES=0` (don't offer Nubo for ROMs) or `DESKTOP_SHORTCUT=1` (add a desktop shortcut) to choose; `/passive` shows only a progress bar.
 
-On macOS, `cargo xtask bundle` builds `Nubo.app` in `target/bundle/`, with its own icon in the Dock. Drag it to the Applications folder to install it.
+On macOS, `cargo xtask macos` builds `Nubo.app` in `target/bundle/`, with its own icon in the Dock. Drag it to the Applications folder to install it.
 
 On Linux, `cargo xtask flatpak` builds the app as a Flatpak and installs it for your user, to try it in the sandbox that Flathub apps run in. Start it from the app grid or with `flatpak run io.github.mschoenm.nubo`, and remove it with `flatpak uninstall --user io.github.mschoenm.nubo`. It needs flatpak-builder; the first build downloads the freedesktop runtime from Flathub, adding Flathub for your user if it isn't there yet. In the sandbox the app keeps its data in `~/.var/app/io.github.mschoenm.nubo/`, and it can read ROM folders in your home folder and on external drives.
 

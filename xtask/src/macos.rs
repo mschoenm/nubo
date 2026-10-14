@@ -1,9 +1,7 @@
 //! Builds `Nubo.app`, the macOS app bundle, so the app has its own icon in
-//! the Dock and can be put in the Applications folder. Also writes the logo
-//! as a PNG.
+//! the Dock and can be put in the Applications folder.
 
-use super::{APP_ID, Result, cargo, licenses, run, target_dir};
-use image::ImageFormat;
+use super::{APP_ID, Result, cargo, icon, licenses, run, target_dir};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -33,7 +31,7 @@ const ICONSET: [(&str, u32); 10] = [
 /// Builds the app in release mode and puts it in `target/bundle/Nubo.app`
 /// with its icon and license files, returning where the bundle is. Needs macOS, for its
 /// `iconutil` tool.
-pub fn build_app_bundle() -> Result<PathBuf> {
+pub fn build_macos_app() -> Result<PathBuf> {
     if !cfg!(target_os = "macos") {
         return Err(String::from("app bundles can only be built on macOS"));
     }
@@ -82,43 +80,14 @@ pub fn build_app_bundle() -> Result<PathBuf> {
     Ok(app)
 }
 
-/// Writes the logo to `path` without a border: as an SVG when the path ends
-/// in `.svg`, as a Windows icon with every size when it ends in `.ico`, and
-/// otherwise as a PNG `size` pixels wide.
-pub fn write_icon(path: &Path, size: u32) -> Result {
-    let extension = path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .map(str::to_ascii_lowercase);
-    let contents = match extension.as_deref() {
-        Some("svg") => nubo_logo::svg().into_bytes(),
-        Some("ico") => nubo_logo::ico(),
-        _ => return write_png(path, size, 0.0),
-    };
-    fs::write(path, contents)
-        .map_err(|error| format!("failed to write {}: {error}", path.display()))
-}
-
 /// Writes the pictures of an `.iconset` folder for `iconutil`.
 fn write_iconset(iconset: &Path) -> Result {
     fs::create_dir_all(iconset).map_err(|error| error.to_string())?;
 
     for (file_name, size) in ICONSET {
-        write_png(&iconset.join(file_name), size, MACOS_ICON_MARGIN)?;
+        icon::write_png(&iconset.join(file_name), size, MACOS_ICON_MARGIN)?;
     }
     Ok(())
-}
-
-fn write_png(path: &Path, size: u32, margin: f32) -> Result {
-    image::save_buffer_with_format(
-        path,
-        &nubo_logo::render(size, margin),
-        size,
-        size,
-        image::ExtendedColorType::Rgba8,
-        ImageFormat::Png,
-    )
-    .map_err(|error| format!("failed to write {}: {error}", path.display()))
 }
 
 /// The bundle's description for macOS: its name, program, icon and version.
