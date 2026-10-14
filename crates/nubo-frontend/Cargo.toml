@@ -42,7 +42,7 @@ image = { version = "0.25", default-features = false, features = ["png"], option
 # The library's folder watcher (src/library/watcher.rs).
 notify-debouncer-mini = { version = "0.7", optional = true }
 # Box art downloads (src/library/box_art/download.rs).
-ureq = { version = "2.12", default-features = false, features = ["tls"], optional = true }
+ureq = { workspace = true, optional = true }
 # The sound of a running game (src/session/audio.rs).
 cpal = { version = "0.18", optional = true }
 # Game controllers (src/gamepads.rs).
