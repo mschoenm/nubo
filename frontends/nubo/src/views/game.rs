@@ -6,8 +6,10 @@
 //! hidden behind the menu bar that macOS slides down there. Double-clicking
 //! the picture switches between fullscreen and a window, as on a video
 //! site. The pause menu works like a context menu: a right click on the
-//! picture opens it, as Esc does, and a click outside it or a row that
-//! leaves it behind closes it. With `--scale` the window shows the picture alone ([`screen_only`]).
+//! picture opens it, as Esc does, and a click on the game outside it or a
+//! row that leaves it behind closes it. The bar's buttons work as usual
+//! while it's open. With `--scale` the window shows the picture alone
+//! ([`screen_only`]).
 
 use crate::app::{GameMessage, Message, SettingsMessage, WindowMessage};
 use crate::game::{Game, PauseMenu};
@@ -350,8 +352,9 @@ pub fn slot_message(info: &SlotInfo, saving: bool) -> Option<Message> {
     }
 }
 
-/// The pause menu over the dimmed game. A click outside the menu's panel,
-/// with either button, closes it, as it does a context menu.
+/// The pause menu over the dimmed game. A click on the game outside the
+/// menu's panel, with either button, closes it, as it does a context menu;
+/// the bar isn't covered, so its buttons do what they always do.
 fn pause_menu<'a>(
     game: &'a Game,
     page: PauseMenu,
