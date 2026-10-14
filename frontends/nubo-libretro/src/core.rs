@@ -725,7 +725,8 @@ struct MemorySnapshot {
     /// ROM banks 0 and 1, as 0x0000-0x7FFF shows them at power-on.
     rom: Box<[u8; 0x8000]>,
     video_ram: Box<[u8; VIDEO_RAM_SIZE]>,
-    /// Cartridge RAM, all banks, with zeros after the cartridge's own.
+    /// Cartridge RAM, all banks, with zeros after the cartridge's own; RAM
+    /// shorter than a bank repeats through the first (`cartridge_ram_index`).
     cartridge_ram: Box<[u8; CARTRIDGE_RAM_SIZE]>,
     work_ram: Box<[u8; WORK_RAM_SIZE]>,
     /// OAM at 0xFE00-0xFE9F and the unusable area after it, which reads 0.
@@ -750,14 +751,32 @@ struct WrittenMemory {
     high_ram: [u8; 0x80],
 }
 
+/// Where byte `index` of the cartridge RAM buffer is in a cartridge RAM
+/// `length` bytes long. RAM shorter than one 8 KiB bank (MBC2's 512 cells, a
+/// 2 KiB chip) repeats through 0xA000-0xBFFF, as the game sees it.
+fn cartridge_ram_index(index: usize, length: usize) -> Option<usize> {
+    if index < length {
+        Some(index)
+    } else if length > 0 && index < 0x2000 {
+        Some(index % length)
+    } else {
+        None
+    }
+}
+
 /// Writes the bytes of `buffer` that differ from `written` into `target`,
-/// the emulator's own memory, except past `target`'s end. Returns whether it
-/// wrote any.
-fn write_changes(buffer: &[u8], written: &[u8], target: &mut [u8]) -> bool {
+/// the emulator's own memory, at the index `target_index` gives (none skips
+/// the byte), except past `target`'s end. Returns whether it wrote any.
+fn write_changes(
+    buffer: &[u8],
+    written: &[u8],
+    target: &mut [u8],
+    target_index: impl Fn(usize) -> Option<usize>,
+) -> bool {
     let mut changed = false;
     for (index, (&byte, &before)) in buffer.iter().zip(written).enumerate() {
         if byte != before
-            && let Some(target) = target.get_mut(index)
+            && let Some(target) = target_index(index).and_then(|index| target.get_mut(index))
         {
             *target = byte;
             changed = true;
@@ -803,22 +822,31 @@ impl MemorySnapshot {
             return false;
         }
         let memory = emulator.memory_mut();
-        write_changes(&self.work_ram[..], &written.work_ram, memory.work_ram);
+        write_changes(&self.work_ram[..], &written.work_ram, memory.work_ram, Some);
         write_changes(
             &self.high_ram[..0x7F],
             &written.high_ram[..0x7F],
             memory.high_ram,
+            Some,
         );
-        write_changes(&self.video_ram[..], &written.video_ram, memory.video_ram);
+        write_changes(
+            &self.video_ram[..],
+            &written.video_ram,
+            memory.video_ram,
+            Some,
+        );
         write_changes(
             &self.oam[..0xA0],
             &written.oam[..0xA0],
             memory.object_attribute_memory,
+            Some,
         );
+        let cartridge_length = memory.cartridge_ram.len();
         let cartridge_changed = write_changes(
             &self.cartridge_ram[..],
             &written.cartridge_ram,
             memory.cartridge_ram,
+            |index| cartridge_ram_index(index, cartridge_length),
         );
         written.work_ram.copy_from_slice(&self.work_ram[..]);
         written.high_ram.copy_from_slice(&self.high_ram[..]);
@@ -836,9 +864,10 @@ impl MemorySnapshot {
         copy_into(&mut self.high_ram[..0x7F], emulator.high_ram());
         self.high_ram[0x7F] = emulator.read_memory(0xFFFF);
         let cartridge_ram = emulator.cartridge_ram();
-        let length = cartridge_ram.len().min(CARTRIDGE_RAM_SIZE);
-        self.cartridge_ram[..length].copy_from_slice(&cartridge_ram[..length]);
-        self.cartridge_ram[length..].fill(0);
+        for (index, byte) in self.cartridge_ram.iter_mut().enumerate() {
+            *byte = cartridge_ram_index(index, cartridge_ram.len())
+                .map_or(0, |index| cartridge_ram[index]);
+        }
         for (offset, byte) in self.io.iter_mut().enumerate() {
             *byte = emulator.read_memory(0xFF00 + offset as u16);
         }

@@ -1,7 +1,7 @@
 use super::*;
 use crate::test_roms::{
-    CHEATS, CLOCK, JOYPAD, MBC1_RAM_BATTERY, MBC3_TIMER_RAM_BATTERY, MBC5_RUMBLE, RAM, RAM_8_KIB,
-    RAM_32_KIB, ROM_BYTE_AT_0200, ROM_ONLY, RUMBLE, TONE, cartridge,
+    CHEATS, CLOCK, JOYPAD, MBC1_RAM_BATTERY, MBC3_TIMER_RAM_BATTERY, MBC5_RUMBLE, RAM, RAM_2_KIB,
+    RAM_8_KIB, RAM_32_KIB, ROM_BYTE_AT_0200, ROM_ONLY, RUMBLE, TONE, cartridge,
 };
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::palettes::DmgPalette;
@@ -747,6 +747,22 @@ fn what_retroarch_writes_to_battery_ram_reaches_the_game_and_the_save() {
     run(&mut core, 2);
     assert_eq!(work_ram(&mut core, 0xC000), 0x6B, "the game read it");
     assert_eq!(core.save_ram()[0], 0x6B, "the .srm keeps it");
+}
+
+#[test]
+fn ram_shorter_than_a_bank_repeats_through_its_window_for_reads_and_writes() {
+    let mut core = booted(MBC1_RAM_BATTERY, RAM_2_KIB, RAM);
+    *region_byte(&mut core, 0xA800) = 0x6B;
+    run(&mut core, 2);
+    assert_eq!(
+        work_ram(&mut core, 0xC000),
+        0x6B,
+        "the game read it at 0xA000"
+    );
+    assert_eq!(*region_byte(&mut core, 0xA000), 0x6B);
+    let counter = *region_byte(&mut core, 0xA001);
+    assert_eq!(*region_byte(&mut core, 0xB801), counter);
+    assert_eq!(core.save_ram()[0], 0x6B);
 }
 
 #[test]
