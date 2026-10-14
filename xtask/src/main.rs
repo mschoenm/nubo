@@ -403,6 +403,7 @@ mod tests {
 mod benchmark_roms;
 mod compare_emulators;
 mod flatpak;
+mod http;
 mod icon;
 mod libretro;
 mod licenses;

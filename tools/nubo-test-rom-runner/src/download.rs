@@ -8,9 +8,10 @@ use crate::suites::Source;
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
-use std::io::Write;
+use std::io;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread;
 
 const VERSION: &str = "v7.0";
 const ARCHIVE_URL: &str =
@@ -24,6 +25,7 @@ const SHOOTOUT_MANIFEST: &str = include_str!("../shootout.sha256");
 /// A file written after a download or extraction succeeds, so an interrupted
 /// one is redone on the next run.
 const COMPLETE_MARKER: &str = ".complete";
+const PARALLEL_DOWNLOADS: usize = 16;
 
 /// The folders the test ROMs are in.
 pub(crate) struct RomDirs {
@@ -74,7 +76,7 @@ fn ensure_collection() -> Result<PathBuf, String> {
     let archive = work_dir().join(format!("game-boy-test-roms-{VERSION}.zip"));
     if !has_checksum(&archive, ARCHIVE_SHA256) {
         println!("Downloading {ARCHIVE_URL}");
-        curl(&[(archive.clone(), ARCHIVE_URL.to_string())])?;
+        download_all(&[(archive.clone(), ARCHIVE_URL.to_string())])?;
         if !has_checksum(&archive, ARCHIVE_SHA256) {
             let _ = fs::remove_file(&archive);
             return Err(format!(
@@ -124,7 +126,7 @@ fn ensure_shootout() -> Result<PathBuf, String> {
                     .map_err(|error| format!("failed to create {}: {error}", parent.display()))?;
             }
         }
-        curl(&missing)?;
+        download_all(&missing)?;
     }
 
     let corrupt: Vec<&str> = entries
@@ -164,59 +166,55 @@ fn sha256_hex(bytes: &[u8]) -> String {
         .collect()
 }
 
-/// Downloads each URL to its destination with curl, which ships with
-/// Windows, macOS and most Linux distributions. The URLs and destinations go
-/// to curl as a config on its standard input rather than as arguments, since
-/// hundreds of them would pass Windows' limit on the length of a command line.
-fn curl(downloads: &[(PathBuf, String)]) -> Result<(), String> {
-    let config = curl_config(downloads)?;
-    let mut command = Command::new("curl");
-    command.args(["--fail", "--location", "--silent", "--show-error"]);
-    if downloads.len() > 1 {
-        command.arg("--parallel");
-    }
-    command.args(["--config", "-"]).stdin(Stdio::piped());
-
-    let mut child = command
-        .spawn()
-        .map_err(|error| format!("failed to run curl: {error}"))?;
-    let written = child
-        .stdin
-        .take()
-        .expect("curl's standard input is piped")
-        .write_all(config.as_bytes());
-    let status = child
-        .wait()
-        .map_err(|error| format!("failed to run curl: {error}"))?;
-    written.map_err(|error| format!("failed to pass the downloads to curl: {error}"))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("curl exited with {status}"))
-    }
+/// Downloads each URL to its destination, several at a time.
+fn download_all(downloads: &[(PathBuf, String)]) -> Result<(), String> {
+    let agent = agent();
+    let next = AtomicUsize::new(0);
+    thread::scope(|scope| {
+        let workers: Vec<_> = (0..PARALLEL_DOWNLOADS.min(downloads.len()))
+            .map(|_| {
+                scope.spawn(|| {
+                    while let Some((destination, url)) =
+                        downloads.get(next.fetch_add(1, Ordering::Relaxed))
+                    {
+                        download(&agent, url, destination)?;
+                    }
+                    Ok(())
+                })
+            })
+            .collect();
+        workers
+            .into_iter()
+            .try_for_each(|worker| worker.join().expect("a download thread panicked"))
+    })
 }
 
-/// A curl config that downloads each URL to its destination: a `url` line
-/// and an `output` line per download, with every value quoted.
-fn curl_config(downloads: &[(PathBuf, String)]) -> Result<String, String> {
-    let mut config = String::new();
-    for (destination, url) in downloads {
-        let destination = destination
-            .to_str()
-            .ok_or_else(|| format!("{} is not valid UTF-8", destination.display()))?;
-        config.push_str(&format!(
-            "url = {}\noutput = {}\n",
-            curl_quote(url),
-            curl_quote(destination)
-        ));
-    }
-    Ok(config)
+/// An HTTP client that finds a proxy and trusted certificates the way the
+/// system's own tools do, from the `HTTPS_PROXY` variable and the system's
+/// certificate store.
+fn agent() -> ureq::Agent {
+    ureq::Agent::new_with_config(
+        ureq::Agent::config_builder()
+            .tls_config(
+                ureq::tls::TlsConfig::builder()
+                    .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+                    .build(),
+            )
+            .build(),
+    )
 }
 
-/// `value` in double quotes for a curl config, where a backslash starts an
-/// escape, so the backslashes in Windows paths are doubled.
-fn curl_quote(value: &str) -> String {
-    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+/// Downloads `url` to `destination`.
+fn download(agent: &ureq::Agent, url: &str, destination: &Path) -> Result<(), String> {
+    let response = agent
+        .get(url)
+        .call()
+        .map_err(|error| format!("failed to download {url}: {error}"))?;
+    let mut file = fs::File::create(destination)
+        .map_err(|error| format!("failed to create {}: {error}", destination.display()))?;
+    io::copy(&mut response.into_body().into_reader(), &mut file)
+        .map_err(|error| format!("failed to download {url}: {error}"))?;
+    Ok(())
 }
 
 /// Unpacks the archive into a fresh `destination` and marks it complete.
@@ -232,31 +230,4 @@ fn extract(archive: &Path, destination: &Path) -> Result<(), String> {
 
     fs::write(destination.join(COMPLETE_MARKER), VERSION)
         .map_err(|error| format!("failed to write to {}: {error}", destination.display()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_curl_config_pairs_each_url_with_its_quoted_destination() {
-        let downloads = [
-            (
-                PathBuf::from(r"C:\target\test-roms\a.gb"),
-                "https://example.com/a.gb".to_string(),
-            ),
-            (
-                PathBuf::from("target/test-roms/\"b\".png"),
-                "https://example.com/b.png".to_string(),
-            ),
-        ];
-        assert_eq!(
-            curl_config(&downloads).unwrap(),
-            r#"url = "https://example.com/a.gb"
-output = "C:\\target\\test-roms\\a.gb"
-url = "https://example.com/b.png"
-output = "target/test-roms/\"b\".png"
-"#
-        );
-    }
 }
