@@ -8,8 +8,9 @@ use crate::suites::Source;
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 const VERSION: &str = "v7.0";
 const ARCHIVE_URL: &str =
@@ -164,25 +165,58 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 /// Downloads each URL to its destination with curl, which ships with
-/// Windows, macOS and most Linux distributions.
+/// Windows, macOS and most Linux distributions. The URLs and destinations go
+/// to curl as a config on its standard input rather than as arguments, since
+/// hundreds of them would pass Windows' limit on the length of a command line.
 fn curl(downloads: &[(PathBuf, String)]) -> Result<(), String> {
+    let config = curl_config(downloads)?;
     let mut command = Command::new("curl");
     command.args(["--fail", "--location", "--silent", "--show-error"]);
     if downloads.len() > 1 {
         command.arg("--parallel");
     }
-    for (destination, url) in downloads {
-        command.arg("--output").arg(destination).arg(url);
-    }
+    command.args(["--config", "-"]).stdin(Stdio::piped());
 
-    let status = command
-        .status()
+    let mut child = command
+        .spawn()
         .map_err(|error| format!("failed to run curl: {error}"))?;
+    let written = child
+        .stdin
+        .take()
+        .expect("curl's standard input is piped")
+        .write_all(config.as_bytes());
+    let status = child
+        .wait()
+        .map_err(|error| format!("failed to run curl: {error}"))?;
+    written.map_err(|error| format!("failed to pass the downloads to curl: {error}"))?;
     if status.success() {
         Ok(())
     } else {
         Err(format!("curl exited with {status}"))
     }
+}
+
+/// A curl config that downloads each URL to its destination: a `url` line
+/// and an `output` line per download, with every value quoted.
+fn curl_config(downloads: &[(PathBuf, String)]) -> Result<String, String> {
+    let mut config = String::new();
+    for (destination, url) in downloads {
+        let destination = destination
+            .to_str()
+            .ok_or_else(|| format!("{} is not valid UTF-8", destination.display()))?;
+        config.push_str(&format!(
+            "url = {}\noutput = {}\n",
+            curl_quote(url),
+            curl_quote(destination)
+        ));
+    }
+    Ok(config)
+}
+
+/// `value` in double quotes for a curl config, where a backslash starts an
+/// escape, so the backslashes in Windows paths are doubled.
+fn curl_quote(value: &str) -> String {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 /// Unpacks the archive into a fresh `destination` and marks it complete.
@@ -198,4 +232,31 @@ fn extract(archive: &Path, destination: &Path) -> Result<(), String> {
 
     fs::write(destination.join(COMPLETE_MARKER), VERSION)
         .map_err(|error| format!("failed to write to {}: {error}", destination.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_curl_config_pairs_each_url_with_its_quoted_destination() {
+        let downloads = [
+            (
+                PathBuf::from(r"C:\target\test-roms\a.gb"),
+                "https://example.com/a.gb".to_string(),
+            ),
+            (
+                PathBuf::from("target/test-roms/\"b\".png"),
+                "https://example.com/b.png".to_string(),
+            ),
+        ];
+        assert_eq!(
+            curl_config(&downloads).unwrap(),
+            r#"url = "https://example.com/a.gb"
+output = "C:\\target\\test-roms\\a.gb"
+url = "https://example.com/b.png"
+output = "target/test-roms/\"b\".png"
+"#
+        );
+    }
 }

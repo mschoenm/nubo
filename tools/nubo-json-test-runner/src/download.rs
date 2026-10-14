@@ -4,8 +4,9 @@
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 /// The commit of adtennant/GameboyCPUTests the tests are taken from.
 const COMMIT: &str = "d1c8fd48c9e543995397fbd20e55bcbd524d029f";
@@ -101,7 +102,9 @@ fn has_expected_checksum(path: &Path, expected: &str) -> bool {
 }
 
 /// Downloads the files of `entries` into `destination` with curl, several at
-/// a time.
+/// a time. The URLs and destinations go to curl as a config on its standard
+/// input rather than as arguments, since hundreds of them would pass Windows'
+/// limit on the length of a command line.
 fn download(destination: &Path, entries: &[&ManifestEntry]) -> Result<(), String> {
     println!(
         "Downloading {} CPU test files from adtennant/GameboyCPUTests@{}",
@@ -109,29 +112,80 @@ fn download(destination: &Path, entries: &[&ManifestEntry]) -> Result<(), String
         &COMMIT[..12]
     );
 
-    let mut command = Command::new("curl");
-    command.args([
-        "--fail",
-        "--location",
-        "--silent",
-        "--show-error",
-        "--parallel",
-        "--parallel-max",
-        PARALLEL_DOWNLOADS,
-    ]);
-    for entry in entries {
-        command
-            .arg("--output")
-            .arg(destination.join(entry.file_name))
-            .arg(format!("{}/{}/v2/{}", BASE_URL, COMMIT, entry.file_name));
-    }
-
-    let status = command
-        .status()
+    let config = curl_config(destination, entries)?;
+    let mut child = Command::new("curl")
+        .args([
+            "--fail",
+            "--location",
+            "--silent",
+            "--show-error",
+            "--parallel",
+            "--parallel-max",
+            PARALLEL_DOWNLOADS,
+            "--config",
+            "-",
+        ])
+        .stdin(Stdio::piped())
+        .spawn()
         .map_err(|error| format!("failed to run curl: {error}"))?;
+    let written = child
+        .stdin
+        .take()
+        .expect("curl's standard input is piped")
+        .write_all(config.as_bytes());
+    let status = child
+        .wait()
+        .map_err(|error| format!("failed to run curl: {error}"))?;
+    written.map_err(|error| format!("failed to pass the downloads to curl: {error}"))?;
     if status.success() {
         Ok(())
     } else {
         Err(format!("curl exited with {status}"))
+    }
+}
+
+/// A curl config that downloads each file of `entries` into `destination`:
+/// a `url` line and an `output` line per file, with every value quoted.
+fn curl_config(destination: &Path, entries: &[&ManifestEntry]) -> Result<String, String> {
+    let mut config = String::new();
+    for entry in entries {
+        let output = destination.join(entry.file_name);
+        let output = output
+            .to_str()
+            .ok_or_else(|| format!("{} is not valid UTF-8", output.display()))?;
+        let url = format!("{}/{}/v2/{}", BASE_URL, COMMIT, entry.file_name);
+        config.push_str(&format!(
+            "url = {}\noutput = {}\n",
+            curl_quote(&url),
+            curl_quote(output)
+        ));
+    }
+    Ok(config)
+}
+
+/// `value` in double quotes for a curl config, where a backslash starts an
+/// escape, so the backslashes in Windows paths are doubled.
+fn curl_quote(value: &str) -> String {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_curl_config_pairs_each_url_with_its_quoted_destination() {
+        let entry = ManifestEntry {
+            sha256: "",
+            file_name: "cb 00.json",
+        };
+        let config = curl_config(Path::new(r"C:\target"), &[&entry]).unwrap();
+        assert_eq!(
+            config,
+            format!(
+                "url = \"{BASE_URL}/{COMMIT}/v2/cb 00.json\"\noutput = \"C:\\\\target{}cb 00.json\"\n",
+                if cfg!(windows) { r"\\" } else { "/" }
+            )
+        );
     }
 }
