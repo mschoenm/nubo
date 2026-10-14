@@ -55,6 +55,11 @@ pub fn run(args: &[String]) -> Result {
                 .ok_or("an emulator in emulators.json has no file")
         })
         .collect::<std::result::Result<_, _>>()?;
+    if let Some(file) = files.iter().find(|file| !is_plain_file_name(file)) {
+        return Err(format!(
+            "emulators.json names the result file {file:?}, which is not a plain file name"
+        ));
+    }
     let results = files
         .iter()
         .map(|file| download_json(commit, file, &folder))
@@ -90,6 +95,13 @@ fn download_json(commit: &str, file: &str, folder: &Path) -> Result<Value> {
     let text = fs::read_to_string(&path)
         .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
     serde_json::from_str(&text).map_err(|error| format!("{file} is not valid JSON: {error}"))
+}
+
+/// Whether `name` is a file name and nothing more, so that joining it onto
+/// the download folder can't reach outside it: no folder separators, not
+/// `.` or `..`, and not empty.
+fn is_plain_file_name(name: &str) -> bool {
+    !name.is_empty() && name != "." && name != ".." && !name.contains(['/', '\\', ':'])
 }
 
 /// `text` with every byte outside the URL's unreserved characters written as
