@@ -303,6 +303,11 @@ shows as they are.
 The three published tests the runner doesn't count can't pass in the Shootout either:
 `acid/which.gb (DMG)`, `acid/which.gb (GBC)` and `daid/rom_and_ram.gb` have no reference
 screenshot: they only report which model or cartridge setup they see, and count as information.
+Nubo shows "No SRAM enable req." and "SRAM = 2K, wrapping" in `rom_and_ram.gb`: its ROM+RAM
+cartridges (types 0x08 and 0x09) keep their RAM always on and repeat a RAM smaller than 8 KiB, as the
+test suggests. Nobody has recorded what real hardware shows. Once someone does (`docs/ACCURACY_PLAN.md`,
+Phase 3 step 2), change `CartridgeMapper::RomRam` to match if it differs, and turn the result into a
+screenshot check in `SHOOTOUT_ROM_CHECKS` (Phase 5 step 1).
 
 The groups `docs/SHOOTOUT_PLAN.md` expected to fail are empty:
 

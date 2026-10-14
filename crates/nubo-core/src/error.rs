@@ -30,8 +30,8 @@ impl fmt::Display for LoadRomError {
             Self::TooSmall => write!(f, "The file is too small to contain a valid ROM."),
             Self::UnsupportedCartridge(cartridge_type) => write!(
                 f,
-                "Sorry, but Nubo currently only supports ROM-only, MBC1, MBC2, MBC3, MBC5, \
-                 or HuC1 cartridges. The cartridge you provided is of type {cartridge_type}."
+                "Sorry, but Nubo currently only supports ROM-only (with or without RAM), MBC1, \
+                 MBC2, MBC3, MBC5, or HuC1 cartridges. The cartridge you provided is of type {cartridge_type}."
             ),
             Self::InvalidRamSize(ram_size) => {
                 write!(
