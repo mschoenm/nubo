@@ -124,7 +124,7 @@ impl App {
                 return self.check_files();
             }
             LibraryMessage::Watch(WatchEvent::Failed(error)) => self.toasts.error(format!(
-                "New games won't show up by themselves ({error}). Use the Rescan button instead."
+                "New games won't show up by themselves ({error}). Use Rescan in the settings' Library tab instead."
             )),
             LibraryMessage::Scanned(result) => {
                 if let Err(error) = self.library.finish_scan(result) {
@@ -356,8 +356,8 @@ impl App {
     }
 
     /// Starts scanning the library folders in the background. The Rescan
-    /// buttons, the folder watcher and folder changes all come here; while a
-    /// scan runs, they lead to one more scan after it instead of a second
+    /// button in the settings, the folder watcher and folder changes all
+    /// come here; while a scan runs, they lead to one more scan after it instead of a second
     /// scan at the same time.
     pub(super) fn rescan(&mut self) -> Task<Message> {
         if !self.keeps_library() {

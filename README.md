@@ -99,13 +99,13 @@ These are the default keys. All of them but Esc can be changed under Settings > 
 | F11 | Fullscreen |
 | F12 | Screenshot |
 
-Ctrl+O opens a game, Ctrl+P pauses and resumes, Ctrl+R resets and Ctrl+, opens the settings (⌘ instead of Ctrl on macOS). Double-clicking the game screen switches between fullscreen and a window, and right-clicking it opens the pause menu, which a click on the game outside it closes again.
+While a game runs, the Library button at the top left takes you back to your games, and Pause at the top right opens the pause menu. Ctrl+O opens a game, Ctrl+P pauses and resumes, Ctrl+R restarts the game and Ctrl+, opens the settings (⌘ instead of Ctrl on macOS). Double-clicking the game screen switches between fullscreen and a window, and right-clicking it opens the pause menu, which a click on the game outside it closes again.
 
 On a controller, the D-pad or left stick moves, and A and B sit where they are on a Game Boy: the right face button (B on Xbox, ○ on PlayStation) is A, and the bottom one (A on Xbox, ✕ on PlayStation) is B. L1 opens the pause menu, R1 fast forwards, and L2 and R2 are quick load and quick save.
 
 <p align="center">
-  <img src="images/screenshots/pause-menu.png" width="600" alt="Nubo's pause menu over El Dueloroso: resume, save state, load state, cheats, fullscreen, reset, settings and back to library"><br>
-  <sub>The pause menu, with save states, cheats and the settings</sub>
+  <img src="images/screenshots/pause-menu.png" width="600" alt="Nubo's pause menu over Tobu Tobu Girl Deluxe: resume; save state, load state and cheats; screenshot, fullscreen and settings; restart game and back to library"><br>
+  <sub>The pause menu, with save states, cheats, screenshots and the settings</sub>
 </p>
 
 <details>
@@ -189,7 +189,7 @@ Much of its accuracy comes from other people's research and code:
 - The [libretro thumbnail collection](https://github.com/libretro-thumbnails/libretro-thumbnails) and the No-Intro game lists of the [libretro database](https://github.com/libretro/libretro-database): the box art the desktop app can download.
 - [Lucide](https://lucide.dev): the icons of the desktop app (ISC License, see [NOTICE](NOTICE)).
 - [libretro.h](https://github.com/libretro/libretro-common) by the RetroArch team: the libretro API the RetroArch core's bindings are written from (MIT License, see [NOTICE](NOTICE)). [SameBoy's libretro core](https://github.com/LIJI32/SameBoy) and [rcheevos](https://github.com/RetroAchievements/rcheevos) showed how a Game Boy core lays out its memory for RetroAchievements.
-- [Tobu Tobu Girl Deluxe](https://tangramgames.itch.io/tobu-tobu-girl-deluxe) by Tangram Games: the game in the Super Game Boy screenshot and the Flatpak's screenshot (`images/`), and in some of the save states every version is checked against (`save-states/`), whose graphics are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- [Tobu Tobu Girl Deluxe](https://tangramgames.itch.io/tobu-tobu-girl-deluxe) by Tangram Games: the game in the Super Game Boy and pause menu screenshots and the Flatpak's screenshot (`images/`), and in some of the save states every version is checked against (`save-states/`), whose graphics are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 - The other homebrew games in the screenshots (`images/screenshots/`), each under its own license: [Big2Small](https://github.com/mdsteele/big2small) by Matthew D. Steele (GPL-3.0-or-later), [Rebound](https://github.com/DevEd2/ReboundGB) by DevEd (MIT), [Moki the Monster Kid](https://github.com/sleepingpandagames/moki-the-monster-kid) by Sleeping Panda Games (MPL-2.0), [Rhythm Land](https://github.com/sinusoid-studios/rhythm-land) by Sinusoid Studios (MIT) and [El Dueloroso](https://github.com/ajgalan/el-dueloroso) by Adrián JG (GPL-3.0), and in the library [Airaki](https://github.com/furrtek/Airaki) by furrtek (GPL-3.0), [Dawn Will Come](https://github.com/eishiya/DawnWillCome) by eishiya, with art by H0lyhandgrenade and eishiya and music by Kezia Salmon (code MIT, art and music [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), [Europa Rescue](https://github.com/godai78/europa) by godai ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)), [Froggy Kong](https://github.com/videogamestorytime/FroggyKong) by videogamestorytime (GPL-3.0) and [Sushi Nights](https://github.com/Zal0/SushiNights) by Zalo, Kirblue, MaikelOrtega_ and sergiodeprado (MIT).
 - [µCity](https://github.com/AntonioND/ucity) and [Geometrix](https://github.com/AntonioND/geometrix) by Antonio Niño Díaz: Geometrix is in the library screenshot (`images/screenshots/`), and both are in the save states every version is checked against (`save-states/`), licensed under the GPL, version 3 or later.
 
