@@ -96,7 +96,8 @@ pub fn definitions() -> Vec<OptionDefinition> {
             description: "Super Game Boy colors",
             info: "The colors of games on a Super Game Boy, as its menu picks them: the game's \
                    own, or one palette for the whole screen. A game can keep its own colors \
-                   anyway, or take them back when it sets new ones.",
+                   anyway, or take them back when it sets new ones. Save states keep the colors \
+                   and border they were made with; for netplay, pick the same on every side.",
             values: std::iter::once((String::from(GAME_COLORS), String::from("The game's")))
                 .chain(
                     DmgPalette::ALL

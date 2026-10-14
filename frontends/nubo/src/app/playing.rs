@@ -155,9 +155,14 @@ impl App {
             GameMessage::SgbOwnColorReleased => self.change_settings(|_| {}),
             GameMessage::SgbOwnColorStepped(shade, channel, step) => {
                 if let Some(&color) = self.settings.shared.sgb_own_palette.get(shade) {
-                    let value = channel.of(color).saturating_add_signed(step);
-                    self.set_sgb_own_color(shade, channel, value);
-                    self.change_settings(|_| {});
+                    let value = channel
+                        .of(color)
+                        .saturating_add_signed(step)
+                        .min(ColorChannel::MAX);
+                    if value != channel.of(color) {
+                        self.set_sgb_own_color(shade, channel, value);
+                        self.change_settings(|_| {});
+                    }
                 }
             }
             GameMessage::SgbBorderPicked(choice) => {

@@ -70,8 +70,10 @@ pub struct Settings {
     pub sgb_own_palette: [u16; 4],
 }
 
-/// Whether `palette` is the player's own palette as it starts. It takes a
-/// slice because serde's skip_serializing_if passes a reference.
+/// Whether `palette` is the player's own palette as it starts. serde's
+/// skip_serializing_if passes a reference to the array, which this takes as
+/// a slice: a reference to an array of this size trips a Clippy lint in some
+/// builds and not others, so no single `expect` fits.
 fn is_default_own_palette(palette: &[u16]) -> bool {
     palette == DEFAULT_OWN_PALETTE
 }

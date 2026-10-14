@@ -300,14 +300,20 @@ impl Core {
     /// change right away; the model and the clock when the game starts
     /// again.
     pub fn set_options(&mut self, options: Options) {
-        let sgb_changed = options.sgb_colors != self.options.sgb_colors
-            || options.nubo_border != self.options.nubo_border;
-        let picture_changed = sgb_changed
+        let colors_changed = options.sgb_colors != self.options.sgb_colors;
+        let border_changed = options.nubo_border != self.options.nubo_border;
+        let picture_changed = colors_changed
+            || border_changed
             || options.palette != self.options.palette
             || options.sgb_border != self.options.sgb_border;
         self.options = options;
-        if sgb_changed {
-            apply_sgb_options(&mut self.emulator, options);
+        // Only the choice that changed goes to the Super Game Boy, so a new
+        // border doesn't bring back a palette the game has taken back.
+        if colors_changed {
+            apply_sgb_colors(&mut self.emulator, options);
+        }
+        if border_changed {
+            apply_sgb_border(&mut self.emulator, options);
         }
         if picture_changed {
             self.draw_frame();
@@ -710,14 +716,21 @@ fn start(
             requests: requests.clone(),
         }),
     )?;
-    apply_sgb_options(&mut emulator, options);
+    apply_sgb_colors(&mut emulator, options);
+    apply_sgb_border(&mut emulator, options);
     Ok(emulator)
 }
 
-/// Gives a Super Game Boy the colors and border `options` pick, as its menu
-/// would. Other models ignore them.
-fn apply_sgb_options(emulator: &mut Emulator, options: Options) {
+/// Gives a Super Game Boy the colors `options` pick, as its menu would.
+/// Other models ignore them. Save states keep the colors they were made
+/// with, so loading one brings those back until the option changes again.
+fn apply_sgb_colors(emulator: &mut Emulator, options: Options) {
     emulator.set_sgb_player_palette(options.sgb_colors.palette(DEFAULT_OWN_PALETTE));
+}
+
+/// Gives a Super Game Boy the border `options` pick, as its menu would.
+/// Other models ignore it; save states keep it like the colors.
+fn apply_sgb_border(emulator: &mut Emulator, options: Options) {
     emulator.set_sgb_border(if options.nubo_border {
         SgbBorder::Nubo
     } else {
