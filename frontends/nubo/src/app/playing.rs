@@ -30,6 +30,14 @@ pub enum GameMessage {
     PlayGame(PathBuf),
     Reset,
     TogglePause,
+    /// Opens the pause menu on its main page, from a right click on the
+    /// game. Does nothing while the menu or the settings are open.
+    OpenPauseMenu,
+    /// Closes the pause menu and resumes the game, from a click outside it.
+    ClosePauseMenu,
+    /// A pause menu row that leaves the menu behind (going fullscreen, the
+    /// settings) was picked: closes the menu, then handles the row's message.
+    PickedFromMenu(Box<Message>),
     /// Stops the game and goes back to the library.
     CloseGame,
     ShowPauseMenu(PauseMenu),
@@ -91,6 +99,24 @@ impl App {
                     };
                     game.show_menu(page);
                 }
+            }
+            GameMessage::OpenPauseMenu => {
+                if let Some(game) = self.game.as_mut().filter(|game| game.menu().is_none())
+                    && self.settings_tab.is_none()
+                {
+                    game.show_menu(Some(PauseMenu::Main));
+                }
+            }
+            GameMessage::ClosePauseMenu => {
+                if let Some(game) = &mut self.game {
+                    game.show_menu(None);
+                }
+            }
+            GameMessage::PickedFromMenu(message) => {
+                if let Some(game) = &mut self.game {
+                    game.show_menu(None);
+                }
+                return self.update(*message);
             }
             GameMessage::CloseGame => self.stop_game(),
             GameMessage::ShowPauseMenu(page) => {
