@@ -34,7 +34,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::mpsc::{self, Sender};
 
-pub use game::GameSession;
+pub use game::{GameSession, StartOptions};
 #[cfg(target_arch = "wasm32")]
 pub use screen_refresh::Session;
 #[cfg(not(target_arch = "wasm32"))]

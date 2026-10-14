@@ -47,23 +47,34 @@ pub struct GameSession {
     controller_state: ControllerState,
 }
 
+/// How [`GameSession::start`] starts a game, besides its ROM and model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StartOptions {
+    /// Whether the game reads and writes its battery saves. Without, it
+    /// keeps none (see [`Saves::Discarded`]).
+    pub keep_saves: bool,
+    /// A speed to fast forward at from the very first frame and for as long
+    /// as the game runs, instead of the settings' speed, such as one asked
+    /// for on the command line. `None` starts at normal speed.
+    pub fast_forward: Option<FastForwardSpeed>,
+}
+
 impl GameSession {
-    /// Starts `rom` on `model`, running (or paused, without `running`) at
-    /// normal speed and as loud as `settings` say, returning the load error
-    /// if it couldn't. With `keep_saves` it reads and writes its battery
-    /// saves; without, it keeps none (see [`Saves::Discarded`]). Problems
-    /// while the game runs, such as a missing sound device, go to `notices`.
+    /// Starts `rom` on `model` as `options` say, running (or paused, without
+    /// `running`) as loud as `settings` say, returning the load error if it
+    /// couldn't. Problems while the game runs, such as a missing sound
+    /// device, go to `notices`.
     pub fn start(
         rom: Rom,
         header: CartridgeHeader,
         model: Model,
-        keep_saves: bool,
+        options: StartOptions,
         notices: &Notices,
         running: bool,
         settings: &Settings,
     ) -> Result<GameSession, String> {
-        let playback = PlaybackControl::new(running, settings);
-        let saves = Saves::for_rom(&rom.path, keep_saves, notices);
+        let playback = PlaybackControl::new(running, options.fast_forward, settings);
+        let saves = Saves::for_rom(&rom.path, options.keep_saves, notices);
         let session = Session::start(&rom, saves, model, playback.sent, notices)?;
 
         Ok(GameSession {
@@ -233,7 +244,7 @@ impl GameSession {
     }
 
     /// How fast the game fast forwards: at its own speed (see
-    /// [`GameSession::fast_forward_at`]) or else the one in `settings`.
+    /// [`StartOptions::fast_forward`]) or else the one in `settings`.
     pub fn fast_forward_speed(&self, settings: &Settings) -> FastForwardSpeed {
         self.playback.speed.unwrap_or(settings.fast_forward_speed)
     }
@@ -252,14 +263,6 @@ impl GameSession {
     /// Switches fast forward on or off, such as with a button.
     pub fn toggle_fast_forward(&mut self) {
         self.playback.fast_forward_on = !self.playback.fast_forward_on;
-    }
-
-    /// Switches fast forward on, at `speed` instead of the settings' speed
-    /// for as long as this game runs, such as for a speed asked for on the
-    /// command line.
-    pub fn fast_forward_at(&mut self, speed: FastForwardSpeed) {
-        self.playback.speed = Some(speed);
-        self.playback.fast_forward_on = true;
     }
 
     /// Applies the settings and pause state to the emulator: it runs only
@@ -412,23 +415,24 @@ struct PlaybackControl {
     /// Whether fast forward was switched on, such as with a button.
     fast_forward_on: bool,
     /// The fast forward speed for this game instead of the settings' one
-    /// (see [`GameSession::fast_forward_at`]).
+    /// (see [`StartOptions::fast_forward`]).
     speed: Option<FastForwardSpeed>,
     /// How the emulator was last told to play.
     sent: Playback,
 }
 
 impl PlaybackControl {
-    /// How a new game plays: running or not, at normal speed, as loud as
-    /// `settings` say.
-    fn new(running: bool, settings: &Settings) -> Self {
+    /// How a new game plays: running or not, as loud as `settings` say, at
+    /// normal speed or fast forwarding at `fast_forward` (see
+    /// [`StartOptions::fast_forward`]).
+    fn new(running: bool, fast_forward: Option<FastForwardSpeed>, settings: &Settings) -> Self {
         PlaybackControl {
             fast_forward_held: false,
-            fast_forward_on: false,
-            speed: None,
+            fast_forward_on: fast_forward.is_some(),
+            speed: fast_forward,
             sent: Playback {
                 running,
-                fast_forward: None,
+                fast_forward,
                 volume: settings.effective_volume(),
             },
         }

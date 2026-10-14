@@ -13,7 +13,7 @@ use nubo_frontend::picture::Picture;
 use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states::{self, Slot};
 use nubo_frontend::screenshots;
-use nubo_frontend::session::GameSession;
+use nubo_frontend::session::{GameSession, StartOptions};
 use std::path::{Path, PathBuf};
 
 /// What the player can do with games: open one, and control the one that
@@ -232,7 +232,10 @@ impl App {
             rom,
             header,
             model,
-            !self.fresh,
+            StartOptions {
+                keep_saves: !self.fresh,
+                fast_forward: self.speed,
+            },
             &self.notices,
             running,
             &self.settings.shared,
@@ -244,9 +247,6 @@ impl App {
                 Ok(cheats) => session.set_cheats(cheats),
                 Err(error) => self.toasts.error(error),
             }
-        }
-        if let Some(speed) = self.speed {
-            session.fast_forward_at(speed);
         }
         session.set_controller_state(self.menu_presses.hide_from(&self.controller_state));
         Ok(Game::new(session, !self.fresh))

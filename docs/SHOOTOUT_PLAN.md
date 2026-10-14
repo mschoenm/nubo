@@ -197,9 +197,9 @@ the build differs from the steps above, and what was checked:
   (`Game::keeps_data`), and settings changed in the window aren't saved. Battery saves are discarded
   through `nubo_frontend::session::Saves::Discarded`, which also puts the cartridge clock on emulated
   time.
-- **`--speed`** takes the fast forward speeds the settings offer (2, 3, 4 and 8) and turns fast
-  forward on at that speed for the run, without changing the saved speed
-  (`GameSession::fast_forward_at`).
+- **`--speed`** takes the fast forward speeds the settings offer (2, 3, 4 and 8) and starts the
+  emulator fast forwarding at that speed from its first frame, for the whole run, without changing
+  the saved speed (`StartOptions::fast_forward`).
 - **Mistakes on the command line now stop the app** with a message and exit code 2, `--model`'s
   included, which used to be ignored. With `--scale`, a ROM that can't be read or started stops the
   app with exit code 1 before the window opens, since the window has nowhere to show why.
