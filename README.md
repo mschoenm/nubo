@@ -10,13 +10,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.msi"><img src="https://img.shields.io/badge/Download_for_Windows-6d5ce8?style=for-the-badge" alt="Download for Windows" height="40"></a>
-  &nbsp;
-  <a href="https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-x86_64.flatpak"><img src="https://img.shields.io/badge/Download_for_Linux-6d5ce8?style=for-the-badge" alt="Download for Linux" height="40"></a>
+  <a href="#download"><img src="https://img.shields.io/badge/Download-6d5ce8?style=for-the-badge" alt="Download" height="40"></a>
   &nbsp;
   <a href="https://mschoenm.github.io/nubo/"><img src="https://img.shields.io/badge/Play_in_your_browser-5b8def?style=for-the-badge" alt="Play in your browser" height="40"></a>
-  <br>
-  <sub><a href="#download">Every download</a>: the Windows zip, Linux on ARM, the RetroArch core and the nightly build</sub>
 </p>
 
 <p align="center">
