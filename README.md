@@ -21,15 +21,15 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/mschoenm/nubo" alt="License: GPL-3.0"></a>
 </p>
 
-<p align="center">
-  <img src="images/screenshots/super-game-boy.png" width="700" alt="Tobu Tobu Girl Deluxe in Nubo, inside the game's own illustrated Super Game Boy border">
-</p>
-
 Nubo emulates the Game Boy cycle by cycle: the processor, the picture and the sound advance together, as they do in the console. Games and demos that depend on exact timing, such as effects that change the picture partway down the screen, run as they do on real hardware.
 
 It has a game library, save states, Super Game Boy colors and borders, cheats, and support for controllers.
 
 Nubo is written in safe Rust, apart from the few lines where RetroArch connects to its core. The app is built with [Iced](https://iced.rs), a user interface library written in Rust, and the same app compiles to WebAssembly to run in the browser. Building it needs only the standard Rust toolchain, plus the ALSA and udev development files on Linux.
+
+<p align="center">
+  <img src="images/screenshots/super-game-boy.png" width="700" alt="Tobu Tobu Girl Deluxe in Nubo, inside the game's own illustrated Super Game Boy border">
+</p>
 
 ## Download
 
