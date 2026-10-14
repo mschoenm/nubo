@@ -15,9 +15,8 @@ const APP_NAME: &str = "Nubo";
 const EXECUTABLE: &str = "nubo";
 const INSTALLER_SCRIPT: &str = "frontends/nubo/windows/nubo.wxs";
 /// How to get the WiX Toolset, for the message when it isn't found.
-const WIX_INSTALL: &str = "install it with `dotnet tool install --global wix --version 7.0.0` \
-                           and accept its license with `wix eula accept wix7`, or set WIX to \
-                           its wix.exe";
+const WIX_INSTALL: &str = "install it with `dotnet tool install --global wix` and accept its \
+                           license with `wix eula accept wix7`";
 
 /// The size of the banner at the top of the installer's pages, in pixels:
 /// 370 by 44 dialog units at the usual display scale, as WiX's own dialogs use.
@@ -192,12 +191,10 @@ pub fn build_windows_downloads(args: &[String]) -> Result<(PathBuf, PathBuf)> {
     Ok((installer, zip))
 }
 
-/// The WiX Toolset's command line: `WIX` from the environment when set, else
-/// `wix` from the path, where `dotnet tool install --global wix` puts it.
+/// The WiX Toolset's command line, `wix` from the path, where `dotnet tool
+/// install --global wix` puts it. (The `WIX` environment variable is WiX 3's
+/// folder, which GitHub's Windows runners still set, so it isn't used.)
 fn wix() -> Result<PathBuf> {
-    if let Some(path) = env::var_os("WIX") {
-        return Ok(PathBuf::from(path));
-    }
     if Command::new("wix").arg("--version").output().is_ok() {
         return Ok(PathBuf::from("wix"));
     }
