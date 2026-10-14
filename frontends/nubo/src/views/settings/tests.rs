@@ -55,8 +55,8 @@ fn every_page_draws_its_rows_in_the_order_the_d_pad_moves_through_them() {
 fn restart_now_is_only_a_row_when_it_shows() {
     let settings = Settings::default();
 
-    let without = rows(SettingsTab::General, &settings, false, Device::Keyboard);
-    let with = rows(SettingsTab::General, &settings, true, Device::Keyboard);
+    let without = rows(SettingsTab::Playing, &settings, false, Device::Keyboard);
+    let with = rows(SettingsTab::Playing, &settings, true, Device::Keyboard);
 
     assert!(!without.contains(&SettingsRow::RestartNow));
     assert_eq!(with.len(), without.len() + 1);
@@ -89,6 +89,23 @@ fn every_library_folder_is_a_row() {
 
     let rows = rows(SettingsTab::Library, &settings, false, Device::Keyboard);
 
-    assert_eq!(rows[..2], [SettingsRow::Folder(0), SettingsRow::Folder(1)]);
-    assert_eq!(rows[2], SettingsRow::AddFolder);
+    assert_eq!(
+        rows[..4],
+        [
+            SettingsRow::Rescan,
+            SettingsRow::Folder(0),
+            SettingsRow::Folder(1),
+            SettingsRow::AddFolder
+        ]
+    );
+}
+
+#[test]
+fn every_tab_but_about_has_rows() {
+    let settings = Settings::default();
+
+    for &tab in SettingsTab::all() {
+        let tab_rows = rows(tab, &settings, false, Device::Keyboard);
+        assert_eq!(tab_rows.is_empty(), tab == SettingsTab::About, "{tab:?}");
+    }
 }

@@ -6,10 +6,22 @@ use crate::ui::theme;
 use iced::widget::{center, column, container, mouse_area, opaque, text};
 use iced::{Alignment, Element};
 
-/// Shows `content` as a dialog over a dimmed screen. Clicking outside the
+/// The least space between a dialog and the edges of the window.
+const MODAL_MARGIN: f32 = 24.0;
+
+/// Shows `content` as a dialog over a dimmed screen, at least
+/// [`MODAL_MARGIN`] from the window's edges, so a dialog that fills the
+/// height it gets still shows the screen around it. Clicking outside the
 /// dialog sends `on_dismiss`.
 pub fn modal<'a>(content: Element<'a, Message>, on_dismiss: Message) -> Element<'a, Message> {
-    opaque(mouse_area(center(opaque(content)).style(theme::backdrop)).on_press(on_dismiss))
+    opaque(
+        mouse_area(
+            center(opaque(content))
+                .padding(MODAL_MARGIN)
+                .style(theme::backdrop),
+        )
+        .on_press(on_dismiss),
+    )
 }
 
 /// The layer shown while a file is dragged over the window.

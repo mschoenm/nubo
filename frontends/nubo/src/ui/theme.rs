@@ -509,6 +509,54 @@ pub fn card_screen(theme: &Theme) -> container::Style {
     }
 }
 
+/// The rounded card that holds a group of settings, a little lighter than
+/// the settings window around it.
+pub fn settings_card(theme: &Theme) -> container::Style {
+    let palette = theme.extended_palette();
+
+    container::Style {
+        background: Some(palette.background.weakest.color.into()),
+        border: Border::default()
+            .rounded(10)
+            .width(1)
+            .color(palette.background.strong.color),
+        ..container::Style::default()
+    }
+}
+
+/// A row of settings that warns about something, such as the running game
+/// still using the previous model: tinted with the warning color, and
+/// outlined like any row while the D-pad is on it.
+pub fn notice_row(focused: bool) -> impl Fn(&Theme) -> container::Style {
+    move |theme| container::Style {
+        background: Some(theme.palette().warning.scale_alpha(0.12).into()),
+        ..focus_ring(focused)(theme)
+    }
+}
+
+/// Text in the warning color, for warning icons.
+pub fn warning_text(theme: &Theme) -> text::Style {
+    text::Style {
+        color: Some(theme.palette().warning),
+    }
+}
+
+/// A button that looks like a link: accent-colored text without a frame,
+/// such as "Add folder…" at the end of the library's folders.
+pub fn text_button(theme: &Theme, status: button::Status) -> button::Style {
+    let palette = theme.extended_palette();
+    let color = match status {
+        button::Status::Hovered | button::Status::Pressed => palette.primary.strong.color,
+        button::Status::Active | button::Status::Disabled => palette.primary.base.color,
+    };
+
+    button::Style {
+        background: None,
+        text_color: color,
+        ..button::Style::default()
+    }
+}
+
 /// The outline around the setting the D-pad is on. It is transparent
 /// otherwise, so the layout doesn't shift when it appears.
 pub fn focus_ring(focused: bool) -> impl Fn(&Theme) -> container::Style {

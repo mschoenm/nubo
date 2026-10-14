@@ -44,8 +44,8 @@ pub struct Settings {
     /// Library tab of the settings.
     pub download_box_art: bool,
     /// Whether leaving a game saves its state, so it continues there the
-    /// next time it starts. On until the player turns it off, in the
-    /// Playing section of the settings' General tab.
+    /// next time it starts. On until the player turns it off, on the
+    /// settings' Playing tab.
     pub resume_games: bool,
     /// How fast fast forward runs.
     pub fast_forward_speed: FastForwardSpeed,
