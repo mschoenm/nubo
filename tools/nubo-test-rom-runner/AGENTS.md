@@ -22,7 +22,7 @@ cargo test-roms shootout      # Only the GB Emulator Shootout's tests, with Nubo
 - A new test suite needs:
   - its download in `download.rs`: a pinned version with checksums (like the shootout's `shootout.sha256`), an `ensure_*` function and a folder in `RomDirs`;
   - a `Source` variant and its test cases in `suites.rs` (collected by `discover`);
-  - its name in the suite list of `main.rs`'s module docs and in the README's Test ROMs section;
+  - its name in the suite list of `main.rs`'s module docs and in `docs/ACCURACY.md`'s Test ROMs table;
   - its download folder in the CI cache, `.github/actions/test-roms/action.yml`: in `path`, and its checksum file in `key` (which lists `download.rs` and each checksum file), or every CI run downloads it again.
 - The GB Emulator Shootout's tests (`shootout.rs`) run as its harness judges them, under the IDs `shootout/<name as the Shootout writes it>`; the collection's copies of the same ROMs keep running with their own checks.
   - `shootout/list.rs` was generated once, by a throwaway script, from the Shootout's `testroms/*.py` and `main.py` at the pinned `main` commit (`SHOOTOUT_COMMIT` in `download.rs`), without running its Python; `shootout.rs`'s module docs give the rules. When that pin moves, regenerate the list and `shootout.sha256` together: a ROM may come from the collection only when its SHA-256 matches the Shootout's, and everything else the tests use is downloaded and listed in `shootout.sha256`.

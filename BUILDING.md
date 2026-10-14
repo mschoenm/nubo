@@ -46,7 +46,7 @@ It also writes `Nubo-<version>-linux-<architecture>.flatpak`, a single file to g
 
 ### RetroArch
 
-`cargo xtask libretro` builds the RetroArch core's zip; the [README](README.md#retroarch-core) says how to install it.
+`cargo xtask libretro` builds the RetroArch core's zip; [docs/RETROARCH.md](docs/RETROARCH.md) says how to install it.
 
 ### Licenses
 
@@ -61,7 +61,7 @@ cargo test-roms                     # Download and run the test ROM suites (abou
 cargo cpu-tests                     # Every CPU instruction, checked cycle by cycle
 ```
 
-The README's [Accuracy](README.md#accuracy) section lists the test ROM suites and the results.
+[docs/ACCURACY.md](docs/ACCURACY.md) lists the test ROM suites, the results and the tests that aren't run.
 
 ## Where Things Are
 

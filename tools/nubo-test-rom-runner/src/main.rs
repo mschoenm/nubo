@@ -4,8 +4,8 @@
 //! TurtleTests, little-things-gb, the MBC3 Tester, and the GB Emulator
 //! Shootout's tests, judged the way the Shootout judges them) in parallel and
 //! compares the results with `passing.txt`, so regressions, newly passing
-//! tests and listed tests that no longer run are noticed. The README lists
-//! the tests that aren't run and why.
+//! tests and listed tests that no longer run are noticed. `docs/ACCURACY.md`
+//! lists the tests that aren't run and why.
 //!
 //! After a count per suite and model and the total, a run that includes every
 //! Shootout test prints one more line with Nubo's score on the Shootout's

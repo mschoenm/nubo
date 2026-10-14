@@ -38,7 +38,7 @@ jobs:
       # Ubuntu, unlike everything else: a core is loaded into the player's
       # RetroArch, so the C library it was built against is the oldest one it
       # runs with. Built there, it needs glibc 2.34 (Ubuntu 22.04, Debian 12),
-      # as the README says.
+      # as docs/RETROARCH.md says.
       matrix:
         include:
           - platform: linux-x86_64
