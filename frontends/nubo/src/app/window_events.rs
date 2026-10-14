@@ -42,7 +42,7 @@ impl App {
             WindowMessage::ToggleFullscreen => return toggle_fullscreen(),
             WindowMessage::MouseMoved(y) => {
                 if let Some(game) = &mut self.game {
-                    game.mouse_moved(y, self.window_height);
+                    game.mouse_moved(y);
                 }
             }
             WindowMessage::Opened(id, size) => {
