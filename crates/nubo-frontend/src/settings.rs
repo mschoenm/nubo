@@ -13,7 +13,7 @@
 use crate::controls::Controls;
 use crate::model::ModelPreference;
 use crate::palettes::DmgPalette;
-use crate::sgb_menu::DEFAULT_OWN_PALETTE;
+use crate::sgb_menu::{DEFAULT_OWN_PALETTE, SgbColors};
 use crate::storage::{Entry, Storage};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -68,6 +68,35 @@ pub struct Settings {
     /// [`DEFAULT_OWN_PALETTE`].
     #[serde(skip_serializing_if = "is_default_own_palette")]
     pub sgb_own_palette: [u16; 4],
+    /// The colors Super Game Boy games show, as the player picks them on the
+    /// pause menu's Super Game Boy page: the game's until they pick others,
+    /// and only saved then. Save states don't keep them, so they also
+    /// apply to a game continued where the player left off.
+    #[serde(skip_serializing_if = "is_game_colors")]
+    pub sgb_colors: SgbColors,
+    /// Whether Super Game Boy games show Nubo's border even when they bring
+    /// their own, as the player picks it on the same page. Only saved when
+    /// it is on.
+    #[serde(skip_serializing_if = "is_false")]
+    pub sgb_nubo_border: bool,
+}
+
+/// Whether `colors` are the game's own, which settings leave out.
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde's skip_serializing_if passes a reference"
+)]
+fn is_game_colors(colors: &SgbColors) -> bool {
+    *colors == SgbColors::Game
+}
+
+/// Whether `value` is false, for settings saved only when they are on.
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde's skip_serializing_if passes a reference"
+)]
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 /// Whether `palette` is the player's own palette as it starts. serde's
@@ -101,6 +130,8 @@ impl Default for Settings {
             dmg_palette: DmgPalette::default(),
             sgb_border: true,
             sgb_own_palette: DEFAULT_OWN_PALETTE,
+            sgb_colors: SgbColors::Game,
+            sgb_nubo_border: false,
         }
     }
 }

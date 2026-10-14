@@ -585,6 +585,12 @@ impl<T: Serializable> Serializable for Box<T> {
 }
 
 /// An `Option` is stored as a 0 byte for `None`, or a 1 byte followed by the value.
+///
+/// A value that is already there is read into in place, as a plain field
+/// is, so what its type leaves out of save states (caches, and the Super
+/// Game Boy menu's choices, which are the player's) stays as it is and isn't
+/// made again on every load. Stored values are still all replaced: a load
+/// first reads the power-on state, then the saved one.
 impl<T: Serializable + Default> Serializable for Option<T> {
     fn serialize(&self, writer: &mut dyn Write) -> Result<()> {
         match self {
@@ -605,11 +611,14 @@ impl<T: Serializable + Default> Serializable for Option<T> {
 
         match tag {
             0 => *self = None,
-            1 => {
-                let mut value = T::default();
-                value.deserialize(reader)?;
-                *self = Some(value);
-            }
+            1 => match self {
+                Some(value) => value.deserialize(reader)?,
+                None => {
+                    let mut value = T::default();
+                    value.deserialize(reader)?;
+                    *self = Some(value);
+                }
+            },
             _ => return Err(unreadable_value("an Option's tag isn't 0 or 1")),
         }
         Ok(())
@@ -867,6 +876,43 @@ mod tests {
             let mut read = original();
             assert!(read.deserialize(&mut &state[..length]).is_err());
         }
+    }
+
+    #[test]
+    fn an_option_reads_into_the_value_already_there() {
+        #[derive(Debug, Default, PartialEq, Serializable)]
+        struct Kept {
+            stored: u8,
+            #[serializable(skip)]
+            players: u8,
+        }
+        let saved_state = saved(&Some(Kept {
+            stored: 7,
+            players: 1,
+        }));
+
+        let mut read = Some(Kept {
+            stored: 0,
+            players: 9,
+        });
+        read.deserialize(&mut saved_state.as_slice()).unwrap();
+        assert_eq!(
+            read,
+            Some(Kept {
+                stored: 7,
+                players: 9
+            })
+        );
+
+        let mut read: Option<Kept> = None;
+        read.deserialize(&mut saved_state.as_slice()).unwrap();
+        assert_eq!(
+            read,
+            Some(Kept {
+                stored: 7,
+                players: 0
+            })
+        );
     }
 
     #[test]

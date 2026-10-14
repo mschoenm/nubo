@@ -1043,23 +1043,23 @@ fn the_super_game_boy_intro_is_over_before_the_game_runs() {
 }
 
 #[test]
-fn the_super_game_boy_menu_settings_survive_a_save_state() {
+fn the_players_super_game_boy_choices_stay_when_a_state_loads() {
     let rom = program_rom(Model::Sgb, &[0x18, 0xFE]);
     let mut emulator = booted(Model::Sgb, &rom);
     assert!(emulator.sgb_player_palette_allowed());
+    let state = emulator.save_state();
+
     let palette = [0x7FFF, 0x001F, 0x03E0, 0x7C00];
     emulator.set_sgb_player_palette(Some(palette));
     emulator.set_sgb_border(SgbBorder::Nubo);
+    emulator.load_state(&state).unwrap();
     assert_eq!(emulator.sgb_player_palette(), Some(palette));
+    assert_eq!(emulator.sgb_border(), SgbBorder::Nubo);
 
-    let state = emulator.save_state();
-    let mut loaded = booted(Model::Sgb, &rom);
-    loaded.load_state(&state).unwrap();
-    assert_eq!(loaded.sgb_player_palette(), Some(palette));
-    assert_eq!(loaded.sgb_border(), SgbBorder::Nubo);
-
-    loaded.set_sgb_player_palette(None);
-    assert_eq!(loaded.sgb_player_palette(), None);
+    let mut other = booted(Model::Sgb, &rom);
+    other.load_state(&emulator.save_state()).unwrap();
+    assert_eq!(other.sgb_player_palette(), None);
+    assert_eq!(other.sgb_border(), SgbBorder::Game);
 }
 
 #[test]
@@ -1111,4 +1111,31 @@ fn a_super_game_boy_menu_change_shows_on_the_last_frame_at_once() {
     emulator.set_sgb_player_palette(Some([0x001F; 4]));
     assert_eq!(&emulator.frame_buffer()[..4], &[0xFF, 0x00, 0x00, 0xFF]);
     assert!(!emulator.frame_in_dmg_shades());
+}
+
+/// Rewind and run-ahead load states into the emulator that is running,
+/// whose Super Game Boy is read into in place: it must go on exactly like a
+/// new emulator that loads the same state.
+#[test]
+fn a_super_game_boy_state_loaded_into_the_running_emulator_goes_on_like_a_new_one() {
+    let rom = program_rom(Model::Sgb, &[0x18, 0xFE]);
+    let (mut left, mut right) = (Vec::new(), Vec::new());
+    let mut emulator = booted(Model::Sgb, &rom);
+    for _ in 0..30 {
+        emulator.run_frame(&mut left, &mut right);
+    }
+    let state = emulator.save_state();
+    for _ in 0..50 {
+        emulator.run_frame(&mut left, &mut right);
+    }
+    emulator.load_state(&state).unwrap();
+    let mut new = booted(Model::Sgb, &rom);
+    new.load_state(&state).unwrap();
+
+    for _ in 0..20 {
+        emulator.run_frame(&mut left, &mut right);
+        new.run_frame(&mut left, &mut right);
+        assert_eq!(emulator.frame_with_border(), new.frame_with_border());
+    }
+    assert_eq!(emulator.save_state(), new.save_state());
 }

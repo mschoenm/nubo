@@ -65,8 +65,9 @@ impl Gpu {
     /// Rejects a loaded save state with values the PPU never has, which could otherwise make it
     /// index out of bounds or overflow: a position outside the frame, a line state or LY that
     /// doesn't fit the line, a mode STAT can't show, timing of another model, a frame buffer of
-    /// the wrong size, an OAM DMA write outside OAM, or a renderer state that doesn't fit
-    /// (`Pipeline::is_consistent`).
+    /// the wrong size, an OAM DMA write outside OAM, a renderer state that doesn't fit
+    /// (`Pipeline::is_consistent`), or a Super Game Boy on a model without one, or none on a
+    /// model with one.
     fn check_loaded_state(&self) -> std::io::Result<()> {
         let line_state_fits = match self.line_state {
             LineState::OamScan | LineState::Drawing | LineState::HBlank => {
@@ -87,7 +88,8 @@ impl Gpu {
             && self
                 .pending_dma_oam_write
                 .is_none_or(|write| usize::from(write.index) < self.object_attribute_memory.len())
-            && self.pipeline.is_consistent(drawing_line);
+            && self.pipeline.is_consistent(drawing_line)
+            && self.sgb.is_some() == self.model.is_sgb();
         if valid {
             Ok(())
         } else {

@@ -2,12 +2,14 @@
 //! shows (the game's own, one of Nubo's palettes, or the player's own) and
 //! which border shows around the screen. A real Super Game Boy has a menu for
 //! this, opened with the Super Nintendo's L and R buttons; the emulator keeps
-//! the choices as part of the console (`Emulator::set_sgb_player_palette`,
-//! `Emulator::set_sgb_border`), and each app draws a page of its own for
+//! the choices (`Emulator::set_sgb_player_palette`, `Emulator::set_sgb_border`)
+//! until the game starts again, also when a save state loads, since they are
+//! the player's rather than the game's. Each app draws a page of its own for
 //! them.
 
 use crate::palettes::DmgPalette;
 use nubo_core::{Emulator, SgbBorder};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// What the emulator's Super Game Boy says about its menu, taken with each
 /// frame so an app's menu page shows what the game shows.
@@ -48,10 +50,12 @@ impl SgbMenu {
     }
 }
 
-/// The colors a player can pick for a Super Game Boy game.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The colors a player can pick for a Super Game Boy game. Settings store
+/// them by `stored_name`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SgbColors {
     /// The game's own colors, or the Game Boy's grays until it sets some.
+    #[default]
     Game,
     /// One of Nubo's palettes for the whole screen.
     Preset(DmgPalette),
@@ -79,6 +83,18 @@ impl SgbColors {
         }
     }
 
+    /// The name settings store the choice under, the same as RetroArch's
+    /// option values.
+    pub fn stored_name(self) -> &'static str {
+        match self {
+            SgbColors::Game => "game",
+            SgbColors::Preset(DmgPalette::Gray) => "gray",
+            SgbColors::Preset(DmgPalette::Green) => "green",
+            SgbColors::Preset(DmgPalette::Pocket) => "pocket",
+            SgbColors::Own => "own",
+        }
+    }
+
     /// The choice's name, for a menu.
     pub fn label(self) -> &'static str {
         match self {
@@ -88,6 +104,24 @@ impl SgbColors {
             SgbColors::Preset(DmgPalette::Pocket) => "Pocket",
             SgbColors::Own => "Your own colors",
         }
+    }
+}
+
+impl Serialize for SgbColors {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.stored_name())
+    }
+}
+
+impl<'de> Deserialize<'de> for SgbColors {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let name = String::deserialize(deserializer)?;
+        SgbColors::ALL
+            .into_iter()
+            .find(|colors| colors.stored_name() == name)
+            .ok_or_else(|| {
+                serde::de::Error::custom(format!("unknown Super Game Boy colors: {name}"))
+            })
     }
 }
 

@@ -85,10 +85,10 @@ Left: the maintainer's tests by hand (above), the AppStream release notes entry 
    own colors and border (Nubo's for games that bring none; the picture is then 256×224, and
    RetroArch is told whenever its size changes) and the cartridge clock on real time. The Super Game
    Boy options offer what its menu does: one palette for the whole screen, and Nubo's border or
-   none. They reach the emulator as its menu's choices, which save states keep: a loaded state shows
-   the colors and border it was made with until the option changes again, and netplay needs the same
-   choices on every side. Re-applying the options after each load would undo a game taking its colors
-   back (`PAL_PRI`), since run-ahead loads a state every frame. Ports 2 to 4 play a Super Game Boy's second to fourth players. Change these if needed.
+   none. They reach the emulator as its menu's choices when the game starts and when they change.
+   Save states don't keep the player's choices, only what the game did (such as taking its colors
+   back with `PAL_PRI`), so a loaded state, rewind and run-ahead keep the options, and each netplay
+   player sees their own without the states differing. Ports 2 to 4 play a Super Game Boy's second to fourth players. Change these if needed.
 
 ## References
 

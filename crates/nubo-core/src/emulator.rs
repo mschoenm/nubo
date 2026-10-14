@@ -416,10 +416,16 @@ impl Emulator {
     /// palette picked from the Super Game Boy's menu does, or brings back
     /// the game's own colors for `None`. The palette stays until the player
     /// changes it, or, if the game asks for that, until the game sets new
-    /// colors. Does nothing while the game doesn't allow it
+    /// colors; picking one again gives it back. It doesn't show while the
+    /// game takes the palettes away
     /// ([`Emulator::sgb_player_palette_allowed`]). The last frame shows it
-    /// at once, so a paused game shows it too. Save states keep it, as they
-    /// keep the rest of the Super Game Boy.
+    /// at once, so a paused game shows it too.
+    ///
+    /// Save states don't keep it: it is the player's, like the buttons held,
+    /// and stays as it is when a state loads. The loaded state shows it too,
+    /// unless the game had taken its colors back by then, which states do
+    /// keep. A new game, or this one started again, starts with the game's
+    /// colors.
     pub fn set_sgb_player_palette(&mut self, palette: Option<[u16; 4]>) {
         self.address_bus_mut()
             .change_sgb_menu(|sgb| sgb.set_player_palette(palette));
@@ -443,8 +449,9 @@ impl Emulator {
 
     /// On the Super Game Boy models, picks the border around the screen in
     /// [`Emulator::frame_with_border`]: the game's own, or Nubo's. The last
-    /// frame shows it at once, so a paused game shows it too. Save states
-    /// keep it, as they keep the rest of the Super Game Boy.
+    /// frame shows it at once, so a paused game shows it too. Like the
+    /// palette ([`Emulator::set_sgb_player_palette`]), it is the player's:
+    /// save states don't keep it, and it stays as it is when a state loads.
     pub fn set_sgb_border(&mut self, border: SgbBorder) {
         self.address_bus_mut()
             .change_sgb_menu(|sgb| sgb.set_border_choice(border));
