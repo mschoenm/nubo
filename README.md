@@ -52,12 +52,13 @@ Nubo doesn't come with any games. Use games you own, or try free homebrew games 
 - **Cheats:** GameShark and Game Genie codes, kept per game.
 - **Colors:** light and dark themes that can follow your system, and gray, green or Pocket colors for Game Boy games. The pause menu's Super Game Boy page picks those games' colors (the game's, gray, green, Pocket or your own, with a color editor) and border (the game's, Nubo's or none).
 - **In-game saves** for cartridges with a battery, kept on your computer (or in the browser's storage).
-- **Cartridges:** ROM only, ROM and RAM, MBC1, MBC2, MBC3 (with its clock, and the MBC30 of 4 MB games), MBC5 (with rumble) and HuC1. Games load from `.gb`, `.gbc` and `.zip` files.
+- **Cartridges:** ROM only, ROM and RAM, MBC1, MBC2, MBC3 (with its clock, and the MBC30 of 4 MB games), MBC5 and HuC1. Games load from `.gb`, `.gbc` and `.zip` files.
 
 ## Not Supported Yet
 
 - A download for macOS (you can [build it](BUILDING.md#macos)), and Android or iOS.
 - Linking two games with the link cable.
+- Rumble in the desktop app and the browser (the [RetroArch core](#retroarch-core) has it).
 - The Pocket Camera, and the cartridges with an MBC6, MBC7 (Kirby Tilt 'n' Tumble), MMM01, HuC3 or TAMA5.
 
 ## Playing
@@ -68,7 +69,7 @@ Open a single game, or add your ROM folders under Settings > Library to fill the
   <img src="images/screenshots/library.png" width="700" alt="Nubo's game library with Geometrix, Tobu Tobu Girl Deluxe and µCity, each shown with its title screen">
 </p>
 
-The default controls are below; all of them can be changed under Settings > Controls.
+The default controls are below; all of them but Esc can be changed under Settings > Controls.
 
 | Keyboard | Game Boy |
 | -------- | -------- |
