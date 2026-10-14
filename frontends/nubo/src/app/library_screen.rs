@@ -119,6 +119,9 @@ impl App {
                     self.toasts.error(error);
                 }
                 self.library_selection = None;
+                // A game moving up into "Continue playing" wasn't watched
+                // before, so its file may be gone already.
+                return self.check_files();
             }
             LibraryMessage::Watch(WatchEvent::Failed(error)) => self.toasts.error(format!(
                 "New games won't show up by themselves ({error}). Use the Rescan button instead."
@@ -337,7 +340,9 @@ impl App {
 
     /// Starts a quick background look at whether the games' files still
     /// exist, so games that were deleted disappear right away, before the
-    /// slower scan of the folders. The app runs it when it starts.
+    /// slower scan of the folders. The app runs it when it starts, and when
+    /// a game is taken off "Continue playing", which brings up one that
+    /// the folder watcher didn't watch.
     pub(super) fn check_files(&self) -> Task<Message> {
         if !self.keeps_library() {
             return Task::none();

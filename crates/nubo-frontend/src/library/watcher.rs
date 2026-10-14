@@ -128,13 +128,22 @@ fn game_folders(folders: &[LibraryFolder], games: &[PathBuf]) -> Vec<PathBuf> {
 }
 
 /// Whether a change at `path` can affect the library: a ROM or folder in a
-/// library folder (see `matters`), or one of the `games` outside them, or
-/// the folder one of those is in, if it was removed itself.
+/// library folder, or in its subfolders where it includes them (see
+/// `matters`), or one of the `games` outside them, or the folder one of
+/// those is in, if it was removed itself.
 fn affects(path: &Path, folders: &[LibraryFolder], games: &[PathBuf]) -> bool {
+    let in_library_folder = |folder: &LibraryFolder| {
+        if folder.include_subfolders {
+            path.starts_with(&folder.path)
+        } else {
+            path == folder.path || path.parent() == Some(folder.path.as_path())
+        }
+    };
+
     games
         .iter()
         .any(|game| game == path || game.parent() == Some(path))
-        || (matters(path) && folders.iter().any(|folder| path.starts_with(&folder.path)))
+        || (matters(path) && folders.iter().any(in_library_folder))
 }
 
 /// Whether a change at `path` can affect the library: a ROM, or a folder
@@ -197,6 +206,16 @@ mod tests {
         assert!(affects(Path::new("/downloads"), &folders, &games));
         assert!(affects(Path::new("/games/Tetris.gb"), &folders, &games));
         assert!(!affects(Path::new("/downloads/Zelda.gb"), &folders, &games));
+    }
+
+    #[test]
+    fn subfolders_count_only_in_folders_that_include_them() {
+        let folders = [folder("/games", false)];
+        let games = [PathBuf::from("/games/old/Mario.gb")];
+
+        assert!(affects(Path::new("/games/Tetris.gb"), &folders, &games));
+        assert!(affects(Path::new("/games/old/Mario.gb"), &folders, &games));
+        assert!(!affects(Path::new("/games/old/Zelda.gb"), &folders, &games));
     }
 
     #[test]
