@@ -1,0 +1,330 @@
+use super::*;
+use crate::gpu::DMG_SHADES;
+use crate::sgb::packets::PACKET_SIZE;
+
+/// A Super Game Boy running a game that supports it, with the JOYP select
+/// bits a game would have written last.
+struct Console {
+    sgb: Sgb,
+    select: u8,
+}
+
+impl Console {
+    fn new() -> Self {
+        let mut sgb = Sgb::new();
+        sgb.start(0x03, 0x33);
+        Console { sgb, select: 0x30 }
+    }
+
+    /// Writes JOYP and returns the players an `MLT_REQ` asked for.
+    fn write(&mut self, value: u8) -> Option<u8> {
+        let players = self.sgb.write_joyp(self.select, value);
+        self.select = value & 0x30;
+        players
+    }
+
+    /// Sends the packets of `command` (padded to whole packets) the way games
+    /// do: a start pulse, the bits lowest first, and a 0 stop bit.
+    fn send(&mut self, command: &[u8]) -> Option<u8> {
+        let mut players = None;
+        for packet in command.chunks(PACKET_SIZE) {
+            let mut bytes = [0; PACKET_SIZE];
+            bytes[..packet.len()].copy_from_slice(packet);
+            self.write(0x00);
+            self.write(0x30);
+            for byte in bytes {
+                for bit in 0..8 {
+                    self.write(if byte & (1 << bit) != 0 { 0x10 } else { 0x20 });
+                    self.write(0x30);
+                }
+            }
+            self.write(0x20);
+            players = self.write(0x30).or(players);
+        }
+        players
+    }
+
+    /// Finishes a frame whose pixels all have `shade`, and returns the game
+    /// screen.
+    fn frame_of_shade(&mut self, shade: usize) -> Vec<u8> {
+        let frame = DMG_SHADES[shade].repeat(SCREEN_PIXELS);
+        self.frame(Some(&frame))
+    }
+
+    /// Finishes a frame and returns the game screen.
+    fn frame(&mut self, frame: Option<&[u8]>) -> Vec<u8> {
+        let mut game_screen = vec![0; SCREEN_PIXELS * 4];
+        self.sgb.finish_frame(frame, &mut game_screen);
+        game_screen
+    }
+}
+
+/// The first byte of a command of `packets` packets.
+fn header(command: u8, packets: u8) -> u8 {
+    command << 3 | packets
+}
+
+/// The RGBA color of the game screen's pixel at `x`, `y`.
+fn pixel(game_screen: &[u8], x: usize, y: usize) -> [u8; 4] {
+    let index = (x + y * SCREEN_WIDTH) * 4;
+    game_screen[index..index + 4].try_into().unwrap()
+}
+
+/// A `PAL01` command setting color 0 and colors 1 to 3 of palettes 0 and 1.
+fn pal01(colors: [u16; 7]) -> Vec<u8> {
+    let mut command = vec![header(command::PAL01, 1)];
+    for color in colors {
+        command.extend_from_slice(&color.to_le_bytes());
+    }
+    command
+}
+
+#[test]
+fn a_whole_packet_with_its_stop_bit_runs_the_command() {
+    let mut console = Console::new();
+    assert_eq!(console.send(&[header(command::MLT_REQ, 1), 0x03]), Some(4));
+    assert_eq!(console.send(&[header(command::MLT_REQ, 1), 0x01]), Some(2));
+}
+
+#[test]
+fn a_stop_bit_of_1_still_ends_the_packet() {
+    let mut console = Console::new();
+    console.write(0x00);
+    console.write(0x30);
+    for byte in [header(command::MLT_REQ, 1), 0x03]
+        .into_iter()
+        .chain([0; 14])
+    {
+        for bit in 0..8 {
+            console.write(if byte & (1 << bit) != 0 { 0x10 } else { 0x20 });
+            console.write(0x30);
+        }
+    }
+    console.write(0x10);
+    assert_eq!(console.write(0x30), Some(4));
+}
+
+#[test]
+fn bits_before_a_start_pulse_are_ignored() {
+    let mut console = Console::new();
+    for _ in 0..64 {
+        console.write(0x10);
+        console.write(0x30);
+    }
+    assert_eq!(console.send(&[header(command::MLT_REQ, 1), 0x03]), Some(4));
+}
+
+#[test]
+fn games_without_super_game_boy_support_send_nothing() {
+    let mut console = Console::new();
+    console.sgb.start(0x00, 0x33);
+    assert_eq!(console.send(&[header(command::MLT_REQ, 1), 0x03]), None);
+    console.sgb.start(0x03, 0x01);
+    assert_eq!(console.send(&[header(command::MLT_REQ, 1), 0x03]), None);
+}
+
+#[test]
+fn the_screen_keeps_the_game_boy_grays_until_a_game_sets_colors() {
+    let mut console = Console::new();
+    let game_screen = console.frame_of_shade(2);
+    assert_eq!(pixel(&game_screen, 0, 0), DMG_SHADES[2]);
+    assert!(!console.sgb.frame_colorized());
+
+    console.send(&pal01([
+        0x0000, 0x001F, 0x03E0, 0x7C00, 0x7FFF, 0x0000, 0x0000,
+    ]));
+    let game_screen = console.frame_of_shade(2);
+    assert_eq!(pixel(&game_screen, 0, 0), [0x00, 0xFF, 0x00, 0xFF]);
+    assert!(console.sgb.frame_colorized());
+}
+
+#[test]
+fn color_0_is_shared_by_every_palette() {
+    let mut console = Console::new();
+    console.send(&pal01([0x001F, 0, 0, 0, 0, 0, 0]));
+    for palette in 0..4 {
+        assert_eq!(console.sgb.palette_color(palette * 4), 0x001F);
+    }
+}
+
+#[test]
+fn attribute_blocks_color_their_inside_edge_and_outside() {
+    let mut console = Console::new();
+    console.send(&pal01([
+        0x0000, 0x001F, 0x001F, 0x001F, 0x03E0, 0x03E0, 0x03E0,
+    ]));
+    // One block from square (2, 2) to (6, 6): palette 1 inside and on the
+    // edge, palette 0 outside.
+    console.send(&[header(command::ATTR_BLK, 1), 1, 0x07, 0b00_0101, 2, 2, 6, 6]);
+    let game_screen = console.frame_of_shade(3);
+    assert_eq!(pixel(&game_screen, 4 * 8, 4 * 8), [0x00, 0xFF, 0x00, 0xFF]);
+    assert_eq!(pixel(&game_screen, 2 * 8, 2 * 8), [0x00, 0xFF, 0x00, 0xFF]);
+    assert_eq!(pixel(&game_screen, 0, 0), [0xFF, 0x00, 0x00, 0xFF]);
+}
+
+#[test]
+fn attribute_lines_divisions_and_squares_set_the_attribute_map() {
+    let mut console = Console::new();
+    console.send(&[header(command::ATTR_LIN, 1), 2, 0x80 | 0x20 | 3, 0x40 | 5]);
+    assert_eq!(console.sgb.attribute_map[7 + 3 * 20], 1);
+    assert_eq!(console.sgb.attribute_map[5 + 10 * 20], 2);
+
+    console.send(&[header(command::ATTR_DIV, 1), 0x40 | 0b10_01_11, 9]);
+    assert_eq!(console.sgb.attribute_map[0], 1);
+    assert_eq!(console.sgb.attribute_map[9 * 20], 2);
+    assert_eq!(console.sgb.attribute_map[17 * 20], 3);
+
+    console.send(&[header(command::ATTR_CHR, 1), 19, 0, 3, 0, 0, 0b11_10_01_00]);
+    assert_eq!(console.sgb.attribute_map[19], 3);
+    assert_eq!(console.sgb.attribute_map[20], 2);
+    assert_eq!(console.sgb.attribute_map[21], 1);
+}
+
+#[test]
+fn a_transfer_reads_the_screen_three_frames_later() {
+    let mut console = Console::new();
+    console.send(&[header(command::PAL_TRN, 1)]);
+    console.frame_of_shade(1);
+    console.frame_of_shade(1);
+    assert!(console.sgb.system_palettes.iter().all(|&byte| byte == 0));
+    console.frame_of_shade(1);
+    // Shade 1 sets the low bit plane: 0xFF, 0x00 for every row.
+    assert_eq!(&console.sgb.system_palettes[..4], &[0xFF, 0x00, 0xFF, 0x00]);
+
+    // PAL_SET picks palettes from them: 0x00FF is a red of 31 and a green of 7.
+    console.send(&[header(command::PAL_SET, 1), 0, 0, 1, 0, 2, 0, 3, 0, 0]);
+    assert_eq!(console.sgb.palette_color(5), 0x00FF);
+}
+
+#[test]
+fn an_attribute_transfer_fills_the_attribute_files_that_attr_set_loads() {
+    let mut console = Console::new();
+    console.send(&[header(command::ATTR_TRN, 1)]);
+    for _ in 0..3 {
+        console.frame_of_shade(3);
+    }
+    console.send(&[header(command::ATTR_SET, 1), 0]);
+    assert!(
+        console
+            .sgb
+            .attribute_map
+            .iter()
+            .all(|&palette| palette == 3)
+    );
+}
+
+#[test]
+fn the_mask_freezes_or_blanks_the_screen() {
+    let mut console = Console::new();
+    console.frame_of_shade(1);
+    console.send(&[header(command::MASK_EN, 1), 1]);
+    let game_screen = console.frame_of_shade(3);
+    assert_eq!(pixel(&game_screen, 0, 0), DMG_SHADES[1]);
+
+    console.send(&[header(command::MASK_EN, 1), 2]);
+    let game_screen = console.frame_of_shade(3);
+    assert_eq!(pixel(&game_screen, 0, 0), [0x00, 0x00, 0x00, 0xFF]);
+
+    console.send(&[header(command::MASK_EN, 1), 0]);
+    let game_screen = console.frame_of_shade(3);
+    assert_eq!(pixel(&game_screen, 0, 0), DMG_SHADES[3]);
+}
+
+#[test]
+fn the_picture_stays_while_the_lcd_draws_nothing() {
+    let mut console = Console::new();
+    console.frame_of_shade(2);
+    let game_screen = console.frame(None);
+    assert_eq!(pixel(&game_screen, 80, 70), DMG_SHADES[2]);
+}
+
+#[test]
+fn nubo_border_surrounds_the_screen_until_a_game_sends_its_own() {
+    let mut console = Console::new();
+    console.frame_of_shade(3);
+    let bordered = console.sgb.bordered_frame();
+    let (left, top) = SCREEN_OFFSET;
+    let at = |x: usize, y: usize| {
+        let index = (x + y * BORDERED_WIDTH) * 4;
+        <[u8; 4]>::try_from(&bordered[index..index + 4]).unwrap()
+    };
+    assert_eq!(at(left, top), DMG_SHADES[3]);
+    assert_ne!(at(0, 0), DMG_SHADES[3]);
+    assert_eq!(at(0, 0)[3], 0xFF);
+}
+
+#[test]
+fn a_game_border_fades_in_after_the_old_one_fades_out() {
+    let mut console = Console::new();
+    // Color 1 of the first border palette everywhere: tile 0 with every
+    // pixel's lowest bit set.
+    console.send(&[header(command::CHR_TRN, 1), 0]);
+    for _ in 0..3 {
+        console.frame_of_shade(1);
+    }
+    assert_eq!(console.sgb.pending_border.tiles[0], 0xFF);
+
+    console.send(&[header(command::PCT_TRN, 1)]);
+    for _ in 0..3 {
+        console.frame_of_shade(0);
+    }
+    assert!(console.sgb.pending_border.from_game);
+    assert!(!console.sgb.border.from_game);
+
+    for _ in 0..(BORDER_FADE_FRAMES - 32) {
+        console.frame_of_shade(0);
+    }
+    assert!(console.sgb.border.from_game);
+    for _ in 0..32 {
+        console.frame_of_shade(0);
+    }
+    assert_eq!(console.sgb.border_fade, 0);
+}
+
+#[test]
+fn border_tiles_flip_and_pick_their_palette() {
+    let mut border = Border::default();
+    // Tile 1: only its top-left pixel has color 3.
+    border.tiles[32] = 0x80;
+    border.tiles[33] = 0x80;
+    let entry: u16 = 1 | 1 << 10 | 0x4000;
+    border.map[..2].copy_from_slice(&entry.to_le_bytes());
+    let color_3_of_palette_1 = 32 * 32 * 2 + (16 + 3) * 2;
+    border.map[color_3_of_palette_1..color_3_of_palette_1 + 2]
+        .copy_from_slice(&0x1234_u16.to_le_bytes());
+    assert_eq!(border.pixel(7, 0), Some(0x1234));
+    assert_eq!(border.pixel(0, 0), None);
+}
+
+#[test]
+fn faded_colors_darken_every_channel() {
+    assert_eq!(faded(0x7FFF, 1), 0x7BDE);
+    assert_eq!(faded(0x7FFF, 31), 0x0000);
+    assert_eq!(faded(0x0421, 2), 0x0000);
+}
+
+#[test]
+fn a_loaded_save_state_goes_on_like_the_super_game_boy_that_saved_it() {
+    use crate::serializable::Serializable;
+
+    let mut console = Console::new();
+    console.send(&pal01([
+        0x1234, 0x0011, 0x0222, 0x3333, 0x4444, 0x5555, 0x6666,
+    ]));
+    console.send(&[header(command::ATTR_DIV, 1), 0b10_01_11, 7]);
+    console.send(&[header(command::MASK_EN, 1), 1]);
+    console.frame_of_shade(2);
+    console.send(&[header(command::PCT_TRN, 1)]);
+    console.frame_of_shade(1);
+
+    let mut bytes = Vec::new();
+    console.sgb.serialize(&mut bytes).unwrap();
+    let mut loaded = Console::new();
+    loaded.sgb.start(0x00, 0x00);
+    loaded.sgb.deserialize(&mut bytes.as_slice()).unwrap();
+
+    for _ in 0..BORDER_FADE_FRAMES {
+        assert_eq!(console.frame_of_shade(3), loaded.frame_of_shade(3));
+    }
+    assert_eq!(format!("{:?}", console.sgb), format!("{:?}", loaded.sgb));
+}

@@ -39,6 +39,8 @@ struct Record {
     achievements: Option<bool>,
     /// Each frame: width, height, pitch and the first pixel's bytes.
     frames: Vec<(c_uint, c_uint, usize, Vec<u8>)>,
+    /// `RETRO_ENVIRONMENT_SET_GEOMETRY`: each new base width and height.
+    geometries: Vec<(c_uint, c_uint)>,
     /// Each batch of sound: how many frames of two samples.
     audio_batches: Vec<usize>,
     polls: usize,
@@ -156,6 +158,19 @@ unsafe extern "C" fn test_environment(cmd: c_uint, data: *mut c_void) -> bool {
                 true
             }
             RETRO_ENVIRONMENT_GET_INPUT_BITMASKS => settings.bitmasks,
+            RETRO_ENVIRONMENT_SET_GEOMETRY => {
+                let geometry = &*data.cast::<RetroGameGeometry>();
+                assert_eq!(
+                    (geometry.max_width, geometry.max_height),
+                    (MAX_WIDTH as c_uint, MAX_HEIGHT as c_uint)
+                );
+                record(|record| {
+                    record
+                        .geometries
+                        .push((geometry.base_width, geometry.base_height));
+                });
+                true
+            }
             RETRO_ENVIRONMENT_SET_MEMORY_MAPS => {
                 let map = &*data.cast::<RetroMemoryMap>();
                 let descriptors =
@@ -201,7 +216,7 @@ unsafe extern "C" fn test_video_refresh(
     assert!(!data.is_null());
     // SAFETY: the core passes `height` lines of `pitch` bytes.
     let pixels = unsafe { std::slice::from_raw_parts(data.cast::<u8>(), pitch * height as usize) };
-    let first = pixels[..pitch / SCREEN_WIDTH].to_vec();
+    let first = pixels[..pitch / width as usize].to_vec();
     record(|record| record.frames.push((width, height, pitch, first)));
 }
 
@@ -360,8 +375,11 @@ fn the_core_describes_itself() {
     unsafe { retro_get_system_av_info(&raw mut av_info) };
     assert_eq!(av_info.geometry.base_width, 160);
     assert_eq!(av_info.geometry.base_height, 144);
-    assert_eq!(av_info.geometry.max_width, 160);
-    assert_eq!(av_info.geometry.max_height, 144);
+    assert_eq!(
+        av_info.geometry.max_width, 256,
+        "room for a Super Game Boy's border"
+    );
+    assert_eq!(av_info.geometry.max_height, 224);
     assert!((av_info.geometry.aspect_ratio - 10.0 / 9.0).abs() < 1e-6);
     assert!((av_info.timing.fps - 59.7275).abs() < 1e-4);
     assert_eq!(av_info.timing.sample_rate, 48_000.0);
@@ -372,7 +390,10 @@ fn the_core_describes_itself() {
         .iter()
         .map(|(key, _, _)| key.as_str())
         .collect();
-    assert_eq!(keys, ["nubo_model", "nubo_palette", "nubo_rtc"]);
+    assert_eq!(
+        keys,
+        ["nubo_model", "nubo_palette", "nubo_sgb_border", "nubo_rtc"]
+    );
     for (key, default, values) in &record.options {
         assert_eq!(values.first(), Some(default), "{key}");
     }
@@ -618,6 +639,34 @@ fn the_options_retroarch_keeps_pick_the_model_and_the_palette() {
 }
 
 #[test]
+fn a_super_game_boy_border_changes_the_pictures_size() {
+    let variable = |key: &str, value: &CStr| (String::from(key), CString::from(value));
+    let _turn = start(Settings {
+        variables: vec![variable("nubo_model", c"SGB")],
+        ..default_settings()
+    });
+    assert!(load_game(&cartridge(ROM_ONLY, 0, false, JOYPAD)));
+    take_record();
+    retro_run();
+    let record = take_record();
+    assert_eq!(record.geometries, [(256, 224)]);
+    let (width, height, pitch, _) = &record.frames[0];
+    assert_eq!((*width, *height, *pitch), (256, 224, 1024));
+
+    lock(&SETTINGS).variables = vec![
+        variable("nubo_model", c"SGB"),
+        variable("nubo_sgb_border", c"disabled"),
+    ];
+    lock(&SETTINGS).variables_updated = true;
+    retro_run();
+    let record = take_record();
+    assert_eq!(record.geometries, [(160, 144)]);
+    let (width, height, pitch, _) = &record.frames[0];
+    assert_eq!((*width, *height, *pitch), (160, 144, 640));
+    finish();
+}
+
+#[test]
 fn older_frontends_get_the_options_in_the_form_they_know() {
     {
         let _turn = start(Settings {
@@ -625,7 +674,7 @@ fn older_frontends_get_the_options_in_the_form_they_know() {
             ..default_settings()
         });
         let record = take_record();
-        assert_eq!(record.options.len(), 3);
+        assert_eq!(record.options.len(), 4);
         assert!(record.variables.is_empty());
         finish();
     }
@@ -635,7 +684,7 @@ fn older_frontends_get_the_options_in_the_form_they_know() {
     });
     let record = take_record();
     assert!(record.options.is_empty());
-    let (key, value) = &record.variables[2];
+    let (key, value) = &record.variables[3];
     assert_eq!(key, "nubo_rtc");
     assert_eq!(value, "Cartridge clock; real|emulated");
     assert!(record.variables[0].1.starts_with("Model; auto|DMG-0|DMG|"));

@@ -13,7 +13,6 @@
 //! cache next to them.
 
 use super::{Entry, Storage};
-use crate::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use directories::ProjectDirs;
 use image::codecs::png::PngEncoder;
 use image::{ExtendedColorType, ImageEncoder};
@@ -115,16 +114,12 @@ pub fn write_atomically(path: &Path, contents: &[u8]) -> io::Result<()> {
     fs::rename(&temporary_path, path)
 }
 
-/// Encodes a frame of the Game Boy screen (RGBA pixels) as a PNG image.
-pub fn encode_png(pixels: &[u8]) -> Result<Vec<u8>, String> {
+/// Encodes a picture of `width` by `height` RGBA pixels, such as a frame of
+/// the Game Boy screen, as a PNG image.
+pub fn encode_png(width: u32, height: u32, pixels: &[u8]) -> Result<Vec<u8>, String> {
     let mut png = Vec::new();
     PngEncoder::new(&mut png)
-        .write_image(
-            pixels,
-            SCREEN_WIDTH,
-            SCREEN_HEIGHT,
-            ExtendedColorType::Rgba8,
-        )
+        .write_image(pixels, width, height, ExtendedColorType::Rgba8)
         .map_err(|error| error.to_string())?;
     Ok(png)
 }

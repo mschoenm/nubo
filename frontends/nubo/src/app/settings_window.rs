@@ -26,6 +26,7 @@ pub enum SettingsMessage {
     AppearanceSelected(Appearance),
     PaletteSelected(DmgPalette),
     IntegerScalingToggled(bool),
+    SgbBorderToggled(bool),
     ModelSelected(ModelPreference),
     ResumeGamesToggled(bool),
     FastForwardSpeedSelected(FastForwardSpeed),
@@ -82,6 +83,12 @@ impl App {
             }
             SettingsMessage::IntegerScalingToggled(enabled) => {
                 self.change_settings(|settings| settings.integer_scaling = enabled);
+            }
+            SettingsMessage::SgbBorderToggled(shown) => {
+                self.change_settings(|settings| settings.shared.sgb_border = shown);
+                if let Some(game) = &mut self.game {
+                    game.session.set_sgb_border(shown);
+                }
             }
             SettingsMessage::ModelSelected(model) => {
                 self.model_override = None;
@@ -271,6 +278,9 @@ impl App {
         Some(match row {
             SettingsRow::SharpPixels => {
                 SettingsMessage::IntegerScalingToggled(!settings.integer_scaling).into()
+            }
+            SettingsRow::SgbBorder => {
+                SettingsMessage::SgbBorderToggled(!settings.shared.sgb_border).into()
             }
             SettingsRow::RestartNow => GameMessage::Reset.into(),
             SettingsRow::ResumeGames => {

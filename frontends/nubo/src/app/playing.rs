@@ -242,6 +242,7 @@ impl App {
         )?;
         session.set_controls(&self.settings.shared.controls);
         session.set_palette(self.settings.shared.dmg_palette);
+        session.set_sgb_border(self.settings.shared.sgb_border);
         if !self.fresh {
             match cheats::load(&session.rom().path) {
                 Ok(cheats) => session.set_cheats(cheats),
@@ -271,9 +272,7 @@ impl App {
         }
 
         if let Some(pixels) = game.session.last_frame()
-            && let Err(error) = self
-                .library
-                .set_thumbnail(&game.session.rom().path, pixels.to_vec())
+            && let Err(error) = self.library.set_thumbnail(&game.session.rom().path, pixels)
         {
             self.toasts.error(error);
         }
@@ -375,11 +374,11 @@ impl App {
         // A controller can ask for this while the window is minimized and
         // doesn't show new frames.
         game.session.refresh_screen();
-        let Some(pixels) = game.session.last_frame() else {
+        let Some(picture) = game.session.screen() else {
             return;
         };
 
-        match screenshots::save(&game.session.name(), pixels) {
+        match screenshots::save(&game.session.name(), picture) {
             Ok(path) => self.toasts.info(format!(
                 "Screenshot saved as {}",
                 path.file_name().unwrap_or_default().to_string_lossy()

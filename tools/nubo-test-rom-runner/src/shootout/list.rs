@@ -6,17 +6,15 @@
 //! (<https://github.com/gbdev/GBEmulatorShootout>), MIT License, Copyright
 //! (c) 2026 daid; see `NOTICE`.
 //!
-//! Left out: the Super Game Boy tests `samesuite/sgb/command_mlt_req.gb`,
-//! `samesuite/sgb/command_mlt_req_1_incrementing.gb` and
-//! `cpp/sgb-ext-test.gb`, and `acid/which.gb (DMG)`, `acid/which.gb (GBC)`
-//! and `daid/rom_and_ram.gb`, which have no reference screenshot. The
+//! Left out: `acid/which.gb (DMG)`, `acid/which.gb (GBC)` and
+//! `daid/rom_and_ram.gb`, which have no reference screenshot. The
 //! Shootout's `required_features=(PCM,)` is left out too: Nubo has the PCM12
 //! and PCM34 registers, so it runs those tests.
 
-use super::{CGB, DMG, ShootoutTest, test};
+use super::{CGB, DMG, SGB, ShootoutTest, test};
 
 /// Every Shootout test the runner runs.
-pub(super) static TESTS: [ShootoutTest; 258] = [
+pub(super) static TESTS: [ShootoutTest; 261] = [
     test("acid/dmg-acid2.gb", DMG, 1500).in_collection("dmg-acid2/dmg-acid2.gb"),
     test("acid/cgb-acid2.gbc", CGB, 1500).in_collection("cgb-acid2/cgb-acid2.gbc"),
     test("acid/cgb-acid-hell.gbc", CGB, 1500).in_collection("cgb-acid-hell/cgb-acid-hell.gbc"),
@@ -402,12 +400,15 @@ pub(super) static TESTS: [ShootoutTest; 258] = [
     test("samesuite/dma/hdma_lcd_off.gb", CGB, 1500),
     test("samesuite/dma/hdma_mode0.gb", CGB, 1500),
     test("samesuite/ppu/blocking_bgpi_increase.gb", CGB, 1500),
+    test("samesuite/sgb/command_mlt_req.gb", SGB, 1500),
+    test("samesuite/sgb/command_mlt_req_1_incrementing.gb", SGB, 1500),
     test("ashiepaws/bully.gb (DMG)", DMG, 500).rom("ashiepaws/bully.gb"),
     test("ashiepaws/bully.gb (GBC)", CGB, 500).rom("ashiepaws/bully.gb"),
     test("ashiepaws/strikethrough.gb", DMG, 500).in_collection("strikethrough/strikethrough.gb"),
     test("cpp/rtc-invalid-banks-test.gb", DMG, 500),
     test("cpp/latch-rtc-test.gb", DMG, 500),
     test("cpp/ramg-mbc3-test.gb", DMG, 500),
+    test("cpp/sgb-ext-test.gb", SGB, 500),
     test(
         "mealybug-tearoom-tests/ppu/m2_win_en_toggle.gb (DMG)",
         DMG,

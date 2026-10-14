@@ -9,6 +9,7 @@ fn the_defaults_are_what_options_start_as() {
     assert_eq!(options, Options::default());
     assert_eq!(options.model, ModelPreference::Automatic);
     assert_eq!(options.palette, DmgPalette::Gray);
+    assert!(options.sgb_border);
     assert_eq!(options.rtc_clock, RtcClock::WallClock);
 }
 
@@ -41,11 +42,13 @@ fn the_values_set_the_settings_they_name() {
     assert!(options.set(PALETTE, "pocket"));
     assert!(options.set(RTC, "emulated"));
     assert!(options.set(MODEL, "CGB-C"));
+    assert!(options.set(SGB_BORDER, "disabled"));
     assert_eq!(
         options,
         Options {
             model: ModelPreference::Fixed(Model::CgbC),
             palette: DmgPalette::Pocket,
+            sgb_border: false,
             rtc_clock: RtcClock::EmulatedTime,
         }
     );
@@ -58,6 +61,7 @@ fn unknown_keys_and_values_change_nothing() {
     assert!(!options.set(MODEL, "GBA SP"));
     assert!(!options.set(PALETTE, "purple"));
     assert!(!options.set(RTC, "sometimes"));
+    assert!(!options.set(SGB_BORDER, "maybe"));
     assert_eq!(options, Options::default());
 }
 

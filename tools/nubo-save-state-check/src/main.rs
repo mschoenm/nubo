@@ -36,9 +36,11 @@ const SAMPLE_RATE: u32 = 44100;
 /// The audio buffer the core fills on each `step_until_next_audio_buffer`.
 const SAMPLES_PER_BUFFER: u32 = 512;
 
-/// The games states are kept of, and the models each one runs on.
+/// The games states are kept of, and the models each one runs on. Tobu Tobu
+/// Girl Deluxe supports the Super Game Boy, so its SGB state holds a game's
+/// colors and border.
 const GAMES: [(&str, &[Model]); 3] = [
-    ("tobudx.gb", &[Model::Dmg, Model::CgbE]),
+    ("tobudx.gb", &[Model::Dmg, Model::Sgb, Model::CgbE]),
     ("ucity.gbc", &[Model::CgbE]),
     ("geometrix.gbc", &[Model::CgbE]),
 ];

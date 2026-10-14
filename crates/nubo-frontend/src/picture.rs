@@ -6,6 +6,8 @@
 //! it, such as a texture on the graphics card. [`Picture::drawn`] keeps that
 //! form with the picture, so it is made once and not again on every redraw.
 
+use crate::palettes::DmgPalette;
+use nubo_core::{Emulator, SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH, SGB_SCREEN_POSITION};
 use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, OnceLock};
@@ -14,6 +16,100 @@ use std::sync::{Arc, OnceLock};
 pub const SCREEN_WIDTH: u32 = 160;
 /// How many pixels high the Game Boy screen is.
 pub const SCREEN_HEIGHT: u32 = 144;
+
+/// A frame as the emulator finished it, before the player's palette or
+/// choices change it: the Game Boy screen, or on a Super Game Boy the TV
+/// picture with the border around the screen.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Frame {
+    /// RGBA pixels, row by row from the top left.
+    pub pixels: Vec<u8>,
+    /// How many pixels wide the frame is.
+    pub width: u32,
+    /// How many pixels high the frame is.
+    pub height: u32,
+    /// Where the Game Boy screen's top-left corner is in the frame.
+    pub screen_position: (u32, u32),
+    /// Whether the Game Boy screen is in the emulator's grays
+    /// (`nubo_core::DMG_SHADES`), which a [`DmgPalette`] repaints.
+    pub in_dmg_shades: bool,
+}
+
+impl Frame {
+    /// The emulator's newest frame (see `Emulator::frame_with_border`).
+    pub fn latest(emulator: &Emulator) -> Frame {
+        let mut frame = Frame::default();
+        frame.update(emulator);
+        frame
+    }
+
+    /// Makes this the emulator's newest frame, reusing its pixels' memory.
+    /// Returns whether anything changed.
+    pub fn update(&mut self, emulator: &Emulator) -> bool {
+        let (pixels, width, height, screen_position) = match emulator.frame_with_border() {
+            Some(pixels) => (
+                pixels,
+                SGB_FRAME_WIDTH,
+                SGB_FRAME_HEIGHT,
+                SGB_SCREEN_POSITION,
+            ),
+            None => (emulator.frame_buffer(), SCREEN_WIDTH, SCREEN_HEIGHT, (0, 0)),
+        };
+        let in_dmg_shades = emulator.frame_in_dmg_shades();
+        if self.pixels == pixels && self.width == width && self.in_dmg_shades == in_dmg_shades {
+            return false;
+        }
+        self.pixels.clear();
+        self.pixels.extend_from_slice(pixels);
+        self.width = width;
+        self.height = height;
+        self.screen_position = screen_position;
+        self.in_dmg_shades = in_dmg_shades;
+        true
+    }
+
+    /// Whether the frame has a Super Game Boy border around the screen.
+    pub fn has_border(&self) -> bool {
+        self.width != SCREEN_WIDTH || self.height != SCREEN_HEIGHT
+    }
+
+    /// The Game Boy screen alone, 160×144 pixels.
+    pub fn screen_pixels(&self) -> Vec<u8> {
+        let (left, top) = self.screen_position;
+        let row_bytes = SCREEN_WIDTH as usize * 4;
+        (0..SCREEN_HEIGHT as usize)
+            .flat_map(|row| {
+                let start = ((top as usize + row) * self.width as usize + left as usize) * 4;
+                &self.pixels[start..start + row_bytes]
+            })
+            .copied()
+            .collect()
+    }
+
+    /// The frame as the player sees it: with or without its border, and with
+    /// the Game Boy screen in `palette` when it is in the emulator's grays.
+    pub fn shown(&self, palette: DmgPalette, with_border: bool) -> Picture {
+        let repaint = self.in_dmg_shades && palette != DmgPalette::Gray;
+        if with_border || !self.has_border() {
+            let mut pixels = self.pixels.clone();
+            if repaint {
+                let (left, top) = self.screen_position;
+                let row_bytes = SCREEN_WIDTH as usize * 4;
+                for row in 0..SCREEN_HEIGHT as usize {
+                    let start = ((top as usize + row) * self.width as usize + left as usize) * 4;
+                    palette.recolor(&mut pixels[start..start + row_bytes]);
+                }
+            }
+            Picture::new(self.width, self.height, pixels)
+        } else {
+            let mut pixels = self.screen_pixels();
+            if repaint {
+                palette.recolor(&mut pixels);
+            }
+            Picture::new(SCREEN_WIDTH, SCREEN_HEIGHT, pixels)
+        }
+    }
+}
 
 /// A picture as RGBA pixels: four bytes (red, green, blue and alpha) per
 /// pixel, row by row from the top left. Cloning it is cheap: the clones share

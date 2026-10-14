@@ -1,7 +1,6 @@
 //! Small building blocks shared by the screens, so buttons, labels and
 //! sections look the same everywhere.
 
-use crate::app::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::ui::icons::{self, Icon};
 use crate::ui::theme;
 use iced::widget::text::Wrapping;
@@ -196,29 +195,33 @@ fn divider<'a, Message: 'a>() -> Element<'a, Message> {
         .into()
 }
 
-/// A picture of the Game Boy screen, grown by the largest whole factor that
-/// fits in the space it gets, so every Game Boy pixel is the same number of
-/// screen pixels.
-pub fn whole_step_screen<'a, Message: 'a>(handle: image::Handle) -> Element<'a, Message> {
+/// A picture of the Game Boy screen, `size` pixels (width and height; the
+/// screen alone or a Super Game Boy's picture with its border), grown by the
+/// largest whole factor that fits in the space it gets, so every Game Boy
+/// pixel is the same number of screen pixels.
+pub fn whole_step_screen<'a, Message: 'a>(
+    handle: image::Handle,
+    (width, height): (u32, u32),
+) -> Element<'a, Message> {
     responsive(move |available| {
-        let factor = whole_step_factor(available);
+        let factor = whole_step_factor(available, width, height);
 
         center(
             image(handle.clone())
                 .filter_method(image::FilterMethod::Nearest)
-                .width(SCREEN_WIDTH as f32 * factor)
-                .height(SCREEN_HEIGHT as f32 * factor),
+                .width(width as f32 * factor)
+                .height(height as f32 * factor),
         )
         .into()
     })
     .into()
 }
 
-/// The largest whole factor the Game Boy screen can grow by in `available`,
-/// and at least 1.
-fn whole_step_factor(available: Size) -> f32 {
-    (available.width / SCREEN_WIDTH as f32)
-        .min(available.height / SCREEN_HEIGHT as f32)
+/// The largest whole factor a picture `width` by `height` pixels can grow by
+/// in `available`, and at least 1.
+fn whole_step_factor(available: Size, width: u32, height: u32) -> f32 {
+    (available.width / width as f32)
+        .min(available.height / height as f32)
         .floor()
         .max(1.0)
 }

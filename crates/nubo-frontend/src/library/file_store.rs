@@ -6,6 +6,7 @@
 pub use crate::storage::files::decode_png;
 
 use super::{Cache, LibraryEntry, PictureKind};
+use crate::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::storage::files::{encode_png, write_atomically};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -47,7 +48,7 @@ pub fn save_entries(cache: &Cache, entries: &[LibraryEntry]) -> Result<(), Strin
 
 /// Saves a frame of the game at `rom_path` as its thumbnail.
 pub fn save_thumbnail(cache: &Cache, rom_path: &Path, pixels: &[u8]) -> Result<(), String> {
-    let png = encode_png(pixels)?;
+    let png = encode_png(SCREEN_WIDTH, SCREEN_HEIGHT, pixels)?;
 
     write_atomically(&thumbnail_path(cache, rom_path)?, &png)
         .map_err(|error| format!("The game's thumbnail couldn't be saved: {error}"))
@@ -56,8 +57,11 @@ pub fn save_thumbnail(cache: &Cache, rom_path: &Path, pixels: &[u8]) -> Result<(
 /// Saves the title screen of the game at `rom_path`, as the emulator drew
 /// it (in gray for original Game Boy games).
 pub fn save_title_screen(cache: &Cache, rom_path: &Path, pixels: &[u8]) -> Result<(), String> {
-    write_atomically(&title_screen_path(cache, rom_path)?, &encode_png(pixels)?)
-        .map_err(|error| format!("A title screen couldn't be saved: {error}"))
+    write_atomically(
+        &title_screen_path(cache, rom_path)?,
+        &encode_png(SCREEN_WIDTH, SCREEN_HEIGHT, pixels)?,
+    )
+    .map_err(|error| format!("A title screen couldn't be saved: {error}"))
 }
 
 /// Reads a saved picture of the game at `rom_path` as its width, height

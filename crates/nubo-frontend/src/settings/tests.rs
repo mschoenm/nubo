@@ -18,6 +18,7 @@ fn settings_survive_a_round_trip() {
         muted: true,
         controls: Controls::default(),
         dmg_palette: DmgPalette::Pocket,
+        sgb_border: false,
     };
 
     let contents = toml::to_string(&settings).unwrap();
@@ -48,6 +49,22 @@ fn missing_fields_get_their_defaults() {
     assert!(settings.library_folders.is_empty());
     assert!(!settings.resume_games);
     assert_eq!(settings.fast_forward_speed.multiplier(), 4);
+}
+
+#[test]
+fn the_super_game_boy_border_is_only_saved_when_it_is_off() {
+    assert!(
+        !toml::to_string(&Settings::default())
+            .unwrap()
+            .contains("sgb_border")
+    );
+    let hidden = Settings {
+        sgb_border: false,
+        ..Settings::default()
+    };
+    let contents = toml::to_string(&hidden).unwrap();
+    assert!(contents.contains("sgb_border = false"));
+    assert!(!toml::from_str::<Settings>(&contents).unwrap().sgb_border);
 }
 
 #[test]
@@ -138,6 +155,7 @@ fn earlier_settings() -> Settings {
         muted: true,
         controls,
         dmg_palette: DmgPalette::Pocket,
+        sgb_border: true,
     }
 }
 

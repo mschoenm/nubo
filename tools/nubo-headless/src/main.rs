@@ -1,12 +1,13 @@
 //! Runs a ROM without a window or sound for a fixed stretch of emulated time
 //! and optionally saves a screenshot of the last frame. Useful for checking
 //! test ROMs by hand. Every run of the same ROM ends on the same frame,
-//! however fast the machine is.
+//! however fast the machine is. On the Super Game Boy models the screenshot
+//! is the whole 256×224 picture with its border.
 
 use chrono::Local;
 use clap::Parser;
 use image::RgbaImage;
-use nubo_core::{Emulator, Model, NoSaves, RtcClock};
+use nubo_core::{Emulator, Model, NoSaves, RtcClock, SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -45,15 +46,23 @@ struct Args {
     model: Option<Model>,
 }
 
-/// Saves an RGBA frame as `<rom name>_<timestamp>.png` in `output_dir` (or
-/// the current directory) and returns the file's path.
+/// Saves the emulator's latest frame (with its border on a Super Game Boy) as
+/// `<rom name>_<timestamp>.png` in `output_dir` (or the current directory) and
+/// returns the file's path.
 fn save_screenshot(
-    frame: &[u8],
+    emulator: &Emulator,
     rom_path: &Path,
     output_dir: Option<&Path>,
 ) -> Result<PathBuf, String> {
-    let screenshot = RgbaImage::from_raw(SCREEN_WIDTH, SCREEN_HEIGHT, frame.to_vec())
-        .ok_or("Failed to create image buffer")?;
+    let screenshot = match emulator.frame_with_border() {
+        Some(frame) => RgbaImage::from_raw(SGB_FRAME_WIDTH, SGB_FRAME_HEIGHT, frame.to_vec()),
+        None => RgbaImage::from_raw(
+            SCREEN_WIDTH,
+            SCREEN_HEIGHT,
+            emulator.frame_buffer().to_vec(),
+        ),
+    }
+    .ok_or("Failed to create image buffer")?;
 
     let rom_stem = rom_path
         .file_stem()
@@ -144,11 +153,7 @@ fn run(args: &Args) -> Result<(), String> {
     );
 
     if args.screenshot {
-        let path = save_screenshot(
-            emulator.frame_buffer(),
-            &args.rom,
-            args.screenshot_path.as_deref(),
-        )?;
+        let path = save_screenshot(&emulator, &args.rom, args.screenshot_path.as_deref())?;
         println!("Screenshot saved to: {}", path.display());
     }
 

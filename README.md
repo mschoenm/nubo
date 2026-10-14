@@ -26,6 +26,7 @@ These are the files of the [latest release](https://github.com/mschoenm/nubo/rel
 - Accurate audio emulation, with channel timing ported from [SameBoy](https://github.com/LIJI32/SameBoy)
 - Dot-based graphics emulation with a pixel FIFO, so mid-scanline effects and mode 3 timing match the hardware
 - Every hardware model from the first Game Boy to the Game Boy Advance, picked automatically per game or by hand
+- Super Game Boy support: games' colors, borders, screen masking and multiplayer requests, with Nubo's own border for games that bring none (the border can be switched off); games made for it start on it automatically, unless they're made for the Game Boy Color too
 - MBC1, MBC2, MBC3 (including the MBC30 for 4 MB games), MBC5, and HuC1 support, with RTC support for MBC3 cartridges
 - Loading ROMs directly from `.zip` files
 - A desktop app with:
@@ -107,7 +108,7 @@ The Linux cores need glibc 2.34 or newer (Ubuntu 22.04, Debian 12 or later); the
 
 ## Test ROMs
 
-`cargo test-roms` downloads a pinned release of the [Game Boy test ROM collection](https://github.com/c-sp/game-boy-test-roms), plus the test ROMs and reference screenshots of the [GB Emulator Shootout](https://gbdev.io/GBEmulatorShootout/) that the collection doesn't have in the same version, and runs each test ROM on the hardware models it targets: DMG-0, DMG, MGB, SGB and SGB2 (monochrome) and CGB-0 to CGB-E and AGB (color). The Shootout's own tests also run the way the Shootout judges them, on a DMG or a CGB-E with its screenshot comparison, and the runner compares the result with the Shootout's published table: counted on the 264 tests published on 2026-06-04, Nubo passes 258, which would put it first (the leader, DocBoy, passes 255). Of the other six, three are Super Game Boy tests and three only report information. The tests that currently pass are listed in [tools/nubo-test-rom-runner/passing.txt](tools/nubo-test-rom-runner/passing.txt), and CI fails if any of them stop passing. The tests that still fail, and why, are explained in [tools/nubo-test-rom-runner/FAILING_TESTS.md](tools/nubo-test-rom-runner/FAILING_TESTS.md). What still has to happen before Nubo can claim to be the most accurate Game Boy emulator is planned in [docs/ACCURACY_PLAN.md](docs/ACCURACY_PLAN.md).
+`cargo test-roms` downloads a pinned release of the [Game Boy test ROM collection](https://github.com/c-sp/game-boy-test-roms), plus the test ROMs and reference screenshots of the [GB Emulator Shootout](https://gbdev.io/GBEmulatorShootout/) that the collection doesn't have in the same version, and runs each test ROM on the hardware models it targets: DMG-0, DMG, MGB, SGB and SGB2 (monochrome) and CGB-0 to CGB-E and AGB (color). The Shootout's own tests also run the way the Shootout judges them, on a DMG, an SGB or a CGB-E with its screenshot comparison, and the runner compares the result with the Shootout's published table: counted on the 264 tests published on 2026-06-04, Nubo passes 261, which would put it first (the leader, DocBoy, passes 255). The other three only report information. The tests that currently pass are listed in [tools/nubo-test-rom-runner/passing.txt](tools/nubo-test-rom-runner/passing.txt), and CI fails if any of them stop passing. The tests that still fail, and why, are explained in [tools/nubo-test-rom-runner/FAILING_TESTS.md](tools/nubo-test-rom-runner/FAILING_TESTS.md). What still has to happen before Nubo can claim to be the most accurate Game Boy emulator is planned in [docs/ACCURACY_PLAN.md](docs/ACCURACY_PLAN.md).
 
 | Suite | Monochrome | Color |
 | ----- | ---------- | ----- |
@@ -118,7 +119,7 @@ The Linux cores need glibc 2.34 or newer (Ubuntu 22.04, Debian 12 or later); the
 | [cgb-acid2](https://github.com/mattcurrie/cgb-acid2) | | 1/1 |
 | [cgb-acid-hell](https://github.com/mattcurrie/cgb-acid-hell) | | 1/1 |
 | [Mealybug Tearoom Tests](https://github.com/mattcurrie/mealybug-tearoom-tests) | 24/24 | 69/71 |
-| [SameSuite](https://github.com/LIJI32/SameSuite) | | 82/82 |
+| [SameSuite](https://github.com/LIJI32/SameSuite) | 4/4 | 82/82 |
 | [Gambatte](https://github.com/pokemon-speedrunning/gambatte-core) | 1865/1873 | 3340/3352 |
 | [GBMicrotest](https://github.com/aappleby/GBMicrotest) | 480/482 | |
 | [AGE](https://github.com/c-sp/age-test-roms) | 12/14 | 102/105 |
@@ -130,8 +131,8 @@ The Linux cores need glibc 2.34 or newer (Ubuntu 22.04, Debian 12 or later); the
 | [little-things-gb](https://github.com/pinobatch/little-things-gb) | 2/2 | 2/2 |
 | [MBC3 Tester](https://github.com/EricKirschenmann/MBC3-Tester-gb) | 1/1 | 1/1 |
 | [daid's tests](https://github.com/gbdev/GBEmulatorShootout/tree/main/testroms/daid) | 2/2 | 6/6 |
-| [CasualPokePlayer's MBC3 tests](https://github.com/gbdev/GBEmulatorShootout/tree/main/testroms/cpp) | 3/3 | |
-| [GB Emulator Shootout](https://github.com/gbdev/GBEmulatorShootout), judged as the Shootout judges them | 158/165 | 93/93 |
+| [CasualPokePlayer's MBC3 and Super Game Boy tests](https://github.com/gbdev/GBEmulatorShootout/tree/main/testroms/cpp) | 5/5 | |
+| [GB Emulator Shootout](https://github.com/gbdev/GBEmulatorShootout), judged as the Shootout judges them | 168/168 | 93/93 |
 
 These aren't run, because nothing can check them automatically or they need hardware Nubo doesn't emulate:
 
@@ -139,7 +140,6 @@ These aren't run, because nothing can check them automatically or they need hard
 - The shootout's `which.gb` and `rom_and_ram.gb`: they report what they find instead of passing or failing.
 - Wilbert Pol's `logic-analysis` ROMs and Mooneye's `utils`: they are for logic analyzers and hardware dumps.
 - The collection's Bully on monochrome models: real DMGs fail it too. (The Shootout runs its own build of Bully on DMG, which Nubo passes.)
-- SameSuite's `sgb` tests and CasualPokePlayer's `sgb-ext-test`: Super Game Boy packets aren't emulated.
 - CasualPokePlayer's `gb-camera-test` and `open-bus-ss-test`: the first needs the Pocket Camera, the second only has a photo of real hardware to compare with.
 - The [144p Test Suite](https://github.com/pinobatch/240p-test-mini) (judged by eye) and [AntonioND's GBC hardware tests](https://github.com/AntonioND/gbc-hw-tests) (results recorded from real consoles, which would need a checker of their own).
 
@@ -155,7 +155,7 @@ Nubo started as a fork of [Retro Boy](https://github.com/smparsons/retroboy) by 
 
 Much of its accuracy comes from other people's research and code:
 
-- [SameBoy](https://github.com/LIJI32/SameBoy) by Lior Halphon: the APU channel timing, the mode 3 pixel pipeline, the OAM corruption bug, the OAM DMA bus conflicts, the CGB speed switch timing, STOP mode, the PPU register write timing, the serial clock and the MBC3's banks and clock latch are ported from SameBoy, and the Game Boy Color boot ROM is a modified version of SameBoy's (Expat License, see [NOTICE](NOTICE)). SameBoy was also the reference for halt timing, the order of the hardware models, GameShark codes and many smaller hardware quirks.
+- [SameBoy](https://github.com/LIJI32/SameBoy) by Lior Halphon: the APU channel timing, the mode 3 pixel pipeline, the OAM corruption bug, the OAM DMA bus conflicts, the CGB speed switch timing, STOP mode, the PPU register write timing, the serial clock, the MBC3's banks and clock latch and the Super Game Boy's commands, colors and borders are ported from SameBoy, and the Game Boy Color boot ROM is a modified version of SameBoy's (Expat License, see [NOTICE](NOTICE)). SameBoy was also the reference for halt timing, the order of the hardware models, GameShark codes and many smaller hardware quirks.
 - [Bootix](https://github.com/Hacktix/Bootix) by Hacktix: the boot ROM of the monochrome models is a modified version of Bootix (CC0).
 - [Gambatte](https://github.com/pokemon-speedrunning/gambatte-core) by sinamas: a reference for the timing of double speed and the window, worked out by running the same test ROMs in Gambatte and Nubo and studying where they differ. Gambatte's GPL-2.0-only license can't be combined with Nubo's, so no code comes from it.
 - [Pan Docs](https://gbdev.io/pandocs/) and the [gbdev](https://gbdev.io) community: the reference for nearly every hardware register.

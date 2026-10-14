@@ -5,6 +5,7 @@ use super::playing::read_rom;
 use super::{App, Message, SCREEN_HEIGHT, SCREEN_WIDTH};
 use iced::theme::Mode;
 use iced::{Event, Size, Task, event, mouse, window};
+use nubo_core::{SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH};
 use std::path::PathBuf;
 
 /// What happens to the window.
@@ -87,19 +88,34 @@ impl App {
         let Some(scale) = self.screen_scale else {
             return Task::none();
         };
-        window::scale_factor(id)
-            .then(move |scale_factor| window::resize(id, screen_only_size(scale, scale_factor)))
+        let picture = self.screen_size();
+        window::scale_factor(id).then(move |scale_factor| {
+            window::resize(id, screen_only_size(scale, scale_factor, picture))
+        })
+    }
+
+    /// The size, in Game Boy pixels, of the picture the game shows: the
+    /// Game Boy screen, or on a Super Game Boy the picture with its border
+    /// unless the settings hide it.
+    fn screen_size(&self) -> (u32, u32) {
+        match &self.game {
+            Some(game) if game.session.model().is_sgb() && self.settings.shared.sgb_border => {
+                (SGB_FRAME_WIDTH, SGB_FRAME_HEIGHT)
+            }
+            _ => (SCREEN_WIDTH, SCREEN_HEIGHT),
+        }
     }
 }
 
 /// The size, in Iced's logical pixels, of a window whose inside is exactly
-/// the Game Boy screen `scale` times its size (160·scale × 144·scale) in
-/// pixels of a display that scales by `scale_factor`, such as 1.5 at 150%.
-/// Iced and winit multiply logical sizes by the scale factor and round, so
-/// the window comes out exact.
-pub fn screen_only_size(scale: u32, scale_factor: f32) -> Size {
+/// the game's picture of `width` by `height` Game Boy pixels (160×144, or
+/// 256×224 with a Super Game Boy's border) `scale` times its size in pixels
+/// of a display that scales by `scale_factor`, such as 1.5 at 150%. Iced and
+/// winit multiply logical sizes by the scale factor and round, so the window
+/// comes out exact.
+pub fn screen_only_size(scale: u32, scale_factor: f32, (width, height): (u32, u32)) -> Size {
     let pixels = |length: u32| (length * scale) as f32 / scale_factor;
-    Size::new(pixels(SCREEN_WIDTH), pixels(SCREEN_HEIGHT))
+    Size::new(pixels(width), pixels(height))
 }
 
 /// Switches the window between fullscreen and a normal window.

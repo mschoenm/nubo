@@ -1,6 +1,7 @@
 //! The core options RetroArch shows in its Quick Menu: which hardware a game
-//! starts on, the colors of original Game Boy games, and which clock an
-//! MBC3 cartridge's real-time clock follows.
+//! starts on, the colors of original Game Boy games, whether a Super Game
+//! Boy's border shows, and which clock an MBC3 cartridge's real-time clock
+//! follows.
 //!
 //! The definitions here are plain data; `ffi.rs` hands them to RetroArch in
 //! whichever form it understands and reads the values back as text, which
@@ -16,6 +17,8 @@ pub const MODEL: &str = "nubo_model";
 pub const PALETTE: &str = "nubo_palette";
 /// The option that picks which clock the cartridge's real-time clock follows.
 pub const RTC: &str = "nubo_rtc";
+/// The option that shows or hides a Super Game Boy's border.
+pub const SGB_BORDER: &str = "nubo_sgb_border";
 
 /// The value of [`MODEL`] that picks the hardware from the game.
 const AUTOMATIC_MODEL: &str = "auto";
@@ -23,6 +26,10 @@ const AUTOMATIC_MODEL: &str = "auto";
 const REAL_TIME: &str = "real";
 /// The value of [`RTC`] for the time the emulator has run.
 const EMULATED_TIME: &str = "emulated";
+/// The value of [`SGB_BORDER`] that shows the border.
+const SHOWN: &str = "enabled";
+/// The value of [`SGB_BORDER`] that hides the border.
+const HIDDEN: &str = "disabled";
 
 /// One core option as RetroArch shows it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,8 +67,9 @@ pub fn definitions() -> Vec<OptionDefinition> {
             key: MODEL,
             description: "Model",
             info: "The hardware to emulate. Automatic runs Game Boy Color games on a Game Boy \
-                   Color (CGB-E) and other games on the original Game Boy (DMG). Takes effect \
-                   when the game is restarted or loaded again.",
+                   Color (CGB-E), Super Game Boy games on a Super Game Boy (SGB) and other \
+                   games on the original Game Boy (DMG). Takes effect when the game is \
+                   restarted or loaded again.",
             values: models.collect(),
         },
         OptionDefinition {
@@ -73,6 +81,17 @@ pub fn definitions() -> Vec<OptionDefinition> {
                 .iter()
                 .map(|palette| (palette.to_string().to_lowercase(), palette.to_string()))
                 .collect(),
+        },
+        OptionDefinition {
+            key: SGB_BORDER,
+            description: "Super Game Boy border",
+            info: "Whether games on a Super Game Boy show the border around the screen: the \
+                   game's own, or Nubo's for games that bring none. Hidden, only the Game Boy \
+                   screen shows.",
+            values: vec![
+                (String::from(SHOWN), String::from("Shown")),
+                (String::from(HIDDEN), String::from("Hidden")),
+            ],
         },
         OptionDefinition {
             key: RTC,
@@ -92,14 +111,27 @@ pub fn definitions() -> Vec<OptionDefinition> {
 }
 
 /// The settings the options stand for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Options {
     /// The hardware a game starts on.
     pub model: ModelPreference,
     /// The colors of original Game Boy games on a Game Boy.
     pub palette: DmgPalette,
+    /// Whether a Super Game Boy's border shows around the screen.
+    pub sgb_border: bool,
     /// The clock an MBC3 cartridge's real-time clock follows.
     pub rtc_clock: RtcClock,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Options {
+            model: ModelPreference::default(),
+            palette: DmgPalette::default(),
+            sgb_border: true,
+            rtc_clock: RtcClock::default(),
+        }
+    }
 }
 
 impl Options {
@@ -120,6 +152,11 @@ impl Options {
                     None => return false,
                 }
             }
+            SGB_BORDER => match value {
+                SHOWN => self.sgb_border = true,
+                HIDDEN => self.sgb_border = false,
+                _ => return false,
+            },
             RTC => match value {
                 REAL_TIME => self.rtc_clock = RtcClock::WallClock,
                 EMULATED_TIME => self.rtc_clock = RtcClock::EmulatedTime,

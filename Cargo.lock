@@ -2863,6 +2863,7 @@ name = "nubo-core"
 version = "0.5.0"
 dependencies = [
  "getset",
+ "nubo-logo",
  "nubo-serializable-derive",
  "zip",
 ]

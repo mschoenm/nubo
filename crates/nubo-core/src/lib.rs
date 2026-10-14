@@ -17,7 +17,10 @@ pub use crate::address_bus::{
 };
 pub use crate::controller::{ControllerButton, ControllerMapping, ControllerState};
 pub use crate::cpu::{BusActivityEntry, BusActivityKind, Registers};
-pub use crate::emulator::{BUILD_COMMIT, DOTS_PER_FRAME, Emulator, SaveStateHeader};
+pub use crate::emulator::{
+    BUILD_COMMIT, DOTS_PER_FRAME, Emulator, SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH, SGB_SCREEN_POSITION,
+    SaveStateHeader,
+};
 pub use crate::error::{CheatError, LoadRomError, SaveStateError};
 pub use crate::gpu::DMG_SHADES;
 pub use crate::joypad::Key;
@@ -38,4 +41,5 @@ mod model;
 mod rom_archive;
 mod serial;
 mod serializable;
+mod sgb;
 mod utils;

@@ -8,8 +8,8 @@
 //!   instead of the one the settings pick.
 //! - `--scale <n>` shows only the game screen, `n` times its size (1 to 8),
 //!   in a window whose inside is exactly 160·n × 144·n pixels of the
-//!   display, whatever its scaling. Nothing else can be brought up in it.
-//!   It needs a ROM.
+//!   display, whatever its scaling (256·n × 224·n on a Super Game Boy, with
+//!   its border). Nothing else can be brought up in it. It needs a ROM.
 //! - `--fresh` starts like a new install and leaves nothing behind: default
 //!   settings, no library, no battery saves, save states, cheats or
 //!   screenshots, a cartridge clock that follows emulated time, and

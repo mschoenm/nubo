@@ -222,22 +222,22 @@ impl Machine {
     }
 
     /// Emulates one audio buffer's worth of time and queues its sound.
-    /// Returns how long that sound takes to play, and the frame that
-    /// finished meanwhile, if one did.
-    fn play_buffer(&mut self) -> (Duration, Option<&[u8]>) {
+    /// Returns how long that sound takes to play, and whether a frame
+    /// finished meanwhile (see `Frame::latest`).
+    fn play_buffer(&mut self) -> (Duration, bool) {
         let (left, right) = self.emulator.step_until_next_audio_buffer();
         let playing_time = self.audio.queue(left, right);
-        (playing_time, self.emulator.take_frame())
+        (playing_time, self.emulator.take_frame().is_some())
     }
 
     /// Emulates one audio buffer's worth of time without playing it, for
     /// fast forward. Returns how long that sound would have taken to play,
-    /// and the frame that finished meanwhile, if one did.
-    fn skip_buffer(&mut self) -> (Duration, Option<&[u8]>) {
+    /// and whether a frame finished meanwhile.
+    fn skip_buffer(&mut self) -> (Duration, bool) {
         let samples = self.emulator.step_until_next_audio_buffer().0.len();
         let emulated_time =
             Duration::from_secs_f64(samples as f64 / f64::from(self.audio.sample_rate()));
-        (emulated_time, self.emulator.take_frame())
+        (emulated_time, self.emulator.take_frame().is_some())
     }
 }
 

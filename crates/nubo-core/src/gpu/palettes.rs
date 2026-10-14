@@ -106,7 +106,7 @@ fn write_palette_ram(
 }
 
 /// Scales a CGB RGB555 color (five bits per channel) to an RGBA color with eight bits per channel.
-fn rgb555_to_rgba(rgb555: u16) -> Color {
+pub(crate) fn rgb555_to_rgba(rgb555: u16) -> Color {
     let channel = |shift: u16| CHANNEL_LEVELS[usize::from((rgb555 >> shift) & 0b11111)];
     [channel(0), channel(5), channel(10), 0xFF]
 }

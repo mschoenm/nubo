@@ -286,10 +286,13 @@ behaviour behind those rows is known, there is nothing to model.
 
 ## The GB Emulator Shootout
 
-The runner runs 258 of the 264 tests of the Shootout's published table (`shootout/...` in
+The runner runs 261 of the 264 tests of the Shootout's published table (`shootout/...` in
 `passing.txt`), judged the way its harness judges them (`src/shootout.rs`): in grayscale, on a
-screenshot of the app, so in the colors the app shows. All 258 pass: 258 of 264, which would rank
-first, ahead of the leader, DocBoy, with 255.
+screenshot of the app, so in the colors the app shows. All 261 pass: 261 of 264, which would rank
+first, ahead of the leader, DocBoy, with 255. The three Super Game Boy tests
+(`samesuite/sgb/command_mlt_req.gb`, `samesuite/sgb/command_mlt_req_1_incrementing.gb` and
+`cpp/sgb-ext-test.gb`) pass since Nubo emulates the Super Game Boy's commands; on the published table
+only GSE and mGBA pass the first and only GSE the last.
 
 Seven DMG tests used to fail only because of the colors Nubo showed original Game Boy games in: the
 emulator's middle grays were 0xD3 and 0xA9, and the Shootout's screenshots use evenly spaced grays
@@ -297,13 +300,9 @@ emulator's middle grays were 0xD3 and 0xA9, and the Shootout's screenshots use e
 away. The emulator now draws the evenly spaced grays (`DMG_SHADES`), which the app's default palette
 shows as they are.
 
-The six published tests the runner doesn't count can't pass in the Shootout either:
-
-- `samesuite/sgb/command_mlt_req.gb`, `samesuite/sgb/command_mlt_req_1_incrementing.gb` and
-  `cpp/sgb-ext-test.gb` run on the Super Game Boy, whose commands Nubo doesn't emulate. The harness
-  class doesn't start Nubo for them, and the Shootout counts them as not run.
-- `acid/which.gb (DMG)`, `acid/which.gb (GBC)` and `daid/rom_and_ram.gb` have no reference
-  screenshot: they only report which model or cartridge setup they see, and count as information.
+The three published tests the runner doesn't count can't pass in the Shootout either:
+`acid/which.gb (DMG)`, `acid/which.gb (GBC)` and `daid/rom_and_ram.gb` have no reference
+screenshot: they only report which model or cartridge setup they see, and count as information.
 
 The groups `docs/SHOOTOUT_PLAN.md` expected to fail are empty:
 

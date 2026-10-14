@@ -27,6 +27,18 @@ const SGB_HEADER_END: usize = 0x0150;
 /// multiple of it since power-on.
 pub const DOTS_PER_FRAME: u64 = crate::gpu::DOTS_PER_FRAME as u64;
 
+/// The width of a Super Game Boy's picture with its border
+/// ([`Emulator::frame_with_border`]), in pixels.
+pub const SGB_FRAME_WIDTH: u32 = crate::sgb::BORDERED_WIDTH as u32;
+/// The height of a Super Game Boy's picture with its border, in pixels.
+pub const SGB_FRAME_HEIGHT: u32 = crate::sgb::BORDERED_HEIGHT as u32;
+/// Where the Game Boy screen's top-left corner is in a Super Game Boy's
+/// picture with its border, in pixels from the left and from the top.
+pub const SGB_SCREEN_POSITION: (u32, u32) = (
+    crate::sgb::SCREEN_OFFSET.0 as u32,
+    crate::sgb::SCREEN_OFFSET.1 as u32,
+);
+
 /// A Game Boy or Game Boy Color.
 ///
 /// Create one with [`Emulator::new`] for the hardware to emulate, load a game
@@ -328,6 +340,23 @@ impl Emulator {
     /// The most recent complete frame: 160x144 pixels, four bytes (RGBA) each.
     pub fn frame_buffer(&self) -> &[u8] {
         self.address_bus().completed_frame()
+    }
+
+    /// On the Super Game Boy models, the most recent complete frame as the
+    /// TV shows it: 256x224 RGBA pixels, with the Game Boy screen
+    /// ([`Emulator::frame_buffer`]) at [`SGB_SCREEN_POSITION`] and the
+    /// border around it. `None` on other models.
+    pub fn frame_with_border(&self) -> Option<&[u8]> {
+        self.address_bus().completed_frame_with_border()
+    }
+
+    /// Whether the most recent frame's Game Boy screen uses only the four
+    /// [`DMG_SHADES`](crate::DMG_SHADES), which frontends may show in other
+    /// colors: true on the original Game Boy models, and on a Super Game Boy
+    /// until the game sets colors of its own. Frontends that repaint a frame
+    /// with a border repaint only its Game Boy screen.
+    pub fn frame_in_dmg_shades(&self) -> bool {
+        self.address_bus().completed_frame_in_dmg_shades()
     }
 
     /// Returns the latest frame if a new one was finished since the last call.

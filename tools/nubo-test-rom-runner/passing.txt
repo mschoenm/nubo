@@ -6461,6 +6461,7 @@ mgb mooneye-test-suite/acceptance/ppu/lcdon_timing-GS.gb
 mgb mooneye-test-suite/acceptance/ppu/lcdon_write_timing-GS.gb
 mgb mooneye-test-suite/acceptance/ppu/vblank_stat_intr-GS.gb
 mgb mooneye-test-suite/acceptance/serial/boot_sclk_align-dmgABCmgb.gb
+sgb cpp/sgb-ext-test.gb
 sgb mooneye-test-suite-wilbertpol/acceptance/bits/unused_hwio-GS.gb
 sgb mooneye-test-suite-wilbertpol/acceptance/di_timing-GS.gb
 sgb mooneye-test-suite-wilbertpol/acceptance/gpu/hblank_ly_scx_timing-GS.gb
@@ -6493,6 +6494,9 @@ sgb mooneye-test-suite/acceptance/ppu/intr_1_2_timing-GS.gb
 sgb mooneye-test-suite/acceptance/ppu/lcdon_timing-GS.gb
 sgb mooneye-test-suite/acceptance/ppu/lcdon_write_timing-GS.gb
 sgb mooneye-test-suite/acceptance/ppu/vblank_stat_intr-GS.gb
+sgb same-suite/sgb/command_mlt_req.gb
+sgb same-suite/sgb/command_mlt_req_1_incrementing.gb
+sgb2 cpp/sgb-ext-test.gb
 sgb2 mooneye-test-suite-wilbertpol/acceptance/bits/unused_hwio-GS.gb
 sgb2 mooneye-test-suite-wilbertpol/acceptance/di_timing-GS.gb
 sgb2 mooneye-test-suite-wilbertpol/acceptance/gpu/hblank_ly_scx_timing-GS.gb
@@ -6525,6 +6529,8 @@ sgb2 mooneye-test-suite/acceptance/ppu/intr_1_2_timing-GS.gb
 sgb2 mooneye-test-suite/acceptance/ppu/lcdon_timing-GS.gb
 sgb2 mooneye-test-suite/acceptance/ppu/lcdon_write_timing-GS.gb
 sgb2 mooneye-test-suite/acceptance/ppu/vblank_stat_intr-GS.gb
+sgb2 same-suite/sgb/command_mlt_req.gb
+sgb2 same-suite/sgb/command_mlt_req_1_incrementing.gb
 shootout/acid/cgb-acid-hell.gbc
 shootout/acid/cgb-acid2.gbc
 shootout/acid/dmg-acid2.gb
@@ -6588,6 +6594,7 @@ shootout/blargg/oam_bug/8-instr_effect.gb
 shootout/cpp/latch-rtc-test.gb
 shootout/cpp/ramg-mbc3-test.gb
 shootout/cpp/rtc-invalid-banks-test.gb
+shootout/cpp/sgb-ext-test.gb
 shootout/daid/ppu_scanline_bgp.gb (DMG)
 shootout/daid/ppu_scanline_bgp.gb (GBC)
 shootout/daid/speed_switch_timing_div.gbc
@@ -6783,3 +6790,5 @@ shootout/samesuite/dma/gdma_addr_mask.gb
 shootout/samesuite/dma/hdma_lcd_off.gb
 shootout/samesuite/dma/hdma_mode0.gb
 shootout/samesuite/ppu/blocking_bgpi_increase.gb
+shootout/samesuite/sgb/command_mlt_req.gb
+shootout/samesuite/sgb/command_mlt_req_1_incrementing.gb

@@ -25,8 +25,9 @@
 use crate::options::Options;
 use nubo_core::{
     CartridgeEffects, CartridgeHeader, DOTS_PER_FRAME, Emulator, Key, LoadRomError, Model,
-    RtcClock, RtcState, extract_rom, validate_gamegenie_code,
+    RtcClock, RtcState, SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH, extract_rom, validate_gamegenie_code,
 };
+use nubo_frontend::picture::Frame;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -36,6 +37,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub const SCREEN_WIDTH: usize = 160;
 /// The height of the Game Boy's screen in pixels.
 pub const SCREEN_HEIGHT: usize = 144;
+/// The widest picture the core hands over: a Super Game Boy's, with its
+/// border.
+pub const MAX_WIDTH: usize = SGB_FRAME_WIDTH as usize;
+/// The highest picture the core hands over.
+pub const MAX_HEIGHT: usize = SGB_FRAME_HEIGHT as usize;
 /// How many samples per second of each channel the core hands RetroArch.
 /// Nubo makes exactly this many per emulated second, and RetroArch
 /// resamples them for the sound card.
@@ -81,11 +87,12 @@ pub enum PixelFormat {
 }
 
 impl PixelFormat {
-    /// The bytes from the start of one line of a frame to the next.
-    pub fn pitch(self) -> usize {
+    /// The bytes from the start of one line of a frame `width` pixels wide
+    /// to the next.
+    pub fn pitch(self, width: usize) -> usize {
         match self {
-            PixelFormat::Xrgb8888 => SCREEN_WIDTH * 4,
-            PixelFormat::Rgb1555 => SCREEN_WIDTH * 2,
+            PixelFormat::Xrgb8888 => width * 4,
+            PixelFormat::Rgb1555 => width * 2,
         }
     }
 }
@@ -195,8 +202,11 @@ pub struct Core {
     /// What the core last copied into `rtc_memory`.
     rtc_copy: Vec<u8>,
     pixel_format: PixelFormat,
-    /// The latest frame with the palette applied, as RGBA bytes.
-    rgba: Vec<u8>,
+    /// The latest frame as the emulator drew it.
+    frame: Frame,
+    /// The width and height of the picture handed over, which a Super Game
+    /// Boy's border makes larger.
+    video_size: (usize, usize),
     frame_xrgb8888: Vec<u32>,
     frame_rgb1555: Vec<u16>,
     left: Vec<f32>,
@@ -237,9 +247,10 @@ impl Core {
             rtc_memory: Vec::new(),
             rtc_copy: Vec::new(),
             pixel_format,
-            rgba: vec![0; SCREEN_WIDTH * SCREEN_HEIGHT * 4],
-            frame_xrgb8888: vec![0; SCREEN_WIDTH * SCREEN_HEIGHT],
-            frame_rgb1555: vec![0; SCREEN_WIDTH * SCREEN_HEIGHT],
+            frame: Frame::default(),
+            video_size: (SCREEN_WIDTH, SCREEN_HEIGHT),
+            frame_xrgb8888: Vec::with_capacity(MAX_WIDTH * MAX_HEIGHT),
+            frame_rgb1555: Vec::with_capacity(MAX_WIDTH * MAX_HEIGHT),
             left: Vec::new(),
             right: Vec::new(),
             audio: Vec::new(),
@@ -279,12 +290,14 @@ impl Core {
         &mut self.emulator
     }
 
-    /// Takes on the options the player set. The palette changes right away;
-    /// the model and the clock when the game starts again.
+    /// Takes on the options the player set. The palette and the border
+    /// change right away; the model and the clock when the game starts
+    /// again.
     pub fn set_options(&mut self, options: Options) {
-        let palette_changed = options.palette != self.options.palette;
+        let picture_changed = options.palette != self.options.palette
+            || options.sgb_border != self.options.sgb_border;
         self.options = options;
-        if palette_changed {
+        if picture_changed {
             self.draw_frame();
         }
     }
@@ -418,25 +431,30 @@ impl Core {
     }
 
     /// Converts the latest frame to RetroArch's pixel format, in the
-    /// palette the player picked on a Game Boy.
+    /// palette the player picked on a Game Boy, with a Super Game Boy's
+    /// border unless the options hide it.
     fn draw_frame(&mut self) {
-        self.rgba.copy_from_slice(self.emulator.frame_buffer());
-        if !self.emulator.model().is_cgb() {
-            self.options.palette.recolor(&mut self.rgba);
-        }
-        let pixels = self.rgba.as_chunks::<4>().0;
+        self.frame.update(&self.emulator);
+        let picture = self
+            .frame
+            .shown(self.options.palette, self.options.sgb_border);
+        self.video_size = (picture.width() as usize, picture.height() as usize);
+        let pixels = picture.pixels().as_chunks::<4>().0.iter();
         match self.pixel_format {
             PixelFormat::Xrgb8888 => {
-                for (out, &[red, green, blue, _]) in self.frame_xrgb8888.iter_mut().zip(pixels) {
-                    *out = u32::from_be_bytes([0, red, green, blue]);
-                }
+                self.frame_xrgb8888.clear();
+                self.frame_xrgb8888.extend(
+                    pixels.map(|&[red, green, blue, _]| u32::from_be_bytes([0, red, green, blue])),
+                );
             }
             PixelFormat::Rgb1555 => {
-                for (out, &[red, green, blue, _]) in self.frame_rgb1555.iter_mut().zip(pixels) {
-                    *out = (u16::from(red >> 3) << 10)
-                        | (u16::from(green >> 3) << 5)
-                        | u16::from(blue >> 3);
-                }
+                self.frame_rgb1555.clear();
+                self.frame_rgb1555
+                    .extend(pixels.map(|&[red, green, blue, _]| {
+                        (u16::from(red >> 3) << 10)
+                            | (u16::from(green >> 3) << 5)
+                            | u16::from(blue >> 3)
+                    }));
             }
         }
     }
@@ -451,7 +469,19 @@ impl Core {
         }
     }
 
-    /// The latest frame, [`SCREEN_WIDTH`] × [`SCREEN_HEIGHT`] pixels.
+    /// The width and height of [`Core::video`]: [`SCREEN_WIDTH`] ×
+    /// [`SCREEN_HEIGHT`], or [`MAX_WIDTH`] × [`MAX_HEIGHT`] for a Super Game
+    /// Boy's picture with its border.
+    pub fn video_size(&self) -> (usize, usize) {
+        self.video_size
+    }
+
+    /// The bytes from the start of one line of [`Core::video`] to the next.
+    pub fn pitch(&self) -> usize {
+        self.pixel_format.pitch(self.video_size.0)
+    }
+
+    /// The latest frame, [`Core::video_size`] pixels.
     pub fn video(&self) -> Video<'_> {
         match self.pixel_format {
             PixelFormat::Xrgb8888 => Video::Xrgb8888(&self.frame_xrgb8888),

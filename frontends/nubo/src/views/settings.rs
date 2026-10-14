@@ -70,7 +70,7 @@ impl fmt::Display for ModelChoice {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
             ModelPreference::Automatic => {
-                formatter.write_str("Automatic (Color games on a Game Boy Color)")
+                formatter.write_str("Automatic (each game on the Game Boy it was made for)")
             }
             ModelPreference::Fixed(model) => formatter.write_str(model.description()),
         }
@@ -91,6 +91,7 @@ pub enum SettingsRow {
     Appearance,
     Palette,
     SharpPixels,
+    SgbBorder,
     Model,
     RestartNow,
     ResumeGames,
@@ -125,6 +126,7 @@ pub fn rows(
                 SettingsRow::Appearance,
                 SettingsRow::Palette,
                 SettingsRow::SharpPixels,
+                SettingsRow::SgbBorder,
                 SettingsRow::Model,
             ]);
             if restart_needed {
@@ -362,7 +364,8 @@ fn general<'a>(
     .into()
 }
 
-/// The palette for original Game Boy games and the sharp pixels switch.
+/// The palette for original Game Boy games, the sharp pixels switch and the
+/// Super Game Boy border switch.
 fn screen_settings<'a>(settings: &Settings, rings: &Rings) -> Element<'a, Message> {
     let palettes = row(DmgPalette::ALL
         .into_iter()
@@ -387,6 +390,14 @@ fn screen_settings<'a>(settings: &Settings, rings: &Rings) -> Element<'a, Messag
                     |enabled| Message::Settings(SettingsMessage::IntegerScalingToggled(enabled))
                 ),
             SettingsRow::SharpPixels,
+        ),
+        rings.around(
+            toggler(settings.shared.sgb_border)
+                .label("Super Game Boy border around the screen")
+                .text_size(14)
+                .size(18)
+                .on_toggle(|shown| Message::Settings(SettingsMessage::SgbBorderToggled(shown))),
+            SettingsRow::SgbBorder,
         ),
     ]
     .spacing(14)

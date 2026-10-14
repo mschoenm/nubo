@@ -49,8 +49,11 @@ What is missing or unproven:
   changes in double speed, the speed switch's freeze lengths and TIMA's jump ahead were worked out by
   comparing Nubo with Gambatte where Gambatte's tests left gaps. Gambatte's tests were verified on
   hardware, but its behaviour between the tested points may not be.
-- **Super Game Boy.** Only the hardware differences are emulated. Command packets, borders, palettes,
-  multiplayer and sound functions are not.
+- **Super Game Boy.** Command packets, palettes, attribute maps, transfers, borders, masking and
+  multiplayer requests are emulated (`crates/nubo-core/src/sgb.rs`, ported from SameBoy), and pass
+  SameSuite's `sgb` tests and CasualPokePlayer's `sgb-ext-test`. Not emulated yet: border sprites
+  (`OBJ_TRN`), the startup's length, the menu's functions and controllers for the second to fourth
+  players (Phase 4, step 1). Not planned: see that step. None of this is checked on hardware yet.
 - **Link cable.** The serial port always behaves as if no cable is plugged in. Two Nubo instances can't
   be linked, and the Game Boy Printer isn't emulated.
 - **Infrared.** The CGB's RP register (0xFF56) isn't emulated. HuC1's infrared port always sees no light.
@@ -147,8 +150,31 @@ and Nubo matches all of them or the differences are fixed or explained.
 
 Largest phase, but each part stands alone:
 
-1. **Super Game Boy**: command packets (palettes, attribute maps, borders, multiplayer, masking, sound),
-   so SameSuite's `sgb` tests and CasualPokePlayer's `sgb-ext-test` can run.
+1. **Super Game Boy**: command packets (palettes, attribute maps, borders, multiplayer, masking),
+   so SameSuite's `sgb` tests and CasualPokePlayer's `sgb-ext-test` can run. **Done**: the tests run
+   and pass. What is left, in this order:
+   - Controllers for players 2 to 4 (the Super Nintendo's multitap): the core takes four players'
+     buttons, the app gives them controllers 2 to 4, RetroArch its ports 2 to 4.
+   - Border sprites (`OBJ_TRN`), as far as documentation pins down what they do.
+   - The startup: a Nubo animation of its own, as long as the real one, so games start when they
+     would on hardware.
+   - The menu's functions in Nubo's own design: the game's colors or the player's own, a color editor,
+     the border on or off, and the commands that control the real menu (`PAL_PRI`, `ICON_EN`,
+     `ATRC_EN`).
+
+   Decided against, for now or for good (maintainer, 2026-10-14):
+   - **Anything that needs the Super Nintendo itself**: its sound (`SOUND`, `SOU_TRN`) and the
+     programs games run on it (`DATA_SND`, `DATA_TRN`, `JUMP`, such as Space Invaders' arcade mode).
+     That needs a Super Nintendo emulator running the player's own copy of the Super Game Boy's
+     program, as bsnes, Mesen and ares do. Out of scope; it may come back if Nubo ever gets a Super
+     Nintendo emulator of its own.
+   - **Nintendo's artwork and data**: the built-in borders, the 32 built-in palettes, the automatic
+     colors for Nintendo's older games and the startup animation are never included. Nubo draws its
+     own border and animation.
+   - **The first Super Game Boy's clock**, about 2.4% faster than a Game Boy's (the Super Nintendo's
+     clock divided by 5), which makes games run and sound that much faster. Postponed: it changes how
+     every app paces the game and how the cartridge clock counts, so it will be weighed and planned
+     as a feature of its own.
 2. **Link cable**: two linked Nubo instances (in one process first, over a network later), the external
    clock, and the Game Boy Printer.
 3. **Infrared**: the CGB's RP register, including what it reads with nothing in front of it, and linking
@@ -167,7 +193,7 @@ need them run.
 1. Make the unrun tests checkable: Mealybug's `mbc3_rtc` and Scribbltests' manual ROMs (with hardware
    photos as references), `which.gb` (expecting each model's name), `rom_and_ram.gb`, `open-bus-ss-test`
    (a reference screenshot from hardware), AntonioND's tests (comparing with his recorded results),
-   `gb-camera-test` after the camera, and the SGB tests after Phase 4.
+   and `gb-camera-test` after the camera. (The SGB tests run since Phase 4 step 1.)
 2. Look for suites not run yet, such as newer releases of the c-sp test ROM collection and the suites
    listed by gbdev.
 3. Add a game list: games and demos known for hard effects (mid-line raster effects, timing-sensitive

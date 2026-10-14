@@ -34,10 +34,26 @@ impl AddressBus {
         }
     }
 
+    /// Writes JOYP (0xFF00). On a Super Game Boy the Super Nintendo sees the write too, and it may
+    /// finish a command, such as `MLT_REQ`, which changes how many controllers the joypad reads
+    /// (see `sgb.rs`). Every frame the PPU has finished by now has already reached the Super
+    /// Nintendo, since the PPU is never left behind past the end of a frame.
+    fn write_joyp(&mut self, value: u8) {
+        let previous_select = self.joypad.group_select();
+        match self.gpu.sgb_mut() {
+            Some(sgb) => {
+                let requested_players = sgb.write_joyp(previous_select, value);
+                self.joypad
+                    .write_byte_with_sgb_players(value, requested_players);
+            }
+            None => self.joypad.write_byte(value),
+        }
+    }
+
     /// Writes the I/O register at `address` (0xFF00-0xFF7F).
     pub(super) fn write_io_register(&mut self, address: u16, value: u8) {
         match address & 0xFF {
-            0x00 => self.joypad.write_byte(value),
+            0x00 => self.write_joyp(value),
             0x01..=0x02 => self.serial.write_byte(address, value),
             0x10..=0x26 | 0x30..=0x3F => self.apu.write_byte(address, value),
             0x40..=0x45 | 0x47..=0x4B => self.gpu.write_byte(address, value),

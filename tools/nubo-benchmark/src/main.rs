@@ -5,9 +5,9 @@
 //! with a scripted sequence of button presses, without a window or sound. The
 //! speed is emulated time divided by the time spent inside the emulator; the
 //! target is at least 20 times real time on both DMG and CGB. The
-//! fingerprints are hashes of every frame, every audio sample and the final
-//! save state; `--record` writes them to a file and `--compare` checks a later
-//! run against it. Run over the games and all test ROMs, this shows that an
+//! fingerprints are hashes of every frame (with its border on a Super Game
+//! Boy), every audio sample and the final save state; `--record` writes them
+//! to a file and `--compare` checks a later run against it. Run over the games and all test ROMs, this shows that an
 //! optimization changes nothing at all, far beyond what the test ROMs'
 //! pass/fail results show. Built with the core's `eager` feature, which runs
 //! every M-cycle on its own, it checks the lazy shortcuts against stepping
@@ -356,11 +356,15 @@ fn run(
         audio_hasher.add_samples(left);
         audio_hasher.add_samples(right);
         let samples = copy.is_some().then(|| (left.to_vec(), right.to_vec()));
-        let frame = emulator.take_frame();
-        if let Some(frame) = frame {
-            frame_hasher.add_bytes(frame);
+        let new_frame = emulator.take_frame().is_some();
+        if new_frame {
+            frame_hasher.add_bytes(emulator.frame_buffer());
+            if let Some(bordered) = emulator.frame_with_border() {
+                frame_hasher.add_bytes(bordered);
+            }
             frames += 1;
         }
+        let frame = new_frame.then(|| emulator.frame_buffer());
 
         if let (Some(loaded), Some((left, right))) = (&mut copy, &samples) {
             loaded.follow(left, right, frame);
