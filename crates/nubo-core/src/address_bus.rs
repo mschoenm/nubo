@@ -60,7 +60,6 @@ use crate::model::Model;
 use crate::serial::Serial;
 use crate::serializable::{FieldWriter, Serializable, read_fields};
 use std::fmt;
-
 use std::sync::Arc;
 
 pub use crate::address_bus::cartridge::CartridgeHeader;
@@ -1196,16 +1195,19 @@ pub(crate) mod test_utils {
     use crate::address_bus::cartridge::*;
     use crate::address_bus::constants::*;
 
+    /// A blank ROM whose header names the cartridge type, ROM size and RAM
+    /// size given by their header codes, with as many 16 KiB banks as the ROM
+    /// size code says.
     pub(crate) fn build_rom(cartridge_type: u8, rom_size_index: u8, ram_size_index: u8) -> Vec<u8> {
-        let mut rom_buffer: Vec<u8> = Vec::new();
-        let number_of_banks = u32::from(rom_bank_count(rom_size_index));
-        rom_buffer.resize((0x4000 * number_of_banks) as usize, 0);
+        let number_of_banks = usize::from(rom_bank_count(rom_size_index));
+        let mut rom_buffer = vec![0; ROM_BANK_SIZE * number_of_banks];
         rom_buffer[CARTRIDGE_TYPE_ADDRESS] = cartridge_type;
         rom_buffer[ROM_SIZE_ADDRESS] = rom_size_index;
         rom_buffer[RAM_SIZE_ADDRESS] = ram_size_index;
         rom_buffer
     }
 
+    /// An address bus with no cartridge, outside processor test mode.
     pub(crate) fn initialize_test_address_bus() -> AddressBus {
         AddressBus::new(false)
     }
