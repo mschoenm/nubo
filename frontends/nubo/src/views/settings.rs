@@ -44,6 +44,9 @@ const BINDING_ROW_PADDING: Padding = Padding {
     bottom: 6.0,
     ..ROW_PADDING
 };
+/// The least height of a group's title row, which grows to fit a button
+/// next to the title.
+const HEADING_HEIGHT: f32 = 28.0;
 /// The width of the chips that show the key or button of an action.
 const CHIP_WIDTH: f32 = 140.0;
 /// The width of the clear button next to a chip, kept free when there is
@@ -419,9 +422,12 @@ fn group<'a>(
     rows: Vec<Element<'a, Message>>,
     note: Option<&'a str>,
 ) -> Element<'a, Message> {
-    let mut heading = row![text(title).size(13).style(theme::muted_text)]
-        .align_y(Alignment::Center)
-        .height(28);
+    let mut heading = row![
+        container(text(title).size(13).style(theme::muted_text))
+            .height(HEADING_HEIGHT)
+            .align_y(Alignment::Center)
+    ]
+    .align_y(Alignment::Center);
     if let Some(action) = action {
         heading = heading.push(space::horizontal()).push(action);
     }
