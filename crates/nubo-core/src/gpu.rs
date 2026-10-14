@@ -560,6 +560,14 @@ impl Gpu {
         self.sgb.as_deref_mut()
     }
 
+    /// On a Super Game Boy, draws the last picture again with the menu's
+    /// settings as they are now (`Sgb::redraw`).
+    pub(crate) fn redraw_sgb_picture(&mut self) {
+        if let Some(sgb) = &mut self.sgb {
+            sgb.redraw(&mut self.completed_frame);
+        }
+    }
+
     /// Whether `completed_frame` holds a frame the frontend hasn't taken yet.
     pub(crate) fn frame_ready(&self) -> bool {
         self.frame_ready

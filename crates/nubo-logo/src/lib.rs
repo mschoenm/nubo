@@ -66,7 +66,7 @@ impl Shape {
 
     /// Whether the point `(x, y)` (in design units) lies inside the shape,
     /// rounded corners included.
-    fn contains(&self, x: f32, y: f32) -> bool {
+    pub fn contains(&self, x: f32, y: f32) -> bool {
         if x < self.x || y < self.y || x >= self.x + self.width || y >= self.y + self.height {
             return false;
         }

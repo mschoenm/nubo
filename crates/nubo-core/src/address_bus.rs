@@ -984,18 +984,51 @@ impl AddressBus {
 
     pub(crate) fn press_key(&mut self, key: Key) {
         self.joypad.press_key(key);
+        self.show_sgb_buttons_held();
     }
 
     pub(crate) fn release_key(&mut self, key: Key) {
         self.joypad.release_key(key);
+        self.show_sgb_buttons_held();
     }
 
     pub(crate) fn set_controller_states(&mut self, states: &[ControllerState]) {
         self.joypad.set_controller_states(states);
+        self.show_sgb_buttons_held();
     }
 
     pub(crate) fn set_player_keys(&mut self, player: u8, keys: &[Key]) {
         self.joypad.set_player_keys(player, keys);
+        self.show_sgb_buttons_held();
+    }
+
+    /// Tells a Super Game Boy whether the player holds a button, which keeps
+    /// its attraction mode away.
+    fn show_sgb_buttons_held(&mut self) {
+        let held = self.joypad.any_button_held();
+        if let Some(sgb) = self.gpu.sgb_mut() {
+            sgb.set_buttons_held(held);
+        }
+    }
+
+    /// The Super Game Boy's menu settings, on the Super Game Boy models.
+    pub(crate) fn sgb(&self) -> Option<&Sgb> {
+        self.gpu.sgb()
+    }
+
+    /// On the Super Game Boy models, changes the menu's settings with
+    /// `change` and draws the last picture again with them, so a paused
+    /// frontend shows the change. The PPU catches up first, as for any change
+    /// to what it draws.
+    pub(crate) fn change_sgb_menu(&mut self, change: impl FnOnce(&mut Sgb)) {
+        if self.gpu.sgb().is_none() {
+            return;
+        }
+        self.catch_up_ppu_before_change();
+        if let Some(sgb) = self.gpu.sgb_mut() {
+            change(sgb);
+        }
+        self.gpu.redraw_sgb_picture();
     }
 
     pub(crate) fn set_controller_mapping(&mut self, mapping: ControllerMapping) {
@@ -1298,6 +1331,10 @@ impl AddressBus {
     pub(crate) fn finish_loading_save_state(&mut self) {
         self.cartridge.finish_loading_save_state(self.elapsed_dots);
         self.joypad.finish_loading_save_state();
+        self.show_sgb_buttons_held();
+        if let Some(sgb) = self.gpu.sgb_mut() {
+            sgb.finish_loading_save_state();
+        }
         // A state from before the Super Game Boy's intro existed lacks its
         // frames; past the boot ROM, its intro is long over.
         if !self.in_boot_rom

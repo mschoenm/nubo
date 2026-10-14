@@ -7,9 +7,11 @@
 //! palette is transparent, so the Game Boy screen shows through it in the
 //! middle and the game's color 0 fills it elsewhere.
 //!
-//! The Super Game Boy's built-in border is Nintendo's artwork, so Nubo draws
-//! its own instead, from its logo (`nubo_logo`).
+//! The Super Game Boy's built-in borders are Nintendo's artwork, so Nubo draws
+//! its own instead, from its logo (`nubo_logo`), with a screensaver of its
+//! own too (`attraction.rs`).
 
+use crate::sgb::attraction::{self, Cloud};
 use crate::sgb::{BORDERED_HEIGHT, BORDERED_WIDTH, SCREEN_OFFSET};
 use nubo_serializable_derive::Serializable;
 
@@ -92,7 +94,7 @@ impl Border {
 pub(super) struct BorderPicture {
     /// 256×224 colors, row by row, with `TRANSPARENT` where the game screen
     /// shows.
-    pixels: Vec<u16>,
+    pub(super) pixels: Vec<u16>,
 }
 
 /// Marks a transparent pixel in a `BorderPicture`. RGB555 colors leave the
@@ -100,9 +102,9 @@ pub(super) struct BorderPicture {
 const TRANSPARENT: u16 = 0x8000;
 
 /// The colors of Nubo's border, as RGB 8-bit channels.
-mod nubo_colors {
+pub(super) mod nubo_colors {
     /// The frame around everything: a deep purple.
-    pub(super) const BACKGROUND: [u8; 3] = [0x24, 0x1C, 0x5A];
+    pub(in crate::sgb) const BACKGROUND: [u8; 3] = [0x24, 0x1C, 0x5A];
     /// The raised panel the screen sits in.
     pub(super) const PANEL: [u8; 3] = [0x34, 0x29, 0x8A];
     /// The thin dark rim right around the screen.
@@ -121,13 +123,29 @@ const LOGO_POSITION: (usize, usize) = (118, 200);
 /// edges.
 const SAMPLES: usize = 4;
 
-impl BorderPicture {
-    /// Nubo's own border: the screen sits in a rounded purple panel on a
-    /// deep purple frame, with the Nubo logo below it.
-    pub(super) fn nubo() -> Self {
+/// Nubo's own border: the screen sits in a rounded purple panel on a deep
+/// purple frame, with the Nubo logo below it. Besides the picture, it keeps
+/// what the attraction mode (`attraction.rs`) needs to let clouds drift over
+/// the frame, behind the panel and the logo.
+#[derive(Clone, Debug, Default)]
+pub(super) struct NuboBorder {
+    /// The border as it normally shows.
+    pub(super) picture: BorderPicture,
+    /// The same picture as RGB 8-bit colors, row by row.
+    pub(super) colors: Vec<[u8; 3]>,
+    /// How much of each pixel is the open frame (`nubo_colors::BACKGROUND`)
+    /// rather than the panel or the logo, from 0 to 1.
+    pub(super) open_frame: Vec<f32>,
+    /// The clouds of the attraction mode.
+    pub(super) clouds: Vec<Cloud>,
+}
+
+impl NuboBorder {
+    pub(super) fn new() -> Self {
         let mut colors = vec![nubo_colors::BACKGROUND; BORDERED_WIDTH * BORDERED_HEIGHT];
+        let mut open_frame = vec![1.0; BORDERED_WIDTH * BORDERED_HEIGHT];
         for (shape, color) in [(PANEL, nubo_colors::PANEL), (RIM, nubo_colors::RIM)] {
-            fill_rounded_rectangle(&mut colors, shape, color);
+            fill_rounded_rectangle(&mut colors, &mut open_frame, shape, color);
         }
 
         let logo = nubo_logo::render(LOGO_SIZE as u32, 0.0);
@@ -136,32 +154,39 @@ impl BorderPicture {
                 LOGO_POSITION.0 + index % LOGO_SIZE,
                 LOGO_POSITION.1 + index / LOGO_SIZE,
             );
+            let amount = f32::from(pixel[3]) / 255.0;
             let color = &mut colors[x + y * BORDERED_WIDTH];
-            *color = blend(
-                *color,
-                [pixel[0], pixel[1], pixel[2]],
-                f32::from(pixel[3]) / 255.0,
-            );
+            *color = blend(*color, [pixel[0], pixel[1], pixel[2]], amount);
+            open_frame[x + y * BORDERED_WIDTH] *= 1.0 - amount;
         }
 
-        let (screen_left, screen_top) = SCREEN_OFFSET;
         let pixels = colors
             .iter()
             .enumerate()
             .map(|(index, &color)| {
-                let (x, y) = (index % BORDERED_WIDTH, index / BORDERED_WIDTH);
-                let in_screen = (screen_left..screen_left + 160).contains(&x)
-                    && (screen_top..screen_top + 144).contains(&y);
-                if in_screen {
+                if in_game_screen(index % BORDERED_WIDTH, index / BORDERED_WIDTH) {
                     TRANSPARENT
                 } else {
                     to_rgb555(color)
                 }
             })
             .collect();
-        BorderPicture { pixels }
+        NuboBorder {
+            picture: BorderPicture { pixels },
+            colors,
+            open_frame,
+            clouds: attraction::clouds(),
+        }
     }
+}
 
+/// Whether `x`, `y` in the 256×224 picture is on the game screen.
+fn in_game_screen(x: usize, y: usize) -> bool {
+    let (screen_left, screen_top) = SCREEN_OFFSET;
+    (screen_left..screen_left + 160).contains(&x) && (screen_top..screen_top + 144).contains(&y)
+}
+
+impl BorderPicture {
     /// A game's border, drawn as a whole picture.
     fn from_border(border: &Border) -> Self {
         let pixels = (0..BORDERED_WIDTH * BORDERED_HEIGHT)
@@ -183,14 +208,28 @@ impl BorderPicture {
     }
 }
 
+/// Which border to draw: a game's, or Nubo's at a frame of the attraction
+/// mode (`None` when it isn't running).
+#[derive(Clone, Copy, Debug)]
+pub(super) enum BorderSource<'a> {
+    Game(&'a Border),
+    Nubo { attraction_frame: Option<u32> },
+}
+
+/// A border the cache drew, to tell whether it has to draw again.
+#[derive(Clone, Debug)]
+enum DrawnSource {
+    Game(Box<Border>),
+    Nubo { attraction_frame: Option<u32> },
+}
+
 /// The border as last drawn, kept so that it is only drawn again when it
 /// changes. Save states leave it out: it is worked out again from the border
 /// whenever that differs.
 #[derive(Clone, Debug, Default)]
 pub(in crate::sgb) struct BorderCache {
-    /// The game's border `picture` was drawn from, or `None` for Nubo's.
-    /// Empty until the first frame.
-    source: Option<Option<Box<Border>>>,
+    /// The border `picture` was drawn from. Empty until the first frame.
+    source: Option<DrawnSource>,
     /// The border as RGB555 colors.
     pub(in crate::sgb) picture: BorderPicture,
     /// The pixels of the border that cover the game screen: their index in
@@ -202,21 +241,33 @@ pub(in crate::sgb) struct BorderCache {
 }
 
 impl BorderCache {
-    /// Draws the border again if it isn't `border` (a game's) or, when that
-    /// is `None`, `nubo_border`.
-    pub(in crate::sgb) fn update(&mut self, border: Option<&Border>, nubo_border: &BorderPicture) {
-        let up_to_date = match (&self.source, border) {
-            (Some(None), None) => true,
-            (Some(Some(drawn)), Some(border)) => {
+    /// Draws the border again if it isn't the one `source` names.
+    pub(in crate::sgb) fn update(&mut self, source: BorderSource, nubo_border: &NuboBorder) {
+        let up_to_date = match (&self.source, source) {
+            (Some(DrawnSource::Game(drawn)), BorderSource::Game(border)) => {
                 drawn.tiles == border.tiles && drawn.map == border.map
             }
+            (
+                Some(DrawnSource::Nubo { attraction_frame }),
+                BorderSource::Nubo {
+                    attraction_frame: frame,
+                },
+            ) => *attraction_frame == frame,
             _ => false,
         };
         if up_to_date {
             return;
         }
 
-        self.picture = border.map_or_else(|| nubo_border.clone(), BorderPicture::from_border);
+        self.picture = match source {
+            BorderSource::Game(border) => BorderPicture::from_border(border),
+            BorderSource::Nubo {
+                attraction_frame: None,
+            } => nubo_border.picture.clone(),
+            BorderSource::Nubo {
+                attraction_frame: Some(frame),
+            } => attraction::draw(nubo_border, frame),
+        };
         let (screen_left, screen_top) = SCREEN_OFFSET;
         self.screen_cover = (0..160 * 144)
             .filter_map(|index| {
@@ -225,15 +276,20 @@ impl BorderCache {
                 (color != TRANSPARENT).then_some((index as u16, color))
             })
             .collect();
-        self.source = Some(border.map(|border| Box::new(border.clone())));
+        self.source = Some(match source {
+            BorderSource::Game(border) => DrawnSource::Game(Box::new(border.clone())),
+            BorderSource::Nubo { attraction_frame } => DrawnSource::Nubo { attraction_frame },
+        });
         self.drawn_with = None;
     }
 }
 
 /// Paints a rounded rectangle (left, top, right, bottom, corner radius) over
-/// `colors`, with its edges smoothed.
+/// `colors`, with its edges smoothed, and takes what it covers out of
+/// `open_frame`.
 fn fill_rounded_rectangle(
     colors: &mut [[u8; 3]],
+    open_frame: &mut [f32],
     (left, top, right, bottom, radius): (f32, f32, f32, f32, f32),
     color: [u8; 3],
 ) {
@@ -246,7 +302,7 @@ fn fill_rounded_rectangle(
         let (dx, dy) = (x - nearest_x, y - nearest_y);
         dx * dx + dy * dy <= radius * radius
     };
-    for (index, pixel) in colors.iter_mut().enumerate() {
+    for (index, (pixel, open)) in colors.iter_mut().zip(open_frame).enumerate() {
         let (x, y) = (index % BORDERED_WIDTH, index / BORDERED_WIDTH);
         let mut covered = 0;
         for sample_y in 0..SAMPLES {
@@ -258,7 +314,9 @@ fn fill_rounded_rectangle(
             }
         }
         if covered > 0 {
-            *pixel = blend(*pixel, color, covered as f32 / (SAMPLES * SAMPLES) as f32);
+            let amount = covered as f32 / (SAMPLES * SAMPLES) as f32;
+            *pixel = blend(*pixel, color, amount);
+            *open *= 1.0 - amount;
         }
     }
 }
@@ -272,7 +330,7 @@ fn blend(under: [u8; 3], over: [u8; 3], amount: f32) -> [u8; 3] {
 }
 
 /// The nearest RGB555 color to an RGB color with 8-bit channels.
-fn to_rgb555(color: [u8; 3]) -> u16 {
+pub(super) fn to_rgb555(color: [u8; 3]) -> u16 {
     let channel = |value: u8| (u16::from(value) * 31 + 127) / 255;
     channel(color[0]) | channel(color[1]) << 5 | channel(color[2]) << 10
 }

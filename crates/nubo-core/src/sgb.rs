@@ -40,11 +40,20 @@
 //!   (`Sgb::holds_game_boy_in_reset`); neither length is measured on
 //!   hardware yet. The intro is silent.
 //!
+//! - **The menu.** The player can recolor the game with a palette of their
+//!   own and pick Nubo's border over the game's (a real Super Game Boy has a
+//!   menu for this, opened with the L and R buttons; Nubo's apps draw their
+//!   own). A game can take the palettes away (`ICON_EN`), take its colors
+//!   back whenever it sets new ones (`PAL_PRI`), and stop all further
+//!   commands (`ICON_EN`). Left alone for seven minutes, Nubo's border plays
+//!   a screensaver (`attraction.rs`), unless the game turned it off
+//!   (`ATRC_EN`).
+//!
 //! Not emulated: the Super Nintendo's sound (`SOUND`, `SOU_TRN`), programs a
 //! game sends to the Super Nintendo's own processor (`DATA_SND`, `DATA_TRN`,
-//! `JUMP`), sprites on the border (`OBJ_TRN`), the startup animation, the
-//! menu the player opens with the L and R buttons (`ICON_EN`, `PAL_PRI`,
-//! `ATRC_EN`), and the built-in palettes it offers, which are Nintendo's.
+//! `JUMP`), and the built-in palettes and borders, which are Nintendo's.
+//! `OBJ_TRN` and `TEST_EN` do nothing on a retail Super Game Boy, so they do
+//! nothing here either.
 //!
 //! Until a game sets colors of its own, the picture keeps the Game Boy's
 //! grays (`DMG_SHADES`), so frontends show it in the player's palette like a
@@ -57,7 +66,7 @@
 //! it every JOYP write.
 
 use crate::gpu::{DMG_SHADES, rgb555_to_rgba};
-use crate::sgb::border::{Border, BorderCache, BorderPicture};
+use crate::sgb::border::{Border, BorderCache, BorderSource, NuboBorder};
 use crate::sgb::intro::Intro;
 use crate::sgb::packets::{MAX_COMMAND_SIZE, PacketReceiver, is_header_packet};
 use nubo_serializable_derive::Serializable;
@@ -121,12 +130,25 @@ mod command {
     pub(super) const ATTR_CHR: u8 = 0x07;
     pub(super) const PAL_SET: u8 = 0x0A;
     pub(super) const PAL_TRN: u8 = 0x0B;
+    pub(super) const ATRC_EN: u8 = 0x0C;
+    pub(super) const ICON_EN: u8 = 0x0E;
     pub(super) const MLT_REQ: u8 = 0x11;
     pub(super) const CHR_TRN: u8 = 0x13;
     pub(super) const PCT_TRN: u8 = 0x14;
     pub(super) const ATTR_TRN: u8 = 0x15;
     pub(super) const ATTR_SET: u8 = 0x16;
     pub(super) const MASK_EN: u8 = 0x17;
+    pub(super) const PAL_PRI: u8 = 0x19;
+}
+
+/// Which border a Super Game Boy shows, as the player picks it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serializable)]
+pub enum SgbBorder {
+    /// The game's own border, or Nubo's until the game sends one.
+    #[default]
+    Game,
+    /// Nubo's border, even when the game sent one of its own.
+    Nubo,
 }
 
 /// What `MASK_EN` does to the picture.
@@ -211,12 +233,36 @@ pub(crate) struct Sgb {
     /// How many frames of the intro have been shown since power-on, up to
     /// `INTRO_FRAMES`.
     intro_frames: u16,
+    /// Whether the game took away the palettes the player can pick from the
+    /// menu (`ICON_EN` bit 0).
+    player_palettes_disabled: bool,
+    /// Whether the game takes its colors back from the player's palette
+    /// whenever it sets new ones (`PAL_PRI`).
+    game_palette_priority: bool,
+    /// Whether the game turned the attraction mode off (`ATRC_EN`).
+    attraction_disabled: bool,
+    /// The palette the player picked from the menu, four little-endian
+    /// RGB555 colors.
+    player_palette: [u8; 8],
+    /// Whether the player's palette colors the whole screen instead of the
+    /// game's colors.
+    player_palette_active: bool,
+    /// The border the player picked from the menu.
+    border_choice: SgbBorder,
+    /// How many frames since the intro the player has held no button. The
+    /// attraction mode starts at `attraction::IDLE_FRAMES`.
+    idle_frames: u32,
+    /// Whether the player holds a button now, which the address bus passes
+    /// on. Save states leave it out, as they leave out the buttons in the
+    /// joypad: they belong to the player rather than the console.
+    #[serializable(skip)]
+    buttons_held: bool,
     /// Nubo's intro, drawn once.
     #[serializable(skip)]
     intro: Intro,
     /// Nubo's own border, drawn once.
     #[serializable(skip)]
-    nubo_border: BorderPicture,
+    nubo_border: NuboBorder,
     /// The border as last drawn, so it is only drawn again when it changes.
     #[serializable(skip)]
     border_cache: BorderCache,
@@ -224,6 +270,16 @@ pub(crate) struct Sgb {
     /// than in the Game Boy's grays.
     #[serializable(skip)]
     frame_colorized: bool,
+    /// Whether the last picture is a frame of the game that `redraw` can
+    /// draw again: not during the intro, and not until a frame was drawn
+    /// since power-on or since a save state was loaded, whose picture this
+    /// one's fields don't describe.
+    #[serializable(skip)]
+    redrawable: bool,
+    /// How much darker the border's fade made the last picture's border, in
+    /// steps of 1/31 of full brightness (`next_border_fade`).
+    #[serializable(skip)]
+    shown_border_fade: u8,
     /// The last picture with its border, 256×224 RGBA.
     #[serializable(skip)]
     bordered_frame: Vec<u8>,
@@ -242,6 +298,8 @@ impl Sgb {
         for (index, color) in palettes.as_chunks_mut::<2>().0.iter_mut().enumerate() {
             *color = GRAY_PALETTE[index % 4].to_le_bytes();
         }
+        let mut player_palette = [0; 8];
+        player_palette.copy_from_slice(&palettes[..8]);
         Sgb {
             receiver: PacketReceiver::new(),
             commands_enabled: false,
@@ -258,10 +316,20 @@ impl Sgb {
             screen: [0; SCREEN_PIXELS],
             shown_screen: [0; SCREEN_PIXELS],
             intro_frames: 0,
+            player_palettes_disabled: false,
+            game_palette_priority: false,
+            attraction_disabled: false,
+            player_palette,
+            player_palette_active: false,
+            border_choice: SgbBorder::Game,
+            idle_frames: 0,
+            buttons_held: false,
             intro: Intro::new(),
-            nubo_border: BorderPicture::nubo(),
+            nubo_border: NuboBorder::new(),
             border_cache: BorderCache::default(),
             frame_colorized: false,
+            redrawable: false,
+            shown_border_fade: 0,
             bordered_frame: vec![0; BORDERED_WIDTH * BORDERED_HEIGHT * 4],
         }
     }
@@ -281,6 +349,12 @@ impl Sgb {
         self.intro_frames < RESET_HOLD_FRAMES
     }
 
+    /// Called after a save state was loaded: the last picture is the old
+    /// run's, so `redraw` waits for the next frame.
+    pub(crate) fn finish_loading_save_state(&mut self) {
+        self.redrawable = false;
+    }
+
     /// Ends the intro, for a save state made by a version without one, of a
     /// game already past the boot ROM: its state lacks the intro's frames,
     /// which would otherwise start again from power-on.
@@ -298,6 +372,68 @@ impl Sgb {
     #[cfg(test)]
     pub(crate) fn restart_intro_for_tests(&mut self) {
         self.intro_frames = 0;
+    }
+
+    /// The palette the player picked, while it colors the screen.
+    pub(crate) fn player_palette(&self) -> Option<[u16; 4]> {
+        self.player_palette_active
+            .then(|| std::array::from_fn(|index| self.player_palette_color(index)))
+    }
+
+    /// Colors the whole screen with `palette`, four RGB555 colors from
+    /// lightest to darkest shade, or with the game's colors again for
+    /// `None`. Does nothing while the game has taken the palettes away
+    /// (`player_palettes_allowed`).
+    pub(crate) fn set_player_palette(&mut self, palette: Option<[u16; 4]>) {
+        if self.player_palettes_disabled {
+            return;
+        }
+        self.player_palette_active = palette.is_some();
+        if let Some(palette) = palette {
+            for (bytes, color) in self
+                .player_palette
+                .as_chunks_mut::<2>()
+                .0
+                .iter_mut()
+                .zip(palette)
+            {
+                *bytes = color.to_le_bytes();
+            }
+        }
+    }
+
+    /// Whether the game lets the player pick a palette (`ICON_EN`).
+    pub(crate) fn player_palettes_allowed(&self) -> bool {
+        !self.player_palettes_disabled
+    }
+
+    /// The border the player picked.
+    pub(crate) fn border_choice(&self) -> SgbBorder {
+        self.border_choice
+    }
+
+    /// Picks the border to show.
+    pub(crate) fn set_border_choice(&mut self, border: SgbBorder) {
+        self.border_choice = border;
+    }
+
+    /// Tells whether the player holds any button now. A press ends the
+    /// attraction mode and starts the wait for it again.
+    ///
+    /// Only the end of a frame reads what this sets, and the PPU, which hands
+    /// over the frames, is never left behind past one, so a lazily run PPU
+    /// sees the same as one run M-cycle by M-cycle.
+    pub(crate) fn set_buttons_held(&mut self, held: bool) {
+        self.buttons_held = held;
+        if held {
+            self.idle_frames = 0;
+        }
+    }
+
+    /// Whether the player holds a button, as `set_buttons_held` last said.
+    #[cfg(test)]
+    pub(crate) fn buttons_held_for_tests(&self) -> bool {
+        self.buttons_held
     }
 
     /// Whether the last picture was drawn with colors a game set. Until a
@@ -340,6 +476,19 @@ impl Sgb {
             command::ATTR_CHR => self.attribute_squares(command),
             command::PAL_SET => self.set_palettes_from_system(command),
             command::PAL_TRN => self.start_transfer(TransferDestination::SystemPalettes),
+            command::ATRC_EN => self.attraction_disabled = command[1] & 0x01 != 0,
+            command::ICON_EN => {
+                self.player_palettes_disabled = command[1] & 0x01 != 0;
+                if self.player_palettes_disabled {
+                    self.player_palette_active = false;
+                }
+                // Bit 1 bars the menu's controller setup, which Nubo's menu
+                // doesn't have: the apps' own controls settings serve
+                // instead. Bit 2 ignores every command after this one.
+                if command[1] & 0x04 != 0 {
+                    self.commands_enabled = false;
+                }
+            }
             command::MLT_REQ => return Some((command[1] & 0x03) + 1),
             command::CHR_TRN => self.start_transfer(if command[1] & 0x01 == 0 {
                 TransferDestination::LowBorderTiles
@@ -362,6 +511,7 @@ impl Sgb {
                     _ => Mask::Color0,
                 };
             }
+            command::PAL_PRI => self.game_palette_priority = command[1] & 0x01 != 0,
             _ => {}
         }
         None
@@ -372,6 +522,23 @@ impl Sgb {
         u16::from_le_bytes([self.palettes[index * 2], self.palettes[index * 2 + 1]])
     }
 
+    /// The color at `index` (0 to 3) of `player_palette`.
+    fn player_palette_color(&self, index: usize) -> u16 {
+        u16::from_le_bytes([
+            self.player_palette[index * 2],
+            self.player_palette[index * 2 + 1],
+        ])
+    }
+
+    /// Called when the game sets new colors: with `PAL_PRI` on, they replace
+    /// the player's palette.
+    fn game_sets_colors(&mut self) {
+        self.colorized = true;
+        if self.game_palette_priority {
+            self.player_palette_active = false;
+        }
+    }
+
     /// Sets the color at `index` (palette × 4 + color) of `palettes`.
     fn set_palette_color(&mut self, index: usize, color: u16) {
         self.palettes[index * 2..index * 2 + 2].copy_from_slice(&color.to_le_bytes());
@@ -380,7 +547,7 @@ impl Sgb {
     /// `PAL01`, `PAL23`, `PAL03` and `PAL12`: sets the shared color 0 and
     /// colors 1 to 3 of two palettes.
     fn set_two_palettes(&mut self, command: &[u8; MAX_COMMAND_SIZE], first: usize, second: usize) {
-        self.colorized = true;
+        self.game_sets_colors();
         let color = |offset: usize| u16::from_le_bytes([command[offset], command[offset + 1]]);
         for palette in 0..4 {
             self.set_palette_color(palette * 4, color(1));
@@ -394,7 +561,7 @@ impl Sgb {
     /// `PAL_SET`: copies four of the 512 system palettes into the palettes,
     /// and then maybe loads an attribute file and lifts the mask.
     fn set_palettes_from_system(&mut self, command: &[u8; MAX_COMMAND_SIZE]) {
-        self.colorized = true;
+        self.game_sets_colors();
         for palette in 0..4 {
             let number = usize::from(command[1 + palette * 2])
                 | usize::from(command[2 + palette * 2] & 0x01) << 8;
@@ -595,16 +762,37 @@ impl Sgb {
         }
 
         let in_intro = self.intro_frames < INTRO_FRAMES;
+        self.redrawable = !in_intro;
         let colors = self.colors();
         if in_intro {
             self.intro_frames += 1;
             self.intro.draw(self.intro_frames, game_screen);
             self.frame_colorized = true;
         } else {
+            self.idle_frames = if self.buttons_held {
+                0
+            } else {
+                self.idle_frames.saturating_add(1)
+            };
             self.draw_game_screen(&colors, game_screen);
-            self.frame_colorized = self.colorized;
+            self.frame_colorized = self.colorized || self.player_palette_active;
         }
+        self.shown_border_fade = self.next_border_fade();
         self.draw_border(&colors, game_screen, in_intro);
+    }
+
+    /// Draws the last picture again with the menu's settings as they are
+    /// now, without moving time on, so a change made from the menu shows
+    /// while the game is paused. The intro, and a picture from before a
+    /// save state was loaded, are left as they are.
+    pub(crate) fn redraw(&mut self, game_screen: &mut [u8]) {
+        if !self.redrawable {
+            return;
+        }
+        let colors = self.colors();
+        self.draw_game_screen(&colors, game_screen);
+        self.frame_colorized = self.colorized || self.player_palette_active;
+        self.draw_border(&colors, game_screen, false);
     }
 
     /// Reads the screen as tile data into the transfer's destination: each
@@ -639,10 +827,13 @@ impl Sgb {
         }
     }
 
-    /// The 16 colors of the four palettes as RGBA. Until a game sets colors
-    /// they are the `DMG_SHADES`.
+    /// The 16 colors of the four palettes as RGBA: the player's palette in
+    /// all four while it is active, and otherwise the game's. Until a game
+    /// sets colors they are the `DMG_SHADES`.
     fn colors(&self) -> [[u8; 4]; 16] {
-        if self.colorized {
+        if self.player_palette_active {
+            std::array::from_fn(|index| rgb555_to_rgba(self.player_palette_color(index % 4)))
+        } else if self.colorized {
             std::array::from_fn(|index| rgb555_to_rgba(self.palette_color(index)))
         } else {
             std::array::from_fn(|index| DMG_SHADES[index % 4])
@@ -687,20 +878,25 @@ impl Sgb {
     /// screen is copied in.
     fn draw_border(&mut self, colors: &[[u8; 4]; 16], game_screen: &mut [u8], in_intro: bool) {
         // The intro shows the border at full brightness while a fade runs on
-        // (SameBoy).
-        let fade = if in_intro {
-            self.next_border_fade();
+        // (SameBoy), and so does Nubo's border when the player picked it over
+        // the game's.
+        let fade = if in_intro || self.border_choice == SgbBorder::Nubo {
             0
         } else {
-            self.next_border_fade()
+            self.shown_border_fade
         };
-        let active = if self.border.from_game {
-            Some(&self.border)
+        let source = if self.border.from_game && self.border_choice == SgbBorder::Game {
+            BorderSource::Game(&self.border)
         } else {
-            None
+            let attraction = !in_intro
+                && !self.attraction_disabled
+                && self.idle_frames >= attraction::IDLE_FRAMES;
+            BorderSource::Nubo {
+                attraction_frame: attraction.then(|| self.idle_frames - attraction::IDLE_FRAMES),
+            }
         };
         let cache = &mut self.border_cache;
-        cache.update(active, &self.nubo_border);
+        cache.update(source, &self.nubo_border);
 
         let screen_pixels = game_screen.as_chunks_mut::<4>().0;
         for &(index, color) in &cache.screen_cover {
@@ -776,6 +972,7 @@ fn faded(color: u16, fade: u8) -> u16 {
     channel(0) | channel(5) << 5 | channel(10) << 10
 }
 
+mod attraction;
 mod border;
 mod intro;
 mod packets;

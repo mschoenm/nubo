@@ -26,6 +26,7 @@ pub use crate::gpu::DMG_SHADES;
 pub use crate::joypad::Key;
 pub use crate::model::Model;
 pub use crate::rom_archive::extract_rom;
+pub use crate::sgb::SgbBorder;
 
 mod address_bus;
 mod apu;
