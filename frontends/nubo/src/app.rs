@@ -8,7 +8,6 @@
 //! the window itself (`app/window_events.rs`), and keys and controller
 //! buttons (`app/player_input.rs`).
 
-use crate::controllers::ControllerEvent;
 use crate::game::{Game, PauseMenu};
 use crate::input::{self, KeyInput};
 use crate::menu_presses::MenuPresses;
@@ -24,6 +23,7 @@ use iced::{Element, Subscription, Task, Theme, event, keyboard, system, window};
 use nubo_core::{CartridgeHeader, ControllerState, Model};
 use nubo_frontend::background;
 use nubo_frontend::controls::{Action, Device};
+use nubo_frontend::gamepads::ControllerEvent;
 use nubo_frontend::library::Library;
 use nubo_frontend::library::box_art::GameList;
 use nubo_frontend::notices::Notices;
@@ -118,7 +118,7 @@ pub enum Message {
     /// such as toasts expiring: the emulator finished a new frame, a timer
     /// check is due (desktop, see `App::check_interval`), or the window is
     /// about to draw (browser, which also emulates the frames due by then,
-    /// see `emulation/web.rs`).
+    /// see `nubo_frontend::session`).
     Tick,
     DismissToast(usize),
 }
@@ -183,7 +183,7 @@ impl App {
     /// The window title, including the game's name while one is running.
     pub fn title(&self) -> String {
         match &self.game {
-            Some(game) => format!("{} — Nubo", game.name()),
+            Some(game) => format!("{} — Nubo", game.session.name()),
             None => String::from("Nubo"),
         }
     }
@@ -213,8 +213,8 @@ impl App {
             Message::Tick => {
                 if let Some(game) = self.game.as_mut().filter(|_| !self.minimized) {
                     #[cfg(target_arch = "wasm32")]
-                    game.advance();
-                    game.refresh_screen();
+                    game.session.run_due_frames();
+                    game.session.refresh_screen();
                 }
                 self.toasts.remove_expired(iced::time::Instant::now());
                 Task::none()
@@ -233,8 +233,10 @@ impl App {
     /// Reads the pictures of the save state slots a pause menu page that
     /// just opened lists, on a background thread.
     fn load_slot_thumbnails(&mut self) -> Task<Message> {
-        let Some((slot_listing, rom_path, slots)) =
-            self.game.as_mut().and_then(Game::thumbnails_to_load)
+        let Some((slot_listing, rom_path, slots)) = self
+            .game
+            .as_mut()
+            .and_then(|game| game.session.thumbnails_to_load())
         else {
             return Task::none();
         };
@@ -324,7 +326,8 @@ impl App {
                 subscriptions.push(crate::ticks::every(interval).map(|()| Message::Tick));
             }
         }
-        // The browser build emulates on these ticks (see emulation/web.rs).
+        // The browser build emulates on these ticks (see
+        // `nubo_frontend::session`).
         #[cfg(target_arch = "wasm32")]
         if self.is_running() || !self.toasts.is_empty() {
             subscriptions.push(window::frames().map(|_| Message::Tick));
@@ -344,7 +347,7 @@ impl App {
     fn restart_needed(&self) -> bool {
         self.game
             .as_ref()
-            .is_some_and(|game| game.model() != self.model_for(game.header()))
+            .is_some_and(|game| game.session.model() != self.model_for(game.session.header()))
     }
 
     /// Whether the D-pad, A, B and Start move through menus instead of
@@ -395,7 +398,7 @@ impl App {
     fn apply_to_game(&mut self) {
         let running = self.is_running();
         if let Some(game) = &mut self.game {
-            game.apply(running, &self.settings);
+            game.session.apply(running, &self.settings.shared);
         }
     }
 

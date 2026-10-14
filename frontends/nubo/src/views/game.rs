@@ -30,7 +30,7 @@ const SLOT_THUMBNAIL_WIDTH: f32 = 80.0;
 const SLOT_THUMBNAIL_HEIGHT: f32 = 72.0;
 
 pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<'a, Message> {
-    let picture: Element<'a, Message> = match game.screen().map(pictures::handle) {
+    let picture: Element<'a, Message> = match game.session.screen().map(pictures::handle) {
         Some(handle) if settings.integer_scaling => whole_step_screen(handle),
         Some(handle) => image(handle)
             .filter_method(image::FilterMethod::Nearest)
@@ -49,7 +49,7 @@ pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Ele
             .into(),
     ];
 
-    if game.is_fast_forwarding() {
+    if game.session.is_fast_forwarding() {
         layers.push(fast_forward_badge(settings));
     }
 
@@ -106,11 +106,11 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
             String::from("Library"),
             Message::Game(GameMessage::CloseGame)
         ),
-        truncated_text(game.name(), 15.0, theme::HEADING_FONT),
+        truncated_text(game.session.name(), 15.0, theme::HEADING_FONT),
         toggle_icon_button(
             Icon::FastForward,
             String::from("Fast forward (hold Tab)"),
-            game.is_fast_forward_on(),
+            game.session.is_fast_forward_on(),
             Message::Game(GameMessage::ToggleFastForward),
             tooltips,
         ),
@@ -273,7 +273,8 @@ pub fn main_entries(settings: &Settings, fullscreen: bool) -> Vec<MenuEntry> {
 /// The slots listed on the save or load page. Loading doesn't list the
 /// "where you left off" slot while it's empty.
 pub fn listed_slots(game: &Game, saving: bool) -> Vec<&SlotInfo> {
-    game.slots()
+    game.session
+        .slots()
         .iter()
         .filter(|info| saving || info.slot != Slot::Resume || info.saved_at.is_some())
         .collect()
@@ -327,7 +328,7 @@ fn main_page<'a>(
         .map(|(index, entry)| menu_item(entry, index == selection));
 
     column![
-        text(game.name()).size(18).font(theme::HEADING_FONT),
+        text(game.session.name()).size(18).font(theme::HEADING_FONT),
         text("Paused").size(13).style(theme::muted_text),
         space().height(8),
         Column::with_children(rows).spacing(2),
@@ -428,13 +429,14 @@ fn slot_row(info: &SlotInfo, saving: bool, selected: bool) -> Element<'_, Messag
 /// The cheats page: the game's cheats with a switch each, and a form to add
 /// one.
 fn cheats_page(game: &Game, selection: usize) -> Element<'_, Message> {
-    let list: Element<'_, Message> = if game.cheats().is_empty() {
+    let cheats = game.session.cheats();
+    let list: Element<'_, Message> = if cheats.is_empty() {
         text("No cheats yet. Add a GameShark or Game Genie code below.")
             .size(13)
             .style(theme::muted_text)
             .into()
     } else {
-        Column::with_children(game.cheats().iter().enumerate().map(|(index, cheat)| {
+        Column::with_children(cheats.iter().enumerate().map(|(index, cheat)| {
             container(
                 row![
                     toggler(cheat.enabled)

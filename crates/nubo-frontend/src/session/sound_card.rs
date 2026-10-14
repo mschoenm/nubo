@@ -1,15 +1,15 @@
-//! The desktop session: the emulator runs on its own thread, and the audio
-//! queue paces it. The thread sleeps until the sound card is about to run
-//! out of samples, then emulates more. The UI thread sends commands over a
-//! channel (waking the thread so it sees them) and picks up finished frames
-//! from a shared buffer, after the thread tells it a new one is there.
+//! The session paced by the sound card, which the desktop uses: the
+//! emulator runs on its own thread, and the audio queue paces it. The
+//! thread sleeps until the sound card is about to run out of samples, then
+//! emulates more. The app sends commands over a channel (waking the thread
+//! so it sees them) and picks up finished frames from a shared buffer,
+//! after the thread calls the app's callback to say a new one is there.
 
 use super::{Command, Machine, Playback, ask, stopped_error};
-use futures::channel::mpsc as frame_channel;
+use crate::battery::BatterySaves;
+use crate::notices::Notices;
+use crate::rom::Rom;
 use nubo_core::Model;
-use nubo_frontend::battery::BatterySaves;
-use nubo_frontend::notices::Notices;
-use nubo_frontend::rom::Rom;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -29,20 +29,21 @@ struct SharedFrame {
     /// so readers can tell whether the pixels changed since they last looked.
     sequence: u64,
     pixels: Vec<u8>,
-    /// Told about every new frame while the UI listens (see
+    /// Called for every new frame while the app listens (see
     /// [`FrameListener::listen`]).
-    listener: Option<frame_channel::Sender<()>>,
+    on_frame: Option<Box<dyn FnMut() + Send>>,
 }
 
 /// Numbers sessions in the order they start (see [`FrameListener`]).
 static NEXT_SESSION_NUMBER: AtomicU64 = AtomicU64::new(0);
 
-/// Tells the UI about one session's new frames (see
+/// Tells the app about one session's new frames (see
 /// [`Session::frame_listener`]). It hashes as the session's number, so that
-/// a UI that tells its listeners apart by their hash, as Iced's subscriptions
-/// do, gives each session a listener of its own. The `Arc`'s address wouldn't
-/// do: a game started right after another stopped can get the same address,
-/// and Iced would then keep the stopped session's subscription.
+/// an app that tells its listeners apart by their hash, as Iced's
+/// subscriptions do, gives each session a listener of its own. The `Arc`'s
+/// address wouldn't do: a game started right after another stopped can get
+/// the same address, and Iced would then keep the stopped session's
+/// subscription.
 pub struct FrameListener {
     session_number: u64,
     frame: Arc<Mutex<SharedFrame>>,
@@ -55,19 +56,21 @@ impl Hash for FrameListener {
 }
 
 impl FrameListener {
-    /// Starts telling a new receiver about new frames, replacing any
-    /// earlier one. A channel of 0 still holds one message per sender, so
-    /// notices of frames the UI hasn't picked up yet merge into one. One
-    /// notice is sent straight away, since frames finished before the UI
-    /// listened were never announced. The UI then picks up the newest frame
-    /// with [`Session::frame_since`] for each notice.
-    pub fn listen(&self) -> frame_channel::Receiver<()> {
-        let (mut sender, receiver) = frame_channel::channel(0);
-        let _ = sender.try_send(());
+    /// Calls `on_frame` for every new frame from now on, replacing any
+    /// earlier callback. It is called once straight away, since frames
+    /// finished before the app listened were never announced. The app then
+    /// picks up the newest frame with [`Session::frame_since`]. A frame
+    /// still waiting when the next one comes is replaced by it, so the
+    /// callback can merge the calls the app hasn't handled yet into one,
+    /// such as by sending into a channel that holds one message.
+    ///
+    /// The callback runs on the emulator thread while the frame is locked,
+    /// so it must be quick and must not call the session.
+    pub fn listen(&self, mut on_frame: impl FnMut() + Send + 'static) {
+        on_frame();
         if let Ok(mut frame) = self.frame.lock() {
-            frame.listener = Some(sender);
+            frame.on_frame = Some(Box::new(on_frame));
         }
-        receiver
     }
 }
 
@@ -84,10 +87,10 @@ pub struct Session {
 }
 
 /// Counts what the emulator thread does, to measure how often it wakes the
-/// processor (see `efficiency.rs`). Every wake-up keeps a laptop's processor
-/// from resting, so fewer of them save battery.
+/// processor (see the app's `nubo --measure-efficiency`). Every wake-up
+/// keeps a laptop's processor from resting, so fewer of them save battery.
 #[derive(Debug, Default)]
-pub struct Activity {
+struct Activity {
     /// How often the thread went to sleep, and so woke up again.
     wakeups: AtomicU64,
     /// Audio buffers emulated, played or skipped.
@@ -98,10 +101,12 @@ pub struct Activity {
 /// [`Session::activity`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActivityCount {
+    /// How often the thread went to sleep, and so woke up again.
     pub wakeups: u64,
+    /// Audio buffers emulated, played or skipped.
     pub buffers: u64,
-    /// Frames handed to the window, which skips frames exactly like the one
-    /// before.
+    /// Frames handed to the app. Frames exactly like the one before are
+    /// skipped.
     pub frames: u64,
 }
 
@@ -208,8 +213,8 @@ impl Session {
         )?
     }
 
-    /// Something that tells the UI whenever the emulator finishes a new
-    /// frame, so the window only redraws when there is something new to
+    /// Something that tells the app whenever the emulator finishes a new
+    /// frame, so its window only redraws when there is something new to
     /// show: about 60 times a second at normal speed, and more when fast
     /// forwarding, up to what the screen can show.
     pub fn frame_listener(&self) -> FrameListener {
@@ -386,9 +391,9 @@ impl FastForward {
     }
 }
 
-/// Copies a finished frame into the shared buffer for the UI thread, and
-/// tells the UI if it listens. A notice the UI hasn't picked up yet already
-/// covers this frame, since the UI always takes the newest one. A frame
+/// Copies a finished frame into the shared buffer for the app, and calls
+/// the app's callback if it listens. A call the app hasn't handled yet
+/// already covers this frame, since the app always takes the newest one. A frame
 /// exactly like the one before is skipped, so still screens such as menus
 /// and text boxes don't redraw the window at all.
 fn publish_frame(frame: &Mutex<SharedFrame>, pixels: &[u8]) {
@@ -399,8 +404,8 @@ fn publish_frame(frame: &Mutex<SharedFrame>, pixels: &[u8]) {
         shared.pixels.clear();
         shared.pixels.extend_from_slice(pixels);
         shared.sequence += 1;
-        if let Some(listener) = &mut shared.listener {
-            let _ = listener.try_send(());
+        if let Some(on_frame) = &mut shared.on_frame {
+            on_frame();
         }
     }
 }

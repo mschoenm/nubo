@@ -1,4 +1,5 @@
-//! Measures how much the desktop app's emulator thread wakes the processor,
+//! Measures how much the desktop app's emulator thread (the session paced
+//! by the sound card, in `nubo_frontend::session`) wakes the processor,
 //! which is most of what a running game costs a laptop's battery besides the
 //! emulation itself. Run it with `nubo --measure-efficiency <rom> [--model
 //! <name>]`: it plays the game without a window or sound for a few seconds in
@@ -9,11 +10,11 @@
 //! emulated second with `cargo benchmark` under cachegrind. Real battery
 //! drain and the window's drawing can only be measured on real hardware.
 
-use crate::emulation::{ActivityCount, Command, Playback, Session};
 use nubo_core::Model;
 use nubo_frontend::battery::BatterySaves;
 use nubo_frontend::notices::Notices;
 use nubo_frontend::rom::Rom;
+use nubo_frontend::session::{ActivityCount, Command, Playback, Session};
 use nubo_frontend::settings::FastForwardSpeed;
 use std::env;
 use std::path::{Path, PathBuf};

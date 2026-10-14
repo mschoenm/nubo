@@ -1,13 +1,14 @@
 //! When the browser starts drawing each frame: the timestamps it passes to
 //! `requestAnimationFrame` callbacks, which follow the screen's refreshes to
-//! the microsecond. Iced's frame ticks only reach the app some milliseconds
-//! later, by an amount that varies with how long drawing took, which is too
-//! uneven to count refreshes with at 120 Hz.
+//! the microsecond. A UI toolkit's frame ticks, such as Iced's, only reach
+//! the app some milliseconds later, by an amount that varies with how long
+//! drawing took, which is too uneven to count refreshes with at 120 Hz.
 //!
 //! The clock asks for the next frame from inside its own callback, so once
 //! its callback runs first in a frame it stays first: it starts while the
-//! game starts, before Iced asks to draw the next frame, and so has already
-//! recorded a frame's time when that frame's tick reaches the session.
+//! game starts, before the app asks to draw the next frame, and so has
+//! already recorded a frame's time when that frame's tick reaches the
+//! session.
 
 use std::cell::Cell;
 use std::rc::Rc;

@@ -76,7 +76,7 @@ impl App {
             SettingsMessage::PaletteSelected(palette) => {
                 self.change_settings(|settings| settings.shared.dmg_palette = palette);
                 if let Some(game) = &mut self.game {
-                    game.set_palette(palette);
+                    game.session.set_palette(palette);
                 }
                 return self.load_pictures(false);
             }
@@ -133,7 +133,7 @@ impl App {
     pub(super) fn change_controls(&mut self, change: impl FnOnce(&mut Controls)) {
         self.change_settings(|settings| change(&mut settings.shared.controls));
         if let Some(game) = &mut self.game {
-            game.set_controls(&self.settings.shared.controls);
+            game.session.set_controls(&self.settings.shared.controls);
         }
     }
 

@@ -11,6 +11,16 @@ fn hash_of(listener: &FrameListener) -> u64 {
     hasher.finish()
 }
 
+/// Listens to `listener` with a callback that counts its calls.
+fn count_calls(listener: &FrameListener) -> Arc<AtomicU64> {
+    let calls = Arc::new(AtomicU64::new(0));
+    let counter = calls.clone();
+    listener.listen(move || {
+        counter.fetch_add(1, Ordering::Relaxed);
+    });
+    calls
+}
+
 #[test]
 fn a_new_listener_is_told_to_look_for_a_frame_straight_away() {
     let listener = FrameListener {
@@ -18,9 +28,25 @@ fn a_new_listener_is_told_to_look_for_a_frame_straight_away() {
         frame: shared_frame(),
     };
 
-    let mut receiver = listener.listen();
+    let calls = count_calls(&listener);
 
-    assert_eq!(receiver.try_recv().ok(), Some(()));
+    assert_eq!(calls.load(Ordering::Relaxed), 1);
+}
+
+#[test]
+fn the_listener_is_told_about_new_frames_only() {
+    let frame = shared_frame();
+    let listener = FrameListener {
+        session_number: 0,
+        frame: frame.clone(),
+    };
+    let calls = count_calls(&listener);
+
+    publish_frame(&frame, &[1, 2, 3]);
+    publish_frame(&frame, &[1, 2, 3]);
+    publish_frame(&frame, &[1, 2, 4]);
+
+    assert_eq!(calls.load(Ordering::Relaxed), 3);
 }
 
 #[test]
