@@ -37,6 +37,8 @@ pub enum PauseMenu {
 /// `Game::slot_listing`).
 static NEXT_SLOT_LISTING: AtomicU64 = AtomicU64::new(1);
 
+/// A game being played: its emulator session, the ROM and its header, the
+/// screen, the pause menu and the cheats.
 pub struct Game {
     session: Session,
     rom: Rom,
