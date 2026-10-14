@@ -2,10 +2,8 @@
 //! and the pause menu with its save state, cheats and Super Game Boy
 //! (`sgb.rs`) pages. In a window the bar sits
 //! above the picture. In fullscreen the picture fills the screen and the bar
-//! appears along the bottom when the mouse moves; at the top it would be
-//! hidden behind the menu bar that macOS slides down there. Double-clicking
-//! the picture switches between fullscreen and a window, as on a video
-//! site. The pause menu works like a context menu: a right click on the
+//! appears over its top when the mouse moves. Double-clicking the picture
+//! switches between fullscreen and a window, as on a video site. The pause menu works like a context menu: a right click on the
 //! picture opens it, as Esc does, and a click on the game outside it or a
 //! row that leaves it behind closes it. The bar's buttons work as usual
 //! while it's open. With `--scale` the window shows the picture alone
@@ -18,12 +16,12 @@ use crate::ui::icons::{Icon, icon};
 use crate::ui::pictures;
 use crate::ui::theme;
 use crate::ui::widgets::{
-    bottom_bar, icon_button, icon_button_at, secondary_button, shortcut, toggle_icon_button,
-    top_bar, truncated_text, whole_step_screen,
+    icon_button, secondary_button, shortcut, toggle_icon_button, top_bar, truncated_text,
+    whole_step_screen,
 };
 use iced::widget::{
     self, Column, Stack, button, center, column, container, image, mouse_area, opaque, row,
-    scrollable, space, text, text_input, toggler, tooltip,
+    scrollable, space, text, text_input, toggler,
 };
 use iced::{Alignment, ContentFit, Element, Fill};
 use nubo_frontend::cheats;
@@ -77,11 +75,7 @@ pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Ele
     }
 
     if game.controls_visible() {
-        layers.push(
-            container(bar(game, settings, true))
-                .align_bottom(Fill)
-                .into(),
-        );
+        layers.push(container(bar(game, settings, true)).align_top(Fill).into());
     }
 
     Stack::with_children(layers).into()
@@ -111,17 +105,10 @@ pub fn screen_only(game: Option<&Game>) -> Element<'_, Message> {
     }
 }
 
-/// The bar with the game's name and controls: at the top of the window, or
-/// along the bottom of the screen in fullscreen, with its tooltips above the
-/// buttons.
+/// The bar with the game's name and controls, at the top of the window, or
+/// over the top of the picture in fullscreen.
 fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<'a, Message> {
-    let tooltips = if fullscreen {
-        tooltip::Position::Top
-    } else {
-        tooltip::Position::Bottom
-    };
-    let button =
-        |icon, label: String, message| icon_button_at(icon, label, Some(message), tooltips);
+    let button = |icon, label: String, message| icon_button(icon, label, Some(message));
 
     let (pause_icon, pause_label) = if game.is_paused() {
         (Icon::Play, "Resume (Esc)")
@@ -151,7 +138,6 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
             String::from("Fast forward (hold Tab)"),
             game.session.is_fast_forward_on(),
             Message::Game(GameMessage::ToggleFastForward),
-            tooltips,
         ),
         button(
             volume_icon,
@@ -191,11 +177,7 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
         ),
     ]);
 
-    if fullscreen {
-        bottom_bar(controls)
-    } else {
-        top_bar(controls)
-    }
+    top_bar(controls)
 }
 
 /// The label in the top-right corner while fast forwarding.
