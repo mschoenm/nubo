@@ -62,7 +62,13 @@ Nubo doesn't come with any games. Use games you own, or try free homebrew games 
 
 ## Playing
 
-Open a single game, or add your ROM folders under Settings > Library to fill the library. The default controls are below; all of them can be changed under Settings > Controls.
+Open a single game, or add your ROM folders under Settings > Library to fill the library:
+
+<p align="center">
+  <img src="images/screenshots/library.png" width="700" alt="Nubo's game library with Geometrix, Tobu Tobu Girl Deluxe and µCity, each shown with its title screen">
+</p>
+
+The default controls are below; all of them can be changed under Settings > Controls.
 
 | Keyboard | Game Boy |
 | -------- | -------- |
@@ -185,7 +191,7 @@ Much of its accuracy comes from other people's research and code:
 - [Lucide](https://lucide.dev): the icons of the desktop app (ISC License, see [NOTICE](NOTICE)).
 - [libretro.h](https://github.com/libretro/libretro-common) by the RetroArch team: the libretro API the RetroArch core's bindings are written from (MIT License, see [NOTICE](NOTICE)). [SameBoy's libretro core](https://github.com/LIJI32/SameBoy) and [rcheevos](https://github.com/RetroAchievements/rcheevos) showed how a Game Boy core lays out its memory for RetroAchievements.
 - [Tobu Tobu Girl Deluxe](https://tangramgames.itch.io/tobu-tobu-girl-deluxe) by Tangram Games: the game in the screenshots (`images/`) and in some of the save states every version is checked against (`save-states/`), whose graphics are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-- [µCity](https://github.com/AntonioND/ucity) and [Geometrix](https://github.com/AntonioND/geometrix) by Antonio Niño Díaz: games in the save states every version is checked against (`save-states/`), licensed under the GPL, version 3 or later.
+- [µCity](https://github.com/AntonioND/ucity) and [Geometrix](https://github.com/AntonioND/geometrix) by Antonio Niño Díaz: games in the library screenshot (`images/screenshots/`) and in the save states every version is checked against (`save-states/`), licensed under the GPL, version 3 or later.
 
 The original project was built with the help of these resources:
 
