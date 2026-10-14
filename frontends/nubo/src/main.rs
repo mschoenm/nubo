@@ -1,7 +1,8 @@
 //! Desktop frontend built with Iced. The game runs in
 //! `nubo_frontend::session` (on a thread of its own on the desktop, on each
 //! frame tick in the browser build) and the window shows the latest frame.
-//! Run it with `cargo play [rom] [--cgb] [--model <name>]`.
+//! Run it with `cargo play [rom] [--cgb | --model <name>] [--scale <n>]
+//! [--fresh] [--speed <n>]`; `command_line` explains the options.
 
 // Release builds are Windows apps rather than console programs, so no empty
 // console window opens next to Nubo. Debug builds keep the console for
@@ -9,10 +10,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use app::App;
-use nubo_core::Model;
+use command_line::Options;
+use nubo_core::Emulator;
 use nubo_frontend::rom::Rom;
 use std::env;
-use std::path::PathBuf;
+use std::process::ExitCode;
 
 const DEFAULT_SCALE_FACTOR: f32 = 4.0;
 const TOP_BAR_HEIGHT: f32 = 52.0;
@@ -26,31 +28,25 @@ const WINDOW_ICON_SIZE: u32 = 256;
 #[cfg(target_os = "linux")]
 const APPLICATION_ID: &str = "io.github.mschoenm.nubo";
 
-/// Reads the optional ROM path and the `--cgb` / `--model <name>` options
-/// from the command line. Invalid options are reported and ignored.
-fn parse_args() -> (Option<PathBuf>, Option<Model>) {
-    let mut rom_path = None;
-    let mut model = None;
+/// Reads the ROM the command line names. A window that shows only the game
+/// (`--scale`) has nowhere to show why a ROM couldn't start, so for one the
+/// ROM must also have a cartridge header the emulator can start; otherwise
+/// this returns why not, to print before the window opens.
+fn read_rom(options: &Options) -> Result<Option<Result<Rom, String>>, String> {
+    let Some(path) = &options.rom_path else {
+        return Ok(None);
+    };
+    let rom = Rom::read(path);
 
-    let mut args = env::args().skip(1);
-    while let Some(arg) = args.next() {
-        if arg == "--cgb" {
-            model = Some(Model::CgbE);
-        } else if arg == "--model" {
-            match args.next().map(|name| name.parse()) {
-                Some(Ok(parsed)) => model = Some(parsed),
-                Some(Err(error)) => eprintln!("{error}"),
-                None => eprintln!("--model needs a value such as dmg, mgb, sgb, cgb or agb"),
-            }
-        } else {
-            rom_path = Some(PathBuf::from(arg));
-        }
+    if options.scale.is_some() {
+        let readable = rom.as_ref().map_err(Clone::clone)?;
+        Emulator::read_rom_header(&readable.bytes)
+            .map_err(|error| format!("Couldn't start {}: {error}", readable.name()))?;
     }
-
-    (rom_path, model)
+    Ok(Some(rom))
 }
 
-fn main() -> iced::Result {
+fn main() -> ExitCode {
     #[cfg(target_arch = "wasm32")]
     console_error_panic_hook::set_once();
 
@@ -59,52 +55,109 @@ fn main() -> iced::Result {
         std::process::exit(exit_code);
     }
 
-    let (rom_path, model) = parse_args();
-    let rom = rom_path.map(|path| Rom::read(&path));
+    let options = match command_line::parse(env::args().skip(1)) {
+        Ok(options) => options,
+        Err(error) => {
+            eprintln!("{error}\n{}", command_line::USAGE);
+            return ExitCode::from(2);
+        }
+    };
+    let rom = match read_rom(&options) {
+        Ok(rom) => rom,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
+    };
 
-    iced::application(move || App::new(rom.clone(), model), App::update, App::view)
-        .title(App::title)
-        .subscription(App::subscription)
-        .theme(App::theme)
-        .font(ui::icons::FONT_BYTES)
-        .window(iced::window::Settings {
-            // Wide enough for a whole row of library cards, and high enough
-            // for the game screen at four times its size.
-            size: iced::Size::new(
-                (app::SCREEN_WIDTH as f32 * DEFAULT_SCALE_FACTOR + SCREEN_PADDING)
-                    .max(views::library::FULL_ROW_WINDOW_WIDTH),
-                app::SCREEN_HEIGHT as f32 * DEFAULT_SCALE_FACTOR + SCREEN_PADDING + TOP_BAR_HEIGHT,
-            ),
-            min_size: Some(MINIMUM_SIZE.into()),
-            icon: iced::window::icon::from_rgba(
-                nubo_logo::render(WINDOW_ICON_SIZE, 0.0),
-                WINDOW_ICON_SIZE,
-                WINDOW_ICON_SIZE,
-            )
-            .ok(),
-            position: iced::window::Position::Centered,
-            // Closing the window asks the app first (`Message::CloseRequested`),
-            // so it can stop the game: that writes where the player left off,
-            // the game's thumbnail and the battery saves still waiting. On
-            // macOS, Quit in the app menu (⌘Q) or the Dock ends the process
-            // without asking: winit's default menu calls `terminate:`, and
-            // Iced 0.14 doesn't pass winit's `exiting` event on. The battery
-            // saves are on disk by then all the same, unless the game wrote
-            // them in the last quarter of a second (see
-            // `nubo_frontend::battery`), but the Resume slot and the thumbnail
-            // aren't written. This hasn't been checked on a Mac yet.
-            exit_on_close_request: false,
-            #[cfg(target_os = "linux")]
-            platform_specific: iced::window::settings::PlatformSpecific {
-                application_id: APPLICATION_ID.to_owned(),
-                ..iced::window::settings::PlatformSpecific::default()
-            },
-            ..iced::window::Settings::default()
-        })
-        .run()
+    match run(rom, options) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// Opens the window and runs the app until it closes.
+fn run(rom: Option<Result<Rom, String>>, options: Options) -> iced::Result {
+    let window = match options.scale {
+        Some(scale) => screen_only_window(scale),
+        None => default_window(),
+    };
+
+    iced::application(
+        move || App::new(rom.clone(), &options),
+        App::update,
+        App::view,
+    )
+    .title(App::title)
+    .subscription(App::subscription)
+    .theme(App::theme)
+    .font(ui::icons::FONT_BYTES)
+    .window(window)
+    .run()
+}
+
+/// The window the app usually opens: wide enough for a whole row of library
+/// cards, and high enough for the game screen at four times its size.
+fn default_window() -> iced::window::Settings {
+    iced::window::Settings {
+        size: iced::Size::new(
+            (app::SCREEN_WIDTH as f32 * DEFAULT_SCALE_FACTOR + SCREEN_PADDING)
+                .max(views::library::FULL_ROW_WINDOW_WIDTH),
+            app::SCREEN_HEIGHT as f32 * DEFAULT_SCALE_FACTOR + SCREEN_PADDING + TOP_BAR_HEIGHT,
+        ),
+        min_size: Some(MINIMUM_SIZE.into()),
+        ..window_settings()
+    }
+}
+
+/// The window for `--scale`: just the game screen at `scale` times its size,
+/// which the player can't resize. It opens at that size in logical pixels;
+/// once it is open, the app makes it exact in the display's own pixels
+/// (`app::screen_only_size`).
+fn screen_only_window(scale: u32) -> iced::window::Settings {
+    iced::window::Settings {
+        size: app::screen_only_size(scale, 1.0),
+        resizable: false,
+        ..window_settings()
+    }
+}
+
+/// What every window of the app has: the icon, its place, and asking the app
+/// before it closes.
+fn window_settings() -> iced::window::Settings {
+    iced::window::Settings {
+        icon: iced::window::icon::from_rgba(
+            nubo_logo::render(WINDOW_ICON_SIZE, 0.0),
+            WINDOW_ICON_SIZE,
+            WINDOW_ICON_SIZE,
+        )
+        .ok(),
+        position: iced::window::Position::Centered,
+        // Closing the window asks the app first (`Message::CloseRequested`),
+        // so it can stop the game: that writes where the player left off,
+        // the game's thumbnail and the battery saves still waiting. On
+        // macOS, Quit in the app menu (⌘Q) or the Dock ends the process
+        // without asking: winit's default menu calls `terminate:`, and
+        // Iced 0.14 doesn't pass winit's `exiting` event on. The battery
+        // saves are on disk by then all the same, unless the game wrote
+        // them in the last quarter of a second (see
+        // `nubo_frontend::battery`), but the Resume slot and the thumbnail
+        // aren't written. This hasn't been checked on a Mac yet.
+        exit_on_close_request: false,
+        #[cfg(target_os = "linux")]
+        platform_specific: iced::window::settings::PlatformSpecific {
+            application_id: APPLICATION_ID.to_owned(),
+            ..iced::window::settings::PlatformSpecific::default()
+        },
+        ..iced::window::Settings::default()
+    }
 }
 
 mod app;
+mod command_line;
 #[cfg(not(target_arch = "wasm32"))]
 mod efficiency;
 mod game;

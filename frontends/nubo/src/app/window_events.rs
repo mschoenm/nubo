@@ -2,7 +2,7 @@
 //! files dragged onto it, the system's light or dark mode, and closing it.
 
 use super::playing::read_rom;
-use super::{App, Message};
+use super::{App, Message, SCREEN_HEIGHT, SCREEN_WIDTH};
 use iced::theme::Mode;
 use iced::{Event, Size, Task, event, mouse, window};
 use std::path::PathBuf;
@@ -13,9 +13,14 @@ pub enum WindowMessage {
     ToggleFullscreen,
     /// The mouse moved to this height in the window.
     MouseMoved(f32),
-    /// The window opened or changed size, perhaps because it entered or left
+    /// The window opened with this size.
+    Opened(window::Id, Size),
+    /// The window changed size, perhaps because it entered or left
     /// fullscreen or was minimized.
     Resized(Size),
+    /// The display's scaling changed for the window, such as when it moved
+    /// to another monitor.
+    Rescaled(window::Id),
     FullscreenChanged(bool),
     FileHovered,
     FileHoverLeft,
@@ -39,6 +44,12 @@ impl App {
                     game.mouse_moved(y, self.window_height);
                 }
             }
+            WindowMessage::Opened(id, size) => {
+                return Task::batch([
+                    self.update_window(WindowMessage::Resized(size)),
+                    self.fit_to_screen(id),
+                ]);
+            }
             WindowMessage::Resized(size) => {
                 self.minimized = size.width <= 0.0 || size.height <= 0.0;
                 if !self.minimized {
@@ -49,12 +60,15 @@ impl App {
                     WindowMessage::FullscreenChanged(mode == window::Mode::Fullscreen).into()
                 });
             }
+            WindowMessage::Rescaled(id) => return self.fit_to_screen(id),
             WindowMessage::FullscreenChanged(fullscreen) => self.fullscreen = fullscreen,
             WindowMessage::FileHovered => self.file_hovered = true,
             WindowMessage::FileHoverLeft => self.file_hovered = false,
             WindowMessage::FileDropped(path) => {
                 self.file_hovered = false;
-                return read_rom(path);
+                if self.screen_scale.is_none() {
+                    return read_rom(path);
+                }
             }
             WindowMessage::SystemThemeChanged(mode) => self.system_mode = mode,
             WindowMessage::CloseRequested => {
@@ -65,6 +79,27 @@ impl App {
 
         Task::none()
     }
+
+    /// Sizes a window that shows only the game (`--scale`) so its inside is
+    /// exactly the game screen at its scale in the display's own pixels,
+    /// whatever the display's scaling (see [`screen_only_size`]).
+    fn fit_to_screen(&self, id: window::Id) -> Task<Message> {
+        let Some(scale) = self.screen_scale else {
+            return Task::none();
+        };
+        window::scale_factor(id)
+            .then(move |scale_factor| window::resize(id, screen_only_size(scale, scale_factor)))
+    }
+}
+
+/// The size, in Iced's logical pixels, of a window whose inside is exactly
+/// the Game Boy screen `scale` times its size (160·scale × 144·scale) in
+/// pixels of a display that scales by `scale_factor`, such as 1.5 at 150%.
+/// Iced and winit multiply logical sizes by the scale factor and round, so
+/// the window comes out exact.
+pub fn screen_only_size(scale: u32, scale_factor: f32) -> Size {
+    let pixels = |length: u32| (length * scale) as f32 / scale_factor;
+    Size::new(pixels(SCREEN_WIDTH), pixels(SCREEN_HEIGHT))
 }
 
 /// Switches the window between fullscreen and a normal window.
@@ -81,20 +116,20 @@ pub(super) fn toggle_fullscreen() -> Task<Message> {
     })
 }
 
-/// Turns mouse movements, window sizes and file drag-and-drop events into
-/// messages.
+/// Turns mouse movements, window sizes and scaling, and file drag-and-drop
+/// events into messages.
 pub(super) fn message_for(
     event: Event,
     _status: event::Status,
-    _window: window::Id,
+    window: window::Id,
 ) -> Option<Message> {
     let message = match event {
         Event::Mouse(mouse::Event::CursorMoved { position }) => {
             WindowMessage::MouseMoved(position.y)
         }
-        Event::Window(window::Event::Opened { size, .. } | window::Event::Resized(size)) => {
-            WindowMessage::Resized(size)
-        }
+        Event::Window(window::Event::Opened { size, .. }) => WindowMessage::Opened(window, size),
+        Event::Window(window::Event::Resized(size)) => WindowMessage::Resized(size),
+        Event::Window(window::Event::Rescaled(_)) => WindowMessage::Rescaled(window),
         Event::Window(window::Event::FileHovered(_)) => WindowMessage::FileHovered,
         Event::Window(window::Event::FilesHoveredLeft) => WindowMessage::FileHoverLeft,
         Event::Window(window::Event::FileDropped(path)) => WindowMessage::FileDropped(path),
@@ -102,3 +137,6 @@ pub(super) fn message_for(
     };
     Some(message.into())
 }
+
+#[cfg(test)]
+mod tests;

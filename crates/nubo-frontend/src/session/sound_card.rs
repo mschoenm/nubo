@@ -5,8 +5,7 @@
 //! so it sees them) and picks up finished frames from a shared buffer,
 //! after the thread calls the app's callback to say a new one is there.
 
-use super::{Command, Machine, Playback, ask, stopped_error};
-use crate::battery::BatterySaves;
+use super::{Command, Machine, Playback, Saves, ask, stopped_error};
 use crate::notices::Notices;
 use crate::rom::Rom;
 use nubo_core::Model;
@@ -111,24 +110,14 @@ pub struct ActivityCount {
 }
 
 impl Session {
-    /// Starts an emulator thread for `rom` on `model`, playing as `playback`
-    /// says from the start, and waits until the ROM has loaded, returning
-    /// the load error if it couldn't. Problems while the game runs, such as
-    /// a missing sound device, go to `notices`.
+    /// Starts an emulator thread for `rom` on `model`, with its battery
+    /// saves kept in `saves`, playing as `playback` says from the start, and
+    /// waits until the ROM has loaded, returning the load error if it
+    /// couldn't. Problems while the game runs, such as a missing sound
+    /// device, go to `notices`.
     pub fn start(
         rom: &Rom,
-        model: Model,
-        playback: Playback,
-        notices: &Notices,
-    ) -> Result<Session, String> {
-        let saves = BatterySaves::for_rom(&rom.path, notices.clone());
-        Session::start_with_saves(rom, saves, model, playback, notices)
-    }
-
-    /// Like [`Session::start`], with the battery saves kept in `saves`.
-    pub fn start_with_saves(
-        rom: &Rom,
-        saves: Arc<BatterySaves>,
+        saves: Saves,
         model: Model,
         playback: Playback,
         notices: &Notices,
@@ -148,8 +137,8 @@ impl Session {
 
             thread::Builder::new()
                 .name(String::from("emulator"))
-                .spawn(move || {
-                    match Machine::start_with_saves(&rom, saves, model, playback, &notices) {
+                .spawn(
+                    move || match Machine::start(&rom, saves, model, playback, &notices) {
                         Ok(machine) => {
                             machine.audio.wake_when_low(thread::current());
                             let _ = loaded_sender.send(Ok(()));
@@ -166,8 +155,8 @@ impl Session {
                         Err(error) => {
                             let _ = loaded_sender.send(Err(error));
                         }
-                    }
-                })
+                    },
+                )
                 .map_err(|error| error.to_string())?
         };
 

@@ -97,6 +97,7 @@ impl SaveStateHeader {
         }
     }
 
+    /// Writes the header as named fields, which `split` reads back.
     fn write(&self, writer: &mut dyn Write) -> io::Result<()> {
         let mut fields = FieldWriter::new(writer);
         fields.field("nubo_version", &self.nubo_version)?;

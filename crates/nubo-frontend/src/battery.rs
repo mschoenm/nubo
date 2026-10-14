@@ -6,10 +6,10 @@
 //! browser.
 //!
 //! Games write save RAM often, and write a save in several pieces over a
-//! few frames, so writes are collected and go to disk once the game has
+//! few frames, so writes are collected and stored once the game has
 //! stopped writing for a moment (see `SETTLE_TIME`), when it pauses and
 //! when it stops. That way the app ending without stopping the game most
-//! likely leaves a whole save on disk, not half of one.
+//! likely leaves a whole save behind, not half of one.
 
 use crate::notices::Notices;
 use crate::storage::{self, Entry, Storage};
@@ -18,7 +18,7 @@ use nubo_core::{CartridgeEffects, RtcState};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-/// How long the game has to stop writing before what it wrote goes to disk.
+/// How long the game has to stop writing before what it wrote is stored.
 const SETTLE_TIME: Duration = Duration::from_millis(250);
 /// A game that keeps writing is still saved this often: some games use the
 /// battery-backed RAM as scratch space, and some read the clock every frame.

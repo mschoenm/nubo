@@ -31,13 +31,18 @@ struct Part {
     name: String,
     /// The files, relative to the workspace root with `/` separators.
     files: Vec<String>,
+    /// How many lines its files hold together.
     lines: usize,
 }
 
 /// A Rust module: its file, its folder of child modules, or both.
 struct Module {
+    /// Its path from the workspace root without `.rs`, such as
+    /// `crates/nubo-core/src/apu`.
     name: String,
+    /// Its file, such as `apu.rs`, if it has one.
     file: Option<PathBuf>,
+    /// Its folder of child modules, such as `apu/`, if it has one.
     folder: Option<PathBuf>,
 }
 

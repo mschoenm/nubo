@@ -10,7 +10,7 @@
 //! After a count per suite and model and the total, a run that includes every
 //! Shootout test prints one more line with Nubo's score on the Shootout's
 //! published tests and the rank it would have there, such as
-//! `  shootout  250/264  rank 4  leader DocBoy 255  published 2026-06-04 72fd745`,
+//! `  shootout  258/264  rank 1  leader DocBoy 255  published 2026-06-04 72fd745`,
 //! which the nightly run records (see `shootout.rs`).
 
 use clap::Parser;

@@ -14,7 +14,7 @@ cargo test --workspace        # Every crate, frontends and xtask included
 cargo test-roms [filter]      # The test ROM suites, compared with tools/nubo-test-rom-runner/passing.txt (about 30 s)
 cargo cpu-tests               # Every CPU opcode, checked cycle by cycle
 cargo save-states             # The kept save states still load, and the stored layout is unchanged
-cargo play [rom] [--cgb | --model cgb-c]   # Run the desktop app (models: dmg-0, dmg, mgb, sgb, sgb2, cgb-0 to cgb-e, agb)
+cargo play [rom] [--cgb | --model cgb-c]   # Run the desktop app (models: dmg-0, dmg, mgb, sgb, sgb2, cgb-0 to cgb-e, agb; more options in frontends/nubo/src/command_line.rs)
 cargo screenshot rom.gb 5     # Run 5 emulated seconds headless, save a PNG to target/screenshots/
 cargo benchmark <roms> --record a.txt / --compare a.txt   # Speed, and fingerprints of every frame, sample and end state
 ```

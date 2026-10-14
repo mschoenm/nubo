@@ -59,9 +59,9 @@ fn setup_test_address_bus() -> AddressBus {
     address_bus.gpu.set_object_attribute_memory_byte(0x7B, 0x45);
     address_bus.gpu.set_object_attribute_memory_byte(0x7C, 0x9B);
 
-    address_bus.zero_page_ram[0x20] = 0xBB;
-    address_bus.zero_page_ram[0x21] = 0x44;
-    address_bus.zero_page_ram[0x5B] = 0x5F;
+    address_bus.high_ram[0x20] = 0xBB;
+    address_bus.high_ram[0x21] = 0x44;
+    address_bus.high_ram[0x5B] = 0x5F;
 
     address_bus.interrupt_enable = 0x1F;
 
@@ -196,7 +196,7 @@ fn reads_from_object_attribute_memory() {
 }
 
 #[test]
-fn reads_from_zero_page_ram() {
+fn reads_from_high_ram() {
     let address_bus = setup_test_address_bus();
     assert_eq!(address_bus.peek(0xFFA0), 0xBB);
 }

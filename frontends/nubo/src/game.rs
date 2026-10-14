@@ -39,12 +39,17 @@ pub struct Game {
     controls_shown_until: Instant,
     /// Whether the mouse is over the bar along the bottom in fullscreen.
     cursor_near_bar: bool,
+    /// Whether the game keeps save states, cheats, screenshots, its
+    /// thumbnail and where the player left off, which a run started with
+    /// `--fresh` doesn't (see `command_line`).
+    pub keeps_data: bool,
 }
 
 impl Game {
     /// Shows `session`, a game that just started, with its bar showing and
-    /// no menu open.
-    pub fn new(session: GameSession) -> Game {
+    /// no menu open. Without `keeps_data` it offers no save states, cheats
+    /// or screenshots.
+    pub fn new(session: GameSession, keeps_data: bool) -> Game {
         Game {
             session,
             menu: None,
@@ -52,6 +57,7 @@ impl Game {
             cheat_form: CheatForm::default(),
             controls_shown_until: Instant::now() + CONTROLS_TIMEOUT,
             cursor_near_bar: false,
+            keeps_data,
         }
     }
 

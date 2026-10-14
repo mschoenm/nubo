@@ -51,22 +51,23 @@ const NORMAL_SPEED: Playback = Playback {
 };
 
 /// A machine running an empty cartridge, without a sound device, keeping its
-/// battery saves in `storage`.
-fn machine_with(storage: Arc<Memory>) -> Machine {
+/// battery saves in `storage`, and those saves.
+fn machine_with(storage: Arc<Memory>) -> (Machine, Arc<BatterySaves>) {
     let saves = BatterySaves::in_storage(storage, Path::new("game.gb"), Notices::default());
-    Machine::new(
+    let machine = Machine::new(
         &[0; 0x8000],
-        saves,
+        Saves::Kept(saves.clone()),
         AudioOutput::without_device(),
         Model::Dmg,
         NORMAL_SPEED,
     )
-    .unwrap()
+    .unwrap();
+    (machine, saves)
 }
 
 /// A machine running an empty cartridge, without a sound device.
 fn machine() -> Machine {
-    machine_with(Arc::default())
+    machine_with(Arc::default()).0
 }
 
 fn save_state(machine: &mut Machine) -> Vec<u8> {
@@ -108,8 +109,8 @@ fn a_state_that_isnt_one_is_refused() {
 #[test]
 fn pausing_writes_the_battery_saves_still_waiting() {
     let storage = Arc::new(Memory::default());
-    let mut machine = machine_with(storage.clone());
-    let mut cartridge = BatteryCartridgeEffects::new(machine.saves.clone());
+    let (mut machine, saves) = machine_with(storage.clone());
+    let mut cartridge = BatteryCartridgeEffects::new(saves);
     cartridge.save_ram(&[0x42; 0x2000]);
 
     machine.handle(Command::SetPlayback(Playback {
@@ -119,6 +120,28 @@ fn pausing_writes_the_battery_saves_still_waiting() {
 
     let saved = storage.written(Entry::BatteryRam(Path::new("game.gb")));
     assert_eq!(saved, Some(vec![0x42; 0x2000]));
+}
+
+#[test]
+fn discarded_saves_keep_nothing_and_count_emulated_time() {
+    let saves = Saves::Discarded;
+    let mut cartridge = saves.cartridge_effects();
+
+    cartridge.save_ram(&[0x42; 0x2000]);
+    saves.flush();
+
+    assert_eq!(cartridge.load_ram(), None);
+    assert_eq!(cartridge.rtc_clock(), RtcClock::EmulatedTime);
+    assert_eq!(
+        Saves::Kept(BatterySaves::in_storage(
+            Arc::new(Memory::default()),
+            Path::new("game.gb"),
+            Notices::default()
+        ))
+        .cartridge_effects()
+        .rtc_clock(),
+        RtcClock::WallClock
+    );
 }
 
 #[test]
