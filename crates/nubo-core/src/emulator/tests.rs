@@ -1027,3 +1027,17 @@ fn an_older_super_game_boy_state_past_the_boot_rom_skips_the_intro() {
     loaded.address_bus_mut().finish_loading_save_state();
     assert!(!loaded.address_bus().held_in_reset());
 }
+
+/// The intro counts the frames the PPU hands over, which a game switching
+/// the LCD off and on could hold back. No game runs before the intro is over,
+/// though: Nubo's boot ROM, which switches the LCD on once and never off,
+/// runs until after it ends.
+#[test]
+fn the_super_game_boy_intro_is_over_before_the_game_runs() {
+    for model in [Model::Sgb, Model::Sgb2] {
+        let rom = program_rom(model, &[0x18, 0xFE]);
+        let mut emulator = booted(model, &rom);
+        let gpu = emulator.address_bus_mut().gpu_mut_for_tests();
+        assert!(gpu.sgb().unwrap().intro_over(), "{model:?}");
+    }
+}

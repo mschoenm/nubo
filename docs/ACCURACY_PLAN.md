@@ -168,7 +168,9 @@ Largest phase, but each part stands alone:
      ROMs come up): a Super Game Boy boot ROM of Nubo's own, based on SameBoy's `sgb_boot.asm` (Expat License), which
      shows nothing and really sends the cartridge header to the Super Nintendo as packets, so the
      Super Nintendo side checks it (`packets.rs` already knows the header packets) and the boot takes
-     as long as the real one. Until then the Super Game Boys run the DMG boot ROM (Bootix, its
+     as long as the real one. The intro counts the frames the PPU hands over, which only works while
+     no game can switch the LCD before it ends: a boot ROM that hands over sooner has to count it
+     another way (`the_super_game_boy_intro_is_over_before_the_game_runs` checks this). Until then the Super Game Boys run the DMG boot ROM (Bootix, its
      scrolling logo hidden behind the intro), whose end state matches the Super Game Boy's (Mooneye's
      boot tests), but whose length likely doesn't, so a game may start a little earlier or later than
      on hardware.

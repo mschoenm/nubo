@@ -288,6 +288,12 @@ impl Sgb {
         self.intro_frames = INTRO_FRAMES;
     }
 
+    /// Whether the intro has shown all its frames.
+    #[cfg(test)]
+    pub(crate) fn intro_over(&self) -> bool {
+        self.intro_frames >= INTRO_FRAMES
+    }
+
     /// Starts the intro again, as a state without its frames would.
     #[cfg(test)]
     pub(crate) fn restart_intro_for_tests(&mut self) {
