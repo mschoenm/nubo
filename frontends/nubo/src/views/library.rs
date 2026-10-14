@@ -11,13 +11,13 @@ use crate::ui::logo::logo;
 use crate::ui::pictures;
 use crate::ui::theme;
 use crate::ui::widgets::{
-    icon_button, keycap, primary_button, secondary_button, shortcut, top_bar, truncated_text,
-    whole_step_screen, with_tooltip,
+    bar_button, icon_button, keycap, primary_button, secondary_button, shortcut, top_bar,
+    truncated_text, whole_step_screen, with_tooltip,
 };
 use crate::views::settings::SettingsTab;
 use iced::widget::{
-    Column, Row, button, center, column, container, grid, hover, image, row, scrollable, space,
-    text, text_input, tooltip,
+    Column, Row, button, center, column, container, grid, hover, image, responsive, row,
+    scrollable, space, text, text_input, tooltip,
 };
 use iced::{Alignment, ContentFit, Element, Fill, widget};
 use nubo_frontend::controls::Action;
@@ -46,6 +46,10 @@ const CARD_ASPECT: (f32, f32) = (160.0, 196.0);
 const CONTENT_MAX_WIDTH: f32 = 1100.0;
 const PAGE_PADDING: (f32, f32) = (20.0, 24.0);
 const SECTION_SPACING: f32 = 14.0;
+/// The search field in the top bar is at most this wide.
+const SEARCH_MAX_WIDTH: f32 = 260.0;
+/// The height of the search field: its text, padding and border.
+const SEARCH_HEIGHT: f32 = 34.0;
 /// The space above "All games" when "Continue playing" comes first.
 const SHELF_GAP: f32 = 12.0;
 /// The height of a section heading, at 17 points.
@@ -275,51 +279,59 @@ pub fn view<'a>(
     column![bar(Some(search)), page].into()
 }
 
-/// The top bar, with a search field when there are games to search.
+/// The top bar, with a search field when there are games to search, and
+/// Open ROM and the settings on the right. Rescanning the folders is in the
+/// settings' Library tab.
 fn bar(search: Option<&str>) -> Element<'_, Message> {
-    let mut bar = row![brand()];
+    let middle: Element<'_, Message> = match search {
+        Some(search) => search_field(search),
+        None => space::horizontal().into(),
+    };
 
-    if let Some(search) = search {
-        bar = bar.push(space().width(12)).push(
-            text_input("Search games", search)
-                .on_input(|search| Message::Library(LibraryMessage::SearchChanged(search)))
-                .icon(text_input::Icon {
-                    font: icons::FONT,
-                    code_point: char::from(Icon::Search),
-                    size: Some(15.into()),
-                    spacing: 8.0,
-                    side: text_input::Side::Left,
-                })
-                .padding([6, 10])
-                .width(260)
-                .style(theme::search_field),
-        );
-    }
-
-    let mut bar = bar.push(space::horizontal());
-    // The library screen with games gets a button to scan the folders
-    // again, for folders whose changes aren't noticed, such as network
-    // shares.
-    if search.is_some() {
-        bar = bar.push(icon_button(
-            Icon::RefreshCw,
-            String::from("Rescan folders"),
-            Some(Message::Library(LibraryMessage::Rescan)),
-        ));
-    }
-
-    top_bar(bar.extend([
-        icon_button(
+    top_bar(row![
+        brand(),
+        middle,
+        bar_button(
             Icon::FolderOpen,
+            "Open ROM",
             format!("Open ROM ({})", shortcut("O")),
-            Some(Message::Game(GameMessage::OpenRom)),
+            false,
+            Message::Game(GameMessage::OpenRom),
         ),
+        space().width(6),
         icon_button(
             Icon::Settings,
             format!("Settings ({})", shortcut(",")),
             Some(Message::Settings(SettingsMessage::Open)),
         ),
-    ]))
+    ])
+}
+
+/// The search field, filling the space between the app's name and the
+/// buttons on the right, up to [`SEARCH_MAX_WIDTH`] wide, so it shrinks in a
+/// narrow window instead of pushing the buttons out.
+fn search_field(search: &str) -> Element<'_, Message> {
+    let field = responsive(move |bounds| {
+        text_input("Search games", search)
+            .on_input(|search| Message::Library(LibraryMessage::SearchChanged(search)))
+            .icon(text_input::Icon {
+                font: icons::FONT,
+                code_point: char::from(Icon::Search),
+                size: Some(15.into()),
+                spacing: 8.0,
+                side: text_input::Side::Left,
+            })
+            .padding([6, 10])
+            .width(bounds.width.min(SEARCH_MAX_WIDTH))
+            .style(theme::search_field)
+            .into()
+    });
+
+    container(field)
+        .padding([0, 12])
+        .width(Fill)
+        .height(SEARCH_HEIGHT)
+        .into()
 }
 
 /// The app's name and logo, at the left of the top bar.

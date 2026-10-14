@@ -71,6 +71,50 @@ pub fn with_tooltip<'a, Message: 'a>(
     .into()
 }
 
+/// A top bar button with an icon and its name, for the buttons a player has
+/// to find at a glance (Library, Pause, Open ROM), and a tooltip below it
+/// with `tip`, such as the shortcut. `primary` fills it with the accent
+/// color, as the Resume button is while the game is paused.
+pub fn bar_button<'a, Message: Clone + 'a>(
+    icon: Icon,
+    label: &'a str,
+    tip: String,
+    primary: bool,
+    on_press: Message,
+) -> Element<'a, Message> {
+    let button = labelled_button(icon, label)
+        .padding([6, 12])
+        .style(if primary {
+            theme::primary_button
+        } else {
+            theme::secondary_button
+        })
+        .on_press(on_press);
+
+    with_tooltip(button, tip, tooltip::Position::Bottom)
+}
+
+/// A short upright line between groups of buttons in the top bar.
+pub fn bar_separator<'a, Message: 'a>() -> Element<'a, Message> {
+    container(iced::widget::space())
+        .width(1)
+        .height(22)
+        .style(theme::divider)
+        .into()
+}
+
+/// A thin line across a menu, between groups of rows.
+pub fn menu_separator<'a, Message: 'a>() -> Element<'a, Message> {
+    container(
+        container(iced::widget::space())
+            .width(Fill)
+            .height(1)
+            .style(theme::divider),
+    )
+    .padding([5, 4])
+    .into()
+}
+
 /// The filled accent-colored button for the main action on a screen.
 pub fn primary_button<'a, Message: Clone + 'a>(
     icon: Icon,

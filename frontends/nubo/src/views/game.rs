@@ -1,6 +1,9 @@
 //! The game screen: a bar with the game's controls and the Game Boy screen,
 //! and the pause menu with its save state, cheats and Super Game Boy
-//! (`sgb.rs`) pages. In a window the bar sits
+//! (`sgb.rs`) pages. The bar keeps only what a player reaches for while
+//! playing: the way back to the library on the left, and fast forward,
+//! sound, fullscreen and Pause on the right. Pause opens the pause menu,
+//! which holds everything else. In a window the bar sits
 //! above the picture. In fullscreen the picture fills the screen and the bar
 //! appears over its top when the mouse moves. Double-clicking the picture
 //! switches between fullscreen and a window, as on a video site. The pause menu works like a context menu: a right click on the
@@ -16,8 +19,8 @@ use crate::ui::icons::{Icon, icon};
 use crate::ui::pictures;
 use crate::ui::theme;
 use crate::ui::widgets::{
-    icon_button, secondary_button, shortcut, toggle_icon_button, top_bar, truncated_text,
-    whole_step_screen,
+    bar_button, bar_separator, icon_button, menu_separator, secondary_button, shortcut,
+    toggle_icon_button, top_bar, truncated_text, whole_step_screen,
 };
 use iced::widget::{
     self, Column, Stack, button, center, column, container, image, mouse_area, opaque, row,
@@ -26,6 +29,7 @@ use iced::widget::{
 use iced::{Alignment, ContentFit, Element, Fill};
 use nubo_frontend::cheats;
 use nubo_frontend::controls::Action;
+use nubo_frontend::library;
 use nubo_frontend::save_states::{self, Slot, SlotInfo};
 use nubo_frontend::screenshots;
 
@@ -106,15 +110,9 @@ pub fn screen_only(game: Option<&Game>) -> Element<'_, Message> {
 }
 
 /// The bar with the game's name and controls, at the top of the window, or
-/// over the top of the picture in fullscreen.
+/// over the top of the picture in fullscreen. The two buttons a player has
+/// to find, back to the library and Pause, carry their names.
 fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<'a, Message> {
-    let button = |icon, label: String, message| icon_button(icon, label, Some(message));
-
-    let (pause_icon, pause_label) = if game.is_paused() {
-        (Icon::Play, "Resume (Esc)")
-    } else {
-        (Icon::Pause, "Pause (Esc)")
-    };
     let (volume_icon, volume_label) = if settings.shared.muted {
         (Icon::VolumeX, "Unmute")
     } else {
@@ -125,13 +123,42 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
     } else {
         (Icon::Maximize, "Fullscreen (F11)")
     };
+    // The browser has no library: leaving a game goes back to the start
+    // screen.
+    let (back_label, back_tip) = if library::AVAILABLE {
+        ("Library", "Back to the library")
+    } else {
+        ("Home", "Back to the start screen")
+    };
+    let pause = if game.is_paused() {
+        bar_button(
+            Icon::Play,
+            "Resume",
+            String::from("Resume (Esc)"),
+            true,
+            Message::Game(GameMessage::TogglePause),
+        )
+    } else {
+        bar_button(
+            Icon::Pause,
+            "Pause",
+            String::from("Pause and open the menu (Esc)"),
+            false,
+            Message::Game(GameMessage::TogglePause),
+        )
+    };
 
-    let mut controls = row![
-        button(
-            Icon::House,
-            String::from("Library"),
-            Message::Game(GameMessage::CloseGame)
+    top_bar(row![
+        bar_button(
+            Icon::ArrowLeft,
+            back_label,
+            String::from(back_tip),
+            false,
+            Message::Game(GameMessage::CloseGame),
         ),
+        space().width(4),
+        bar_separator(),
+        space().width(4),
         truncated_text(game.session.name(), 15.0, theme::HEADING_FONT),
         toggle_icon_button(
             Icon::FastForward,
@@ -139,45 +166,19 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
             game.session.is_fast_forward_on(),
             Message::Game(GameMessage::ToggleFastForward),
         ),
-        button(
+        icon_button(
             volume_icon,
             String::from(volume_label),
-            Message::Settings(SettingsMessage::ToggleMute)
+            Some(Message::Settings(SettingsMessage::ToggleMute)),
         ),
-        button(
-            pause_icon,
-            String::from(pause_label),
-            Message::Game(GameMessage::TogglePause)
-        ),
-        button(
-            Icon::RotateCcw,
-            format!("Reset ({})", shortcut("R")),
-            Message::Game(GameMessage::Reset)
-        ),
-    ];
-
-    if screenshots::AVAILABLE && game.keeps_data {
-        controls = controls.push(button(
-            Icon::Camera,
-            String::from("Screenshot (F12)"),
-            Message::Game(GameMessage::Screenshot),
-        ));
-    }
-
-    let controls = controls.extend([
-        button(
+        icon_button(
             fullscreen_icon,
             String::from(fullscreen_label),
-            Message::Window(WindowMessage::ToggleFullscreen),
+            Some(Message::Window(WindowMessage::ToggleFullscreen)),
         ),
-        button(
-            Icon::Settings,
-            format!("Settings ({})", shortcut(",")),
-            Message::Settings(SettingsMessage::Open),
-        ),
-    ]);
-
-    top_bar(controls)
+        space().width(6),
+        pause,
+    ])
 }
 
 /// The label in the top-right corner while fast forwarding.
@@ -206,19 +207,24 @@ pub struct MenuEntry {
     icon: Icon,
     label: &'static str,
     hint: Option<String>,
+    /// Whether a thin line above the row starts a new group of rows.
+    starts_group: bool,
     pub message: Message,
 }
 
 /// The rows of the pause menu's main page, in order. The D-pad moves through
 /// them and A picks one, so the view and the app both use this list.
 /// `fullscreen` says whether the window fills the screen; hints show the
-/// keys bound in `settings`. Save states and cheats are left out for a game
-/// that keeps neither (`--fresh`).
+/// keys bound in `settings`. Save states, cheats and screenshots are left
+/// out for a game that keeps none of them (`--fresh`). The rows come in
+/// groups: going on playing, the game's saves and extras, the picture and
+/// the app, and leaving the game.
 pub fn main_entries(game: &Game, settings: &Settings, fullscreen: bool) -> Vec<MenuEntry> {
     let entry = |icon, label, hint: Option<String>, message| MenuEntry {
         icon,
         label,
         hint,
+        starts_group: false,
         message,
     };
     let key = |action, what: &str| {
@@ -230,39 +236,38 @@ pub fn main_entries(game: &Game, settings: &Settings, fullscreen: bool) -> Vec<M
             .map(|key| format!("{key} {what}").trim().to_owned())
     };
 
-    let mut entries = vec![entry(
+    let playing = vec![entry(
         Icon::Play,
         "Resume",
         Some("Esc".into()),
         Message::Game(GameMessage::TogglePause),
     )];
 
+    let mut extras = Vec::new();
     if save_states::AVAILABLE && game.keeps_data {
-        entries.push(entry(
+        extras.push(entry(
             Icon::Save,
             "Save state",
             key(Action::QuickSave, "quick save"),
             Message::Game(GameMessage::ShowPauseMenu(PauseMenu::Save)),
         ));
-        entries.push(entry(
+        extras.push(entry(
             Icon::History,
             "Load state",
             key(Action::QuickLoad, "quick load"),
             Message::Game(GameMessage::ShowPauseMenu(PauseMenu::Load)),
         ));
     }
-
     if cheats::AVAILABLE && game.keeps_data {
-        entries.push(entry(
+        extras.push(entry(
             Icon::WandSparkles,
             "Cheats",
             None,
             Message::Game(GameMessage::ShowPauseMenu(PauseMenu::Cheats)),
         ));
     }
-
     if game.session.model().is_sgb() {
-        entries.push(entry(
+        extras.push(entry(
             Icon::Palette,
             "Super Game Boy",
             None,
@@ -270,24 +275,26 @@ pub fn main_entries(game: &Game, settings: &Settings, fullscreen: bool) -> Vec<M
         ));
     }
 
+    let mut app = Vec::new();
+    if screenshots::AVAILABLE && game.keeps_data {
+        app.push(entry(
+            Icon::Camera,
+            "Screenshot",
+            key(Action::Screenshot, ""),
+            closing_menu(Message::Game(GameMessage::Screenshot)),
+        ));
+    }
     let (fullscreen_icon, fullscreen_label) = if fullscreen {
         (Icon::Minimize, "Exit fullscreen")
     } else {
         (Icon::Maximize, "Fullscreen")
     };
-    entries.push(entry(
-        fullscreen_icon,
-        fullscreen_label,
-        key(Action::Fullscreen, ""),
-        closing_menu(Message::Window(WindowMessage::ToggleFullscreen)),
-    ));
-
-    entries.extend([
+    app.extend([
         entry(
-            Icon::RotateCcw,
-            "Reset",
-            Some(shortcut("R")),
-            Message::Game(GameMessage::Reset),
+            fullscreen_icon,
+            fullscreen_label,
+            key(Action::Fullscreen, ""),
+            closing_menu(Message::Window(WindowMessage::ToggleFullscreen)),
         ),
         entry(
             Icon::Settings,
@@ -295,13 +302,30 @@ pub fn main_entries(game: &Game, settings: &Settings, fullscreen: bool) -> Vec<M
             Some(shortcut(",")),
             closing_menu(Message::Settings(SettingsMessage::Open)),
         ),
+    ]);
+
+    let leaving = vec![
         entry(
-            Icon::House,
+            Icon::RotateCcw,
+            "Restart game",
+            Some(shortcut("R")),
+            Message::Game(GameMessage::Reset),
+        ),
+        entry(
+            Icon::ArrowLeft,
             "Back to library",
             None,
             Message::Game(GameMessage::CloseGame),
         ),
-    ]);
+    ];
+
+    let mut entries = Vec::new();
+    for mut group in [playing, extras, app, leaving] {
+        if let Some(first) = group.first_mut() {
+            first.starts_group = !entries.is_empty();
+        }
+        entries.append(&mut group);
+    }
 
     entries
 }
@@ -385,16 +409,22 @@ fn main_page<'a>(
     settings: &Settings,
     fullscreen: bool,
 ) -> Element<'a, Message> {
-    let rows = main_entries(game, settings, fullscreen)
+    let mut rows = Column::new().spacing(2);
+    for (index, entry) in main_entries(game, settings, fullscreen)
         .into_iter()
         .enumerate()
-        .map(|(index, entry)| menu_item(entry, index == selection));
+    {
+        if entry.starts_group {
+            rows = rows.push(menu_separator());
+        }
+        rows = rows.push(menu_item(entry, index == selection));
+    }
 
     column![
         text(game.session.name()).size(18).font(theme::HEADING_FONT),
         text("Paused").size(13).style(theme::muted_text),
         space().height(8),
-        Column::with_children(rows).spacing(2),
+        rows,
     ]
     .spacing(2)
     .into()
