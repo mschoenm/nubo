@@ -25,7 +25,7 @@
   <img src="images/screenshots/super-game-boy.png" width="700" alt="Tobu Tobu Girl Deluxe in Nubo, inside the game's own illustrated Super Game Boy border">
 </p>
 
-Nubo emulates the Game Boy cycle by cycle: the processor, the picture and the sound advance together, as they do in the console. Games and demos that depend on exact timing, such as effects that change the picture partway down the screen, run as they do on real hardware. Nubo passes 261 of the 264 tests of the [GB Emulator Shootout](https://gbdev.io/GBEmulatorShootout/), the most of any emulator in its published table.
+Nubo emulates the Game Boy cycle by cycle: the processor, the picture and the sound advance together, as they do in the console. Games and demos that depend on exact timing, such as effects that change the picture partway down the screen, run as they do on real hardware.
 
 It also has a game library, save states, Super Game Boy colors and borders, cheats, and support for controllers.
 
@@ -145,7 +145,6 @@ Screenshots go to your Pictures folder, in `Pictures/Nubo`.
 
 Every change to Nubo is checked against thousands of test ROMs: small programs that each test one detail of the hardware against what real consoles do. Every pull request runs them, and fails if a test that passed stops passing.
 
-- **[GB Emulator Shootout](https://gbdev.io/GBEmulatorShootout/):** 261 of its 264 tests pass, counted on the table published on 2026-06-04, the most in that table (DocBoy, the next, passes 255).
 - **The test ROM suites:** 6,793 of 6,824 test runs pass on the 12 hardware models Nubo emulates, including Blargg's tests, Mooneye, the acid tests, SameSuite, Mealybug Tearoom and Gambatte's.
 - **The processor:** all [JSON CPU tests](https://github.com/adtennant/GameboyCPUTests) pass, which check every instruction cycle by cycle.
 - **Speed:** on one core of a shared 2.1 GHz cloud server, Nubo runs games about 50 to 125 times as fast as a real Game Boy, and 3 to 6 times as fast as SameBoy, which also draws the screen dot by dot.
