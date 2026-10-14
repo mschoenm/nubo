@@ -44,6 +44,12 @@ impl DmgPalette {
         }
     }
 
+    /// The palette's four colors as RGB555, lightest first, for a Super
+    /// Game Boy to color a game with (see `sgb_menu`).
+    pub fn rgb555(self) -> [u16; 4] {
+        self.colors().map(crate::sgb_menu::rgb555)
+    }
+
     /// Repaints a frame of RGBA pixels drawn in the emulator's grays with
     /// this palette. Pixels of any other color are left alone.
     pub fn recolor(self, pixels: &mut [u8]) {

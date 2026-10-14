@@ -19,6 +19,7 @@ fn settings_survive_a_round_trip() {
         controls: Controls::default(),
         dmg_palette: DmgPalette::Pocket,
         sgb_border: false,
+        sgb_own_palette: [0x001F, 0x03E0, 0x7C00, 0x0000],
     };
 
     let contents = toml::to_string(&settings).unwrap();
@@ -49,6 +50,27 @@ fn missing_fields_get_their_defaults() {
     assert!(settings.library_folders.is_empty());
     assert!(!settings.resume_games);
     assert_eq!(settings.fast_forward_speed.multiplier(), 4);
+}
+
+#[test]
+fn the_super_game_boy_palette_is_only_saved_once_the_player_changes_it() {
+    assert!(
+        !toml::to_string(&Settings::default())
+            .unwrap()
+            .contains("sgb_own_palette")
+    );
+    let changed = Settings {
+        sgb_own_palette: [1, 2, 3, 4],
+        ..Settings::default()
+    };
+    let contents = toml::to_string(&changed).unwrap();
+    assert!(contents.contains("sgb_own_palette = [1, 2, 3, 4]"));
+    assert_eq!(
+        toml::from_str::<Settings>(&contents)
+            .unwrap()
+            .sgb_own_palette,
+        [1, 2, 3, 4]
+    );
 }
 
 #[test]
@@ -156,6 +178,7 @@ fn earlier_settings() -> Settings {
         controls,
         dmg_palette: DmgPalette::Pocket,
         sgb_border: true,
+        sgb_own_palette: DEFAULT_OWN_PALETTE,
     }
 }
 

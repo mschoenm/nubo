@@ -1,5 +1,6 @@
 //! The game screen: a bar with the game's controls and the Game Boy screen,
-//! and the pause menu with its save state pages. In a window the bar sits
+//! and the pause menu with its save state, cheats and Super Game Boy
+//! (`sgb.rs`) pages. In a window the bar sits
 //! above the picture. In fullscreen the picture fills the screen and the bar
 //! appears along the bottom when the mouse moves; at the top it would be
 //! hidden behind the menu bar that macOS slides down there. With `--scale`
@@ -16,7 +17,7 @@ use crate::ui::widgets::{
     top_bar, truncated_text, whole_step_screen,
 };
 use iced::widget::{
-    Column, Stack, button, center, column, container, image, row, scrollable, space, text,
+    self, Column, Stack, button, center, column, container, image, row, scrollable, space, text,
     text_input, toggler, tooltip,
 };
 use iced::{Alignment, ContentFit, Element, Fill};
@@ -269,6 +270,15 @@ pub fn main_entries(game: &Game, settings: &Settings, fullscreen: bool) -> Vec<M
         ));
     }
 
+    if game.session.model().is_sgb() {
+        entries.push(entry(
+            Icon::Palette,
+            "Super Game Boy",
+            None,
+            Message::Game(GameMessage::ShowPauseMenu(PauseMenu::SuperGameBoy)),
+        ));
+    }
+
     let (fullscreen_icon, fullscreen_label) = if fullscreen {
         (Icon::Minimize, "Exit fullscreen")
     } else {
@@ -338,17 +348,26 @@ fn pause_menu<'a>(
         PauseMenu::Save => slots_page("Save state", listed_slots(game, true), true, selection),
         PauseMenu::Load => slots_page("Load state", listed_slots(game, false), false, selection),
         PauseMenu::Cheats => cheats_page(game, selection),
+        PauseMenu::SuperGameBoy => sgb::page(game, settings, selection),
     };
 
-    center(
-        container(scrollable(content).spacing(12))
-            .padding(20)
-            .width(MENU_WIDTH)
-            .max_height(MENU_MAX_HEIGHT)
-            .style(theme::panel),
-    )
-    .style(theme::backdrop)
-    .into()
+    let panel = container(scrollable(content).id(pause_scroll_id()).spacing(12))
+        .padding(20)
+        .width(MENU_WIDTH)
+        .max_height(MENU_MAX_HEIGHT)
+        .style(theme::panel);
+
+    // The Super Game Boy page sits at the side over the undimmed game, so
+    // the player sees the colors and border they pick.
+    if page == PauseMenu::SuperGameBoy {
+        return container(panel)
+            .align_right(Fill)
+            .center_y(Fill)
+            .padding(16)
+            .into();
+    }
+
+    center(panel).style(theme::backdrop).into()
 }
 
 fn main_page<'a>(
@@ -389,6 +408,12 @@ fn menu_item<'a>(entry: MenuEntry, selected: bool) -> Element<'a, Message> {
         .style(theme::segment(selected))
         .on_press(entry.message)
         .into()
+}
+
+/// The pause menu's scrolling page, so the app can scroll it to the row the
+/// D-pad is on.
+pub fn pause_scroll_id() -> widget::Id {
+    widget::Id::new("pause-menu")
 }
 
 /// The title of a page below the main one, with a button back to it.
@@ -541,3 +566,5 @@ fn cheats_page(game: &Game, selection: usize) -> Element<'_, Message> {
     .spacing(12)
     .into()
 }
+
+pub mod sgb;

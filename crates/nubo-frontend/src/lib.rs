@@ -4,8 +4,8 @@
 //! It doesn't depend on Iced or any other UI toolkit. It holds:
 //!
 //! - what the RetroArch core needs too: the palettes for original Game Boy
-//!   games ([`palettes`]) and the rule that picks the hardware a game starts
-//!   on ([`model`]);
+//!   games ([`palettes`]), the Super Game Boy menu's choices ([`sgb_menu`])
+//!   and the rule that picks the hardware a game starts on ([`model`]);
 //! - neutral building blocks: clocks that work in the browser too ([`time`]),
 //!   pictures as plain RGBA pixels ([`picture`]), slow work on a thread of its
 //!   own ([`background`]) and problems for the app to show ([`notices`]);
@@ -58,5 +58,6 @@ pub mod screenshots;
 #[cfg(any(feature = "desktop", feature = "web"))]
 pub mod session;
 pub mod settings;
+pub mod sgb_menu;
 pub mod storage;
 pub mod time;

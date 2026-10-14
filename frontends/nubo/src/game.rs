@@ -22,6 +22,37 @@ pub enum PauseMenu {
     Save,
     Load,
     Cheats,
+    /// The colors and border of a game on a Super Game Boy.
+    SuperGameBoy,
+}
+
+/// The borders a player can pick for a Super Game Boy game.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SgbBorderChoice {
+    /// The game's own border, or Nubo's until the game sends one.
+    Game,
+    /// Nubo's border, even when the game sent one.
+    Nubo,
+    /// No border: the Game Boy screen alone.
+    None,
+}
+
+impl SgbBorderChoice {
+    /// Every choice, in the order the menu lists them.
+    pub const ALL: [SgbBorderChoice; 3] = [
+        SgbBorderChoice::Game,
+        SgbBorderChoice::Nubo,
+        SgbBorderChoice::None,
+    ];
+
+    /// The choice's name, for the menu.
+    pub fn label(self) -> &'static str {
+        match self {
+            SgbBorderChoice::Game => "The game's border",
+            SgbBorderChoice::Nubo => "Nubo's border",
+            SgbBorderChoice::None => "No border",
+        }
+    }
 }
 
 /// A running game and the controls the window draws over it.

@@ -5,6 +5,7 @@ use crate::test_roms::{
 };
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::palettes::DmgPalette;
+use nubo_frontend::sgb_menu::SgbColors;
 
 /// Frames the boot ROM takes, with room to spare, before a test program
 /// runs.
@@ -172,6 +173,30 @@ fn a_super_game_boy_shows_its_border_unless_it_is_hidden() {
     });
     assert_eq!(core.video_size(), (SCREEN_WIDTH, SCREEN_HEIGHT));
     assert_eq!(frame(&core).len(), SCREEN_WIDTH * SCREEN_HEIGHT);
+}
+
+#[test]
+fn the_super_game_boy_options_reach_its_menu() {
+    let options = Options {
+        model: ModelPreference::Fixed(Model::Sgb),
+        sgb_colors: SgbColors::Preset(DmgPalette::Green),
+        nubo_border: true,
+        ..Options::default()
+    };
+    let mut core = load_with(&cartridge(ROM_ONLY, 0, false, JOYPAD), options);
+    assert_eq!(
+        core.emulator().sgb_player_palette(),
+        Some(DmgPalette::Green.rgb555())
+    );
+    assert_eq!(core.emulator().sgb_border(), SgbBorder::Nubo);
+
+    core.set_options(Options {
+        sgb_colors: SgbColors::Game,
+        nubo_border: false,
+        ..options
+    });
+    assert_eq!(core.emulator().sgb_player_palette(), None);
+    assert_eq!(core.emulator().sgb_border(), SgbBorder::Game);
 }
 
 #[test]

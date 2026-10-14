@@ -180,9 +180,9 @@ Largest phase, but each part stands alone:
      and the attraction mode: after seven minutes with no button held, clouds drift across Nubo's
      border (`crates/nubo-core/src/sgb/attraction.rs`). Not done: the R, L, L, L, L, R shortcut
      that starts the attraction mode at once, since a Game Boy game has no L and R buttons to read.
-     **Left:** the app's page for it (colors: the game's, a few of Nubo's, or the player's own from a
-     color editor; the border: the game's, Nubo's or none), and the same choices as RetroArch core
-     options.
+     **Done in the apps:** the pause menu's Super Game Boy page (colors: the game's, Gray, Green,
+     Pocket or the player's own from a color editor; the border: the game's, Nubo's or none), and the
+     same choices, without the editor, as RetroArch core options.
 
    Decided against, for now or for good (maintainer, 2026-10-14):
    - **Anything that needs the Super Nintendo itself**: its sound (`SOUND`, `SOU_TRN`) and the

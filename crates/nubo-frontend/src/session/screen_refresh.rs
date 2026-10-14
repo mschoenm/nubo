@@ -98,7 +98,9 @@ impl Session {
         if matches!(command, Command::SetPlayback(_)) {
             self.last_tick = None;
         }
-        self.machine.handle(command);
+        if self.machine.handle(command) {
+            self.frame_sequence += 1;
+        }
     }
 
     /// Captures the game's complete state.

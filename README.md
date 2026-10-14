@@ -35,6 +35,7 @@ These are the files of the [latest release](https://github.com/mschoenm/nubo/rel
   - Fast forward, fullscreen, screenshots, and volume control
   - Keyboard and controller controls you can change, and menus you can use with a controller
   - GameShark and Game Genie cheats per game
+  - A Super Game Boy page in the pause menu, standing in for its own menu: the game's colors, gray, green, Pocket or your own (with a color editor), and the game's border, Nubo's or none
   - Light and dark themes that can follow the system, and gray, green or Pocket colors for Game Boy games
 - In-game saves for battery-backed cartridges, kept in the user's data folder (or the browser's local storage)
 
@@ -93,7 +94,7 @@ Nubo also runs in [RetroArch](https://www.retroarch.com/) and other frontends of
 
 What it does:
 
-- **Games:** every cartridge type the app runs, with the boot ROMs built in, so no BIOS files are needed. The core options pick the model (automatic, or any model from DMG-0 to AGB), the colors of Game Boy games (gray, green or Pocket) and the cartridge clock; the model and the clock take effect when the game is restarted.
+- **Games:** every cartridge type the app runs, with the boot ROMs built in, so no BIOS files are needed. The core options pick the model (automatic, or any model from DMG-0 to AGB), the colors of Game Boy games (gray, green or Pocket), the colors and border of Super Game Boy games (the game's own, or a palette and Nubo's border, as the Super Game Boy's menu picks them) and the cartridge clock; the model and the clock take effect when the game is restarted.
 - **Saves:** RetroArch keeps in-game saves as `.srm` and `.rtc` files. The `.srm` is the same raw cartridge RAM as the app's `.sav` file, and the `.rtc` the same clock file, so saves move between the app and RetroArch by renaming them.
 - **Save states, rewind, run-ahead and netplay**, with states of one fixed size. A state saved with the cartridge clock on real time goes on with the time it is loaded at; for netplay with games that have a clock, such as Pokémon Gold, set the Cartridge clock option to Emulated time on every player's side.
 - **Cheats:** RetroArch's cheat list, with Game Genie and GameShark codes, several in one cheat joined with `+`, and cheats that RetroArch applies itself by writing to memory (its cheat files' RetroArch handler and its cheat search).

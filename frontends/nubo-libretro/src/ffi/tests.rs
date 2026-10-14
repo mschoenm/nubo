@@ -419,7 +419,13 @@ fn the_core_describes_itself() {
         .collect();
     assert_eq!(
         keys,
-        ["nubo_model", "nubo_palette", "nubo_sgb_border", "nubo_rtc"]
+        [
+            "nubo_model",
+            "nubo_palette",
+            "nubo_sgb_colors",
+            "nubo_sgb_border",
+            "nubo_rtc"
+        ]
     );
     for (key, default, values) in &record.options {
         assert_eq!(values.first(), Some(default), "{key}");
@@ -712,7 +718,7 @@ fn older_frontends_get_the_options_in_the_form_they_know() {
             ..default_settings()
         });
         let record = take_record();
-        assert_eq!(record.options.len(), 4);
+        assert_eq!(record.options.len(), 5);
         assert!(record.variables.is_empty());
         finish();
     }
@@ -722,7 +728,7 @@ fn older_frontends_get_the_options_in_the_form_they_know() {
     });
     let record = take_record();
     assert!(record.options.is_empty());
-    let (key, value) = &record.variables[3];
+    let (key, value) = &record.variables[4];
     assert_eq!(key, "nubo_rtc");
     assert_eq!(value, "Cartridge clock; real|emulated");
     assert!(record.variables[0].1.starts_with("Model; auto|DMG-0|DMG|"));
