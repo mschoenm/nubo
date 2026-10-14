@@ -1,0 +1,77 @@
+# Building Nubo
+
+How to build, run and package Nubo from its source code. To play, the [downloads in the README](README.md#download) are all you need; this page is for building it yourself (on macOS, for now, the only way to get the app) and for working on it.
+
+## What You Need
+
+A Rust toolchain installed with [rustup](https://rustup.rs). `rust-toolchain.toml` asks for the newest stable Rust, so run `rustup update` if a build complains. Everything is driven by cargo, on Windows, macOS and Linux.
+
+The test ROMs, the CPU tests and the benchmark games are downloaded with `curl`, which most systems have. `cargo xtask web` adds the WebAssembly target to your toolchain with rustup the first time.
+
+On Linux, sound and controllers also need the ALSA and udev development files, for example `sudo apt install libasound2-dev libudev-dev pkg-config` on Debian or Ubuntu.
+
+## Running
+
+```
+cargo play                          # Run the desktop app
+cargo play path/to/rom.gb           # Run a specific ROM (.gb, .gbc, or a .zip containing one)
+cargo play path/to/rom.gbc --cgb    # Run in Game Boy Color mode
+cargo play path/to/rom.gb --model mgb  # Run on another model: dmg-0, dmg, mgb, sgb, sgb2, cgb-0 to cgb-e, agb
+cargo play path/to/rom.gb --scale 2 --fresh --speed 4  # Only the screen at 2×, keeping nothing, fast forwarding at 4× (for test harnesses)
+cargo xtask web                     # Build the app for the browser and serve it at http://127.0.0.1:8080
+cargo screenshot path/to/rom.gb 10  # Run headless for 10 emulated seconds and save a screenshot to target/screenshots/
+```
+
+The other command-line options are in `frontends/nubo/src/command_line.rs`.
+
+## Packaging
+
+Each package goes into `target/bundle/`. Releases and the nightly build make these on GitHub, so you only need them to build a package yourself.
+
+### macOS
+
+`cargo xtask macos` builds `Nubo.app`, with its own icon in the Dock. Drag it to the Applications folder to install it.
+
+### Windows
+
+`cargo xtask windows` builds `Nubo-<version>-windows-x64.msi`, which installs Nubo for your user (no administrator rights) with a Start menu entry, and can offer Nubo for opening `.gb` and `.gbc` files and add a desktop shortcut. It also writes a zip of the same files, to run Nubo without installing. It needs the [WiX Toolset](https://wixtoolset.org): `dotnet tool install --global wix`, then `wix eula accept wix7` to accept its license (Nubo owes no fee).
+
+The `nightly` pre-release's installer shows as "Nubo (nightly <date>)" once installed (`cargo xtask windows --nightly <date>` names it so).
+
+### Linux
+
+`cargo xtask flatpak` builds the app as a Flatpak and installs it for your user, to try it in the sandbox that Flathub apps run in. It needs flatpak-builder; the first build downloads the freedesktop runtime from Flathub, adding Flathub for your user if it isn't there yet.
+
+It also writes `Nubo-<version>-linux-<architecture>.flatpak`, a single file to give to others, the same as the ones in each release.
+
+### RetroArch
+
+`cargo xtask libretro` builds the RetroArch core's zip; the [README](README.md#retroarch-core) says how to install it.
+
+### Licenses
+
+The macOS app, the web version and the RetroArch core come with `THIRD_PARTY_LICENSES.txt`, the licenses of the Rust crates Nubo is built from. `cargo xtask licenses <folder>` writes it with the other license files; the packaging tasks run it for you.
+
+## Testing
+
+```
+cargo test                          # The emulator's own tests
+cargo test --workspace              # Every crate, the apps and tools included
+cargo test-roms                     # Download and run the test ROM suites (about 30 s)
+cargo cpu-tests                     # Every CPU instruction, checked cycle by cycle
+```
+
+The README's [Accuracy](README.md#accuracy) section lists the test ROM suites and the results.
+
+## Where Things Are
+
+- `crates/nubo-core`: the emulator itself, a plain library with no platform dependencies.
+- `crates/nubo-frontend`: everything an app needs besides drawing: settings, saves, the game library and running a game with its sound.
+- `frontends/nubo`: the desktop and browser app, drawn with [Iced](https://iced.rs).
+- `frontends/nubo-libretro`: the RetroArch core.
+- `tools/`: the developer tools, such as the test ROM runner and the benchmark.
+- `xtask/`: the web build, packaging and the other project tasks ([`xtask/AGENTS.md`](xtask/AGENTS.md) lists them all).
+
+## Contributing
+
+Pull requests are welcome. [`AGENTS.md`](AGENTS.md) holds the project's rules, its code style and the checks to run before you push; it is written for AI coding agents, but it is the same for people. The folders with an `AGENTS.md` of their own explain how their code fits together.
