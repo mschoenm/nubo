@@ -489,7 +489,7 @@ fn a_games_border_has_no_attraction_mode() {
 }
 
 #[test]
-fn save_states_keep_the_menu_settings() {
+fn save_states_keep_what_the_game_did_but_not_the_players_choices() {
     use crate::serializable::Serializable;
 
     let mut console = Console::new();
@@ -502,12 +502,34 @@ fn save_states_keep_the_menu_settings() {
     let mut bytes = Vec::new();
     console.sgb.serialize(&mut bytes).unwrap();
     let mut loaded = Console::new();
+    loaded.sgb.set_player_palette(Some([1, 2, 3, 4]));
     loaded.sgb.deserialize(&mut bytes.as_slice()).unwrap();
-    assert_eq!(loaded.sgb.player_palette(), Some(PLAYER_PALETTE));
-    assert_eq!(loaded.sgb.border_choice(), SgbBorder::Nubo);
+    assert_eq!(loaded.sgb.player_palette(), Some([1, 2, 3, 4]));
+    assert_eq!(loaded.sgb.border_choice(), SgbBorder::Game);
     assert!(loaded.sgb.game_palette_priority);
     assert!(loaded.sgb.attraction_disabled);
     assert_eq!(loaded.sgb.idle_frames, 1);
+}
+
+#[test]
+fn a_loaded_state_keeps_the_colors_the_game_took_back() {
+    use crate::serializable::Serializable;
+
+    let mut console = Console::new();
+    console.send(&[header(command::PAL_PRI, 1), 0x01]);
+    console.sgb.set_player_palette(Some(PLAYER_PALETTE));
+    console.send(&pal01([0, 0x7C00, 0, 0, 0x7C00, 0, 0]));
+    assert_eq!(console.sgb.player_palette(), None);
+
+    let mut bytes = Vec::new();
+    console.sgb.serialize(&mut bytes).unwrap();
+    let mut loaded = Console::new();
+    loaded.sgb.set_player_palette(Some(PLAYER_PALETTE));
+    loaded.sgb.deserialize(&mut bytes.as_slice()).unwrap();
+    assert_eq!(loaded.sgb.player_palette(), None);
+
+    loaded.sgb.set_player_palette(Some(PLAYER_PALETTE));
+    assert_eq!(loaded.sgb.player_palette(), Some(PLAYER_PALETTE));
 }
 
 #[test]

@@ -1043,23 +1043,23 @@ fn the_super_game_boy_intro_is_over_before_the_game_runs() {
 }
 
 #[test]
-fn the_super_game_boy_menu_settings_survive_a_save_state() {
+fn the_players_super_game_boy_choices_stay_when_a_state_loads() {
     let rom = program_rom(Model::Sgb, &[0x18, 0xFE]);
     let mut emulator = booted(Model::Sgb, &rom);
     assert!(emulator.sgb_player_palette_allowed());
+    let state = emulator.save_state();
+
     let palette = [0x7FFF, 0x001F, 0x03E0, 0x7C00];
     emulator.set_sgb_player_palette(Some(palette));
     emulator.set_sgb_border(SgbBorder::Nubo);
+    emulator.load_state(&state).unwrap();
     assert_eq!(emulator.sgb_player_palette(), Some(palette));
+    assert_eq!(emulator.sgb_border(), SgbBorder::Nubo);
 
-    let state = emulator.save_state();
-    let mut loaded = booted(Model::Sgb, &rom);
-    loaded.load_state(&state).unwrap();
-    assert_eq!(loaded.sgb_player_palette(), Some(palette));
-    assert_eq!(loaded.sgb_border(), SgbBorder::Nubo);
-
-    loaded.set_sgb_player_palette(None);
-    assert_eq!(loaded.sgb_player_palette(), None);
+    let mut other = booted(Model::Sgb, &rom);
+    other.load_state(&emulator.save_state()).unwrap();
+    assert_eq!(other.sgb_player_palette(), None);
+    assert_eq!(other.sgb_border(), SgbBorder::Game);
 }
 
 #[test]

@@ -722,14 +722,14 @@ fn start(
 }
 
 /// Gives a Super Game Boy the colors `options` pick, as its menu would.
-/// Other models ignore them. Save states keep the colors they were made
-/// with, so loading one brings those back until the option changes again.
+/// Other models ignore them. Save states don't keep them (they are the
+/// player's), so they stay through loads, rewind and run-ahead.
 fn apply_sgb_colors(emulator: &mut Emulator, options: Options) {
     emulator.set_sgb_player_palette(options.sgb_colors.palette(DEFAULT_OWN_PALETTE));
 }
 
 /// Gives a Super Game Boy the border `options` pick, as its menu would.
-/// Other models ignore it; save states keep it like the colors.
+/// Other models ignore it; like the colors, it stays through loads.
 fn apply_sgb_border(emulator: &mut Emulator, options: Options) {
     emulator.set_sgb_border(if options.nubo_border {
         SgbBorder::Nubo

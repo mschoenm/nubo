@@ -1,0 +1,481 @@
+apu.blep_left.accumulator: f32
+apu.blep_left.buffer: 128 × f32
+apu.blep_left.position: u8
+apu.blep_left: fields
+apu.blep_right.accumulator: f32
+apu.blep_right.buffer: 128 × f32
+apu.blep_right.position: u8
+apu.blep_right: fields
+apu.bus_address: u16
+apu.cgb_double_speed: bool
+apu.highpass_left_charge: f32
+apu.highpass_right_charge: f32
+apu.late_div_events: bool
+apu.pending_div_event: optional bool
+apu.previous_left_outputs: 4 × f32
+apu.previous_right_outputs: 4 × f32
+apu.registers: 48 bytes
+apu.sample_clock: u32
+apu.state.active_channels: u8
+apu.state.channel_1_completed_addend: u16
+apu.state.channel_1_restart_hold: u8
+apu.state.div_event_skip = Inactive
+apu.state.div_event_skip = Pending
+apu.state.div_event_skip = Skipped
+apu.state.div_event_skip: variant
+apu.state.frame_sequencer_step: u8
+apu.state.lfsr_bit_7_before_step: bool
+apu.state.lfsr_stepped_in_narrow: bool
+apu.state.noise.alignment: u8
+apu.state.noise.countdown_reloaded: bool
+apu.state.noise.counter: u16
+apu.state.noise.counter_countdown: u8
+apu.state.noise.current_lfsr_sample: bool
+apu.state.noise.did_step_counter: bool
+apu.state.noise.dmg_delayed_start: u8
+apu.state.noise.envelope.countdown: u8
+apu.state.noise.envelope.locked: bool
+apu.state.noise.envelope.should_lock: bool
+apu.state.noise.envelope.tick_pending: bool
+apu.state.noise.envelope.volume: u8
+apu.state.noise.envelope: fields
+apu.state.noise.length.enabled: bool
+apu.state.noise.length.remaining: u16
+apu.state.noise.length: fields
+apu.state.noise.lfsr: u16
+apu.state.noise.narrow: bool
+apu.state.noise: fields
+apu.state.noise_counting = Background
+apu.state.noise_counting = Running
+apu.state.noise_counting = Stopped
+apu.state.noise_counting: variant
+apu.state.noise_started_with_dac_disabled: bool
+apu.state.pending_envelope_tick: bool
+apu.state.powered_on: bool
+apu.state.samples: 4 bytes
+apu.state.square1.current_sample_index: u8
+apu.state.square1.delay: u8
+apu.state.square1.did_tick: bool
+apu.state.square1.duty_output_high: bool
+apu.state.square1.envelope.countdown: u8
+apu.state.square1.envelope.locked: bool
+apu.state.square1.envelope.should_lock: bool
+apu.state.square1.envelope.tick_pending: bool
+apu.state.square1.envelope.volume: u8
+apu.state.square1.envelope: fields
+apu.state.square1.just_reloaded: bool
+apu.state.square1.length.enabled: bool
+apu.state.square1.length.remaining: u16
+apu.state.square1.length: fields
+apu.state.square1.period: u16
+apu.state.square1.sample_countdown: u16
+apu.state.square1.sample_suppressed: bool
+apu.state.square1: fields
+apu.state.square2.current_sample_index: u8
+apu.state.square2.delay: u8
+apu.state.square2.did_tick: bool
+apu.state.square2.duty_output_high: bool
+apu.state.square2.envelope.countdown: u8
+apu.state.square2.envelope.locked: bool
+apu.state.square2.envelope.should_lock: bool
+apu.state.square2.envelope.tick_pending: bool
+apu.state.square2.envelope.volume: u8
+apu.state.square2.envelope: fields
+apu.state.square2.just_reloaded: bool
+apu.state.square2.length.enabled: bool
+apu.state.square2.length.remaining: u16
+apu.state.square2.length: fields
+apu.state.square2.period: u16
+apu.state.square2.sample_countdown: u16
+apu.state.square2.sample_suppressed: bool
+apu.state.square2: fields
+apu.state.square_sweep_calculate_countdown: u8
+apu.state.square_sweep_calculate_countdown_reload_timer: u8
+apu.state.square_sweep_instant_calculation_done: bool
+apu.state.sweep_pace_counter: u8
+apu.state.sweep_period_addend: u16
+apu.state.sweep_shadow_period: u16
+apu.state.tick_parity: u8
+apu.state.unshifted_sweep: bool
+apu.state.wave.bugged_read_countdown: u8
+apu.state.wave.current_sample_byte: u8
+apu.state.wave.current_sample_index: u8
+apu.state.wave.dac_enabled: bool
+apu.state.wave.length.enabled: bool
+apu.state.wave.length.remaining: u16
+apu.state.wave.length: fields
+apu.state.wave.period: u16
+apu.state.wave.pulsed: bool
+apu.state.wave.sample_countdown: u16
+apu.state.wave.volume_shift: u8
+apu.state.wave.wave_form_just_read: bool
+apu.state.wave: fields
+apu.state: fields
+apu.system_counter: u16
+apu: fields
+bus.elapsed_dots: u64
+bus.extra_oam: 96 bytes
+bus.high_ram: 128 bytes
+bus.in_boot_rom: bool
+bus.interrupt_enable: u8
+bus.ppu_dot_debt: i16
+bus.svbk: u8
+bus.undocumented_registers: 4 bytes
+bus.work_ram: 32768 bytes
+bus: fields
+cartridge.mapper.huc1.is_ir_light_on: bool
+cartridge.mapper.huc1.mode = Infrared
+cartridge.mapper.huc1.mode = Ram
+cartridge.mapper.huc1.mode: variant
+cartridge.mapper.huc1.ram_bank_number: u8
+cartridge.mapper.huc1.rom_bank_number: u8
+cartridge.mapper.huc1: fields
+cartridge.mapper.mbc1.bank1: u8
+cartridge.mapper.mbc1.bank2: u8
+cartridge.mapper.mbc1.mode = Ram
+cartridge.mapper.mbc1.mode = Rom
+cartridge.mapper.mbc1.mode: variant
+cartridge.mapper.mbc1.ram_enabled: bool
+cartridge.mapper.mbc1: fields
+cartridge.mapper.mbc2.ram_enabled: bool
+cartridge.mapper.mbc2.rom_bank_number: u8
+cartridge.mapper.mbc2: fields
+cartridge.mapper.mbc3.latched_rtc.day_high: u8
+cartridge.mapper.mbc3.latched_rtc.day_low: u8
+cartridge.mapper.mbc3.latched_rtc.hours: u8
+cartridge.mapper.mbc3.latched_rtc.minutes: u8
+cartridge.mapper.mbc3.latched_rtc.seconds: u8
+cartridge.mapper.mbc3.latched_rtc: fields
+cartridge.mapper.mbc3.ram_bank_or_rtc_register: u8
+cartridge.mapper.mbc3.ram_rtc_enabled: bool
+cartridge.mapper.mbc3.rom_bank_number: u8
+cartridge.mapper.mbc3.rtc.base_timestamp: f64
+cartridge.mapper.mbc3.rtc.day_carry: bool
+cartridge.mapper.mbc3.rtc.days: u16
+cartridge.mapper.mbc3.rtc.halted: bool
+cartridge.mapper.mbc3.rtc.hours: u8
+cartridge.mapper.mbc3.rtc.milliseconds: u16
+cartridge.mapper.mbc3.rtc.minutes: u8
+cartridge.mapper.mbc3.rtc.seconds: u8
+cartridge.mapper.mbc3.rtc: fields
+cartridge.mapper.mbc3.rtc_clock = EmulatedTime
+cartridge.mapper.mbc3.rtc_clock = WallClock
+cartridge.mapper.mbc3.rtc_clock: variant
+cartridge.mapper.mbc3: fields
+cartridge.mapper.mbc5.is_rumbling: bool
+cartridge.mapper.mbc5.ram_bank_number: u8
+cartridge.mapper.mbc5.ram_enabled: bool
+cartridge.mapper.mbc5.rom_bank_number: u16
+cartridge.mapper.mbc5: fields
+cartridge.mapper: fields
+cartridge.ram: list of u8
+cartridge: fields
+cpu.ime = Off
+cpu.ime = On
+cpu.ime = OnAfterNextInstruction
+cpu.ime: variant
+cpu.next_instruction = HaltBug
+cpu.next_instruction = HaltBugDuringHdma
+cpu.next_instruction = Normal
+cpu.next_instruction = StopOpcodeKept
+cpu.next_instruction: variant
+cpu.registers.a: u8
+cpu.registers.b: u8
+cpu.registers.c: u8
+cpu.registers.d: u8
+cpu.registers.e: u8
+cpu.registers.f: u8
+cpu.registers.h: u8
+cpu.registers.l: u8
+cpu.registers.opcode: u8
+cpu.registers.program_counter: u16
+cpu.registers.stack_pointer: u16
+cpu.registers: fields
+cpu.run_state = Halted
+cpu.run_state = JustHalted
+cpu.run_state = Running
+cpu.run_state = Stopped
+cpu.run_state: variant
+cpu: fields
+header.game_checksum: u16
+header.game_title: text
+header.model = AGB
+header.model = CGB-0
+header.model = CGB-A
+header.model = CGB-B
+header.model = CGB-C
+header.model = CGB-D
+header.model = CGB-E
+header.model = DMG
+header.model = DMG-0
+header.model = MGB
+header.model = SGB
+header.model = SGB2
+header.model: text
+header.nubo_commit: text
+header.nubo_version: text
+joypad.group_select: u8
+joypad.interrupt: bool
+joypad.sgb_current_player: u8
+joypad.sgb_player_count: u8
+joypad: fields
+oam_dma.in_progress: bool
+oam_dma.offset: u8
+oam_dma.paused_by_halt: bool
+oam_dma.register: u8
+oam_dma.source_address: u16
+oam_dma.start_delay: u8
+oam_dma: fields
+ppu.cgb_opri: u8
+ppu.cgb_vbk: u8
+ppu.compared_lyc: u8
+ppu.countdowns.delayed_wy_update: u8
+ppu.countdowns.early_hblank: u8
+ppu.countdowns.first_line_vram_grace: u8
+ppu.countdowns.lyc_interrupt: u8
+ppu.countdowns.lyc_source_hold: u8
+ppu.countdowns.lyc_write: u8
+ppu.countdowns.oam_dma_access: u8
+ppu.countdowns.palette_block: u8
+ppu.countdowns.palette_unblock: u8
+ppu.countdowns.stat_clear: u8
+ppu.countdowns: fields
+ppu.delayed_wy: u8
+ppu.early_hblank_interrupt: bool
+ppu.fetcher_start_delay: u8
+ppu.first_frame_after_lcd_on: bool
+ppu.first_line_after_lcd_on: bool
+ppu.frame_buffer: list of 4 bytes
+ppu.hdma_start_delay: u8
+ppu.idle_dots: u32
+ppu.key0: u8
+ppu.late_cleared_stat_sources: u8
+ppu.lcd_off_hblank_dma: bool
+ppu.lcdc: u8
+ppu.line: u8
+ppu.line_0_oam_interrupt_blocked: bool
+ppu.line_dot: u16
+ppu.line_state = Drawing
+ppu.line_state = HBlank
+ppu.line_state = OamScan
+ppu.line_state = VBlank
+ppu.line_state: variant
+ppu.ly: u8
+ppu.lyc: u8
+ppu.lyc_flag: bool
+ppu.lyc_source_line: optional u8
+ppu.mode_0_interrupt_delay: u8
+ppu.next_oam_dma_access = Free
+ppu.next_oam_dma_access = PausedByHalt
+ppu.next_oam_dma_access = Running
+ppu.next_oam_dma_access: variant and u8
+ppu.oam_dma_access = Free
+ppu.oam_dma_access = PausedByHalt
+ppu.oam_dma_access = Running
+ppu.oam_dma_access: variant and u8
+ppu.oam_scan_row: u8
+ppu.oam_scan_x_bus: u8
+ppu.oam_scan_y_bus: u8
+ppu.object_attribute_memory: 160 bytes
+ppu.palette_ram_blocked: bool
+ppu.palettes.bg_palette_ram: 64 bytes
+ppu.palettes.bgp: u8
+ppu.palettes.cgb_bcps: u8
+ppu.palettes.cgb_ocps: u8
+ppu.palettes.object_palette_ram: 64 bytes
+ppu.palettes.obp0: u8
+ppu.palettes.obp1: u8
+ppu.palettes: fields
+ppu.pending_dma_oam_write.index: u16
+ppu.pending_dma_oam_write.value: u8
+ppu.pending_dma_oam_write: optional fields
+ppu.pipeline.bg_fifo.bg_priority: bool
+ppu.pipeline.bg_fifo.lower: u8
+ppu.pipeline.bg_fifo.palette: u8
+ppu.pipeline.bg_fifo.size: u8
+ppu.pipeline.bg_fifo.upper: u8
+ppu.pipeline.bg_fifo: fields
+ppu.pipeline.cached_fetcher_y: u8
+ppu.pipeline.cgb_wx_glitch: bool
+ppu.pipeline.current_tile: u8
+ppu.pipeline.current_tile_attributes: u8
+ppu.pipeline.current_tile_data: 2 bytes
+ppu.pipeline.data_for_sel_glitch: u8
+ppu.pipeline.disable_window_pixel_insertion_glitch: bool
+ppu.pipeline.during_object_fetch: bool
+ppu.pipeline.fetcher_state = GetTileDataHighT1
+ppu.pipeline.fetcher_state = GetTileDataHighT2
+ppu.pipeline.fetcher_state = GetTileDataLowT1
+ppu.pipeline.fetcher_state = GetTileDataLowT2
+ppu.pipeline.fetcher_state = GetTileT1
+ppu.pipeline.fetcher_state = GetTileT2
+ppu.pipeline.fetcher_state = Push
+ppu.pipeline.fetcher_state: variant
+ppu.pipeline.insert_bg_pixel: bool
+ppu.pipeline.last_tile_data_address: u16
+ppu.pipeline.last_tile_index_address: u16
+ppu.pipeline.last_tileset: bool
+ppu.pipeline.last_unsigned_fetch_data: u8
+ppu.pipeline.lcd_x: u8
+ppu.pipeline.line_has_fractional_scrolling: bool
+ppu.pipeline.oam_fifo.head: u8
+ppu.pipeline.oam_fifo.items.bg_priority: bool
+ppu.pipeline.oam_fifo.items.color_id: u8
+ppu.pipeline.oam_fifo.items.palette: u8
+ppu.pipeline.oam_fifo.items.priority: u8
+ppu.pipeline.oam_fifo.items: 8 × fields
+ppu.pipeline.oam_fifo.size: u8
+ppu.pipeline.oam_fifo: fields
+ppu.pipeline.object_fetch_aborted: bool
+ppu.pipeline.object_flags: u8
+ppu.pipeline.object_tile: u8
+ppu.pipeline.object_tile_data: 2 bytes
+ppu.pipeline.phase = AfterWindowStall
+ppu.pipeline.phase = Done
+ppu.pipeline.phase = ExtraFetcherStep
+ppu.pipeline.phase = LineStart
+ppu.pipeline.phase = ObjectAttributesWait
+ppu.pipeline.phase = ObjectCheck
+ppu.pipeline.phase = ObjectLowWait
+ppu.pipeline.phase = OverlayObject
+ppu.pipeline.phase = ReadObjectAttributes
+ppu.pipeline.phase = ReadObjectHigh
+ppu.pipeline.phase = ReadObjectLow
+ppu.pipeline.phase = Render
+ppu.pipeline.phase = WaitForFetcher
+ppu.pipeline.phase: variant
+ppu.pipeline.position_in_line: u8
+ppu.pipeline.visible_object_count: u8
+ppu.pipeline.visible_object_indices: 10 bytes
+ppu.pipeline.visible_object_x: 10 bytes
+ppu.pipeline.visible_object_y: 10 bytes
+ppu.pipeline.window_continue_pending: bool
+ppu.pipeline.window_is_being_fetched: bool
+ppu.pipeline.window_start_backup.bg_fifo.bg_priority: bool
+ppu.pipeline.window_start_backup.bg_fifo.lower: u8
+ppu.pipeline.window_start_backup.bg_fifo.palette: u8
+ppu.pipeline.window_start_backup.bg_fifo.size: u8
+ppu.pipeline.window_start_backup.bg_fifo.upper: u8
+ppu.pipeline.window_start_backup.bg_fifo: fields
+ppu.pipeline.window_start_backup.current_tile: u8
+ppu.pipeline.window_start_backup.current_tile_attributes: u8
+ppu.pipeline.window_start_backup.current_tile_data: 2 bytes
+ppu.pipeline.window_start_backup.fetcher_state = GetTileDataHighT1
+ppu.pipeline.window_start_backup.fetcher_state = GetTileDataHighT2
+ppu.pipeline.window_start_backup.fetcher_state = GetTileDataLowT1
+ppu.pipeline.window_start_backup.fetcher_state = GetTileDataLowT2
+ppu.pipeline.window_start_backup.fetcher_state = GetTileT1
+ppu.pipeline.window_start_backup.fetcher_state = GetTileT2
+ppu.pipeline.window_start_backup.fetcher_state = Push
+ppu.pipeline.window_start_backup.fetcher_state: variant
+ppu.pipeline.window_start_backup: optional fields
+ppu.pipeline.window_tile_x: u8
+ppu.pipeline.window_y: u8
+ppu.pipeline.wx_triggered: bool
+ppu.pipeline: fields
+ppu.previous_lcdc: u8
+ppu.previous_lyc_flag: bool
+ppu.scx: u8
+ppu.scy: u8
+ppu.sgb.attraction_disabled: bool
+ppu.sgb.attribute_files: 4064 bytes
+ppu.sgb.attribute_map: 360 bytes
+ppu.sgb.border.from_game: bool
+ppu.sgb.border.map: 2176 bytes
+ppu.sgb.border.tiles: 8192 bytes
+ppu.sgb.border: fields
+ppu.sgb.border_fade: u8
+ppu.sgb.colorized: bool
+ppu.sgb.commands_enabled: bool
+ppu.sgb.game_palette_priority: bool
+ppu.sgb.idle_frames: u32
+ppu.sgb.intro_frames: u16
+ppu.sgb.mask = Black
+ppu.sgb.mask = Color0
+ppu.sgb.mask = Freeze
+ppu.sgb.mask = Off
+ppu.sgb.mask: variant
+ppu.sgb.palette_taken_back: bool
+ppu.sgb.palettes: 32 bytes
+ppu.sgb.pending_border.from_game: bool
+ppu.sgb.pending_border.map: 2176 bytes
+ppu.sgb.pending_border.tiles: 8192 bytes
+ppu.sgb.pending_border: fields
+ppu.sgb.player_palettes_disabled: bool
+ppu.sgb.receiver.bits_received: u16
+ppu.sgb.receiver.command: 112 bytes
+ppu.sgb.receiver.ready_for_bit: bool
+ppu.sgb.receiver.ready_for_stop: bool
+ppu.sgb.receiver: fields
+ppu.sgb.screen: 23040 bytes
+ppu.sgb.shown_screen: 23040 bytes
+ppu.sgb.system_palettes: 4096 bytes
+ppu.sgb.transfer.destination = AttributeFiles
+ppu.sgb.transfer.destination = BorderMap
+ppu.sgb.transfer.destination = HighBorderTiles
+ppu.sgb.transfer.destination = LowBorderTiles
+ppu.sgb.transfer.destination = SystemPalettes
+ppu.sgb.transfer.destination: variant
+ppu.sgb.transfer.frames_left: u8
+ppu.sgb.transfer: optional fields
+ppu.sgb: optional fields
+ppu.stat: u8
+ppu.stat_at_line_start: u8
+ppu.stat_interrupt: bool
+ppu.stat_line_high: bool
+ppu.stop_blocks.oam: bool
+ppu.stop_blocks.palettes: bool
+ppu.stop_blocks.vram: bool
+ppu.stop_blocks: fields
+ppu.stopped: bool
+ppu.timing = Cgb
+ppu.timing = CgbDoubleSpeed
+ppu.timing = Dmg
+ppu.timing: variant
+ppu.vblank_interrupt: bool
+ppu.video_ram: 16384 bytes
+ppu.visible_mode: u8
+ppu.window_y_triggered: bool
+ppu.wx: u8
+ppu.wy: u8
+ppu: fields
+serial.bits_transferred: u8
+serial.cgb_mode: bool
+serial.clock_high: bool
+serial.data: u8
+serial.interrupt: bool
+serial.is_high_speed_clock: bool
+serial.last_system_counter: u16
+serial.transfer_enabled: bool
+serial.uses_internal_clock: bool
+serial: fields
+speed_switch.armed: bool
+speed_switch.cgb_double_speed: bool
+speed_switch.double_speed_delay: u8
+speed_switch.freeze: u8
+speed_switch.halt_ended: bool
+speed_switch.halt_units: u32
+speed_switch.timer_hold: bool
+speed_switch: fields
+timers.control: u8
+timers.counter: u8
+timers.interrupt: bool
+timers.modulo: u8
+timers.reload_pending: bool
+timers.reloading: bool
+timers.system_counter: u16
+timers: fields
+vram_dma.cancelled_after_block: bool
+vram_dma.completed: bool
+vram_dma.copy_starts_on_wake: bool
+vram_dma.destination: u16
+vram_dma.halted_outside_hblank: bool
+vram_dma.hblank_started: bool
+vram_dma.in_progress: bool
+vram_dma.keep_block_through_halt: bool
+vram_dma.source: u16
+vram_dma.transfer_length: u8
+vram_dma.transfer_mode = GeneralPurpose
+vram_dma.transfer_mode = HBlank
+vram_dma.transfer_mode: variant
+vram_dma: fields

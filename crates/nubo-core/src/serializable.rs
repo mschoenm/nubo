@@ -585,6 +585,12 @@ impl<T: Serializable> Serializable for Box<T> {
 }
 
 /// An `Option` is stored as a 0 byte for `None`, or a 1 byte followed by the value.
+///
+/// A value that is already there is read into in place, as a plain field
+/// is, so what its type leaves out of save states (caches, and the Super
+/// Game Boy menu's choices, which are the player's) stays as it is and isn't
+/// made again on every load. Stored values are still all replaced: a load
+/// first reads the power-on state, then the saved one.
 impl<T: Serializable + Default> Serializable for Option<T> {
     fn serialize(&self, writer: &mut dyn Write) -> Result<()> {
         match self {
@@ -605,11 +611,14 @@ impl<T: Serializable + Default> Serializable for Option<T> {
 
         match tag {
             0 => *self = None,
-            1 => {
-                let mut value = T::default();
-                value.deserialize(reader)?;
-                *self = Some(value);
-            }
+            1 => match self {
+                Some(value) => value.deserialize(reader)?,
+                None => {
+                    let mut value = T::default();
+                    value.deserialize(reader)?;
+                    *self = Some(value);
+                }
+            },
             _ => return Err(unreadable_value("an Option's tag isn't 0 or 1")),
         }
         Ok(())

@@ -2,8 +2,9 @@
 //! shows (the game's own, one of Nubo's palettes, or the player's own) and
 //! which border shows around the screen. A real Super Game Boy has a menu for
 //! this, opened with the Super Nintendo's L and R buttons; the emulator keeps
-//! the choices as part of the console (`Emulator::set_sgb_player_palette`,
-//! `Emulator::set_sgb_border`), and each app draws a page of its own for
+//! the choices (`Emulator::set_sgb_player_palette`, `Emulator::set_sgb_border`)
+//! until the game starts again, also when a save state loads, since they are
+//! the player's rather than the game's. Each app draws a page of its own for
 //! them.
 
 use crate::palettes::DmgPalette;
