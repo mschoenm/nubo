@@ -144,6 +144,15 @@ jobs:
             }
           }
 
+          # The runner is an administrator, so installing here can't show
+          # whether players get an administrator prompt. The MSI's summary
+          # (its Word Count, property 15) says so instead: 8 means it needs
+          # no elevated rights, which a per-user package gets.
+          $summary = Get-ComMember $installer "SummaryInformation" @($msi, 0)
+          $wordCount = Get-ComMember $summary "Property" @(15)
+          $null = [Runtime.InteropServices.Marshal]::ReleaseComObject($summary)
+          if (($wordCount -band 8) -eq 0) { throw "The MSI asks for administrator rights (Word Count $wordCount)" }
+
           # The installed Nubos, found by the UpgradeCode that every Nubo MSI
           # shares.
           $upgradeCode = Get-MsiProperty $msi "UpgradeCode"
