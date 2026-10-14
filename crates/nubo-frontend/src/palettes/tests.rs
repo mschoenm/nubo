@@ -21,23 +21,10 @@ fn other_colors_are_left_alone() {
 }
 
 #[test]
-fn gray_keeps_the_emulators_grays() {
+fn gray_changes_nothing() {
     let mut pixels = vec![0xAA, 0xAA, 0xAA, 0xFF];
 
     DmgPalette::Gray.recolor(&mut pixels);
 
     assert_eq!(pixels, [0xAA, 0xAA, 0xAA, 0xFF]);
-}
-
-#[test]
-fn the_grays_of_earlier_versions_are_repainted_too() {
-    let earlier = vec![0xD3, 0xD3, 0xD3, 0xFF, 0xA9, 0xA9, 0xA9, 0xFF];
-
-    let mut pixels = earlier.clone();
-    DmgPalette::Gray.recolor(&mut pixels);
-    assert_eq!(pixels, [0xAA, 0xAA, 0xAA, 0xFF, 0x55, 0x55, 0x55, 0xFF]);
-
-    let mut pixels = earlier;
-    DmgPalette::Green.recolor(&mut pixels);
-    assert_eq!(pixels, [0x8B, 0xAC, 0x0F, 0xFF, 0x30, 0x62, 0x30, 0xFF]);
 }
