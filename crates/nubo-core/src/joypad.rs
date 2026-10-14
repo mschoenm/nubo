@@ -307,12 +307,12 @@ impl Joypad {
     }
 
     /// Works out what each player holds: the first player the keyboard and
-    /// every controller, or with more than one player only the first
-    /// controller; each other player their own controller and the keys the
-    /// frontend holds for them.
+    /// every controller, or with more than one player the first controller
+    /// and those after the fourth; each other player their own controller and
+    /// the keys the frontend holds for them.
     fn combine_keys(&mut self) {
         let first_controller = if self.sgb_player_count > 1 {
-            self.controller_keys[0]
+            self.controller_keys[0] | self.other_controller_keys
         } else {
             self.controller_keys
                 .iter()
@@ -729,5 +729,15 @@ mod tests {
             0x0F,
             "the second controller isn't the first player's"
         );
+    }
+
+    #[test]
+    fn controllers_after_the_fourth_keep_playing_the_first_player() {
+        let mut joypad = Joypad::new();
+        let mut states = vec![ControllerState::new(); 4];
+        states.push(controller_pressing(ControllerButton::East));
+        joypad.set_controller_states(&states);
+        joypad.write_byte_with_sgb_players(0x10, Some(4));
+        assert_eq!(joypad.read_byte() & 0x0F, 0x0E);
     }
 }
