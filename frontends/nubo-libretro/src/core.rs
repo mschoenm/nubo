@@ -215,6 +215,9 @@ pub struct Core {
     audio: Vec<i16>,
     /// The libretro buttons held during the last frame, one bit each.
     held_buttons: u16,
+    /// The libretro buttons the second to fourth players held during the
+    /// last frame, one bit each (see [`Core::set_other_players`]).
+    other_players_held: [u16; 3],
     /// The codes of each RetroArch cheat that are on, by its index.
     cheats: BTreeMap<u32, Vec<Cheat>>,
     /// The length every save state is padded to.
@@ -255,6 +258,7 @@ impl Core {
             right: Vec::new(),
             audio: Vec::new(),
             held_buttons: 0,
+            other_players_held: [0; 3],
             cheats: BTreeMap::new(),
             state_size: 0,
             memory: MemorySnapshot::new(),
@@ -338,6 +342,7 @@ impl Core {
         self.emulator = emulator;
         self.reregister_cheats();
         self.held_buttons = 0;
+        self.other_players_held = [0; 3];
         self.sync_saves_from_emulator();
         self.draw_frame();
         self.memory.update(&mut self.emulator);
@@ -410,6 +415,32 @@ impl Core {
             self.rtc_memory.copy_from_slice(&clock.to_bytes());
             self.rtc_copy.copy_from_slice(&self.rtc_memory);
         }
+    }
+
+    /// Holds the buttons of the second to fourth players, RetroArch's ports
+    /// 2 to 4 (one bit per libretro button number, see [`BUTTONS`]). A Super
+    /// Game Boy game reads them once it asks for more than one player;
+    /// otherwise they do nothing.
+    pub fn set_other_players(&mut self, buttons: [u16; 3]) {
+        for (player, (&held, before)) in (2..).zip(buttons.iter().zip(&mut self.other_players_held))
+        {
+            if held == *before {
+                continue;
+            }
+            let keys: Vec<Key> = BUTTONS
+                .iter()
+                .filter(|(id, _, _)| held & 1 << id != 0)
+                .map(|&(_, key, _)| key)
+                .collect();
+            self.emulator.set_player_keys(player, &keys);
+            *before = held;
+        }
+    }
+
+    /// The buttons last handed over for the second to fourth players.
+    #[cfg(test)]
+    pub fn other_players_held_for_tests(&self) -> [u16; 3] {
+        self.other_players_held
     }
 
     /// Presses and releases the Game Boy buttons whose libretro buttons

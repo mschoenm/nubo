@@ -83,7 +83,7 @@ Left: the maintainer's tests by hand (above), the AppStream release notes entry 
 3. **Options and defaults.** By default the model follows the desktop app (Game Boy Color games on
    CGB-E, Super Game Boy games on SGB, others on DMG), with a gray palette, the Super Game Boy's
    border shown (the picture is then 256×224, and RetroArch is told whenever its size changes) and the
-   cartridge clock on real time. Change these if needed.
+   cartridge clock on real time. Ports 2 to 4 play a Super Game Boy's second to fourth players. Change these if needed.
 
 ## References
 

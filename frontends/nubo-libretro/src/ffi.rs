@@ -62,6 +62,7 @@ const RETRO_ENVIRONMENT_SET_VARIABLES: c_uint = 16;
 const RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE: c_uint = 17;
 const RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE: c_uint = 23;
 const RETRO_ENVIRONMENT_GET_LOG_INTERFACE: c_uint = 27;
+const RETRO_ENVIRONMENT_SET_CONTROLLER_INFO: c_uint = 35;
 const RETRO_ENVIRONMENT_SET_MEMORY_MAPS: c_uint = 36 | RETRO_ENVIRONMENT_EXPERIMENTAL;
 const RETRO_ENVIRONMENT_SET_GEOMETRY: c_uint = 37;
 const RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS: c_uint = 42 | RETRO_ENVIRONMENT_EXPERIMENTAL;
@@ -157,6 +158,20 @@ struct RetroInputDescriptor {
     index: c_uint,
     id: c_uint,
     description: *const c_char,
+}
+
+/// `struct retro_controller_description`
+#[repr(C)]
+struct RetroControllerDescription {
+    desc: *const c_char,
+    id: c_uint,
+}
+
+/// `struct retro_controller_info`
+#[repr(C)]
+struct RetroControllerInfo {
+    types: *const RetroControllerDescription,
+    num_types: c_uint,
 }
 
 /// `struct retro_log_callback`
@@ -512,15 +527,20 @@ fn set_input_descriptors() {
         .iter()
         .map(|(_, _, name)| CString::new(*name).unwrap_or_default())
         .collect();
-    let mut descriptors: Vec<RetroInputDescriptor> = BUTTONS
-        .iter()
-        .zip(&names)
-        .map(|((id, _, _), name)| RetroInputDescriptor {
-            port: 0,
-            device: RETRO_DEVICE_JOYPAD,
-            index: 0,
-            id: *id,
-            description: name.as_ptr(),
+    // The same buttons on all four ports: the second to fourth are the other
+    // players of a Super Game Boy's multitap.
+    let mut descriptors: Vec<RetroInputDescriptor> = (0..4)
+        .flat_map(|port| {
+            BUTTONS
+                .iter()
+                .zip(&names)
+                .map(move |((id, _, _), name)| RetroInputDescriptor {
+                    port,
+                    device: RETRO_DEVICE_JOYPAD,
+                    index: 0,
+                    id: *id,
+                    description: name.as_ptr(),
+                })
         })
         .collect();
     descriptors.push(RetroInputDescriptor {
@@ -584,20 +604,21 @@ fn set_memory_maps(core: &mut Core) {
     environment(RETRO_ENVIRONMENT_SET_MEMORY_MAPS, (&raw mut map).cast());
 }
 
-/// Reads which buttons the player holds on the first controller, one bit
-/// per libretro button number.
-fn read_buttons(frontend: &Frontend) -> u16 {
+/// Reads which buttons the player on `port` (0 for the first) holds, one
+/// bit per libretro button number.
+fn read_buttons(frontend: &Frontend, port: c_uint) -> u16 {
     let Some(input_state) = frontend.input_state else {
         return 0;
     };
     if frontend.input_bitmasks {
         // SAFETY: a plain call into RetroArch with numbers.
-        let mask = unsafe { input_state(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK) };
+        let mask =
+            unsafe { input_state(port, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK) };
         return mask as u16;
     }
     BUTTONS.iter().fold(0, |held, (id, _, _)| {
         // SAFETY: a plain call into RetroArch with numbers.
-        let pressed = unsafe { input_state(0, RETRO_DEVICE_JOYPAD, 0, *id) } != 0;
+        let pressed = unsafe { input_state(port, RETRO_DEVICE_JOYPAD, 0, *id) } != 0;
         if pressed { held | 1 << id } else { held }
     })
 }
@@ -776,7 +797,35 @@ pub extern "C" fn retro_set_environment(callback: Option<RetroEnvironment>) {
             lock(&FRONTEND).log = log_callback.log;
         }
         set_core_options();
+        set_controller_info();
     });
+}
+
+/// Declares the core's four controller ports, each a Game Boy's buttons: the
+/// first player's, and the other players of a Super Game Boy's multitap.
+fn set_controller_info() {
+    let joypad = [RetroControllerDescription {
+        desc: c"Game Boy".as_ptr(),
+        id: RETRO_DEVICE_JOYPAD,
+    }];
+    let port = || RetroControllerInfo {
+        types: joypad.as_ptr(),
+        num_types: 1,
+    };
+    let mut ports = [
+        port(),
+        port(),
+        port(),
+        port(),
+        RetroControllerInfo {
+            types: ptr::null(),
+            num_types: 0,
+        },
+    ];
+    environment(
+        RETRO_ENVIRONMENT_SET_CONTROLLER_INFO,
+        ports.as_mut_ptr().cast(),
+    );
 }
 
 /// Keeps the callback that shows frames.
@@ -852,12 +901,14 @@ pub extern "C" fn retro_run() {
             // SAFETY: a plain call into RetroArch.
             unsafe { input_poll() };
         }
-        let buttons = read_buttons(&frontend);
+        let buttons = read_buttons(&frontend, 0);
+        let other_players = [1, 2, 3].map(|port| read_buttons(&frontend, port));
 
         let mut core = lock(&CORE);
         let Some(core) = core.as_mut() else {
             return;
         };
+        core.set_other_players(other_players);
         core.run(buttons);
         present(core);
     });

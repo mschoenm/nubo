@@ -119,7 +119,7 @@ pub enum Command {
     /// Plays as this says from now on.
     SetPlayback(Playback),
     /// What the controllers are doing now.
-    SetControllerState(ControllerState),
+    SetControllerStates(Vec<ControllerState>),
     /// Which controller buttons press which Game Boy buttons.
     SetControllerMapping(ControllerMapping),
     /// Turns a cheat on or off, as its `enabled` field says.
@@ -191,7 +191,7 @@ impl Machine {
             Command::Press(key) => self.emulator.press_key(key),
             Command::Release(key) => self.emulator.release_key(key),
             Command::SetPlayback(playback) => self.set_playback(playback),
-            Command::SetControllerState(state) => self.emulator.set_controller_state(&state),
+            Command::SetControllerStates(states) => self.emulator.set_controller_states(&states),
             Command::SetControllerMapping(mapping) => self.emulator.set_controller_mapping(mapping),
             Command::SetCheat(cheat) => cheat.apply_to(&mut self.emulator),
             Command::SaveState(reply) => {

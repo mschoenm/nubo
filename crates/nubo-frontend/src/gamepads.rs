@@ -1,5 +1,8 @@
-//! Game controllers (gamepads), read with gilrs and combined into one
-//! controller state (the `gamepads` feature). The app hears about them
+//! Game controllers (gamepads), read with gilrs (the `gamepads` feature).
+//! Each controller's state is reported in the order of gilrs's numbers for
+//! them ([`Controllers`]): the game gives each one to its own player when a
+//! Super Game Boy game asks for more than one, and menus and shortcuts use them
+//! all combined. The app hears about them
 //! whatever it shows (Nubo's app turns them into an Iced subscription), so
 //! controllers work on every screen: to play, to use shortcuts such as the
 //! pause menu, and to pick buttons in the settings.
@@ -20,7 +23,7 @@ use gilrs::{Axis, Button, Event, EventType, Gamepad, Gilrs, GilrsBuilder};
 
 #[cfg(target_arch = "wasm32")]
 pub use frame::next_event;
-use nubo_core::{ControllerButton, ControllerState};
+use nubo_core::{ControllerButton, ControllerState, Key};
 #[cfg(not(target_arch = "wasm32"))]
 pub use thread::read_on_thread;
 
@@ -49,6 +52,88 @@ const BUTTONS: [(Button, ControllerButton); 16] = [
     (Button::RightThumb, ControllerButton::RightStick),
 ];
 
+/// A connected controller's identity, which stays the same while it is
+/// connected, even when a controller before it in the list disconnects: the
+/// number gilrs gives it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ControllerId(pub usize);
+
+/// What every connected controller is doing, in the order gilrs lists them:
+/// by the number gilrs gives each, the lowest first. A controller that
+/// disconnects and comes back gets its number back, so it takes its old
+/// place (and Super Game Boy player) again, rather than moving behind the
+/// controllers that were connected meanwhile.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Controllers {
+    /// Each controller's identity, in the order of `each`.
+    ids: Vec<ControllerId>,
+    each: Vec<ControllerState>,
+}
+
+impl Controllers {
+    /// The controllers' states, the first controller's first.
+    pub fn each(&self) -> &[ControllerState] {
+        &self.each
+    }
+
+    /// The controllers' identities, in the order of [`Controllers::each`].
+    pub fn ids(&self) -> &[ControllerId] {
+        &self.ids
+    }
+
+    /// The state of the controller `id`, if it is connected.
+    pub fn state(&self, id: ControllerId) -> Option<&ControllerState> {
+        let index = self.ids.iter().position(|&known| known == id)?;
+        self.each.get(index)
+    }
+
+    /// Every controller combined: a button counts as held if it is held on
+    /// any of them, and the stick points where the first one pushed points.
+    pub fn combined(&self) -> ControllerState {
+        let mut combined = ControllerState::new();
+        for state in &self.each {
+            for button in ControllerButton::ALL {
+                if state.is_pressed(button) {
+                    combined.set_button(button, true);
+                }
+            }
+        }
+        let axis = |positive, negative| {
+            self.each
+                .iter()
+                .find_map(|state| {
+                    let pushed = |key| state.stick_directions().any(|held| held == key);
+                    match (pushed(positive), pushed(negative)) {
+                        (true, false) => Some(1.0),
+                        (false, true) => Some(-1.0),
+                        _ => None,
+                    }
+                })
+                .unwrap_or(0.0)
+        };
+        combined.set_left_stick(axis(Key::Right, Key::Left), axis(Key::Up, Key::Down));
+        combined
+    }
+}
+
+impl From<Vec<(ControllerId, ControllerState)>> for Controllers {
+    /// Controllers with these identities doing what their states say.
+    fn from(controllers: Vec<(ControllerId, ControllerState)>) -> Self {
+        let (ids, each) = controllers.into_iter().unzip();
+        Controllers { ids, each }
+    }
+}
+
+impl From<Vec<ControllerState>> for Controllers {
+    /// Controllers doing what `each` says, numbered from 0 in its order.
+    fn from(each: Vec<ControllerState>) -> Self {
+        Controllers {
+            ids: (0..each.len()).map(ControllerId).collect(),
+            each,
+        }
+    }
+}
+
 /// News about the controllers.
 #[derive(Debug, Clone)]
 pub enum ControllerEvent {
@@ -58,7 +143,7 @@ pub enum ControllerEvent {
     /// The controller with this name was disconnected.
     Disconnected(String),
     /// The buttons held or the stick direction changed, on any controller.
-    Changed(ControllerState),
+    Changed(Controllers),
     /// Controller support couldn't start, for this reason.
     Unavailable(String),
 }
@@ -66,7 +151,7 @@ pub enum ControllerEvent {
 /// Reads all connected controllers and remembers what it last reported.
 struct Reader {
     gilrs: Gilrs,
-    last_state: ControllerState,
+    last_state: Controllers,
 }
 
 impl Reader {
@@ -80,7 +165,7 @@ impl Reader {
             .map_err(|error| error.to_string())?;
         Ok(Reader {
             gilrs,
-            last_state: ControllerState::new(),
+            last_state: Controllers::default(),
         })
     }
 
@@ -127,48 +212,39 @@ impl Reader {
 
         let state = self.state();
         if state != self.last_state {
-            self.last_state = state;
+            self.last_state = state.clone();
             events.push(ControllerEvent::Changed(state));
         }
 
         events
     }
 
-    /// Every connected controller combined: a button counts as held if it
-    /// is held on any of them.
-    fn state(&self) -> ControllerState {
-        let mut state = ControllerState::new();
-        let mut stick_right: f32 = 0.0;
-        let mut stick_up: f32 = 0.0;
-
-        for (_, gamepad) in self.gilrs.gamepads() {
-            for (button, controller_button) in BUTTONS {
-                if gamepad.is_pressed(button) {
-                    state.set_button(controller_button, true);
+    /// Every connected controller's state.
+    fn state(&self) -> Controllers {
+        let (ids, each) = self
+            .gilrs
+            .gamepads()
+            .map(|(id, gamepad)| {
+                let mut state = ControllerState::new();
+                for (button, controller_button) in BUTTONS {
+                    if gamepad.is_pressed(button) {
+                        state.set_button(controller_button, true);
+                    }
                 }
-            }
-
-            stick_right = strongest(stick_right, gamepad.value(Axis::LeftStickX));
-            stick_up = strongest(stick_up, gamepad.value(Axis::LeftStickY));
-        }
-
-        state.set_left_stick(snap(stick_right), snap(stick_up));
-        state
+                state.set_left_stick(
+                    snap(gamepad.value(Axis::LeftStickX)),
+                    snap(gamepad.value(Axis::LeftStickY)),
+                );
+                (ControllerId(id.into()), state)
+            })
+            .unzip();
+        Controllers { ids, each }
     }
 }
 
 /// The name the controller gives itself, for the player to see.
 fn name(gamepad: &Gamepad<'_>) -> String {
     gamepad.name().to_owned()
-}
-
-/// Returns whichever stick value is further from the center.
-fn strongest(current: f32, candidate: f32) -> f32 {
-    if candidate.abs() > current.abs() {
-        candidate
-    } else {
-        current
-    }
 }
 
 /// Reports a stick axis as fully pushed one way, or centered.

@@ -51,9 +51,8 @@ What is missing or unproven:
   hardware, but its behaviour between the tested points may not be.
 - **Super Game Boy.** Command packets, palettes, attribute maps, transfers, borders, masking and
   multiplayer requests are emulated (`crates/nubo-core/src/sgb.rs`, ported from SameBoy), and pass
-  SameSuite's `sgb` tests and CasualPokePlayer's `sgb-ext-test`. Not emulated yet: border sprites
-  (`OBJ_TRN`), the startup's length, the menu's functions and controllers for the second to fourth
-  players (Phase 4, step 1). Not planned: see that step. None of this is checked on hardware yet.
+  SameSuite's `sgb` tests and CasualPokePlayer's `sgb-ext-test`, with controllers for up to four
+  players. Not emulated yet: the startup's length and the menu's functions (Phase 4, step 1). Not planned: see that step. None of this is checked on hardware yet.
 - **Link cable.** The serial port always behaves as if no cable is plugged in. Two Nubo instances can't
   be linked, and the Game Boy Printer isn't emulated.
 - **Infrared.** The CGB's RP register (0xFF56) isn't emulated. HuC1's infrared port always sees no light.
@@ -153,9 +152,14 @@ Largest phase, but each part stands alone:
 1. **Super Game Boy**: command packets (palettes, attribute maps, borders, multiplayer, masking),
    so SameSuite's `sgb` tests and CasualPokePlayer's `sgb-ext-test` can run. **Done**: the tests run
    and pass. What is left, in this order:
-   - Controllers for players 2 to 4 (the Super Nintendo's multitap): the core takes four players'
-     buttons, the app gives them controllers 2 to 4, RetroArch its ports 2 to 4.
-   - Border sprites (`OBJ_TRN`), as far as documentation pins down what they do.
+   - **Done:** controllers for players 2 to 4 (the Super Nintendo's multitap). The core takes each
+     controller's state (`Emulator::set_controller_states`) and other players' keys
+     (`Emulator::set_player_keys`); once a game asks for more players, the app's controllers play
+     in the order of gilrs's numbers for them (a controller that reconnects takes its old place
+     back) and RetroArch's ports 2 to 4 play players 2 to 4.
+   - **Nothing to do:** border sprites (`OBJ_TRN`) and the speed test (`TEST_EN`) do nothing on any
+     retail Super Game Boy, only on prototypes (Pan Docs, "Removed Commands"), so Nubo ignores them
+     as the retail units do.
    - The startup: a Nubo animation of its own, as long as the real one, so games start when they
      would on hardware.
    - The menu's functions in Nubo's own design: the game's colors or the player's own, a color editor,

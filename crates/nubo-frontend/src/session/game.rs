@@ -43,8 +43,8 @@ pub struct GameSession {
     cheats: Vec<Cheat>,
     /// Fast forward, and how the emulator was last told to play.
     playback: PlaybackControl,
-    /// What the controllers were last said to be doing.
-    controller_state: ControllerState,
+    /// What each controller was last said to be doing.
+    controller_states: Vec<ControllerState>,
 }
 
 /// How [`GameSession::start`] starts a game, besides its ROM and model.
@@ -88,7 +88,7 @@ impl GameSession {
             thumbnails_requested: false,
             cheats: Vec::new(),
             playback,
-            controller_state: ControllerState::new(),
+            controller_states: Vec::new(),
         })
     }
 
@@ -284,12 +284,14 @@ impl GameSession {
         }
     }
 
-    /// Passes on what the controllers are doing, unless the game already
-    /// has that (each command wakes the emulator).
-    pub fn set_controller_state(&mut self, state: ControllerState) {
-        if state != self.controller_state {
-            self.controller_state = state;
-            self.session.send(Command::SetControllerState(state));
+    /// Passes on what each controller is doing, the first controller's
+    /// first, unless the game already has that (each command wakes the
+    /// emulator). They all play as the first player, until a Super Game Boy
+    /// game asks for more players (see `Emulator::set_controller_states`).
+    pub fn set_controller_states(&mut self, states: Vec<ControllerState>) {
+        if states != self.controller_states {
+            self.controller_states.clone_from(&states);
+            self.session.send(Command::SetControllerStates(states));
         }
     }
 
