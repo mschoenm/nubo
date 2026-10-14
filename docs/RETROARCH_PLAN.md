@@ -396,7 +396,7 @@ RetroArch with a test account, and a rumble cartridge game (such as Pokémon Pin
    (`licenses::write_license_files`). Cargo names the library `libnubo_libretro.so` on Linux and
    `libnubo_libretro.dylib` on macOS, but RetroArch expects `nubo_libretro.so`, `nubo_libretro.dylib` and
    `nubo_libretro.dll`.
-3. CI already runs clippy and the tests for every workspace member on Linux, macOS and Windows. Make
+3. CI already runs clippy and the tests for every workspace member on Linux, and the nightly run on macOS and Windows. Make
    sure the crate builds with `cargo doc` without warnings, and that `cargo deny` stays clean.
 4. In `release.yml` and `nightly-build.yml`, attach `Nubo-libretro-<os>-<arch>.zip` (core, info file,
    licenses) for Windows x64, Linux x86_64 and ARM64, and macOS.
