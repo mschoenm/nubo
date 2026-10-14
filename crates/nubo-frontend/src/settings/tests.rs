@@ -20,6 +20,8 @@ fn settings_survive_a_round_trip() {
         dmg_palette: DmgPalette::Pocket,
         sgb_border: false,
         sgb_own_palette: [0x001F, 0x03E0, 0x7C00, 0x0000],
+        sgb_colors: SgbColors::Preset(DmgPalette::Green),
+        sgb_nubo_border: true,
     };
 
     let contents = toml::to_string(&settings).unwrap();
@@ -71,6 +73,22 @@ fn the_super_game_boy_palette_is_only_saved_once_the_player_changes_it() {
             .sgb_own_palette,
         [1, 2, 3, 4]
     );
+}
+
+#[test]
+fn the_super_game_boy_choices_are_only_saved_once_the_player_makes_them() {
+    let defaults = toml::to_string(&Settings::default()).unwrap();
+    assert!(!defaults.contains("sgb_colors"));
+    assert!(!defaults.contains("sgb_nubo_border"));
+    let picked = Settings {
+        sgb_colors: SgbColors::Own,
+        sgb_nubo_border: true,
+        ..Settings::default()
+    };
+    let contents = toml::to_string(&picked).unwrap();
+    assert!(contents.contains("sgb_colors = \"own\""));
+    assert!(contents.contains("sgb_nubo_border = true"));
+    assert_eq!(toml::from_str::<Settings>(&contents).unwrap(), picked);
 }
 
 #[test]
@@ -179,6 +197,8 @@ fn earlier_settings() -> Settings {
         dmg_palette: DmgPalette::Pocket,
         sgb_border: true,
         sgb_own_palette: DEFAULT_OWN_PALETTE,
+        sgb_colors: SgbColors::Game,
+        sgb_nubo_border: false,
     }
 }
 

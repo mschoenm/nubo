@@ -380,3 +380,16 @@ fn should_compare_lyc_against_153_then_nothing_then_0_on_line_153() {
 }
 
 mod random_scenes;
+
+#[test]
+fn should_reject_a_save_state_without_the_super_game_boy_its_model_has() {
+    let bytes = serialize(&Gpu::new());
+    let mut sgb = Gpu::new();
+    sgb.set_model(Model::Sgb);
+    assert!(sgb.deserialize(&mut bytes.as_slice()).is_err());
+
+    let mut with_sgb = Gpu::new();
+    with_sgb.set_model(Model::Sgb);
+    let bytes = serialize(&with_sgb);
+    assert!(Gpu::new().deserialize(&mut bytes.as_slice()).is_err());
+}

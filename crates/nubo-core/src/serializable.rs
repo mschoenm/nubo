@@ -879,6 +879,43 @@ mod tests {
     }
 
     #[test]
+    fn an_option_reads_into_the_value_already_there() {
+        #[derive(Debug, Default, PartialEq, Serializable)]
+        struct Kept {
+            stored: u8,
+            #[serializable(skip)]
+            players: u8,
+        }
+        let saved_state = saved(&Some(Kept {
+            stored: 7,
+            players: 1,
+        }));
+
+        let mut read = Some(Kept {
+            stored: 0,
+            players: 9,
+        });
+        read.deserialize(&mut saved_state.as_slice()).unwrap();
+        assert_eq!(
+            read,
+            Some(Kept {
+                stored: 7,
+                players: 9
+            })
+        );
+
+        let mut read: Option<Kept> = None;
+        read.deserialize(&mut saved_state.as_slice()).unwrap();
+        assert_eq!(
+            read,
+            Some(Kept {
+                stored: 7,
+                players: 0
+            })
+        );
+    }
+
+    #[test]
     fn the_layout_lists_the_fields_of_values_that_are_not_there() {
         #[derive(Serializable)]
         struct Outer {

@@ -144,6 +144,7 @@ impl App {
                 }
             }
             GameMessage::SgbColorsPicked(colors) => {
+                self.change_settings(|settings| settings.shared.sgb_colors = colors);
                 let own = self.settings.shared.sgb_own_palette;
                 if let Some(game) = &mut self.game {
                     game.session.set_sgb_player_palette(colors.palette(own));
@@ -167,9 +168,12 @@ impl App {
             }
             GameMessage::SgbBorderPicked(choice) => {
                 let shown = choice != SgbBorderChoice::None;
-                if shown != self.settings.shared.sgb_border {
-                    self.change_settings(|settings| settings.shared.sgb_border = shown);
-                }
+                self.change_settings(|settings| {
+                    settings.shared.sgb_border = shown;
+                    if shown {
+                        settings.shared.sgb_nubo_border = choice == SgbBorderChoice::Nubo;
+                    }
+                });
                 if let Some(game) = &mut self.game {
                     game.session.set_sgb_border(shown);
                     match choice {
@@ -293,6 +297,17 @@ impl App {
         session.set_controls(&self.settings.shared.controls);
         session.set_palette(self.settings.shared.dmg_palette);
         session.set_sgb_border(self.settings.shared.sgb_border);
+        if model.is_sgb() {
+            // The Super Game Boy menu's choices are the player's, which save
+            // states don't keep, so they come from the settings.
+            let shared = &self.settings.shared;
+            session.set_sgb_player_palette(shared.sgb_colors.palette(shared.sgb_own_palette));
+            session.choose_sgb_border(if shared.sgb_nubo_border {
+                SgbBorder::Nubo
+            } else {
+                SgbBorder::Game
+            });
+        }
         if !self.fresh {
             match cheats::load(&session.rom().path) {
                 Ok(cheats) => session.set_cheats(cheats),
@@ -437,13 +452,14 @@ impl App {
         }
     }
 
-    /// Sets a channel of one of the player's own Super Game Boy colors (not
-    /// saved yet), and colors the game with them.
+    /// Sets a channel of one of the player's own Super Game Boy colors and
+    /// picks those colors (neither saved yet), and colors the game with them.
     fn set_sgb_own_color(&mut self, shade: usize, channel: ColorChannel, value: u8) {
         let Some(color) = self.settings.shared.sgb_own_palette.get_mut(shade) else {
             return;
         };
         *color = channel.with(*color, value);
+        self.settings.shared.sgb_colors = SgbColors::Own;
         let own = self.settings.shared.sgb_own_palette;
         if let Some(game) = &mut self.game {
             game.session.set_sgb_player_palette(Some(own));
