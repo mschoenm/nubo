@@ -186,9 +186,9 @@ impl Emulator {
     /// can't stop halfway, so a call may end up to one step past that point
     /// (an instruction with an interrupt dispatch, usually at most 44 dots,
     /// or a general-purpose VRAM DMA, up to about 4,100), and the next call
-    /// is that much shorter: calls never drift from the emulated time. The point comes from the time alone, so after loading
-    /// a save state the next call ends where it did in the run the state was
-    /// saved from.
+    /// is that much shorter: calls never drift from the emulated time. The
+    /// point comes from the time alone, so after loading a save state the next
+    /// call ends where it did in the run the state was saved from.
     ///
     /// Each call normally finishes one frame, which [`Emulator::take_frame`]
     /// then returns. While the game has the screen off, the PPU still hands
