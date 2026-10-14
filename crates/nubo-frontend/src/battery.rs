@@ -26,14 +26,12 @@ const LONGEST_DELAY: Duration = Duration::from_secs(1);
 /// Cartridge RAM sizes are multiples of 2 KiB. Other emulators append an RTC
 /// footer to `.sav` files, and rounding down to this size drops it.
 const RAM_SIZE_GRANULARITY: usize = 0x800;
-/// The size of the `.rtc` file written by `encode_rtc`.
-const RTC_FILE_SIZE: usize = 17;
 
 /// Save data waiting to be written.
 #[derive(Default)]
 struct PendingWrites {
     ram: Option<Pending<Vec<u8>>>,
-    rtc: Option<Pending<[u8; RTC_FILE_SIZE]>>,
+    rtc: Option<Pending<[u8; RtcState::BYTES]>>,
 }
 
 /// The data for one save file, waiting to be written, and when.
@@ -223,7 +221,7 @@ impl BatterySaves {
     }
 
     fn load_rtc(&self) -> Option<RtcState> {
-        decode_rtc(&self.read(self.clock_entry())?)
+        RtcState::from_bytes(&self.read(self.clock_entry())?)
     }
 
     /// Queues the clock state the game left at `now`.
@@ -231,10 +229,10 @@ impl BatterySaves {
         let mut pending = self.pending();
         match &mut pending.rtc {
             Some(waiting) => {
-                waiting.data = encode_rtc(state);
+                waiting.data = state.to_bytes();
                 waiting.written_again(now);
             }
-            None => pending.rtc = Some(Pending::new(encode_rtc(state), now)),
+            None => pending.rtc = Some(Pending::new(state.to_bytes(), now)),
         }
     }
 }
@@ -274,36 +272,6 @@ impl CartridgeEffects for BatteryCartridgeEffects {
     fn save_ram(&mut self, ram: &[u8]) {
         self.saves.queue_ram(ram, Instant::now());
     }
-}
-
-/// Packs the clock state into the little-endian `.rtc` file layout.
-fn encode_rtc(state: &RtcState) -> [u8; RTC_FILE_SIZE] {
-    let mut bytes = [0; RTC_FILE_SIZE];
-    bytes[0..2].copy_from_slice(&state.milliseconds.to_le_bytes());
-    bytes[2] = state.seconds;
-    bytes[3] = state.minutes;
-    bytes[4] = state.hours;
-    bytes[5..7].copy_from_slice(&state.days.to_le_bytes());
-    bytes[7..15].copy_from_slice(&state.base_timestamp.to_le_bytes());
-    bytes[15] = u8::from(state.halted);
-    bytes[16] = u8::from(state.day_carry);
-    bytes
-}
-
-/// Unpacks a `.rtc` file, or returns `None` if it has the wrong size.
-fn decode_rtc(bytes: &[u8]) -> Option<RtcState> {
-    let bytes: &[u8; RTC_FILE_SIZE] = bytes.try_into().ok()?;
-
-    Some(RtcState {
-        milliseconds: u16::from_le_bytes([bytes[0], bytes[1]]),
-        seconds: bytes[2],
-        minutes: bytes[3],
-        hours: bytes[4],
-        days: u16::from_le_bytes([bytes[5], bytes[6]]),
-        base_timestamp: f64::from_le_bytes(bytes[7..15].try_into().ok()?),
-        halted: bytes[15] != 0,
-        day_carry: bytes[16] != 0,
-    })
 }
 
 #[cfg(all(test, feature = "desktop"))]

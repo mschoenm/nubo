@@ -1,0 +1,37 @@
+# Software Information
+display_name = "Nintendo - Game Boy / Color (Nubo)"
+authors = "Michel Schoenmakers"
+supported_extensions = "gb|gbc"
+corename = "Nubo"
+display_version = "0.5.0"
+categories = "Emulator"
+license = "GPLv3"
+permissions = ""
+is_experimental = "true"
+
+# Hardware Information
+manufacturer = "Nintendo"
+systemname = "Game Boy/Game Boy Color"
+systemid = "game_boy"
+
+# Libretro Features
+database = "Nintendo - Game Boy|Nintendo - Game Boy Color"
+supports_no_game = "false"
+savestate = "true"
+savestate_features = "deterministic"
+cheats = "true"
+input_descriptors = "true"
+memory_descriptors = "true"
+libretro_saves = "true"
+core_options = "true"
+core_options_version = "2.0"
+load_subsystem = "false"
+needs_fullpath = "false"
+disk_control = "false"
+hw_render = "false"
+
+# Firmware / BIOS
+firmware_count = 0
+notes = "The boot ROMs are built in: Nubo's own, timed to the cycle like the ones they replace."
+
+description = "Nubo, a cycle-accurate Game Boy and Game Boy Color emulator written in Rust. It emulates every model from the first Game Boy (DMG-0) to the Game Boy Advance running Game Boy Color games, passes nearly all of the Game Boy test ROM suites, and ships its own boot ROMs, so it needs no BIOS files. Saves move between this core and the Nubo app: the .srm is the app's .sav and the .rtc its clock file."

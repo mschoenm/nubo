@@ -583,6 +583,29 @@ impl AddressBus {
         self.cartridge.set_ram(buffer);
     }
 
+    /// The cartridge, to read and set its clock and read its rumble motor.
+    pub(crate) fn cartridge_mut(&mut self) -> &mut Cartridge {
+        &mut self.cartridge
+    }
+
+    /// All of work RAM: bank 0 followed by banks 1-7, 4 KiB each. Only banks
+    /// 0 and 1 exist on a DMG, or on a CGB running a game for the DMG.
+    pub(crate) fn working_ram(&self) -> &[u8] {
+        self.working_ram.as_slice()
+    }
+
+    /// High RAM (0xFF80-0xFFFE).
+    pub(crate) fn high_ram(&self) -> &[u8] {
+        &self.high_ram[..0x7F]
+    }
+
+    /// Video RAM and OAM, after catching the PPU up so an HBlank DMA it owes
+    /// has copied its bytes.
+    pub(crate) fn video_memory(&mut self) -> (&[u8], &[u8]) {
+        self.catch_up_ppu();
+        self.gpu.video_memory()
+    }
+
     /// Advances every component except the CPU by one M-cycle (four clock
     /// ticks, or two in CGB double speed mode). While nothing can tell the
     /// difference, the M-cycle only waits to run in one go with the ones
@@ -1181,6 +1204,7 @@ impl AddressBus {
     /// Sets up what a loaded save state doesn't hold: the views of the
     /// cartridge's ROM, and the PPU and M-cycles caught up (see above).
     pub(crate) fn finish_loading_save_state(&mut self) {
+        self.cartridge.finish_loading_save_state(self.elapsed_dots);
         self.update_rom_view();
         self.ppu_owed_dots = 0;
         self.ppu_quiet_dots = 0;

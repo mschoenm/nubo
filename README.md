@@ -16,6 +16,7 @@ Nubo is a cycle-accurate Game Boy emulator written in Rust. It runs as a native 
 | Linux | [Flatpak for x86_64](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-x86_64.flatpak) (most PCs) · [Flatpak for ARM](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-aarch64.flatpak) |
 | macOS | Not available yet; build `Nubo.app` with `cargo xtask bundle` (see [Desktop App](#desktop-app)) |
 | Browser | [Play in the browser](https://mschoenm.github.io/nubo/) |
+| RetroArch | Zips of the core for Windows, Linux (x86_64 and ARM) and macOS in the [nightly build](https://github.com/mschoenm/nubo/releases/tag/nightly), and in every release after 0.5.0 (see [RetroArch Core](#retroarch-core)) |
 
 These are the files of the [latest release](https://github.com/mschoenm/nubo/releases/latest). On Windows, the files aren't signed yet, so SmartScreen may warn the first time: choose More info and then Run anyway. On Linux, open the `.flatpak` file with your software center to install it, or run `flatpak install --user Nubo-linux-x86_64.flatpak`. The [nightly build](https://github.com/mschoenm/nubo/releases/tag/nightly) has the newest `main` that passed every check.
 
@@ -81,6 +82,25 @@ The default controls are below; all of them can be changed under Settings > Cont
 
 Esc opens the pause menu, Tab fast forwards while held, F5 and F8 quick save and load, F11 switches to fullscreen and F12 saves a screenshot. On a controller, the D-pad or left stick moves, the right face button (B on Xbox, ○ on PlayStation) is A, the bottom face button (A on Xbox, ✕ on PlayStation) is B, L1 opens the pause menu and R1 fast forwards.
 
+## RetroArch Core
+
+Nubo also runs in [RetroArch](https://www.retroarch.com/) and other frontends of the libretro interface, as the core in `frontends/nubo-libretro`. RetroArch then brings what it has for every core: save state slots, rewind, run-ahead, netplay, shaders, RetroAchievements, its cheat list, recording and button remapping. The core is experimental and not in RetroArch's own core downloader yet, so it is installed by hand:
+
+1. Download the zip for your system (`Nubo-libretro-<system>.zip`) from a release or the `nightly` pre-release, or build it with `cargo xtask libretro`, which writes it to `target/bundle/`.
+2. Copy `nubo_libretro.so` (Linux), `nubo_libretro.dll` (Windows) or `nubo_libretro.dylib` (macOS) into RetroArch's `cores` folder, and `nubo_libretro.info` into its `info` folder. Settings > Directory in RetroArch shows where they are. Without the info file RetroArch doesn't know which games the core runs, and turns off rewind and run-ahead for it.
+3. Load a `.gb` or `.gbc` game with Load Core > Nubo, or pick "Nintendo - Game Boy / Color (Nubo)" for a playlist.
+
+What it does:
+
+- **Games:** every cartridge type the app runs, with the boot ROMs built in, so no BIOS files are needed. The core options pick the model (automatic, or any model from DMG-0 to AGB), the colors of Game Boy games (gray, green or Pocket) and the cartridge clock; the model and the clock take effect when the game is restarted.
+- **Saves:** RetroArch keeps in-game saves as `.srm` and `.rtc` files. The `.srm` is the same raw cartridge RAM as the app's `.sav` file, and the `.rtc` the same clock file, so saves move between the app and RetroArch by renaming them.
+- **Save states, rewind, run-ahead and netplay**, with states of one fixed size. A state saved with the cartridge clock on real time goes on with the time it is loaded at; for netplay with games that have a clock, such as Pokémon Gold, set the Cartridge clock option to Emulated time on every player's side.
+- **Cheats:** RetroArch's cheat list, with Game Genie and GameShark codes, several in one cheat joined with `+`.
+- **RetroAchievements:** the memory maps achievements read, laid out as RetroAchievements expects a Game Boy and a Game Boy Color. RetroArch's own memory tools read the same copies, so changing memory with them doesn't reach the game.
+- **Rumble** on rumble cartridges such as Pokémon Pinball.
+
+The Linux cores need glibc 2.34 or newer (Ubuntu 22.04, Debian 12 or later); the macOS core runs on Apple silicon and Intel Macs. There is no Android or iOS core yet.
+
 ## Web Version
 
 `cargo xtask web` builds the same Iced app for the browser. It can open a ROM and play it; the library, save states, cheats and screenshots need the desktop app. Every push to main publishes it to GitHub Pages.
@@ -144,6 +164,7 @@ Much of its accuracy comes from other people's research and code:
 - [Fira Sans](https://github.com/mozilla/Fira): the web version's font, bundled by Iced (SIL Open Font License).
 - The [libretro thumbnail collection](https://github.com/libretro-thumbnails/libretro-thumbnails) and the No-Intro game lists of the [libretro database](https://github.com/libretro/libretro-database): the box art the desktop app can download.
 - [Lucide](https://lucide.dev): the icons of the desktop app (ISC License, see [NOTICE](NOTICE)).
+- [libretro.h](https://github.com/libretro/libretro-common) by the RetroArch team: the libretro API the RetroArch core's bindings are written from (MIT License, see [NOTICE](NOTICE)). [SameBoy's libretro core](https://github.com/LIJI32/SameBoy) and [rcheevos](https://github.com/RetroAchievements/rcheevos) showed how a Game Boy core lays out its memory for RetroAchievements.
 - [Tobu Tobu Girl Deluxe](https://tangramgames.itch.io/tobu-tobu-girl-deluxe) by Tangram Games: the game in the Flatpak's screenshot (`images/flatpak/`) and in some of the save states every version is checked against (`save-states/`), whose graphics are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 - [µCity](https://github.com/AntonioND/ucity) and [Geometrix](https://github.com/AntonioND/geometrix) by Antonio Niño Díaz: games in the save states every version is checked against (`save-states/`), licensed under the GPL, version 3 or later.
 
@@ -157,6 +178,6 @@ The original project was built with the help of these resources:
 
 ## License
 
-Nubo is free software, licensed under the [GNU General Public License, version 3](LICENSE) or (at your option) any later version. It started as a fork of RetroBoy, whose code remains available under the [Apache License 2.0](LICENSE-APACHE). The [NOTICE](NOTICE) file lists the third-party code Nubo includes and their licenses. The macOS app and the web version also come with `THIRD_PARTY_LICENSES.txt`, the licenses of the Rust crates Nubo is built from (`cargo xtask licenses <folder>` writes it with the other license files); keep these files with any copy you distribute.
+Nubo is free software, licensed under the [GNU General Public License, version 3](LICENSE) or (at your option) any later version. It started as a fork of RetroBoy, whose code remains available under the [Apache License 2.0](LICENSE-APACHE). The [NOTICE](NOTICE) file lists the third-party code Nubo includes and their licenses. The macOS app, the web version and the RetroArch core also come with `THIRD_PARTY_LICENSES.txt`, the licenses of the Rust crates Nubo is built from (`cargo xtask licenses <folder>` writes it with the other license files); keep these files with any copy you distribute.
 
 Game Boy and Game Boy Color are trademarks of Nintendo. This project is not affiliated with or endorsed by Nintendo, and it doesn't include any Nintendo software or games.

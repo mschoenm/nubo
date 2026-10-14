@@ -57,6 +57,12 @@ impl Mbc5CartridgeMapper {
         [0, self.rom_bank_number]
     }
 
+    /// Whether the game has the rumble motor on. Always false on a cartridge
+    /// without one.
+    pub(super) fn is_rumbling(&self) -> bool {
+        self.has_rumble && self.is_rumbling
+    }
+
     /// The RAM bank visible at 0xA000-0xBFFF.
     pub(super) fn ram_bank(&self) -> u8 {
         self.ram_bank_number

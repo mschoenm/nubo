@@ -1,8 +1,8 @@
 name: Release
 
 # Pushing a version tag such as v0.2.0 runs every check, the nightly ones
-# included, builds the Flatpaks and the Windows installer and publishes a
-# GitHub release with them. Nothing is published unless every check passes;
+# included, builds the Flatpaks, the Windows installer and the RetroArch core
+# and publishes a GitHub release with them. Nothing is published unless every check passes;
 # the notes are read over in the release's pull request, before the tag.
 # The release skill (.claude/skills/release/SKILL.md) lists the steps.
 on:
@@ -64,8 +64,8 @@ jobs:
           name: release-notes
           path: ${{ runner.temp }}/notes.md
 
-  # Includes CI, the test ROMs with --verify-boot, the Flatpaks and the
-  # Windows installer.
+  # Includes CI, the test ROMs with --verify-boot, the Flatpaks, the
+  # Windows installer and the RetroArch core.
   nightly:
     name: Nightly
     needs: notes
@@ -93,6 +93,9 @@ jobs:
           done
           cp artifacts/windows-x64/*-setup.exe upload/Nubo-windows-x64-setup.exe
           cp artifacts/windows-x64/*.zip upload/Nubo-windows-x64.zip
+          for platform in linux-x86_64 linux-aarch64 windows-x64 macos-universal; do
+            cp artifacts/libretro-$platform/*.zip "upload/Nubo-libretro-$platform.zip"
+          done
 
       # A release started by hand tags the commit every check ran on. GitHub
       # refuses a tag that exists, such as one pushed while the checks ran,

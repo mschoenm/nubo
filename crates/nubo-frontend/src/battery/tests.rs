@@ -49,25 +49,6 @@ fn sample_rtc() -> RtcState {
 }
 
 #[test]
-fn rtc_state_round_trips_through_encoding() {
-    let decoded = decode_rtc(&encode_rtc(&sample_rtc())).unwrap();
-
-    assert_eq!(decoded.milliseconds, 999);
-    assert_eq!(decoded.seconds, 59);
-    assert_eq!(decoded.minutes, 30);
-    assert_eq!(decoded.hours, 23);
-    assert_eq!(decoded.days, 511);
-    assert_eq!(decoded.base_timestamp, 1_791_633_740_867.5);
-    assert!(decoded.halted);
-    assert!(decoded.day_carry);
-}
-
-#[test]
-fn rtc_file_with_wrong_size_is_ignored() {
-    assert!(decode_rtc(&[0; RTC_FILE_SIZE - 1]).is_none());
-}
-
-#[test]
 fn flush_creates_saves_directory_and_writes_queued_ram_and_rtc() {
     let directory = temporary_saves_directory("flush");
     let saves = saves_in(&directory);

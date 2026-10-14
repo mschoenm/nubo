@@ -6,7 +6,7 @@ The emulator itself: a plain Rust library with no platform dependencies and no C
 
 | Part | Files | Notes |
 |---|---|---|
-| Public API | `emulator.rs`, `error.rs` | `Emulator` owns the CPU, which owns the address bus and through it everything else |
+| Public API | `emulator.rs`, `error.rs` | `Emulator` owns the CPU, which owns the address bus and through it everything else. It is `Send` (`CartridgeEffects: Send`), so an app may move it to another thread |
 | Save states | `emulator/save_state.rs`, `serializable.rs`, `crates/nubo-serializable-derive/` | See Save States below |
 | Hardware models | `model.rs`, `cpu/post_boot.rs`, `address_bus/boot_rom.rs` | DMG-0 to AGB, ordered like SameBoy's model numbers |
 | Time | `clock.rs` | How M-cycles, PPU dots and the system counter behind DIV relate, at both speeds |
@@ -45,6 +45,8 @@ Players must never lose a save state to an update. The format is in `emulator/sa
 - When what save states store changes, `cargo test --workspace` and `cargo save-states` fail and list what was added and removed (the check is in `tools/nubo-save-state-check`, which a plain `cargo test` doesn't build); keep a new set with `cargo save-states --record` in the same pull request (see `tools/nubo-save-state-check/AGENTS.md`).
 - A loaded state must go on exactly like the run it was saved from. `a_loaded_state_restores_every_field_of_the_cpu_the_address_bus_the_ppu_and_the_apu` (in `emulator/tests.rs`, with the fields left out on purpose) and `cargo benchmark --check-save-states` catch a field that is missed.
 - The PPU and APU check every loaded value a damaged state could index or overflow with, and a failed load leaves the emulator untouched: input from players never makes the core panic.
+- Run-ahead and rewind in RetroArch save and load a state every frame, so both stay fast: lists of bytes are written and read in one go (`Serializable::serialize_items`), and the power-on state a load starts from is made once per game (`PowerOnState`).
+- An MBC3 clock's `base_timestamp` is a time on the clock it follows (`RtcClock`), which states store as `rtc_clock`; a state made on the other clock is moved over to this emulator's when it loads, keeping what the clock shows (`RtcState::rebase`).
 
 ## Accuracy References
 

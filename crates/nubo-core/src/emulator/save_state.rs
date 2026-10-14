@@ -227,6 +227,13 @@ impl Emulator {
     /// never overwrite the player's battery save by itself. The battery save
     /// follows the loaded state the next time the game writes its RAM or
     /// clock.
+    ///
+    /// A cartridge clock saved while following the other [`RtcClock`] than
+    /// this emulator's cartridge does is moved over to this one, keeping
+    /// what it shows (see [`Emulator::rtc_state`]). The clock of a state
+    /// from before Nubo noted which one it follows loads as it is.
+    ///
+    /// [`RtcClock`]: crate::RtcClock
     pub fn load_state(&mut self, data: &[u8]) -> Result<(), SaveStateError> {
         self.load_state_with_report(data).map(|_| ())
     }
@@ -261,7 +268,7 @@ impl Emulator {
         let previous_state = self.serialized_state();
         let power_on_state = self.power_on_state();
         let loaded = self
-            .deserialize(&mut power_on_state.as_slice())
+            .deserialize(&mut &power_on_state[..])
             .and_then(|()| collect_unreadable(|| self.deserialize(&mut state)));
         match loaded {
             Ok(unreadable) if state.is_empty() => Ok(unreadable),
@@ -302,8 +309,13 @@ impl Emulator {
 
     /// The state of an emulator of the same model with the same game, just
     /// after power-on: loading it first gives every value a save state from
-    /// another version doesn't have its power-on value.
-    fn power_on_state(&self) -> Vec<u8> {
+    /// another version doesn't have its power-on value. It is made on the
+    /// first load and kept until another game is loaded, since run-ahead and
+    /// rewind load a state every frame.
+    fn power_on_state(&mut self) -> std::sync::Arc<[u8]> {
+        if let Some(state) = &self.power_on_state.0 {
+            return state.clone();
+        }
         let mut emulator = Emulator::new(self.model());
         let rom = self.address_bus().cartridge().rom();
         if !rom.is_empty() {
@@ -312,7 +324,22 @@ impl Emulator {
                 .load_rom(rom.to_vec(), Box::new(NoSaves::default()))
                 .expect("the ROM this emulator runs loads again");
         }
-        emulator.serialized_state()
+        let state: std::sync::Arc<[u8]> = emulator.serialized_state().into();
+        self.power_on_state.0 = Some(state.clone());
+        state
+    }
+}
+
+/// The state [`Emulator::load_state`] starts from, once made. It depends
+/// only on the model and the game, never on how the emulator ran, so it is
+/// no part of the emulator's state: its `Debug` output is the same whether
+/// it was made or not, and emulators that compare equal stay equal.
+#[derive(Default)]
+pub(super) struct PowerOnState(Option<std::sync::Arc<[u8]>>);
+
+impl std::fmt::Debug for PowerOnState {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("PowerOnState")
     }
 }
 

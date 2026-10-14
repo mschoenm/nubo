@@ -2908,6 +2908,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nubo-libretro"
+version = "0.5.0"
+dependencies = [
+ "nubo-core",
+ "nubo-frontend",
+ "object",
+]
+
+[[package]]
 name = "nubo-logo"
 version = "0.5.0"
 
@@ -3441,6 +3450,15 @@ dependencies = [
  "objc2 0.5.3",
  "objc2-core-location",
  "objc2-foundation 0.2.2",
+]
+
+[[package]]
+name = "object"
+version = "0.40.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd229a0361b9d0d4396176e02d65897f487eebeab7caa6d443855ee152ca0b9c"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]

@@ -1,0 +1,127 @@
+name: RetroArch core
+
+# Builds the RetroArch core's zips with `cargo xtask libretro` on Linux
+# (x86_64 and ARM), Windows and macOS (universal), and on Linux x86_64 plays
+# a game in RetroArch itself, with run-ahead, rewind and an auto-saved state.
+# Runs on pull requests that change the core, how it is built (the workspace's
+# manifest included) or the crates it is built from (Dependabot's updates),
+# every night, and for releases, which attach the zips it makes. It isn't one
+# of the checks that pull requests wait for. Changes to nubo-core and
+# nubo-frontend don't start it: CI builds and tests the core with them on
+# every pull request, on Linux, macOS and Windows.
+on:
+  pull_request:
+    paths:
+      - .github/workflows/libretro.yml
+      - Cargo.lock
+      - Cargo.toml
+      - frontends/nubo-libretro/**
+      - xtask/src/libretro.rs
+      - xtask/src/licenses.rs
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Core (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      # The Linux cores are built on Ubuntu 24.04 rather than the newest
+      # Ubuntu, unlike everything else: a core is loaded into the player's
+      # RetroArch, so the C library it was built against is the oldest one it
+      # runs with. Built there, it needs glibc 2.34 (Ubuntu 22.04, Debian 12),
+      # as the README says.
+      matrix:
+        include:
+          - platform: linux-x86_64
+            runner: ubuntu-24.04
+          - platform: linux-aarch64
+            runner: ubuntu-24.04-arm
+          - platform: windows-x64
+            runner: windows-latest
+          - platform: macos-universal
+            runner: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build the core's zip
+        run: cargo xtask libretro
+
+      # The zip is what players install, so the core in it plays a game in
+      # the RetroArch Ubuntu packages, headless: the null video and sound
+      # drivers, and D-Bus for RetroArch's GameMode support, which aborts
+      # without a session bus. It must load the game, take part in
+      # RetroAchievements, keep run-ahead and rewind on (which RetroArch
+      # turns off for cores whose info file doesn't allow them), save the
+      # battery RAM and a state on exit, and take a screenshot.
+      - name: Play a game in RetroArch
+        if: matrix.platform == 'linux-x86_64'
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y retroarch dbus
+          cargo xtask benchmark-roms
+          ra="$RUNNER_TEMP/retroarch"
+          mkdir -p "$ra"/{cores,info,saves,states,shots,system}
+          unzip -q target/bundle/Nubo-libretro-linux-x86_64.zip -d "$ra/zip"
+          cp "$ra/zip/Nubo-libretro-linux-x86_64/nubo_libretro.so" "$ra/cores/"
+          cp "$ra/zip/Nubo-libretro-linux-x86_64/nubo_libretro.info" "$ra/info/"
+          cat > "$ra/retroarch.cfg" <<EOF
+          video_driver = "null"
+          audio_driver = "null"
+          input_driver = "null"
+          menu_driver = "null"
+          gamemode_enable = "false"
+          libretro_directory = "$ra/cores"
+          libretro_info_path = "$ra/info"
+          savefile_directory = "$ra/saves"
+          savestate_directory = "$ra/states"
+          screenshot_directory = "$ra/shots"
+          system_directory = "$ra/system"
+          savestate_auto_save = "true"
+          run_ahead_enabled = "true"
+          run_ahead_frames = "1"
+          run_ahead_secondary_instance = "false"
+          rewind_enable = "true"
+          EOF
+          dbus-run-session -- retroarch --config "$ra/retroarch.cfg" --verbose \
+            -L "$ra/cores/nubo_libretro.so" target/benchmark-roms/ucity.gbc \
+            --max-frames=600 --max-frames-ss --max-frames-ss-path="$ra/shots/ucity.png" \
+            2>&1 | tee "$ra/log.txt"
+          check() {
+            if ! grep -q "$1" "$ra/log.txt"; then
+              echo "::error::RetroArch's log lacks: $1"
+              exit 1
+            fi
+          }
+          check "\[Nubo\] MICROCITY"
+          check "SET_PIXEL_FORMAT: XRGB8888"
+          check "SET_SUPPORT_ACHIEVEMENTS: yes"
+          check "Initializing rewind buffer"
+          check "Auto save state to .* succeeded"
+          check "\[SRAM\]: Saved successfully"
+          if grep -q "Run-Ahead unavailable\|Rewind unavailable" "$ra/log.txt"; then
+            echo "::error::RetroArch turned run-ahead or rewind off"
+            exit 1
+          fi
+          test -s "$ra/shots/ucity.png"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: libretro-${{ matrix.platform }}
+          path: target/bundle/Nubo-libretro-${{ matrix.platform }}.zip
+          if-no-files-found: error

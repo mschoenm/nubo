@@ -379,6 +379,45 @@ pub trait Serializable {
     {
         String::from("fields")
     }
+
+    /// Appends `items` one after the other, as a `Vec` stores them. Types
+    /// stored as their plain bytes write them all at once, which is the
+    /// same bytes, only faster.
+    fn serialize_items(items: &[Self], writer: &mut dyn Write) -> Result<()>
+    where
+        Self: Sized,
+    {
+        for item in items {
+            item.serialize(writer)?;
+        }
+        Ok(())
+    }
+
+    /// Reads `count` items written by [`Serializable::serialize_items`].
+    fn deserialize_items(count: u32, reader: &mut dyn Read) -> Result<Vec<Self>>
+    where
+        Self: Sized + Default,
+    {
+        let mut items = Vec::new();
+        for _ in 0..count {
+            let mut item = Self::default();
+            item.deserialize(reader)?;
+            items.push(item);
+        }
+        Ok(items)
+    }
+}
+
+/// Reads exactly `length` bytes, or fails like `read_exact` when they run
+/// out. It reads through `take`, so a damaged length can't make it allocate
+/// gigabytes.
+fn read_bytes(reader: &mut dyn Read, length: u64) -> Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    reader.take(length).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 != length {
+        return Err(Error::new(ErrorKind::UnexpectedEof, "the data ends early"));
+    }
+    Ok(bytes)
 }
 
 /// Implements `Serializable` for number types by storing their little-endian bytes.
@@ -405,7 +444,32 @@ macro_rules! impl_serializable_for_numbers {
     };
 }
 
-impl_serializable_for_numbers!(u8, u16, u32, u64, i16, f32, f64);
+impl_serializable_for_numbers!(u16, u32, u64, i16, f32, f64);
+
+impl Serializable for u8 {
+    fn serialize(&self, writer: &mut dyn Write) -> Result<()> {
+        writer.write_all(&[*self])
+    }
+
+    fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
+        let mut bytes = [0];
+        reader.read_exact(&mut bytes)?;
+        *self = bytes[0];
+        Ok(())
+    }
+
+    fn encoding() -> String {
+        String::from("u8")
+    }
+
+    fn serialize_items(items: &[Self], writer: &mut dyn Write) -> Result<()> {
+        writer.write_all(items)
+    }
+
+    fn deserialize_items(count: u32, reader: &mut dyn Read) -> Result<Vec<Self>> {
+        read_bytes(reader, u64::from(count))
+    }
+}
 
 /// A `bool` is one byte: 1 for true and 0 for false. Any non-zero byte reads as true.
 impl Serializable for bool {
@@ -434,14 +498,22 @@ impl<const N: usize> Serializable for [u8; N] {
     /// Changes nothing if the bytes run out (on the heap, since some arrays
     /// are larger than the stack allows in debug builds).
     fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
-        let mut bytes = vec![0; N];
-        reader.read_exact(&mut bytes)?;
+        let bytes = read_bytes(reader, N as u64)?;
         self.copy_from_slice(&bytes);
         Ok(())
     }
 
     fn encoding() -> String {
         format!("{N} bytes")
+    }
+
+    fn serialize_items(items: &[Self], writer: &mut dyn Write) -> Result<()> {
+        writer.write_all(items.as_flattened())
+    }
+
+    fn deserialize_items(count: u32, reader: &mut dyn Read) -> Result<Vec<Self>> {
+        let bytes = read_bytes(reader, u64::from(count) * N as u64)?;
+        Ok(bytes.as_chunks::<N>().0.to_vec())
     }
 }
 
@@ -481,24 +553,14 @@ impl<T: Serializable + Default> Serializable for Vec<T> {
         if self.is_empty() {
             note_layout_of::<T>()?;
         }
-        for item in self {
-            item.serialize(writer)?;
-        }
-        Ok(())
+        T::serialize_items(self, writer)
     }
 
     /// Changes nothing if an item can't be read.
     fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
         let mut length = 0u32;
         length.deserialize(reader)?;
-
-        let mut items = Vec::new();
-        for _ in 0..length {
-            let mut item = T::default();
-            item.deserialize(reader)?;
-            items.push(item);
-        }
-        *self = items;
+        *self = T::deserialize_items(length, reader)?;
         Ok(())
     }
 
@@ -914,5 +976,54 @@ mod tests {
                 second: 0x0304,
             }
         );
+    }
+
+    /// A `Vec` of bytes or byte arrays is written at once and read at once,
+    /// in the same bytes as item by item.
+    #[test]
+    fn byte_lists_store_the_same_bytes_as_item_by_item() {
+        let bytes: Vec<u8> = (0..=255).collect();
+        let pixels: Vec<[u8; 4]> = (0..64u8)
+            .map(|i| [i, i ^ 0x55, i.wrapping_mul(3), 0xFF])
+            .collect();
+        let mut written = Vec::new();
+        bytes.serialize(&mut written).unwrap();
+        pixels.serialize(&mut written).unwrap();
+
+        let mut by_item = Vec::new();
+        256u32.serialize(&mut by_item).unwrap();
+        for byte in &bytes {
+            by_item.write_all(&[*byte]).unwrap();
+        }
+        64u32.serialize(&mut by_item).unwrap();
+        for pixel in &pixels {
+            by_item.write_all(pixel).unwrap();
+        }
+        assert_eq!(written, by_item);
+
+        let mut reader = written.as_slice();
+        let mut read_bytes = Vec::new();
+        let mut read_pixels = Vec::new();
+        read_bytes.deserialize(&mut reader).unwrap();
+        read_pixels.deserialize(&mut reader).unwrap();
+        assert_eq!((read_bytes, read_pixels), (bytes, pixels));
+        assert!(reader.is_empty());
+    }
+
+    #[test]
+    fn byte_lists_that_end_early_do_not_read() {
+        let mut written = Vec::new();
+        vec![[1u8, 2, 3, 4]; 10].serialize(&mut written).unwrap();
+        written.pop();
+        let mut pixels = vec![[9u8; 4]];
+        let error = pixels.deserialize(&mut written.as_slice()).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::UnexpectedEof);
+        assert_eq!(pixels, vec![[9u8; 4]]);
+
+        let mut bytes = Vec::new();
+        u32::MAX.serialize(&mut bytes).unwrap();
+        bytes.push(7);
+        let mut list = Vec::<u8>::new();
+        assert!(list.deserialize(&mut bytes.as_slice()).is_err());
     }
 }

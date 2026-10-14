@@ -46,7 +46,7 @@ These keep Nubo exact, and players' saves safe. Never break them.
 - **Players never lose a save state to an update.** A field or variant's stored name is permanent: when you rename it in the code, keep the stored name with `#[serializable(name = "...")]` (hand-written implementations and the PPU store names differently; see `crates/nubo-core/AGENTS.md`). A field whose type or meaning changes gets a new stored name. Stored values are fixed-size and little-endian, never `usize`. How: `crates/nubo-core/AGENTS.md`.
 - **Only GPLv3-compatible code and dependencies** (MIT, BSD, ISC, Zlib, Apache-2.0, MPL-2.0 and the like, never GPL-2.0-only). Gambatte is GPL-2.0-only: use it as a reference only (its test ROMs, traces of a local build, its behavior) and never port its code or tables. When you port code, tables or data, credit the project with its link and license at the top of the file, in `NOTICE` and in the README's Credits; SameBoy-derived files point to the Expat notice in `apu.rs`.
 - **Code the browser build shares** takes `Instant`, `SystemTime` and `Duration` from `nubo_frontend::time`, which re-exports the `web-time` crate (std's panic on wasm32; the UI code may use `iced::time`, the same types), and text that sets a font uses `theme::BODY_FONT` or `theme::HEADING_FONT`, never `Font::DEFAULT` or another font of its own, which draw nothing in the browser. Plain `text()` without `.font()` is fine, and so are the icons (`ui::icons`).
-- **No `unsafe`.** The workspace lints forbid it. The one planned exception is the RetroArch core's exported C functions (`docs/RETROARCH_PLAN.md`): they will live in `frontends/nubo-libretro/src/ffi.rs`, with that crate's own lint table and the `unsafe` in as few places as possible. Any later crate that binds Nubo to another language follows the same rule; every other crate, `nubo-core`, `nubo-frontend` and the apps included, keeps it forbidden.
+- **No `unsafe`.** The workspace lints forbid it. The one exception is the RetroArch core's exported C functions: they live in `frontends/nubo-libretro/src/ffi.rs` (and its tests), under one `#[expect(unsafe_code)]`, with that crate's own lint table (`unsafe_code = "deny"`) and the `unsafe` in as few places as possible. Any later crate that binds Nubo to another language follows the same rule; every other crate, `nubo-core`, `nubo-frontend` and the apps included, keeps it forbidden.
 - **Newest stable versions** of Rust, crates, GitHub Actions and tools, never a pre-release unless nothing else works; test data stays pinned. Details, and the Flatpak's exception: `docs/CI.md`.
 - **Merging a pull request:** follow the `merge` skill (CI green, Codex's review done and handled). **Making a release:** follow the `release` skill.
 
@@ -57,7 +57,7 @@ These keep Nubo exact, and players' saves safe. Never break them.
 - **Whole words, not abbreviations.** Acronyms are words in type names (`RtcState`, `Mbc1CartridgeMapper`), getters have no `get_` prefix, and Pan Docs register names (`lcdc`, `nr52`, `svbk`) are fine.
 - **Modules are declared at the bottom of the file.**
 - **Docs move with the code.** Facts about a file live in its doc comments, and how files work together in the folder's `AGENTS.md`; update whatever your change makes wrong, in the same commit.
-- **Clippy stays clean.** The workspace enables the default lints and a curated set of pedantic ones (root `Cargo.toml`); every crate opts in with `[lints] workspace = true`. To silence a lint, put `#[expect(clippy::..., reason = "...")]` on the smallest item possible.
+- **Clippy stays clean.** The workspace enables the default lints and a curated set of pedantic ones (root `Cargo.toml`); every crate opts in with `[lints] workspace = true`, except the RetroArch core, which copies the table to deny `unsafe` instead of forbidding it (keep its copy the same). To silence a lint, put `#[expect(clippy::..., reason = "...")]` on the smallest item possible.
 
 ## Where Things Are
 
@@ -68,6 +68,7 @@ The root `Cargo.toml` is a virtual workspace whose default members are `nubo-cor
 - `crates/nubo-serializable-derive/`: the derive macro behind save states.
 - `crates/nubo-logo/`: the logo, drawn from rounded rectangles, for the app's icons.
 - `frontends/nubo/` (`AGENTS.md`): the app, desktop and browser.
+- `frontends/nubo-libretro/` (`AGENTS.md`): the RetroArch (libretro) core, a dynamic library; `cargo xtask libretro` packages it.
 - `tools/nubo-test-rom-runner/` (`AGENTS.md`): `cargo test-roms`.
 - `tools/nubo-json-test-runner/`: `cargo cpu-tests`.
 - `tools/nubo-save-state-check/` (`AGENTS.md`): `cargo save-states`, and the kept sets in `save-states/`.
@@ -83,7 +84,8 @@ Claude Code and Codex both read these `AGENTS.md` files; keep them the only inst
 
 - `tools/nubo-test-rom-runner/FAILING_TESTS.md`: every test that still fails, what was tried and what to try next.
 - `docs/ACCURACY_PLAN.md`: the plan towards the most accurate emulator; update it when a phase moves on.
-- `docs/SHOOTOUT_PLAN.md`, `docs/RETROARCH_PLAN.md` and `docs/RESTRUCTURE_PLAN.md` (a shared `nubo-frontend` crate and a `tools/` folder, signed off, with the order of the work): plans for work not done yet; update them as their parts get done.
+- `docs/SHOOTOUT_PLAN.md` and `docs/RESTRUCTURE_PLAN.md` (a shared `nubo-frontend` crate and a `tools/` folder, signed off, with the order of the work): plans for work not done yet; update them as their parts get done.
+- `docs/RETROARCH_PLAN.md`: the RetroArch core, what was built and what is left (getting it into RetroArch's core downloader).
 - `docs/CI.md`: CI, the nightly run, nightly builds, toolchain updates.
 - `docs/NIGHTLY_REVIEW.md`: what the nightly review does.
 - `docs/EMULATOR_COMPARISON.md`: speed next to other emulators.

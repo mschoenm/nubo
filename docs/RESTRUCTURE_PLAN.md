@@ -421,7 +421,8 @@ The order of all three plans, agreed with the maintainer on 2026-10-13:
 5. Parts 1 to 3 of the Shootout plan: the app's options, the harness class, and the maintainer's run on
    Windows.
 6. Phases 0 to 5 of [RETROARCH_PLAN.md](RETROARCH_PLAN.md), starting with a review of that plan
-   with Codex.
+   with Codex. The maintainer moved the core ahead of the Shootout's Parts 1 to 3 and asked for it
+   straight away; Phases 1 to 5 are built (see that plan's Status).
 7. When their conditions are met and the maintainer says to go ahead:
    - the pull request to the Shootout (its Part 4), once Nubo would rank first
    - RetroArch's own core downloader (its Phase 6), once the core has been in a few releases

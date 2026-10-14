@@ -1,6 +1,6 @@
 //! Project tasks run with `cargo xtask <command>`: building the Iced
 //! frontend for the browser and serving it locally, building the macOS app
-//! bundle, the Flatpak and the Windows installer, writing the logo and the
+//! bundle, the Flatpak, the Windows installer and the RetroArch core, writing the logo and the
 //! license files that go with them, checking a release's version and notes,
 //! timing Nubo next to other emulators, the nightly review's tooling, and
 //! reading the GB Emulator Shootout's published table.
@@ -51,6 +51,8 @@ Commands:
                 target/bundle as a .flatpak file to share (Linux with flatpak-builder only)
   windows       Build the Windows installer (with Inno Setup 6) and a zip to run without
                 installing into target/bundle (Windows only)
+  libretro      Build the RetroArch core for this computer into target/bundle as a folder and a
+                zip: the core under RetroArch's file name, its info file and the licenses
   icon <path>   Write the Nubo logo to <path>: an SVG if it ends in .svg, a Windows icon if it
                 ends in .ico, else a 256 pixel PNG
   licenses <folder>
@@ -337,6 +339,13 @@ fn main() -> ExitCode {
                 zip.display()
             );
         }),
+        Some("libretro") => libretro::build_libretro_core().map(|zip| {
+            println!(
+                "Built {}. Copy the core into RetroArch's cores folder and the .info file into \
+                 its info folder.",
+                zip.display()
+            );
+        }),
         Some("icon") => match env::args().nth(2) {
             Some(path) => bundle::write_icon(Path::new(&path), 256),
             None => Err(format!("icon needs a path to write to\n\n{USAGE}")),
@@ -393,6 +402,7 @@ mod benchmark_roms;
 mod bundle;
 mod compare_emulators;
 mod flatpak;
+mod libretro;
 mod licenses;
 mod metrics;
 mod release;
