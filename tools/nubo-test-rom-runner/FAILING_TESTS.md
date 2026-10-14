@@ -314,4 +314,4 @@ The groups `docs/SHOOTOUT_PLAN.md` expected to fail are empty:
   `runtime`, 100 tests failed only because they ran out of time: the boot ROM takes 3.1 seconds on
   the CGB, and some tests need up to 8.5 seconds more than their `runtime` on Nubo (`rtc3test-3`,
   `cpu_instrs/11`, `oam_bug/8`). The runner now gives each test the harness's own deadline instead,
-  the `runtime` plus 24 emulated seconds at the harness's speed, as the real harness would.
+  the `runtime` plus 26 emulated seconds at the harness's speed, as the real harness would.
