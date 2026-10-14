@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <a href="#download"><img src="https://img.shields.io/badge/Download-6d5ce8?style=for-the-badge" alt="Download" height="40"></a>
+  <a href="#download"><img src="images/buttons/download.svg" width="210" alt="Download"></a>
   &nbsp;
-  <a href="https://mschoenm.github.io/nubo/"><img src="https://img.shields.io/badge/Play_in_your_browser-5b8def?style=for-the-badge" alt="Play in your browser" height="40"></a>
+  <a href="https://mschoenm.github.io/nubo/"><img src="images/buttons/play-in-your-browser.svg" width="210" alt="Play in your browser"></a>
 </p>
 
 <p align="center">
