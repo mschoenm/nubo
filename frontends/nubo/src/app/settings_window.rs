@@ -54,7 +54,7 @@ impl App {
         match message {
             SettingsMessage::Open => {
                 if self.settings_tab.is_none() {
-                    self.settings_tab = Some(SettingsTab::General);
+                    self.settings_tab = Some(SettingsTab::Display);
                     self.settings_focus = None;
                 }
             }
