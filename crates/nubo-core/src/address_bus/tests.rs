@@ -552,3 +552,14 @@ fn powers_on_cgb_work_ram_with_noise() {
         .count();
     assert!(noisy_bytes > address_bus.working_ram.len() / 2);
 }
+
+#[test]
+fn dots_the_ppu_ran_too_far_ahead_carry_into_the_next_m_cycle() {
+    let mut address_bus = initialize_test_address_bus();
+    address_bus.ppu_dot_debt = -1;
+
+    assert_eq!(address_bus.take_cycle_dots(2, 2), 0);
+    assert_eq!(address_bus.ppu_dot_debt, -1);
+    assert_eq!(address_bus.take_cycle_dots(2, 0), 1);
+    assert_eq!(address_bus.ppu_dot_debt, 0);
+}
