@@ -13,9 +13,20 @@ fn no_arguments_start_the_library() {
 }
 
 #[test]
+fn a_relative_rom_path_is_made_absolute() {
+    let options = parse_args(&["roms/game.gb"]).unwrap();
+    let path = options.rom_path.unwrap();
+    assert!(path.is_absolute());
+    assert!(path.ends_with("roms/game.gb"));
+}
+
+#[test]
 fn a_rom_and_a_model() {
     let options = parse_args(&["game.gb", "--model", "cgb-c"]).unwrap();
-    assert_eq!(options.rom_path, Some(PathBuf::from("game.gb")));
+    assert_eq!(
+        options.rom_path,
+        Some(std::path::absolute("game.gb").unwrap())
+    );
     assert_eq!(options.model, Some(Model::CgbC));
 
     let options = parse_args(&["--cgb", "game.gb"]).unwrap();
@@ -31,7 +42,7 @@ fn the_shootouts_options() {
     assert_eq!(
         options,
         Options {
-            rom_path: Some(PathBuf::from("game.gb")),
+            rom_path: Some(std::path::absolute("game.gb").unwrap()),
             model: Some(Model::Dmg),
             scale: Some(1),
             fresh: true,
