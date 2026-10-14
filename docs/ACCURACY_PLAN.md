@@ -174,9 +174,15 @@ Largest phase, but each part stands alone:
      scrolling logo hidden behind the intro), whose end state matches the Super Game Boy's (Mooneye's
      boot tests), but whose length likely doesn't, so a game may start a little earlier or later than
      on hardware.
-   - The menu's functions in Nubo's own design: the game's colors or the player's own, a color editor,
-     the border on or off, and the commands that control the real menu (`PAL_PRI`, `ICON_EN`,
-     `ATRC_EN`).
+   - The menu's functions in Nubo's own design. **Done in the core:** the commands that control the
+     real menu (`PAL_PRI`, `ICON_EN`, `ATRC_EN`), the player's own palette
+     (`Emulator::set_sgb_player_palette`), Nubo's border over the game's (`Emulator::set_sgb_border`),
+     and the attraction mode: after seven minutes with no button held, clouds drift across Nubo's
+     border (`crates/nubo-core/src/sgb/attraction.rs`). Not done: the R, L, L, L, L, R shortcut
+     that starts the attraction mode at once, since a Game Boy game has no L and R buttons to read.
+     **Left:** the app's page for it (colors: the game's, a few of Nubo's, or the player's own from a
+     color editor; the border: the game's, Nubo's or none), and the same choices as RetroArch core
+     options.
 
    Decided against, for now or for good (maintainer, 2026-10-14):
    - **Anything that needs the Super Nintendo itself**: its sound (`SOUND`, `SOU_TRN`) and the

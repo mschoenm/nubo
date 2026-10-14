@@ -291,6 +291,14 @@ impl Joypad {
         self.update_buttons();
     }
 
+    /// Whether any player holds any button, on the keyboard or a controller.
+    pub(super) fn any_button_held(&self) -> bool {
+        self.keyboard_keys != 0
+            || self.other_controller_keys != 0
+            || self.controller_keys.iter().any(|&keys| keys != 0)
+            || self.player_keys.iter().any(|&keys| keys != 0)
+    }
+
     /// Gives each player the buttons held now, after a loaded save state
     /// changed how many players a Super Game Boy reads. The buttons held
     /// aren't part of the state, so no interrupt follows.

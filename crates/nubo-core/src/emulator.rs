@@ -12,6 +12,7 @@ use crate::error::{CheatError, LoadRomError};
 use crate::joypad::Key;
 use crate::model::Model;
 use crate::rom_archive;
+use crate::sgb::{Sgb, SgbBorder};
 use std::ops::Range;
 
 /// Where the cartridge header starts: the entry point the boot ROM jumps to.
@@ -400,6 +401,53 @@ impl Emulator {
     /// one player.
     pub fn set_player_keys(&mut self, player: u8, keys: &[Key]) {
         self.address_bus_mut().set_player_keys(player, keys);
+    }
+
+    /// On the Super Game Boy models, the palette the player picked from the
+    /// Super Game Boy's menu ([`Emulator::set_sgb_player_palette`]), while it
+    /// colors the screen: four RGB555 colors, from the lightest shade to the
+    /// darkest. `None` while the game's own colors show, and on other models.
+    pub fn sgb_player_palette(&self) -> Option<[u16; 4]> {
+        self.address_bus().sgb()?.player_palette()
+    }
+
+    /// On the Super Game Boy models, colors the whole screen with `palette`
+    /// (four RGB555 colors, from the lightest shade to the darkest), as a
+    /// palette picked from the Super Game Boy's menu does, or brings back
+    /// the game's own colors for `None`. The palette stays until the player
+    /// changes it, or, if the game asks for that, until the game sets new
+    /// colors. Does nothing while the game doesn't allow it
+    /// ([`Emulator::sgb_player_palette_allowed`]). Save states keep it, as
+    /// they keep the rest of the Super Game Boy.
+    pub fn set_sgb_player_palette(&mut self, palette: Option<[u16; 4]>) {
+        if let Some(sgb) = self.address_bus_mut().sgb_mut_for_menu() {
+            sgb.set_player_palette(palette);
+        }
+    }
+
+    /// Whether the game lets the player pick a palette from the Super Game
+    /// Boy's menu. False on other models.
+    pub fn sgb_player_palette_allowed(&self) -> bool {
+        self.address_bus()
+            .sgb()
+            .is_some_and(Sgb::player_palettes_allowed)
+    }
+
+    /// On the Super Game Boy models, the border the player picked
+    /// ([`Emulator::set_sgb_border`]). [`SgbBorder::Game`] on other models.
+    pub fn sgb_border(&self) -> SgbBorder {
+        self.address_bus()
+            .sgb()
+            .map_or(SgbBorder::Game, Sgb::border_choice)
+    }
+
+    /// On the Super Game Boy models, picks the border around the screen in
+    /// [`Emulator::frame_with_border`]: the game's own, or Nubo's. Save states
+    /// keep it, as they keep the rest of the Super Game Boy.
+    pub fn set_sgb_border(&mut self, border: SgbBorder) {
+        if let Some(sgb) = self.address_bus_mut().sgb_mut_for_menu() {
+            sgb.set_border_choice(border);
+        }
     }
 
     /// Chooses which controller buttons act as which Game Boy buttons.

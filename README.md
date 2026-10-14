@@ -26,7 +26,7 @@ These are the files of the [latest release](https://github.com/mschoenm/nubo/rel
 - Accurate audio emulation, with channel timing ported from [SameBoy](https://github.com/LIJI32/SameBoy)
 - Dot-based graphics emulation with a pixel FIFO, so mid-scanline effects and mode 3 timing match the hardware
 - Every hardware model from the first Game Boy to the Game Boy Advance, picked automatically per game or by hand
-- Super Game Boy support: games' colors, borders, screen masking and up to four players (each controller plays its own), with Nubo's own border for games that bring none (the border can be switched off); games made for it start on it automatically, unless they're made for the Game Boy Color too
+- Super Game Boy support: games' colors, borders, screen masking and up to four players (each controller plays its own), with Nubo's own border for games that bring none (the border can be switched off, and comes alive with drifting clouds when the controller is left alone for seven minutes, unless the game turns that off); games made for it start on it automatically, unless they're made for the Game Boy Color too
 - MBC1, MBC2, MBC3 (including the MBC30 for 4 MB games), MBC5, and HuC1 support, with RTC support for MBC3 cartridges
 - Loading ROMs directly from `.zip` files
 - A desktop app with:

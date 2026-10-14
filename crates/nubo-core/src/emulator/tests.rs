@@ -9,7 +9,7 @@
 //! motor and the memory) is right.
 
 use crate::address_bus::effects::empty_cartridge_effects;
-use crate::{CartridgeEffects, DOTS_PER_FRAME, Emulator, Model};
+use crate::{CartridgeEffects, DOTS_PER_FRAME, Emulator, Key, Model, SgbBorder};
 use std::sync::{Arc, Mutex};
 
 const ROM_SIZE: usize = 0x8000;
@@ -1040,4 +1040,61 @@ fn the_super_game_boy_intro_is_over_before_the_game_runs() {
         let gpu = emulator.address_bus_mut().gpu_mut_for_tests();
         assert!(gpu.sgb().unwrap().intro_over(), "{model:?}");
     }
+}
+
+#[test]
+fn the_super_game_boy_menu_settings_survive_a_save_state() {
+    let rom = program_rom(Model::Sgb, &[0x18, 0xFE]);
+    let mut emulator = booted(Model::Sgb, &rom);
+    assert!(emulator.sgb_player_palette_allowed());
+    let palette = [0x7FFF, 0x001F, 0x03E0, 0x7C00];
+    emulator.set_sgb_player_palette(Some(palette));
+    emulator.set_sgb_border(SgbBorder::Nubo);
+    assert_eq!(emulator.sgb_player_palette(), Some(palette));
+
+    let state = emulator.save_state();
+    let mut loaded = booted(Model::Sgb, &rom);
+    loaded.load_state(&state).unwrap();
+    assert_eq!(loaded.sgb_player_palette(), Some(palette));
+    assert_eq!(loaded.sgb_border(), SgbBorder::Nubo);
+
+    loaded.set_sgb_player_palette(None);
+    assert_eq!(loaded.sgb_player_palette(), None);
+}
+
+#[test]
+fn other_models_have_no_super_game_boy_menu() {
+    let rom = program_rom(Model::Dmg, &[0x18, 0xFE]);
+    let mut emulator = booted(Model::Dmg, &rom);
+    emulator.set_sgb_player_palette(Some([0; 4]));
+    emulator.set_sgb_border(SgbBorder::Nubo);
+    assert_eq!(emulator.sgb_player_palette(), None);
+    assert!(!emulator.sgb_player_palette_allowed());
+    assert_eq!(emulator.sgb_border(), SgbBorder::Game);
+}
+
+#[test]
+fn the_super_game_boy_sees_the_buttons_the_player_holds() {
+    let rom = program_rom(Model::Sgb, &[0x18, 0xFE]);
+    let mut emulator = booted(Model::Sgb, &rom);
+    let held = |emulator: &Emulator| {
+        emulator
+            .address_bus()
+            .sgb()
+            .unwrap()
+            .buttons_held_for_tests()
+    };
+
+    emulator.press_key(Key::A);
+    assert!(held(&emulator));
+    emulator.release_key(Key::A);
+    assert!(!held(&emulator));
+    emulator.set_player_keys(3, &[Key::Start]);
+    assert!(held(&emulator));
+
+    let state = emulator.save_state();
+    let mut loaded = booted(Model::Sgb, &rom);
+    loaded.set_player_keys(3, &[Key::Start]);
+    loaded.load_state(&state).unwrap();
+    assert!(held(&loaded));
 }

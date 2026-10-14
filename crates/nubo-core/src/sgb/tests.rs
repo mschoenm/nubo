@@ -353,3 +353,159 @@ fn the_intro_holds_the_game_boy_in_reset_and_then_shows_its_picture() {
     assert_eq!(pixel(&game_screen, 0, 0), DMG_SHADES[3]);
     assert!(!console.sgb.frame_colorized());
 }
+
+/// A palette the player picks: white, red, green and blue.
+const PLAYER_PALETTE: [u16; 4] = [0x7FFF, 0x001F, 0x03E0, 0x7C00];
+
+#[test]
+fn the_player_palette_colors_the_whole_screen_until_the_player_changes_it() {
+    let mut console = Console::new();
+    console.send(&[header(command::ATTR_DIV, 1), 0b10_01_11, 7]);
+    console.sgb.set_player_palette(Some(PLAYER_PALETTE));
+    let game_screen = console.frame_of_shade(1);
+    assert_eq!(pixel(&game_screen, 0, 0), [0xFF, 0x00, 0x00, 0xFF]);
+    assert_eq!(pixel(&game_screen, 159, 143), [0xFF, 0x00, 0x00, 0xFF]);
+    assert!(console.sgb.frame_colorized());
+
+    console.send(&pal01([0, 0x7C00, 0, 0, 0x7C00, 0, 0]));
+    assert_eq!(console.sgb.player_palette(), Some(PLAYER_PALETTE));
+
+    console.sgb.set_player_palette(None);
+    let game_screen = console.frame_of_shade(1);
+    assert_eq!(pixel(&game_screen, 0, 0), [0x00, 0x00, 0xFF, 0xFF]);
+}
+
+#[test]
+fn with_pal_pri_on_the_game_takes_its_colors_back_when_it_sets_new_ones() {
+    let mut console = Console::new();
+    console.send(&[header(command::PAL_PRI, 1), 0x01]);
+    console.sgb.set_player_palette(Some(PLAYER_PALETTE));
+    console.send(&[header(command::PAL_TRN, 1)]);
+    assert_eq!(console.sgb.player_palette(), Some(PLAYER_PALETTE));
+
+    console.send(&pal01([0, 0x7C00, 0, 0, 0x7C00, 0, 0]));
+    assert_eq!(console.sgb.player_palette(), None);
+
+    console.sgb.set_player_palette(Some(PLAYER_PALETTE));
+    console.send(&[header(command::PAL_SET, 1)]);
+    assert_eq!(console.sgb.player_palette(), None);
+}
+
+#[test]
+fn icon_en_takes_the_palettes_away_and_can_stop_all_commands() {
+    let mut console = Console::new();
+    console.sgb.set_player_palette(Some(PLAYER_PALETTE));
+    console.send(&[header(command::ICON_EN, 1), 0x01]);
+    assert!(!console.sgb.player_palettes_allowed());
+    assert_eq!(console.sgb.player_palette(), None);
+    console.sgb.set_player_palette(Some(PLAYER_PALETTE));
+    assert_eq!(console.sgb.player_palette(), None);
+
+    console.send(&[header(command::ICON_EN, 1), 0x02]);
+    assert!(console.sgb.player_palettes_allowed());
+    assert_eq!(console.send(&[header(command::MLT_REQ, 1), 0x03]), Some(4));
+
+    console.send(&[header(command::ICON_EN, 1), 0x04]);
+    assert_eq!(console.send(&[header(command::MLT_REQ, 1), 0x03]), None);
+    console.send(&[header(command::ICON_EN, 1), 0x00]);
+    assert!(console.sgb.player_palettes_allowed());
+}
+
+/// Sends a whole border whose every pixel has color 1 of the first border
+/// palette, and waits until it shows.
+fn send_game_border(console: &mut Console) {
+    console.send(&[header(command::CHR_TRN, 1), 0]);
+    for _ in 0..3 {
+        console.frame_of_shade(1);
+    }
+    console.send(&[header(command::PCT_TRN, 1)]);
+    for _ in 0..3 + usize::from(BORDER_FADE_FRAMES) {
+        console.frame_of_shade(0);
+    }
+}
+
+#[test]
+fn the_player_can_pick_nubos_border_over_the_games() {
+    let mut console = Console::new();
+    console.frame_of_shade(0);
+    let nubo_border = console.sgb.bordered_frame().to_vec();
+    send_game_border(&mut console);
+    assert_ne!(console.sgb.bordered_frame(), nubo_border);
+
+    console.sgb.set_border_choice(SgbBorder::Nubo);
+    console.frame_of_shade(0);
+    assert_eq!(console.sgb.bordered_frame(), nubo_border);
+    console.sgb.set_border_choice(SgbBorder::Game);
+    console.frame_of_shade(0);
+    assert_ne!(console.sgb.bordered_frame(), nubo_border);
+}
+
+/// Runs frames until the attraction mode has been on for a while, and
+/// returns whether Nubo's border changed.
+fn border_comes_alive(console: &mut Console) -> bool {
+    console.frame_of_shade(0);
+    let still = console.sgb.bordered_frame().to_vec();
+    console.sgb.idle_frames = attraction::IDLE_FRAMES - 1;
+    for _ in 0..200 {
+        console.frame_of_shade(0);
+    }
+    console.sgb.bordered_frame() != still
+}
+
+#[test]
+fn nubos_border_comes_alive_when_the_player_leaves_the_controller_alone() {
+    let mut console = Console::new();
+    assert!(border_comes_alive(&mut console));
+
+    console.sgb.set_buttons_held(true);
+    console.frame_of_shade(0);
+    assert_eq!(console.sgb.idle_frames, 0);
+    console.sgb.set_buttons_held(false);
+    console.frame_of_shade(0);
+    assert_eq!(console.sgb.idle_frames, 1);
+}
+
+#[test]
+fn a_held_button_keeps_the_attraction_mode_away() {
+    let mut console = Console::new();
+    console.sgb.set_buttons_held(true);
+    assert!(!border_comes_alive(&mut console));
+}
+
+#[test]
+fn atrc_en_turns_the_attraction_mode_off() {
+    let mut console = Console::new();
+    console.send(&[header(command::ATRC_EN, 1), 0x01]);
+    assert!(!border_comes_alive(&mut console));
+    console.send(&[header(command::ATRC_EN, 1), 0x00]);
+    assert!(border_comes_alive(&mut console));
+}
+
+#[test]
+fn a_games_border_has_no_attraction_mode() {
+    let mut console = Console::new();
+    send_game_border(&mut console);
+    assert!(!border_comes_alive(&mut console));
+}
+
+#[test]
+fn save_states_keep_the_menu_settings() {
+    use crate::serializable::Serializable;
+
+    let mut console = Console::new();
+    console.send(&[header(command::PAL_PRI, 1), 0x01]);
+    console.send(&[header(command::ATRC_EN, 1), 0x01]);
+    console.sgb.set_player_palette(Some(PLAYER_PALETTE));
+    console.sgb.set_border_choice(SgbBorder::Nubo);
+    console.frame_of_shade(0);
+
+    let mut bytes = Vec::new();
+    console.sgb.serialize(&mut bytes).unwrap();
+    let mut loaded = Console::new();
+    loaded.sgb.deserialize(&mut bytes.as_slice()).unwrap();
+    assert_eq!(loaded.sgb.player_palette(), Some(PLAYER_PALETTE));
+    assert_eq!(loaded.sgb.border_choice(), SgbBorder::Nubo);
+    assert!(loaded.sgb.game_palette_priority);
+    assert!(loaded.sgb.attraction_disabled);
+    assert_eq!(loaded.sgb.idle_frames, 1);
+}
