@@ -596,7 +596,7 @@ impl AddressBus {
 
     /// High RAM (0xFF80-0xFFFE).
     pub(crate) fn high_ram(&self) -> &[u8] {
-        &self.zero_page_ram[..0x7F]
+        &self.high_ram[..0x7F]
     }
 
     /// Video RAM and OAM, after catching the PPU up so an HBlank DMA it owes
