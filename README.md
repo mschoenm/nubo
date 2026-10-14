@@ -128,7 +128,7 @@ Screenshots go to your Pictures folder, in `Pictures/Nubo`.
 <summary><strong>Installing, updating and removing</strong></summary>
 
 - **Windows:** the installer installs Nubo for your user, without administrator rights, with a Start menu entry; it can also offer Nubo for opening `.gb` and `.gbc` files and add a desktop shortcut. Running a newer installer updates Nubo and keeps those choices. Uninstall Nubo from Settings > Apps, like any app. To install without questions from a script, run `msiexec /i Nubo-windows-x64.msi /qn`, adding `ASSOCIATE_FILES=0` (don't offer Nubo for ROMs) or `DESKTOP_SHORTCUT=1` (add a desktop shortcut); `/passive` shows only a progress bar.
-- **Linux:** the Flatpak adds Nubo to your app grid; it can read ROM folders in your home folder and on external drives. Start it from a terminal with `flatpak run io.github.mschoenm.nubo`. To update, install the newer file over the old one with `flatpak install --user --reinstall Nubo-linux-x86_64.flatpak`; your saves and settings stay. Remove Nubo with `flatpak uninstall --user io.github.mschoenm.nubo` or your software center.
+- **Linux:** the Flatpak adds Nubo to your app grid; it can read ROM folders in your home folder and on external drives. Start it from a terminal with `flatpak run io.github.mschoenm.nubo`. To update, install the newer file over the old one with `flatpak install --user --reinstall Nubo-linux-x86_64.flatpak` (`Nubo-linux-aarch64.flatpak` on ARM); your saves and settings stay. Remove Nubo with `flatpak uninstall --user io.github.mschoenm.nubo` or your software center.
 
 </details>
 
