@@ -163,7 +163,7 @@ pub struct AddressBus {
     working_ram: Box<[u8; WORKING_RAM_SIZE]>,
 
     /// High RAM (0xFF80-0xFFFE), 127 bytes the CPU can always reach.
-    zero_page_ram: [u8; 0x80],
+    high_ram: [u8; 0x80],
 
     /// SVBK (0xFF70): selects the CGB work RAM bank at 0xD000.
     svbk: u8,
@@ -279,7 +279,7 @@ impl AddressBus {
             in_boot_rom: true,
             boot_rom: vec![0; 0x100],
             working_ram: zeroed_memory(),
-            zero_page_ram: [0; 0x80],
+            high_ram: [0; 0x80],
             svbk: 0,
             cartridge: empty_cartridge(),
             rom: SharedRom::default(),
@@ -485,7 +485,7 @@ impl AddressBus {
             0xC000..=0xFDFF => self.working_ram[self.working_ram_index(address)],
             _ => {
                 debug_assert!(reads_plain_memory(address));
-                self.zero_page_ram[usize::from(address & 0x7F)]
+                self.high_ram[usize::from(address & 0x7F)]
             }
         };
         self.apply_cheats(address, byte)
@@ -499,7 +499,7 @@ impl AddressBus {
             self.working_ram[index] = value;
         } else {
             debug_assert!(writes_plain_memory(address));
-            self.zero_page_ram[usize::from(address & 0x7F)] = value;
+            self.high_ram[usize::from(address & 0x7F)] = value;
         }
     }
 
@@ -536,7 +536,7 @@ impl AddressBus {
             in_boot_rom: self.in_boot_rom,
             boot_rom: self.boot_rom.clone(),
             working_ram: self.working_ram.clone(),
-            zero_page_ram: self.zero_page_ram,
+            high_ram: self.high_ram,
             svbk: self.svbk,
             cartridge,
             rom,
@@ -1104,7 +1104,7 @@ impl AddressBus {
                 let mut bus = FieldWriter::new(writer);
                 bus.field("in_boot_rom", &self.in_boot_rom)?;
                 bus.field("work_ram", &*self.working_ram)?;
-                bus.field("high_ram", &self.zero_page_ram)?;
+                bus.field("high_ram", &self.high_ram)?;
                 bus.field("svbk", &self.svbk)?;
                 bus.field("interrupt_enable", &self.interrupt_enable)?;
                 bus.field("undocumented_registers", &self.undocumented_registers)?;
@@ -1146,7 +1146,7 @@ impl AddressBus {
                 match name {
                     "in_boot_rom" => self.in_boot_rom.deserialize(bytes)?,
                     "work_ram" => self.working_ram.deserialize(bytes)?,
-                    "high_ram" => self.zero_page_ram.deserialize(bytes)?,
+                    "high_ram" => self.high_ram.deserialize(bytes)?,
                     "svbk" => self.svbk.deserialize(bytes)?,
                     "interrupt_enable" => self.interrupt_enable.deserialize(bytes)?,
                     "undocumented_registers" => self.undocumented_registers.deserialize(bytes)?,
