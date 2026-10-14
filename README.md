@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="images/flatpak/tobu-tobu-girl-deluxe.png" width="600" alt="Tobu Tobu Girl Deluxe running in Nubo">
+  <img src="images/screenshots/super-game-boy.png" width="700" alt="Tobu Tobu Girl Deluxe in Nubo, inside the game's own illustrated Super Game Boy border">
 </p>
 
 <p align="center">
@@ -43,6 +43,26 @@ Accuracy is only half of it. Nubo keeps your games in a library with their title
 - **Cheats.** GameShark and Game Genie codes, kept for each game.
 - **The cartridges nearly every game uses.** MBC1, MBC2, MBC3 with its real-time clock (and the MBC30 of 4 MB games), MBC5, HuC1, and plain ROM with or without RAM. Games load from `.gb`, `.gbc` and `.zip` files.
 
+<table>
+  <tr>
+    <td align="center"><img src="images/screenshots/big2small.png" width="400" alt="Big2Small's colorful forest map"><br><sub>Big2Small, a Game Boy Color puzzle adventure</sub></td>
+    <td align="center"><img src="images/screenshots/rebound.png" width="400" alt="Rebound, a blue blob on grassy steps under a blue sky, with coins"><br><sub>Rebound, a Game Boy Color platformer</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="images/screenshots/moki.png" width="400" alt="Moki the Monster Kid waking up in a warm orange bedroom"><br><sub>Moki the Monster Kid, a Game Boy Color adventure</sub></td>
+    <td align="center"><img src="images/screenshots/rhythm-land.png" width="400" alt="Rhythm Land's skateboarder on a street, in Game Boy Pocket colors"><br><sub>Rhythm Land, a Game Boy game, in Pocket colors</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="images/screenshots/pause-menu.png" width="400" alt="Nubo's pause menu over El Dueloroso: resume, save state, load state, cheats, fullscreen, reset, settings and back to library"><br><sub>The pause menu: save states, cheats and more</sub></td>
+    <td align="center"><img src="images/screenshots/super-game-boy-colors.png" width="400" alt="The pause menu's Super Game Boy page over Tobu Tobu Girl Deluxe's border, with the game's colors, gray, green, Pocket and your own colors"><br><sub>Super Game Boy colors, including your own</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="images/screenshots/palettes.png" width="820" alt="El Dueloroso's saloon three times: in green, in Pocket colors and in gray"><br>
+  <sub>One Game Boy game in Nubo's green, Pocket and gray screens</sub>
+</p>
+
 ## Download
 
 | Platform | Download |
@@ -65,7 +85,7 @@ Nubo doesn't come with any games. Play the cartridges you own, or start with fre
 Open a single game, or add your ROM folders under Settings > Library and let Nubo fill the library:
 
 <p align="center">
-  <img src="images/screenshots/library.png" width="700" alt="Nubo's game library with Geometrix, Tobu Tobu Girl Deluxe and µCity, each shown with its title screen">
+  <img src="images/screenshots/library.png" width="760" alt="Nubo's game library in the light theme: a Continue playing row with Moki the Monster Kid, Big2Small, Froggy Kong and Dawn Will Come, above all the games, each shown with its title screen">
 </p>
 
 These are the default controls. All of them but Esc can be changed under Settings > Controls.
@@ -164,8 +184,9 @@ Much of its accuracy comes from other people's research and code:
 - The [libretro thumbnail collection](https://github.com/libretro-thumbnails/libretro-thumbnails) and the No-Intro game lists of the [libretro database](https://github.com/libretro/libretro-database): the box art the desktop app can download.
 - [Lucide](https://lucide.dev): the icons of the desktop app (ISC License, see [NOTICE](NOTICE)).
 - [libretro.h](https://github.com/libretro/libretro-common) by the RetroArch team: the libretro API the RetroArch core's bindings are written from (MIT License, see [NOTICE](NOTICE)). [SameBoy's libretro core](https://github.com/LIJI32/SameBoy) and [rcheevos](https://github.com/RetroAchievements/rcheevos) showed how a Game Boy core lays out its memory for RetroAchievements.
-- [Tobu Tobu Girl Deluxe](https://tangramgames.itch.io/tobu-tobu-girl-deluxe) by Tangram Games: the game in the screenshots (`images/`) and in some of the save states every version is checked against (`save-states/`), whose graphics are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-- [µCity](https://github.com/AntonioND/ucity) and [Geometrix](https://github.com/AntonioND/geometrix) by Antonio Niño Díaz: games in the library screenshot (`images/screenshots/`) and in the save states every version is checked against (`save-states/`), licensed under the GPL, version 3 or later.
+- [Tobu Tobu Girl Deluxe](https://tangramgames.itch.io/tobu-tobu-girl-deluxe) by Tangram Games: the game in the Super Game Boy screenshots and the Flatpak's screenshot (`images/`), and in some of the save states every version is checked against (`save-states/`), whose graphics are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- The other homebrew games in the screenshots (`images/screenshots/`), each under its own license: [Big2Small](https://github.com/mdsteele/big2small) by Matthew D. Steele (GPL-3.0-or-later), [Rebound](https://github.com/DevEd2/ReboundGB) by DevEd (MIT), [Moki the Monster Kid](https://github.com/sleepingpandagames/moki-the-monster-kid) by Sleeping Panda Games (MPL-2.0), [Rhythm Land](https://github.com/sinusoid-studios/rhythm-land) by Sinusoid Studios (MIT) and [El Dueloroso](https://github.com/ajgalan/el-dueloroso) by Adrián JG (GPL-3.0), and in the library [Airaki](https://github.com/furrtek/Airaki) by furrtek (GPL-3.0), [Dawn Will Come](https://github.com/eishiya/DawnWillCome) by eishiya, with art by H0lyhandgrenade and eishiya and music by Kezia Salmon (code MIT, art and music [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), [Europa Rescue](https://github.com/godai78/europa) by godai ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)), [Froggy Kong](https://github.com/videogamestorytime/FroggyKong) by videogamestorytime (GPL-3.0) and [Sushi Nights](https://github.com/Zal0/SushiNights) by Zalo, Kirblue, MaikelOrtega_ and sergiodeprado (MIT).
+- [µCity](https://github.com/AntonioND/ucity) and [Geometrix](https://github.com/AntonioND/geometrix) by Antonio Niño Díaz: Geometrix is in the library screenshot (`images/screenshots/`), and both are in the save states every version is checked against (`save-states/`), licensed under the GPL, version 3 or later.
 
 The original project was built with the help of these resources:
 
