@@ -71,6 +71,7 @@ nubo-core = { path = "crates/nubo-core" }
 nubo-frontend = { path = "crates/nubo-frontend" }
 nubo-logo = { path = "crates/nubo-logo" }
 nubo-serializable-derive = { path = "crates/nubo-serializable-derive" }
+ureq = { version = "3", default-features = false, features = ["rustls", "platform-verifier"] }
 wasm-bindgen = "=0.2.129"
 wasm-bindgen-cli-support = "=0.2.129"
 

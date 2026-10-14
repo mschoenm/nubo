@@ -12,12 +12,11 @@
 //! each test, so CI never downloads these files. It is updated in a pull
 //! request of its own when the Shootout publishes again.
 
-use crate::{Result, target_dir, workspace_root};
+use crate::{Result, http, target_dir, workspace_root};
 use serde_json::Value;
 use std::fmt::Write;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 /// Where the files of the Shootout's branches are downloaded from.
 const RAW_URL: &str = "https://raw.githubusercontent.com/gbdev/GBEmulatorShootout";
@@ -72,26 +71,12 @@ pub fn run(args: &[String]) -> Result {
     Ok(())
 }
 
-/// Downloads `file` from the Shootout at `commit` into `folder` with curl and
-/// reads it as JSON.
+/// Downloads `file` from the Shootout at `commit` into `folder` and reads it
+/// as JSON.
 fn download_json(commit: &str, file: &str, folder: &Path) -> Result<Value> {
     let path = folder.join(file);
     let url = format!("{RAW_URL}/{commit}/{}", percent_encode(file));
-    let status = Command::new("curl")
-        .args([
-            "--fail",
-            "--location",
-            "--silent",
-            "--show-error",
-            "--output",
-        ])
-        .arg(&path)
-        .arg(&url)
-        .status()
-        .map_err(|error| format!("failed to run curl: {error}"))?;
-    if !status.success() {
-        return Err(format!("failed to download {url}"));
-    }
+    http::download(&url, &path)?;
     let text = fs::read_to_string(&path)
         .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
     serde_json::from_str(&text).map_err(|error| format!("{file} is not valid JSON: {error}"))

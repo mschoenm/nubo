@@ -6,7 +6,7 @@ Folders with their own `AGENTS.md` (listed under Where Things Are) explain their
 
 ## Setup and Commands
 
-You need the newest stable Rust, as `rust-toolchain.toml` asks (`rustup update`), and `curl`, which downloads the test ROMs and benchmark games. Linux also needs `libasound2-dev`, `libudev-dev` and `pkg-config`. The browser build's lint needs `rustup target add wasm32-unknown-unknown`, and the license check needs `cargo install cargo-deny --locked`. The `cargo` aliases below are defined in `.cargo/config.toml`; packaging, the web build and the other project tasks are in `xtask/AGENTS.md`.
+You need the newest stable Rust, as `rust-toolchain.toml` asks (`rustup update`); the tools download the test ROMs and benchmark games themselves. Linux also needs `libasound2-dev`, `libudev-dev` and `pkg-config`. The browser build's lint needs `rustup target add wasm32-unknown-unknown`, and the license check needs `cargo install cargo-deny --locked`. The `cargo` aliases below are defined in `.cargo/config.toml`; packaging, the web build and the other project tasks are in `xtask/AGENTS.md`.
 
 ```bash
 cargo build / cargo test      # The core crates only (the workspace's default members)

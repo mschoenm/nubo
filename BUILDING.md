@@ -6,7 +6,7 @@ How to build, run and package Nubo from its source code. To play, the [downloads
 
 A Rust toolchain installed with [rustup](https://rustup.rs). `rust-toolchain.toml` asks for the newest stable Rust, so run `rustup update` if a build complains. Everything is driven by cargo, on Windows, macOS and Linux.
 
-The test ROMs, the CPU tests and the benchmark games are downloaded with `curl`, which most systems have. `cargo xtask web` adds the WebAssembly target to your toolchain with rustup the first time.
+The test ROMs, the CPU tests and the benchmark games are downloaded by the tools themselves, through the proxy in `HTTPS_PROXY` if one is set. `cargo xtask web` adds the WebAssembly target to your toolchain with rustup the first time.
 
 On Linux, sound and controllers also need the ALSA and udev development files, for example `sudo apt install libasound2-dev libudev-dev pkg-config` on Debian or Ubuntu.
 

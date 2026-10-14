@@ -4,11 +4,10 @@
 //! checksums. The games aren't part of Nubo; they are only downloaded to
 //! run them.
 
-use crate::{Result, target_dir};
+use crate::{Result, http, target_dir};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// A homebrew game to download.
 struct BenchmarkRom {
@@ -48,8 +47,7 @@ const ROMS: [BenchmarkRom; 3] = [
 ];
 
 /// Makes sure every benchmark game is in `target/benchmark-roms` with the
-/// right checksum, downloading the missing ones with curl, and returns the
-/// folder.
+/// right checksum, downloading the missing ones, and returns the folder.
 pub fn ensure_benchmark_roms() -> Result<PathBuf> {
     let folder = target_dir().join("benchmark-roms");
     fs::create_dir_all(&folder)
@@ -60,21 +58,7 @@ pub fn ensure_benchmark_roms() -> Result<PathBuf> {
         if has_checksum(&path, rom.sha256) {
             continue;
         }
-        let status = Command::new("curl")
-            .args([
-                "--fail",
-                "--location",
-                "--silent",
-                "--show-error",
-                "--output",
-            ])
-            .arg(&path)
-            .arg(rom.url)
-            .status()
-            .map_err(|error| format!("failed to run curl: {error}"))?;
-        if !status.success() {
-            return Err(format!("failed to download {}", rom.url));
-        }
+        http::download(rom.url, &path)?;
         if !has_checksum(&path, rom.sha256) {
             let _ = fs::remove_file(&path);
             return Err(format!(

@@ -4,9 +4,10 @@
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
-use std::io::Write;
+use std::io;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread;
 
 /// The commit of adtennant/GameboyCPUTests the tests are taken from.
 const COMMIT: &str = "d1c8fd48c9e543995397fbd20e55bcbd524d029f";
@@ -17,7 +18,7 @@ const MANIFEST: &str = include_str!("../v2.sha256");
 /// A file written once every test file has been downloaded and checked, so
 /// later runs don't check them again.
 const COMPLETE_MARKER: &str = ".complete";
-const PARALLEL_DOWNLOADS: &str = "16";
+const PARALLEL_DOWNLOADS: usize = 16;
 
 /// One line of the manifest.
 struct ManifestEntry {
@@ -101,10 +102,7 @@ fn has_expected_checksum(path: &Path, expected: &str) -> bool {
     checksum == expected
 }
 
-/// Downloads the files of `entries` into `destination` with curl, several at
-/// a time. The URLs and destinations go to curl as a config on its standard
-/// input rather than as arguments, since hundreds of them would pass Windows'
-/// limit on the length of a command line.
+/// Downloads the files of `entries` into `destination`, several at a time.
 fn download(destination: &Path, entries: &[&ManifestEntry]) -> Result<(), String> {
     println!(
         "Downloading {} CPU test files from adtennant/GameboyCPUTests@{}",
@@ -112,80 +110,50 @@ fn download(destination: &Path, entries: &[&ManifestEntry]) -> Result<(), String
         &COMMIT[..12]
     );
 
-    let config = curl_config(destination, entries)?;
-    let mut child = Command::new("curl")
-        .args([
-            "--fail",
-            "--location",
-            "--silent",
-            "--show-error",
-            "--parallel",
-            "--parallel-max",
-            PARALLEL_DOWNLOADS,
-            "--config",
-            "-",
-        ])
-        .stdin(Stdio::piped())
-        .spawn()
-        .map_err(|error| format!("failed to run curl: {error}"))?;
-    let written = child
-        .stdin
-        .take()
-        .expect("curl's standard input is piped")
-        .write_all(config.as_bytes());
-    let status = child
-        .wait()
-        .map_err(|error| format!("failed to run curl: {error}"))?;
-    written.map_err(|error| format!("failed to pass the downloads to curl: {error}"))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("curl exited with {status}"))
-    }
+    let agent = agent();
+    let next = AtomicUsize::new(0);
+    thread::scope(|scope| {
+        let workers: Vec<_> = (0..PARALLEL_DOWNLOADS.min(entries.len()))
+            .map(|_| {
+                scope.spawn(|| {
+                    while let Some(entry) = entries.get(next.fetch_add(1, Ordering::Relaxed)) {
+                        let url = format!("{BASE_URL}/{COMMIT}/v2/{}", entry.file_name);
+                        download_file(&agent, &url, &destination.join(entry.file_name))?;
+                    }
+                    Ok(())
+                })
+            })
+            .collect();
+        workers
+            .into_iter()
+            .try_for_each(|worker| worker.join().expect("a download thread panicked"))
+    })
 }
 
-/// A curl config that downloads each file of `entries` into `destination`:
-/// a `url` line and an `output` line per file, with every value quoted.
-fn curl_config(destination: &Path, entries: &[&ManifestEntry]) -> Result<String, String> {
-    let mut config = String::new();
-    for entry in entries {
-        let output = destination.join(entry.file_name);
-        let output = output
-            .to_str()
-            .ok_or_else(|| format!("{} is not valid UTF-8", output.display()))?;
-        let url = format!("{}/{}/v2/{}", BASE_URL, COMMIT, entry.file_name);
-        config.push_str(&format!(
-            "url = {}\noutput = {}\n",
-            curl_quote(&url),
-            curl_quote(output)
-        ));
-    }
-    Ok(config)
-}
-
-/// `value` in double quotes for a curl config, where a backslash starts an
-/// escape, so the backslashes in Windows paths are doubled.
-fn curl_quote(value: &str) -> String {
-    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_curl_config_pairs_each_url_with_its_quoted_destination() {
-        let entry = ManifestEntry {
-            sha256: "",
-            file_name: "cb 00.json",
-        };
-        let config = curl_config(Path::new(r"C:\target"), &[&entry]).unwrap();
-        assert_eq!(
-            config,
-            format!(
-                "url = \"{BASE_URL}/{COMMIT}/v2/cb 00.json\"\noutput = \"C:\\\\target{}cb 00.json\"\n",
-                if cfg!(windows) { r"\\" } else { "/" }
+/// An HTTP client that finds a proxy and trusted certificates the way the
+/// system's own tools do, from the `HTTPS_PROXY` variable and the system's
+/// certificate store.
+fn agent() -> ureq::Agent {
+    ureq::Agent::new_with_config(
+        ureq::Agent::config_builder()
+            .tls_config(
+                ureq::tls::TlsConfig::builder()
+                    .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+                    .build(),
             )
-        );
-    }
+            .build(),
+    )
+}
+
+/// Downloads `url` to `destination`.
+fn download_file(agent: &ureq::Agent, url: &str, destination: &Path) -> Result<(), String> {
+    let response = agent
+        .get(url)
+        .call()
+        .map_err(|error| format!("failed to download {url}: {error}"))?;
+    let mut file = fs::File::create(destination)
+        .map_err(|error| format!("failed to create {}: {error}", destination.display()))?;
+    io::copy(&mut response.into_body().into_reader(), &mut file)
+        .map_err(|error| format!("failed to download {url}: {error}"))?;
+    Ok(())
 }

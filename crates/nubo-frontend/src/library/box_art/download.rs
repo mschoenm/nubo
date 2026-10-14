@@ -160,11 +160,20 @@ const PICTURE_SIZE: u32 = 256;
 const MAX_DOWNLOAD_SIZE: u64 = 16 * 1024 * 1024;
 const TIMEOUT: Duration = Duration::from_secs(20);
 
+/// The HTTP client, which finds a proxy in the `HTTPS_PROXY` variable and
+/// trusts the certificates the system trusts, as browsers do.
 static AGENT: LazyLock<ureq::Agent> = LazyLock::new(|| {
-    ureq::AgentBuilder::new()
-        .timeout(TIMEOUT)
-        .user_agent(concat!("Nubo/", env!("CARGO_PKG_VERSION")))
-        .build()
+    ureq::Agent::new_with_config(
+        ureq::Agent::config_builder()
+            .timeout_global(Some(TIMEOUT))
+            .user_agent(concat!("Nubo/", env!("CARGO_PKG_VERSION")))
+            .tls_config(
+                ureq::tls::TlsConfig::builder()
+                    .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+                    .build(),
+            )
+            .build(),
+    )
 });
 
 /// Reads the No-Intro game lists, downloading the ones that aren't saved
@@ -227,14 +236,15 @@ fn download(url: &str) -> Result<Option<Vec<u8>>, String> {
         Ok(response) => {
             let mut bytes = Vec::new();
             response
+                .into_body()
                 .into_reader()
                 .take(MAX_DOWNLOAD_SIZE)
                 .read_to_end(&mut bytes)
                 .map_err(|error| error.to_string())?;
             Ok(Some(bytes))
         }
-        Err(ureq::Error::Status(404, _)) => Ok(None),
-        Err(ureq::Error::Status(code, _)) => Err(format!("the server answered {code}")),
+        Err(ureq::Error::StatusCode(404)) => Ok(None),
+        Err(ureq::Error::StatusCode(code)) => Err(format!("the server answered {code}")),
         Err(error) => Err(error.to_string()),
     }
 }
