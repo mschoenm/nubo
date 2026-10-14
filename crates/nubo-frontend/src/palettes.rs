@@ -8,6 +8,12 @@ use nubo_core::DMG_SHADES;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+/// The light and dark gray the emulator drew in up to version 0.5 (the web
+/// colors LightGray and DarkGray), with the shade each stands for. Title
+/// screens the library saved then are in these grays, so [`DmgPalette::recolor`]
+/// still recognizes them.
+const EARLIER_GRAYS: [([u8; 3], usize); 2] = [([0xD3; 3], 1), ([0xA9; 3], 2)];
+
 /// The colors original Game Boy games are shown in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -44,16 +50,24 @@ impl DmgPalette {
         }
     }
 
-    /// Repaints a frame of RGBA pixels drawn in the emulator's grays with
-    /// this palette. Pixels of any other color are left alone.
+    /// Repaints a frame of RGBA pixels drawn in the emulator's grays, or in
+    /// the grays of earlier versions (see `EARLIER_GRAYS`), with this
+    /// palette. Pixels of any other color are left alone. The emulator's
+    /// own frames are already in the Gray palette, so apps needn't repaint
+    /// those for it.
     pub fn recolor(self, pixels: &mut [u8]) {
-        if self == DmgPalette::Gray {
-            return;
-        }
-
         let colors = self.colors();
         for pixel in pixels.as_chunks_mut::<4>().0 {
-            if let Some(shade) = DMG_SHADES.iter().position(|gray| pixel[..3] == gray[..3]) {
+            let shade = DMG_SHADES
+                .iter()
+                .position(|gray| pixel[..3] == gray[..3])
+                .or_else(|| {
+                    EARLIER_GRAYS
+                        .iter()
+                        .find(|(gray, _)| pixel[..3] == gray[..])
+                        .map(|&(_, shade)| shade)
+                });
+            if let Some(shade) = shade {
                 pixel[..3].copy_from_slice(&colors[shade]);
             }
         }
