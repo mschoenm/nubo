@@ -294,8 +294,7 @@ impl Core {
     /// [`Core::video`], the sound in [`Core::audio`] and the rumble in
     /// [`Core::rumble`].
     pub fn run(&mut self, buttons: u16) {
-        self.take_frontend_saves();
-        self.take_frontend_memory_writes();
+        self.take_frontend_changes();
         self.press_buttons(buttons);
 
         self.left.clear();
@@ -314,8 +313,7 @@ impl Core {
     /// on, on the model the options pick now and with the clock they pick.
     /// The cartridge keeps what its battery keeps: its RAM and its clock.
     pub fn reset(&mut self) -> Result<(), LoadRomError> {
-        self.take_frontend_saves();
-        self.take_frontend_memory_writes();
+        self.take_frontend_changes();
         let clock = self.emulator.rtc_state(RtcClock::WallClock);
         let mut emulator = start(&self.rom, &self.header, self.options, &self.requests)?;
         if self.header.has_battery {
@@ -331,6 +329,15 @@ impl Core {
         self.draw_frame();
         self.memory.update(&mut self.emulator);
         Ok(())
+    }
+
+    /// Takes everything RetroArch changed since the core last looked: the
+    /// battery saves first (a loaded `.srm`), then its memory writes, so a
+    /// write to cartridge RAM lands on the loaded save rather than the save
+    /// being overwritten with what the emulator held before.
+    fn take_frontend_changes(&mut self) {
+        self.take_frontend_saves();
+        self.take_frontend_memory_writes();
     }
 
     /// Writes what RetroArch wrote to the memory it can reach (its memory
@@ -493,11 +500,11 @@ impl Core {
 
     /// Writes a save state into `buffer`: its length as a 4-byte
     /// little-endian number, the state, and zeros up to the end. Returns
-    /// false, leaving `buffer` alone, if it doesn't fit. What RetroArch wrote
-    /// to the memory it can reach goes to the emulator first, so the state
-    /// holds it.
+    /// false, leaving `buffer` alone, if it doesn't fit. The battery saves
+    /// and memory RetroArch changed go to the emulator first, so the state
+    /// holds them.
     pub fn serialize(&mut self, buffer: &mut [u8]) -> bool {
-        self.take_frontend_memory_writes();
+        self.take_frontend_changes();
         let state = self.emulator.save_state();
         let end = STATE_LENGTH_BYTES + state.len();
         let Ok(length) = u32::try_from(state.len()) else {

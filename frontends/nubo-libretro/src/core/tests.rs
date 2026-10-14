@@ -750,6 +750,21 @@ fn what_retroarch_writes_to_battery_ram_reaches_the_game_and_the_save() {
 }
 
 #[test]
+fn a_state_saved_after_retroarch_loaded_the_save_and_wrote_memory_keeps_both() {
+    let mut core = booted(MBC1_RAM_BATTERY, RAM_8_KIB, RAM);
+    core.save_ram()[1] = 0x55;
+    *region_byte(&mut core, 0xA000) = 0x6B;
+    let mut state = vec![0; core.serialize_size()];
+    assert!(core.serialize(&mut state));
+    assert_eq!(
+        &core.save_ram()[..2],
+        &[0x6B, 0x55],
+        "the loaded .srm survives"
+    );
+    assert_eq!(core.emulator().cartridge_ram()[..2], [0x6B, 0x55]);
+}
+
+#[test]
 fn hardware_registers_ie_and_memory_past_the_cartridge_ram_stay_read_only() {
     let mut core = booted(ROM_ONLY, 0, JOYPAD);
     let lcdc = *region_byte(&mut core, 0xFF40);
