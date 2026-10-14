@@ -70,8 +70,8 @@ fn notes_for(metainfo: &str, version: &str) -> Result<String> {
     notes.push_str(
         "\n## Install\n\
          \n\
-         **Windows:** run `Nubo-windows-x64-setup.exe`, which installs Nubo for your \
-         user and updates an installed Nubo, or unpack `Nubo-windows-x64.zip` to run it \
+         **Windows:** run `Nubo-windows-x64.msi`, which installs Nubo for your user and \
+         updates an installed Nubo, or unpack `Nubo-windows-x64.zip` to run it \
          without installing. The files aren't signed yet, so Windows may say it protected your \
          PC: choose *More info* and then *Run anyway*.\n\
          \n\
@@ -94,7 +94,7 @@ fn notes_for(metainfo: &str, version: &str) -> Result<String> {
 }
 
 /// Whether `text` looks like an AppStream date, `YYYY-MM-DD`.
-fn is_date(text: &str) -> bool {
+pub(crate) fn is_date(text: &str) -> bool {
     let bytes = text.as_bytes();
     bytes.len() == 10
         && bytes.iter().enumerate().all(|(index, byte)| match index {
@@ -188,7 +188,7 @@ mod tests {
              - Fixes *Pokémon* crashing\n\n## Install\n"
         ));
         assert!(notes.contains("flatpak install --user Nubo-linux-x86_64.flatpak"));
-        assert!(notes.contains("`Nubo-windows-x64-setup.exe`"));
+        assert!(notes.contains("`Nubo-windows-x64.msi`"));
         assert!(notes.contains("`Nubo-libretro-<system>.zip`"));
     }
 

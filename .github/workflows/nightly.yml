@@ -231,9 +231,12 @@ jobs:
     name: Flatpak
     uses: ./.github/workflows/flatpak.yml
 
+  # Named as tonight's nightly build, except when a release runs these checks.
   windows:
     name: Windows
     uses: ./.github/workflows/windows.yml
+    with:
+      nightly: ${{ github.workflow == 'Nightly' }}
 
   libretro:
     name: RetroArch core
