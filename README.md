@@ -173,7 +173,7 @@ These aren't run, because nothing can check them automatically or they need hard
 
 ## Building and Contributing
 
-Nubo is written in Rust, and only needs a [Rust toolchain](https://rustup.rs) to build: `cargo play` builds and runs the desktop app, and `cargo xtask web` the browser version. [BUILDING.md](BUILDING.md) has the other commands, how to make the packages, the tests and where the code is. Pull requests are welcome; [AGENTS.md](AGENTS.md) has the project's rules and the checks to run before you push.
+Nubo is written in Rust, and needs a [Rust toolchain](https://rustup.rs) to build, plus the ALSA and udev development files on Linux ([BUILDING.md](BUILDING.md#what-you-need) names the packages): `cargo play` builds and runs the desktop app, and `cargo xtask web` the browser version. [BUILDING.md](BUILDING.md) has the other commands, how to make the packages, the tests and where the code is. Pull requests are welcome; [AGENTS.md](AGENTS.md) has the project's rules and the checks to run before you push.
 
 ## Credits
 
