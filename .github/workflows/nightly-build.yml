@@ -61,7 +61,7 @@ jobs:
       - name: Name the files and write the notes
         if: steps.changed.outputs.changed == 'true'
         run: |
-          date=$(date -u +%Y-%m-%d)
+          date=$(TZ=Europe/Amsterdam date +%Y-%m-%d)
           short=${COMMIT::7}
           mkdir upload
           for arch in x86_64 aarch64; do
