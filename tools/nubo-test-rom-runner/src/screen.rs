@@ -3,7 +3,6 @@
 
 use crate::suites::Model;
 use image::RgbImage;
-use nubo_core::DMG_SHADES;
 use std::path::Path;
 
 pub(crate) const WIDTH: u32 = 160;
@@ -28,14 +27,19 @@ pub(crate) fn load_reference(path: &Path) -> Result<RgbImage, String> {
 }
 
 /// Converts an RGBA frame from the emulator into the colors the reference
-/// screenshots use for `model`.
+/// screenshots use for `model`. The original Game Boy's grays
+/// (`DMG_SHADES`) are already the screenshots' own; Game Boy Color colors
+/// are rounded the way the screenshots store them.
 pub(crate) fn normalize(frame: &[u8], model: Model) -> RgbImage {
-    let channel = channel_mapping(model);
+    if !model.is_cgb() {
+        return as_shown(frame);
+    }
+
     let pixels = frame
         .as_chunks::<4>()
         .0
         .iter()
-        .flat_map(|pixel| [channel(pixel[0]), channel(pixel[1]), channel(pixel[2])])
+        .flat_map(|pixel| [pixel[0], pixel[1], pixel[2]].map(cgb_channel))
         .collect();
     RgbImage::from_raw(WIDTH, HEIGHT, pixels).expect("the frame buffer is 160x144 RGBA")
 }
@@ -54,15 +58,6 @@ pub(crate) fn as_shown(frame: &[u8]) -> RgbImage {
     RgbImage::from_raw(WIDTH, HEIGHT, pixels).expect("the frame buffer is 160x144 RGBA")
 }
 
-/// How [`normalize`] maps each color channel for `model`.
-fn channel_mapping(model: Model) -> fn(u8) -> u8 {
-    if model.is_cgb() {
-        cgb_channel
-    } else {
-        dmg_shade
-    }
-}
-
 /// A reference screenshot's brightness per pixel, for checking many frames
 /// against it quickly in grayscale, as the GB Emulator Shootout compares.
 pub(crate) struct GrayscaleReference {
@@ -78,8 +73,8 @@ impl GrayscaleReference {
     }
 
     /// Whether every pixel of the emulator's RGBA `frame`, in the colors
-    /// the app shows it in (unlike [`normalize`], which maps them to the
-    /// reference screenshots' own grays), is within `GRAYSCALE_TOLERANCE`
+    /// the app shows it in (unlike [`normalize`], which rounds Game Boy
+    /// Color colors as the screenshots store them), is within `GRAYSCALE_TOLERANCE`
     /// of the reference's brightness, as the Shootout's harness compares a
     /// screenshot of the app. Stops at the first pixel that isn't.
     pub(crate) fn matches_as_shown(&self, frame: &[u8]) -> bool {
@@ -169,22 +164,6 @@ fn brightness(pixel: image::Rgb<u8>) -> u8 {
     ((red * 19_595 + green * 38_470 + blue * 7_471 + 0x8000) >> 16) as u8
 }
 
-/// A channel of the emulator's light gray, the second of its four shades of
-/// the original Game Boy (DMG).
-const LIGHT_GRAY: u8 = DMG_SHADES[1][0];
-/// A channel of the emulator's dark gray, the third shade.
-const DARK_GRAY: u8 = DMG_SHADES[2][0];
-
-/// Maps the emulator's two middle gray shades of the original Game Boy (DMG)
-/// palette to the evenly spaced grays of the reference screenshots.
-fn dmg_shade(value: u8) -> u8 {
-    match value {
-        LIGHT_GRAY => 0xAA,
-        DARK_GRAY => 0x55,
-        other => other,
-    }
-}
-
 /// Game Boy Color (CGB) colors have 5 bits per channel. This rounds an 8-bit
 /// channel to 5 bits and expands it back the way the reference screenshots
 /// do, by repeating the top bits.
@@ -196,6 +175,7 @@ fn cgb_channel(value: u8) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use nubo_core::DMG_SHADES;
 
     /// A white RGBA frame.
     fn white_frame() -> Vec<u8> {
@@ -223,10 +203,8 @@ mod tests {
     }
 
     #[test]
-    fn the_original_game_boys_grays_are_compared_as_the_app_shows_them() {
-        let dark_gray = DMG_SHADES[2];
-        let frame = dark_gray.repeat((WIDTH * HEIGHT) as usize);
-        assert!(gray_reference(dark_gray[0]).matches_as_shown(&frame));
-        assert!(!gray_reference(0x55).matches_as_shown(&frame));
+    fn the_original_game_boys_grays_are_the_screenshots_grays() {
+        let grays = DMG_SHADES.map(|[red, green, blue, _alpha]| [red, green, blue]);
+        assert_eq!(grays, [[0xFF; 3], [0xAA; 3], [0x55; 3], [0x00; 3]]);
     }
 }
