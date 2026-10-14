@@ -59,6 +59,16 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.8.1" date="2026-10-14">
+      <description>
+        <p>Nubo now brings its own fonts, so it looks the same on Windows, macOS, Linux and in the browser.</p>
+        <ul>
+          <li>Text is drawn in DejaVu Sans and titles in Liberation Sans Bold everywhere, instead of whatever font the system has</li>
+          <li>Titles in the browser are bold now too</li>
+          <li>Save states made by Nubo 0.4.0 to 0.8.0 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.8.0" date="2026-10-14">
       <description>
         <p>Nubo is simpler to use: the game screen's bar keeps only what you reach for while playing, the pause menu opens with a right click, the settings are tidied into clear pages, and games continue where you left off.</p>
