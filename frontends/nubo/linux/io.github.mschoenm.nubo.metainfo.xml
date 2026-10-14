@@ -59,6 +59,26 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.7.0" date="2026-10-14">
+      <description>
+        <p>Super Game Boy games can now be played by up to four players and get the Super Game Boy's colors, borders and intro, and Nubo for Windows now installs from an MSI, Windows' own installer format.</p>
+        <ul>
+          <li>Super Game Boy games for several players can be played by up to four, each with their own controller, in the app and on RetroArch's ports 1 to 4</li>
+          <li>The pause menu has a Super Game Boy page to pick the colors (the game's, Gray, Green, Pocket or your own, with an editor) and the border (the game's, Nubo's or none), shown at once over the paused game. RetroArch has the same choices as core options. Your choices are kept in the settings, and loading a save state doesn't change them</li>
+          <li>Games can take the color choices away or take their own colors back, as on a real Super Game Boy</li>
+          <li>Games on the Super Game Boy start after a short intro, as on the real one, which holds the Game Boy back while its intro plays. Nubo plays a silent intro of its own</li>
+          <li>Left alone for seven minutes, Nubo's border plays a screensaver of drifting clouds, unless the game turns it off</li>
+          <li>The Windows installer is now an MSI (Nubo-windows-x64.msi). Windows itself uninstalls Nubo from Settings, and installing still needs no administrator rights</li>
+          <li>The installer asks whether to open Game Boy games with Nubo and whether to add a desktop shortcut, can start Nubo when it is done, and keeps your choices when it updates Nubo</li>
+          <li>Installing an older version over a newer one is possible, after a warning about settings and save states</li>
+          <li>Nubo can be installed from the command line without any questions with msiexec, with the choices as ASSOCIATE_FILES and DESKTOP_SHORTCUT</li>
+          <li>Nightly builds show as "Nubo (nightly date)" in the list of installed apps on Windows</li>
+          <li>A security fix in the connection that box art is downloaded over</li>
+          <li>If you installed Nubo 0.6.0 or earlier with the old Windows installer, uninstall it from Settings first; your saves and settings stay</li>
+          <li>Save states made by Nubo 0.4.0, 0.5.0 and 0.6.0 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.6.0" date="2026-10-14">
       <description>
         <p>Nubo now runs in RetroArch, the original Game Boy's grays are drawn as the hardware shows them, and test programs can run Nubo from the command line.</p>
