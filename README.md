@@ -10,8 +10,17 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mschoenm/nubo/releases/latest"><img src="https://img.shields.io/github/v/release/mschoenm/nubo?label=download" alt="Latest release"></a>
-  <a href="https://mschoenm.github.io/nubo/"><img src="https://img.shields.io/badge/play-in_the_browser-5b8def" alt="Play in the browser"></a>
+  <a href="https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.msi"><img src="https://img.shields.io/badge/Download_for_Windows-6d5ce8?style=for-the-badge" alt="Download for Windows" height="40"></a>
+  &nbsp;
+  <a href="https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-x86_64.flatpak"><img src="https://img.shields.io/badge/Download_for_Linux-6d5ce8?style=for-the-badge" alt="Download for Linux" height="40"></a>
+  &nbsp;
+  <a href="https://mschoenm.github.io/nubo/"><img src="https://img.shields.io/badge/Play_in_your_browser-5b8def?style=for-the-badge" alt="Play in your browser" height="40"></a>
+  <br>
+  <sub><a href="#download">Every download</a>: the Windows zip, Linux on ARM, the RetroArch core and the nightly build</sub>
+</p>
+
+<p align="center">
+  <a href="https://github.com/mschoenm/nubo/releases/latest"><img src="https://img.shields.io/github/v/release/mschoenm/nubo?label=latest%20release" alt="Latest release"></a>
   <a href="https://github.com/mschoenm/nubo/actions/workflows/ci.yml"><img src="https://github.com/mschoenm/nubo/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/mschoenm/nubo" alt="License: GPL-3.0"></a>
 </p>
@@ -20,16 +29,24 @@
   <img src="images/screenshots/super-game-boy.png" width="700" alt="Tobu Tobu Girl Deluxe in Nubo, inside the game's own illustrated Super Game Boy border">
 </p>
 
-<p align="center">
-  <a href="#download"><strong>Download</strong></a> &nbsp;·&nbsp;
-  <a href="https://mschoenm.github.io/nubo/"><strong>Play in your browser</strong></a> &nbsp;·&nbsp;
-  <a href="#features"><strong>Features</strong></a> &nbsp;·&nbsp;
-  <a href="#getting-started"><strong>Getting started</strong></a>
-</p>
-
 Nubo rebuilds the Game Boy one clock cycle at a time: the processor, the picture and the sound all run in step, just as they do inside the console. Games and demos that push the hardware to its limits, changing the picture halfway down the screen or timing their sound to the cycle, look and sound just as they did on the real console. Nubo passes 261 of the 264 tests of the [GB Emulator Shootout](https://gbdev.io/GBEmulatorShootout/), more than any emulator in its published table.
 
 Accuracy is only half of it. Nubo keeps your games in a library with their title screens, saves your progress with a picture of the moment, shows Super Game Boy games in their own colors and borders, and plays just as well with a controller as with a keyboard.
+
+## Download
+
+| Platform | Download |
+| -------- | -------- |
+| Windows | [Installer](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.msi) · [Zip](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.zip) (runs without installing) |
+| Linux | [Flatpak for x86_64](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-x86_64.flatpak) (most PCs) · [Flatpak for ARM](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-aarch64.flatpak) |
+| Browser | [Play in your browser](https://mschoenm.github.io/nubo/), nothing to install |
+| RetroArch | The core for Windows, Linux and macOS is in each [release](https://github.com/mschoenm/nubo/releases/latest) ([how to install it](#retroarch-core)) |
+| macOS | No download yet: [build it yourself](BUILDING.md#macos) |
+
+- **Windows:** the files aren't signed yet, so SmartScreen may warn you the first time. Choose More info, then Run anyway.
+- **Linux:** open the `.flatpak` file with your software center, or run `flatpak install --user Nubo-linux-x86_64.flatpak`. Flatpak fetches the runtime Nubo needs from Flathub the first time.
+- **Browser:** plays one game at a time, keeping its in-game saves in the browser. The library, save states, cheats and screenshots are in the desktop app.
+- **Want the newest changes?** The [nightly build](https://github.com/mschoenm/nubo/releases/tag/nightly) has everything that passed every check, ahead of the next release.
 
 ## Features
 
@@ -62,21 +79,6 @@ Accuracy is only half of it. Nubo keeps your games in a library with their title
   <img src="images/screenshots/palettes.png" width="820" alt="El Dueloroso's saloon three times: in green, in Pocket colors and in gray"><br>
   <sub>One Game Boy game in Nubo's green, Pocket and gray screens</sub>
 </p>
-
-## Download
-
-| Platform | Download |
-| -------- | -------- |
-| Windows | [Installer](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.msi) · [Zip](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.zip) (runs without installing) |
-| Linux | [Flatpak for x86_64](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-x86_64.flatpak) (most PCs) · [Flatpak for ARM](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-aarch64.flatpak) |
-| Browser | [Play in your browser](https://mschoenm.github.io/nubo/), nothing to install |
-| RetroArch | The core for Windows, Linux and macOS is in each [release](https://github.com/mschoenm/nubo/releases/latest) ([how to install it](#retroarch-core)) |
-| macOS | No download yet: [build it yourself](BUILDING.md#macos) |
-
-- **Windows:** the files aren't signed yet, so SmartScreen may warn you the first time. Choose More info, then Run anyway.
-- **Linux:** open the `.flatpak` file with your software center, or run `flatpak install --user Nubo-linux-x86_64.flatpak`. Flatpak fetches the runtime Nubo needs from Flathub the first time.
-- **Browser:** plays one game at a time, keeping its in-game saves in the browser. The library, save states, cheats and screenshots are in the desktop app.
-- **Want the newest changes?** The [nightly build](https://github.com/mschoenm/nubo/releases/tag/nightly) has everything that passed every check, ahead of the next release.
 
 ## Getting Started
 
