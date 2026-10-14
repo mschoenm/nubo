@@ -52,6 +52,10 @@ Where the code differs from the plan below:
 - **Cheats:** setting a cheat first removes every code its index had, and a disabled cheat registers nothing (the
   last review finding on mschoenm/nubo#37). A restart keeps the cheats.
 - **Restart** takes on the model and clock the options pick now (another finding there).
+- **RetroArch's memory writes reach the game** (its memory editor, cheat search and RetroArch-handler cheats), not
+  only the reads Phase 4 asked for: before each frame, the core writes the bytes RetroArch changed in its copies into
+  the emulator with `Emulator::memory_mut`, which catches the lazy components up first. Checked in RetroArch 1.18
+  with a game-specific cheat file. The hardware registers stay read-only (`RETRO_MEMDESC_CONST`).
 
 Left: the AppStream release notes entry when the next version ships, and Phase 6.
 

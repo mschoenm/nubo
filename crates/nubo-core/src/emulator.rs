@@ -4,7 +4,7 @@
 //! rest of the hardware, and offers everything frontends can do with them.
 
 use crate::address_bus::{
-    AddressBus, CartridgeEffects, CartridgeHeader, RtcClock, RtcState, read_header,
+    AddressBus, CartridgeEffects, CartridgeHeader, MemoryMut, RtcClock, RtcState, read_header,
 };
 use crate::controller::{ControllerMapping, ControllerState};
 use crate::cpu::{BusActivityEntry, Cpu, Registers};
@@ -189,8 +189,8 @@ impl Emulator {
     /// All of work RAM (0xC000-0xDFFF): bank 0 followed by the banks
     /// 0xD000 can show, 4 KiB each. A CGB has banks 1-7; on the DMG, and on
     /// a CGB running a game for the DMG, only bank 1 is used. Frontends read
-    /// it for features such as RetroAchievements; it is never changed
-    /// through here.
+    /// it for features such as RetroAchievements, and change it with
+    /// [`Emulator::memory_mut`].
     pub fn work_ram(&self) -> &[u8] {
         self.address_bus().working_ram()
     }
@@ -207,6 +207,17 @@ impl Emulator {
     /// [`Emulator::read_memory`]).
     pub fn video_memory(&mut self) -> (&[u8], &[u8]) {
         self.address_bus_mut().video_memory()
+    }
+
+    /// Work RAM, high RAM, video RAM, OAM and the cartridge RAM, to change
+    /// directly, as a cheat device or a debugger would: a frontend's memory
+    /// editor writes here. The changes land between two machine cycles, at
+    /// no particular point of the frame, without the timing or blocking a
+    /// CPU write has, and the game sees them from then on. Everything that
+    /// runs behind (see "Lazy components" in AGENTS.md) is caught up first,
+    /// so the emulator goes on exactly as if they had been made there.
+    pub fn memory_mut(&mut self) -> MemoryMut<'_> {
+        self.address_bus_mut().memory_mut()
     }
 
     /// The Game Boy hardware being emulated.

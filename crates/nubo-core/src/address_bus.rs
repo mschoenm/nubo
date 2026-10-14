@@ -142,6 +142,27 @@ impl fmt::Debug for SharedRom {
 /// frame boundary (`Emulator::run_frame`) could overflow.
 const MAX_ELAPSED_DOTS: u64 = 1 << 62;
 
+/// The memory a frontend can change directly, as a cheat device or a
+/// debugger would: each part as it is stored, every bank of it, whether or
+/// not the CPU could reach it right now. [`Emulator::memory_mut`] hands it
+/// out.
+///
+/// [`Emulator::memory_mut`]: crate::Emulator::memory_mut
+#[derive(Debug)]
+pub struct MemoryMut<'a> {
+    /// Work RAM (0xC000-0xDFFF): bank 0 followed by banks 1-7, 4 KiB each.
+    pub work_ram: &'a mut [u8],
+    /// High RAM (0xFF80-0xFFFE).
+    pub high_ram: &'a mut [u8],
+    /// Video RAM (0x8000-0x9FFF): bank 0, then on a CGB bank 1.
+    pub video_ram: &'a mut [u8],
+    /// OAM (0xFE00-0xFE9F), the objects' attributes.
+    pub object_attribute_memory: &'a mut [u8],
+    /// The cartridge RAM, all banks. Changes made here aren't passed to the
+    /// frontend to save, as the game's own writes are.
+    pub cartridge_ram: &'a mut [u8],
+}
+
 /// The memory map and the hardware components connected to it.
 ///
 /// Its `Debug` output is part of the emulator's, which test runners compare to
@@ -597,6 +618,23 @@ impl AddressBus {
     /// High RAM (0xFF80-0xFFFE).
     pub(crate) fn high_ram(&self) -> &[u8] {
         &self.high_ram[..0x7F]
+    }
+
+    /// The memory a frontend may change directly (see
+    /// [`Emulator::memory_mut`](crate::Emulator::memory_mut)), after running
+    /// the waiting M-cycles and catching the PPU up, so the change lands
+    /// between two M-cycles like any other and the next M-cycle works out
+    /// again how long the PPU may be left behind.
+    pub(crate) fn memory_mut(&mut self) -> MemoryMut<'_> {
+        self.catch_up_ppu_before_change();
+        let (video_ram, object_attribute_memory) = self.gpu.video_memory_mut();
+        MemoryMut {
+            work_ram: self.working_ram.as_mut_slice(),
+            high_ram: &mut self.high_ram[..0x7F],
+            video_ram,
+            object_attribute_memory,
+            cartridge_ram: self.cartridge.ram_mut(),
+        }
     }
 
     /// Video RAM and OAM, after catching the PPU up so an HBlank DMA it owes

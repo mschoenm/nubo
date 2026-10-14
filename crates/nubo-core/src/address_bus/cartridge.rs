@@ -107,6 +107,12 @@ impl Cartridge {
         &self.ram
     }
 
+    /// The RAM, to change directly. Changes made this way aren't passed to
+    /// the frontend to save, as the game's own writes are.
+    pub fn ram_mut(&mut self) -> &mut [u8] {
+        &mut self.ram
+    }
+
     /// Replaces the cartridge RAM, for example with a save file. A buffer of
     /// the wrong size is accepted; reads and writes wrap around its length.
     pub fn set_ram(&mut self, ram: Vec<u8>) {

@@ -561,6 +561,7 @@ fn set_memory_maps(core: &mut Core) {
                 MemoryKind::SystemRam => RETRO_MEMDESC_SYSTEM_RAM,
                 MemoryKind::SaveRam => RETRO_MEMDESC_SAVE_RAM,
                 MemoryKind::VideoRam => RETRO_MEMDESC_VIDEO_RAM,
+                MemoryKind::Registers => RETRO_MEMDESC_CONST,
                 MemoryKind::Other => 0,
             },
             select: region.select(),
@@ -865,7 +866,7 @@ pub unsafe extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool
         // SAFETY: RetroArch passes a buffer of `size` bytes to write.
         let buffer = unsafe { std::slice::from_raw_parts_mut(data.cast::<u8>(), size) };
         lock(&CORE)
-            .as_ref()
+            .as_mut()
             .is_some_and(|core| core.serialize(buffer))
     })
 }

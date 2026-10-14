@@ -492,7 +492,7 @@ fn a_loaded_state_goes_on_exactly_like_the_run_it_was_saved_from() {
 
 #[test]
 fn save_states_are_padded_to_one_size_with_their_length_first() {
-    let core = booted(ROM_ONLY, 0, TONE);
+    let mut core = booted(ROM_ONLY, 0, TONE);
     let mut state = vec![0xFF; core.serialize_size()];
     assert!(core.serialize(&mut state));
     let length = u32::from_le_bytes(state[..4].try_into().unwrap()) as usize;
@@ -503,7 +503,7 @@ fn save_states_are_padded_to_one_size_with_their_length_first() {
 
 #[test]
 fn a_save_state_buffer_too_small_is_left_alone() {
-    let core = booted(ROM_ONLY, 0, TONE);
+    let mut core = booted(ROM_ONLY, 0, TONE);
     let mut small = vec![0xAB; 100];
     assert!(!core.serialize(&mut small));
     assert!(small.iter().all(|&byte| byte == 0xAB));
@@ -695,6 +695,105 @@ fn the_memory_regions_hold_what_the_game_wrote_after_each_frame() {
     assert_eq!(read(0x0147), MBC1_RAM_BATTERY, "the ROM header");
     assert_eq!(read(0x0200), ROM_BYTE_AT_0200);
     assert_eq!(read(0xFF40) & 0x80, 0x80, "LCDC: the screen is on");
+}
+
+/// The buffer and offset of `address` in the regions the memory map
+/// describes.
+fn region_byte(core: &mut Core, address: usize) -> &mut u8 {
+    let region = core
+        .memory_regions()
+        .into_iter()
+        .find(|region| (region.start..region.start + region.length).contains(&address))
+        .unwrap();
+    &mut region.buffer[address - region.start]
+}
+
+#[test]
+fn what_retroarch_writes_to_work_ram_reaches_the_game() {
+    let mut core = booted(ROM_ONLY, 0, CHEATS);
+    core.system_ram()[0x100] = 0x42;
+    run(&mut core, 2);
+    assert_eq!(cheated(&mut core), (0x42, ROM_BYTE_AT_0200));
+    assert_eq!(core.system_ram()[0x100], 0x42, "it stays");
+
+    *region_byte(&mut core, 0xC100) = 0x43;
+    run(&mut core, 2);
+    assert_eq!(cheated(&mut core).0, 0x43);
+}
+
+#[test]
+fn what_retroarch_writes_to_banked_memory_reaches_the_bank() {
+    let mut core = load(&cartridge(MBC1_RAM_BATTERY, RAM_32_KIB, true, RAM));
+    run(&mut core, BOOT_FRAMES);
+    *region_byte(&mut core, 0x1_4123) = 0x61; // work RAM bank 6
+    *region_byte(&mut core, 0x1_6123) = 0x62; // cartridge RAM bank 1
+    *region_byte(&mut core, 0x8010) = 0x63;
+    *region_byte(&mut core, 0xFE04) = 0x64;
+    *region_byte(&mut core, 0xFF90) = 0x65;
+    run(&mut core, 1);
+
+    let emulator = core.emulator();
+    assert_eq!(emulator.work_ram()[0x6123], 0x61);
+    assert_eq!(emulator.cartridge_ram()[0x2123], 0x62);
+    assert_eq!(emulator.high_ram()[0x10], 0x65);
+    let (video_ram, oam) = emulator.video_memory();
+    assert_eq!((video_ram[0x10], oam[0x04]), (0x63, 0x64));
+}
+
+#[test]
+fn what_retroarch_writes_to_battery_ram_reaches_the_game_and_the_save() {
+    let mut core = booted(MBC1_RAM_BATTERY, RAM_8_KIB, RAM);
+    *region_byte(&mut core, 0xA000) = 0x6B;
+    run(&mut core, 2);
+    assert_eq!(work_ram(&mut core, 0xC000), 0x6B, "the game read it");
+    assert_eq!(core.save_ram()[0], 0x6B, "the .srm keeps it");
+}
+
+#[test]
+fn hardware_registers_ie_and_memory_past_the_cartridge_ram_stay_read_only() {
+    let mut core = booted(ROM_ONLY, 0, JOYPAD);
+    let lcdc = *region_byte(&mut core, 0xFF40);
+    let interrupt_enable = *region_byte(&mut core, 0xFFFF);
+    *region_byte(&mut core, 0xFF40) = !lcdc;
+    *region_byte(&mut core, 0xFFFF) = !interrupt_enable;
+    *region_byte(&mut core, 0x3_0000) = 0x77; // no cartridge RAM at all
+    run(&mut core, 2);
+    assert_eq!(*region_byte(&mut core, 0xFF40), lcdc);
+    assert_eq!(*region_byte(&mut core, 0xFFFF), interrupt_enable);
+    assert_eq!(*region_byte(&mut core, 0x3_0000), 0);
+    assert_eq!(core.emulator().read_memory(0xFF40), lcdc);
+}
+
+#[test]
+fn a_state_saved_after_retroarch_wrote_memory_holds_the_write() {
+    let mut core = booted(ROM_ONLY, 0, CHEATS);
+    core.system_ram()[0x100] = 0x42;
+    let mut state = vec![0; core.serialize_size()];
+    assert!(core.serialize(&mut state));
+    core.system_ram()[0x100] = 0x00;
+    run(&mut core, 2);
+    assert!(core.unserialize(&state));
+    assert_eq!(core.system_ram()[0x100], 0x42);
+    run(&mut core, 2);
+    assert_eq!(cheated(&mut core).0, 0x42);
+}
+
+#[test]
+fn a_game_nobody_writes_to_runs_exactly_as_before() {
+    let rom = cartridge(MBC1_RAM_BATTERY, RAM_8_KIB, true, RAM);
+    let mut with_reads = load(&rom);
+    let mut without = load(&rom);
+    for _ in 0..120 {
+        with_reads.run(0);
+        let _ = with_reads.memory_regions().len();
+        without.run(0);
+    }
+    assert_eq!(frame(&with_reads), frame(&without));
+    let mut first = vec![0; with_reads.serialize_size()];
+    let mut second = vec![0; without.serialize_size()];
+    assert!(with_reads.serialize(&mut first));
+    assert!(without.serialize(&mut second));
+    assert!(first == second);
 }
 
 #[test]
