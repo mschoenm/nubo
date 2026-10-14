@@ -270,9 +270,12 @@ pub(crate) struct Sgb {
     /// than in the Game Boy's grays.
     #[serializable(skip)]
     frame_colorized: bool,
-    /// Whether the last picture was a frame of the intro.
+    /// Whether the last picture is a frame of the game that `redraw` can
+    /// draw again: not during the intro, and not until a frame was drawn
+    /// since power-on or since a save state was loaded, whose picture this
+    /// one's fields don't describe.
     #[serializable(skip)]
-    showed_intro: bool,
+    redrawable: bool,
     /// How much darker the border's fade made the last picture's border, in
     /// steps of 1/31 of full brightness (`next_border_fade`).
     #[serializable(skip)]
@@ -325,7 +328,7 @@ impl Sgb {
             nubo_border: NuboBorder::new(),
             border_cache: BorderCache::default(),
             frame_colorized: false,
-            showed_intro: false,
+            redrawable: false,
             shown_border_fade: 0,
             bordered_frame: vec![0; BORDERED_WIDTH * BORDERED_HEIGHT * 4],
         }
@@ -344,6 +347,12 @@ impl Sgb {
     /// time.
     pub(crate) fn holds_game_boy_in_reset(&self) -> bool {
         self.intro_frames < RESET_HOLD_FRAMES
+    }
+
+    /// Called after a save state was loaded: the last picture is the old
+    /// run's, so `redraw` waits for the next frame.
+    pub(crate) fn finish_loading_save_state(&mut self) {
+        self.redrawable = false;
     }
 
     /// Ends the intro, for a save state made by a version without one, of a
@@ -753,7 +762,7 @@ impl Sgb {
         }
 
         let in_intro = self.intro_frames < INTRO_FRAMES;
-        self.showed_intro = in_intro;
+        self.redrawable = !in_intro;
         let colors = self.colors();
         if in_intro {
             self.intro_frames += 1;
@@ -774,9 +783,10 @@ impl Sgb {
 
     /// Draws the last picture again with the menu's settings as they are
     /// now, without moving time on, so a change made from the menu shows
-    /// while the game is paused. The intro is left as it is.
+    /// while the game is paused. The intro, and a picture from before a
+    /// save state was loaded, are left as they are.
     pub(crate) fn redraw(&mut self, game_screen: &mut [u8]) {
-        if self.showed_intro {
+        if !self.redrawable {
             return;
         }
         let colors = self.colors();

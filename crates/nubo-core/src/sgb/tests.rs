@@ -537,3 +537,19 @@ fn a_redraw_leaves_the_intro_alone() {
     console.sgb.redraw(&mut game_screen);
     assert_eq!(game_screen, intro);
 }
+
+#[test]
+fn a_redraw_waits_for_a_frame_after_power_on_or_a_loaded_state() {
+    let mut console = Console::new();
+    let mut game_screen = vec![0x12; SCREEN_PIXELS * 4];
+    console.sgb.set_player_palette(Some(PLAYER_PALETTE));
+    console.sgb.redraw(&mut game_screen);
+    assert!(game_screen.iter().all(|&byte| byte == 0x12));
+
+    let mut game_screen = console.frame_of_shade(1);
+    console.sgb.finish_loading_save_state();
+    let before = game_screen.clone();
+    console.sgb.set_player_palette(None);
+    console.sgb.redraw(&mut game_screen);
+    assert_eq!(game_screen, before);
+}

@@ -1332,6 +1332,9 @@ impl AddressBus {
         self.cartridge.finish_loading_save_state(self.elapsed_dots);
         self.joypad.finish_loading_save_state();
         self.show_sgb_buttons_held();
+        if let Some(sgb) = self.gpu.sgb_mut() {
+            sgb.finish_loading_save_state();
+        }
         // A state from before the Super Game Boy's intro existed lacks its
         // frames; past the boot ROM, its intro is long over.
         if !self.in_boot_rom
