@@ -14,8 +14,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 nubo-core.workspace = true
-# Only the palettes and the model rule: no storage, sound or controllers.
-nubo-frontend = { workspace = true, default-features = false }
+# Only the palettes and the model rule: without features (it has no default
+# ones), no storage, sound or controllers.
+nubo-frontend.workspace = true
 
 [dev-dependencies]
 # Reads the built library's exported symbols (tests/exports.rs).
