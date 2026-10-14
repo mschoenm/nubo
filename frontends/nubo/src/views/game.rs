@@ -3,8 +3,9 @@
 //! (`sgb.rs`) pages. In a window the bar sits
 //! above the picture. In fullscreen the picture fills the screen and the bar
 //! appears along the bottom when the mouse moves; at the top it would be
-//! hidden behind the menu bar that macOS slides down there. With `--scale`
-//! the window shows the picture alone ([`screen_only`]).
+//! hidden behind the menu bar that macOS slides down there. Double-clicking
+//! the picture switches between fullscreen and a window, as on a video
+//! site. With `--scale` the window shows the picture alone ([`screen_only`]).
 
 use crate::app::{GameMessage, Message, SettingsMessage, WindowMessage};
 use crate::game::{Game, PauseMenu};
@@ -17,8 +18,8 @@ use crate::ui::widgets::{
     top_bar, truncated_text, whole_step_screen,
 };
 use iced::widget::{
-    self, Column, Stack, button, center, column, container, image, row, scrollable, space, text,
-    text_input, toggler, tooltip,
+    self, Column, Stack, button, center, column, container, image, mouse_area, row, scrollable,
+    space, text, text_input, toggler, tooltip,
 };
 use iced::{Alignment, ContentFit, Element, Fill};
 use nubo_frontend::cheats;
@@ -48,11 +49,14 @@ pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Ele
         };
 
     let mut layers: Vec<Element<'a, Message>> = vec![
-        container(picture)
-            .center(Fill)
-            .padding(12)
-            .style(theme::screen_area)
-            .into(),
+        mouse_area(
+            container(picture)
+                .center(Fill)
+                .padding(12)
+                .style(theme::screen_area),
+        )
+        .on_double_click(Message::Window(WindowMessage::ToggleFullscreen))
+        .into(),
     ];
 
     if game.session.is_fast_forwarding() {
