@@ -5,7 +5,8 @@ fn reads_edits_and_moves_from_git() {
     let output = "M\tcrates/nubo-core/src/apu.rs\n\
                   R100\tfrontends/benchmark/src/main.rs\ttools/nubo-benchmark/src/main.rs\n\
                   R087\tfrontends/headless/src/main.rs\ttools/nubo-headless/src/main.rs\n\
-                  D\tfrontends/old.rs\n";
+                  D\tfrontends/old.rs\n\
+                  C090\tcrates/nubo-core/src/apu.rs\tcrates/nubo-core/src/apu_copy.rs\n";
     assert_eq!(
         parse_name_status(output),
         vec![
@@ -21,6 +22,7 @@ fn reads_edits_and_moves_from_git() {
                 unchanged: false,
             },
             Change::Edited(String::from("frontends/old.rs")),
+            Change::Edited(String::from("crates/nubo-core/src/apu_copy.rs")),
         ]
     );
 }
@@ -72,5 +74,22 @@ fn a_file_moved_with_changes_counts_as_changed() {
             "crates/nubo-core/src/apu.rs",
             "tools/nubo-headless/src/main.rs"
         ]
+    );
+}
+
+#[test]
+fn deleted_files_leave_the_state() {
+    let mut reviewed = Map::new();
+    reviewed.insert(
+        String::from("crates/nubo-core/src/apu.rs"),
+        Value::from("2026-10-01"),
+    );
+    reviewed.insert(String::from("frontends/old.rs"), Value::from("2026-10-02"));
+
+    forget_missing(&mut reviewed, |file| file != "frontends/old.rs");
+
+    assert_eq!(
+        reviewed.keys().collect::<Vec<_>>(),
+        ["crates/nubo-core/src/apu.rs"]
     );
 }

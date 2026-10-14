@@ -130,6 +130,7 @@ fn next_part(options: &NextOptions) -> Result<String> {
         None => Vec::new(),
     };
     carry_over_moves(&mut reviewed, &changes);
+    forget_missing(&mut reviewed, |file| workspace_root().join(file).is_file());
     let changed_files: Vec<String> = changed_files(&changes)
         .filter(|file| workspace_root().join(file).is_file())
         .collect();
@@ -175,7 +176,7 @@ fn last_reviewed<'a>(part: &Part, reviewed: &'a Map<String, Value>) -> Option<&'
 /// A Rust file that git sees as changed between two commits.
 #[derive(Debug, PartialEq)]
 enum Change {
-    /// Added, changed or deleted in place.
+    /// Added (also by copying), changed or deleted in place.
     Edited(String),
     /// Moved from `from` to `to`; `unchanged` when its content is the same.
     Moved {
@@ -210,8 +211,9 @@ fn rust_changes(from: &str, to: &str) -> Result<Vec<Change>> {
 }
 
 /// Reads the output of `git diff --name-status`: a status letter (`R` with
-/// a similarity score for a move, such as `R100`) and the paths, separated
-/// by tabs.
+/// a similarity score for a move, such as `R100`, and `C` with one for a
+/// copy) and the paths, separated by tabs. A copy counts as an edit of the
+/// new file; the file it was copied from is unchanged.
 fn parse_name_status(output: &str) -> Vec<Change> {
     output
         .lines()
@@ -225,6 +227,8 @@ fn parse_name_status(output: &str) -> Vec<Change> {
                     to: fields.next()?.to_string(),
                     unchanged: status == "R100",
                 })
+            } else if status.starts_with('C') {
+                Some(Change::Edited(fields.next()?.to_string()))
             } else {
                 Some(Change::Edited(path))
             }
@@ -241,6 +245,12 @@ fn carry_over_moves(reviewed: &mut Map<String, Value>, changes: &[Change]) {
             reviewed.insert(to.clone(), date);
         }
     }
+}
+
+/// Drops the review dates of files that are gone, such as deleted ones, so
+/// the state only holds files that `exists` still finds.
+fn forget_missing(reviewed: &mut Map<String, Value>, exists: impl Fn(&str) -> bool) {
+    reviewed.retain(|file, _| exists(file));
 }
 
 /// The paths of the files whose content changed: everything but files only

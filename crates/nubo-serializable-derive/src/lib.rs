@@ -9,13 +9,14 @@
 //! layout (`stored_layout`) the names of all their variants. The stored name is
 //! the field's or variant's name in the code, or the one given with
 //! `#[serializable(name = "stored_name")]`, which keeps it when the code is
-//! renamed. The generated code names the trait by its full path in
+//! renamed. Two fields or two variants can't share a stored name: reading
+//! would only fill the first. The generated code names the trait by its full path in
 //! `nubo-core` (`crate::serializable::Serializable`), so it only works inside
 //! that crate, and the trait doesn't need to be imported.
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use quote::quote;
+use quote::{ToTokens, quote};
 use syn::{
     Attribute, Data, DataEnum, DataStruct, DeriveInput, Error, Fields, Generics, Ident, LitStr,
     parse_macro_input,
@@ -72,6 +73,19 @@ fn options(attributes: &[Attribute]) -> syn::Result<Options> {
     Ok(options)
 }
 
+/// Fails when the last of `names`, the stored name of `item`, is one of the
+/// names before it, which reading could never tell apart.
+fn check_unique(names: &[String], item: impl ToTokens) -> syn::Result<()> {
+    let (last, earlier) = names.split_last().expect("a name was just added");
+    if earlier.iter().any(|name| name == last) {
+        return Err(Error::new_spanned(
+            item,
+            format!("the stored name `{last}` is already used"),
+        ));
+    }
+    Ok(())
+}
+
 /// Builds an impl that stores each named field with its stored name, leaving
 /// out skipped ones, and reads them back by that name.
 fn struct_impl(name: &Ident, generics: &Generics, data: &DataStruct) -> syn::Result<TokenStream2> {
@@ -91,6 +105,7 @@ fn struct_impl(name: &Ident, generics: &Generics, data: &DataStruct) -> syn::Res
         let ident = field.ident.as_ref().expect("named fields have names");
         field_idents.push(ident);
         field_names.push(options.stored_name.unwrap_or_else(|| ident.to_string()));
+        check_unique(&field_names, field)?;
     }
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
@@ -141,6 +156,7 @@ fn enum_impl(name: &Ident, generics: &Generics, data: &DataEnum) -> syn::Result<
                 .stored_name
                 .unwrap_or_else(|| variant.ident.to_string()),
         );
+        check_unique(&variant_names, variant)?;
     }
 
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
@@ -174,3 +190,6 @@ fn enum_impl(name: &Ident, generics: &Generics, data: &DataEnum) -> syn::Result<
         }
     })
 }
+
+#[cfg(test)]
+mod tests;
