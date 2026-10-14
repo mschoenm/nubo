@@ -17,6 +17,12 @@ needs nothing from this folder. You only need it to change a boot ROM.
 Each `.asm` file explains at its top what it shows, how it is laid out and how
 its timeline goes.
 
+Not done yet: the Super Game Boys run the DMG boot ROM, while the real ones have
+a boot ROM of their own, which shows nothing and sends the cartridge header to
+the Super Nintendo as packets. A Nubo version of it, based on SameBoy's
+`sgb_boot.asm`, is planned with the other boot ROM work; see
+`docs/ACCURACY_PLAN.md` (Phase 4, step 1).
+
 ## Building
 
 You need [RGBDS](https://rgbds.gbdev.io) 1.0 (`brew install rgbds` on macOS) and

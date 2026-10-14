@@ -52,7 +52,8 @@ What is missing or unproven:
 - **Super Game Boy.** Command packets, palettes, attribute maps, transfers, borders, masking and
   multiplayer requests are emulated (`crates/nubo-core/src/sgb.rs`, ported from SameBoy), and pass
   SameSuite's `sgb` tests and CasualPokePlayer's `sgb-ext-test`, with controllers for up to four
-  players. Not emulated yet: the startup's length and the menu's functions (Phase 4, step 1). Not planned: see that step. None of this is checked on hardware yet.
+  players and the startup's reset hold behind an intro of Nubo's own. Not emulated yet: the menu's
+  functions, and a boot ROM of the Super Game Boy's own (Phase 4, step 1). Not planned: see that step. None of this is checked on hardware yet.
 - **Link cable.** The serial port always behaves as if no cable is plugged in. Two Nubo instances can't
   be linked, and the Game Boy Printer isn't emulated.
 - **Infrared.** The CGB's RP register (0xFF56) isn't emulated. HuC1's infrared port always sees no light.
@@ -160,8 +161,17 @@ Largest phase, but each part stands alone:
    - **Nothing to do:** border sprites (`OBJ_TRN`) and the speed test (`TEST_EN`) do nothing on any
      retail Super Game Boy, only on prototypes (Pan Docs, "Removed Commands"), so Nubo ignores them
      as the retail units do.
-   - The startup: a Nubo animation of its own, as long as the real one, so games start when they
-     would on hardware.
+   - **Done:** the startup. The Game Boy is held in reset for 106 frames while Nubo's own intro plays
+     (210 frames, silent), and the game's picture shows when it ends: SameBoy's lengths, not measured
+     on hardware yet (`crates/nubo-core/src/sgb/intro.rs`). **Left for the boot ROM work**
+     (maintainer, 2026-10-14: later, together with the other boot ROMs; bring it up whenever boot
+     ROMs come up): a Super Game Boy boot ROM of Nubo's own, based on SameBoy's `sgb_boot.asm` (Expat License), which
+     shows nothing and really sends the cartridge header to the Super Nintendo as packets, so the
+     Super Nintendo side checks it (`packets.rs` already knows the header packets) and the boot takes
+     as long as the real one. Until then the Super Game Boys run the DMG boot ROM (Bootix, its
+     scrolling logo hidden behind the intro), whose end state matches the Super Game Boy's (Mooneye's
+     boot tests), but whose length likely doesn't, so a game may start a little earlier or later than
+     on hardware.
    - The menu's functions in Nubo's own design: the game's colors or the player's own, a color editor,
      the border on or off, and the commands that control the real menu (`PAL_PRI`, `ICON_EN`,
      `ATRC_EN`).
@@ -187,7 +197,8 @@ Largest phase, but each part stands alone:
    infrared, speaker), MMM01, TAMA5 and the Pocket Camera (fed with a picture or a webcam). Check the
    cartridge types in the No-Intro game lists to find what else licensed games use.
 5. **Original boot ROMs** as an option for players who supply them, so the boot and the post-boot
-   state can come from the real code. Nubo's own boot ROMs stay the default.
+   state can come from the real code. Nubo's own boot ROMs stay the default. Also part of the boot ROM
+   work: the Super Game Boy's own boot ROM (step 1, "Left for the boot ROM work").
 
 Done when: every cartridge type and accessory in the licensed library is supported, and the tests that
 need them run.

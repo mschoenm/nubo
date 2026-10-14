@@ -32,6 +32,13 @@
 //!   the next one (`MASK_EN`).
 //! - **Multiplayer.** A game can ask for up to four controllers (`MLT_REQ`),
 //!   which the joypad then reads one after another (`joypad.rs`).
+//! - **The startup.** When the Super Nintendo is switched on, it holds the
+//!   Game Boy in reset while it plays its intro, and shows the Game Boy's
+//!   picture only once the intro is over, so a game starts later than on a
+//!   Game Boy. Nubo plays an intro of its own (`intro.rs`), as long as
+//!   SameBoy's, and holds the Game Boy as long as SameBoy does
+//!   (`Sgb::holds_game_boy_in_reset`); neither length is measured on
+//!   hardware yet. The intro is silent.
 //!
 //! Not emulated: the Super Nintendo's sound (`SOUND`, `SOU_TRN`), programs a
 //! game sends to the Super Nintendo's own processor (`DATA_SND`, `DATA_TRN`,
@@ -51,6 +58,7 @@
 
 use crate::gpu::{DMG_SHADES, rgb555_to_rgba};
 use crate::sgb::border::{Border, BorderCache, BorderPicture};
+use crate::sgb::intro::Intro;
 use crate::sgb::packets::{MAX_COMMAND_SIZE, PacketReceiver, is_header_packet};
 use nubo_serializable_derive::Serializable;
 
@@ -90,6 +98,12 @@ const TRANSFER_DELAY_FRAMES: u8 = 3;
 /// stays for 41 frames, fades out over 32, and the new one fades in over 32.
 /// Measured on an SGB2 by SameBoy, and maybe off by two frames.
 const BORDER_FADE_FRAMES: u8 = 105;
+/// How many frames the intro lasts, from power-on, before the Game Boy's
+/// picture shows (SameBoy: 210).
+const INTRO_FRAMES: u16 = 210;
+/// How many frames from power-on the Game Boy is held in reset (SameBoy: 106,
+/// until "the boot animation is almost done").
+const RESET_HOLD_FRAMES: u16 = 106;
 /// The four grays of `DMG_SHADES` as RGB555, the colors a palette has until a
 /// game sets it.
 const GRAY_PALETTE: [u16; 4] = [0x7FFF, 0x56B5, 0x294A, 0x0000];
@@ -194,6 +208,12 @@ pub(crate) struct Sgb {
     screen: [u8; SCREEN_PIXELS],
     /// The shades the picture shows: `screen`, unless the mask froze it.
     shown_screen: [u8; SCREEN_PIXELS],
+    /// How many frames of the intro have been shown since power-on, up to
+    /// `INTRO_FRAMES`.
+    intro_frames: u16,
+    /// Nubo's intro, drawn once.
+    #[serializable(skip)]
+    intro: Intro,
     /// Nubo's own border, drawn once.
     #[serializable(skip)]
     nubo_border: BorderPicture,
@@ -237,6 +257,8 @@ impl Sgb {
             border_fade: 0,
             screen: [0; SCREEN_PIXELS],
             shown_screen: [0; SCREEN_PIXELS],
+            intro_frames: 0,
+            intro: Intro::new(),
             nubo_border: BorderPicture::nubo(),
             border_cache: BorderCache::default(),
             frame_colorized: false,
@@ -250,6 +272,26 @@ impl Sgb {
     /// SGB flag (0x0146) of 0x03 and an old licensee code (0x014B) of 0x33.
     pub(crate) fn start(&mut self, sgb_flag: u8, old_licensee_code: u8) {
         self.commands_enabled = sgb_flag == 0x03 && old_licensee_code == 0x33;
+    }
+
+    /// Whether the Super Nintendo still holds the Game Boy in reset: its CPU
+    /// and timers stand still, and only its (switched off) PPU and APU count
+    /// time.
+    pub(crate) fn holds_game_boy_in_reset(&self) -> bool {
+        self.intro_frames < RESET_HOLD_FRAMES
+    }
+
+    /// Ends the intro, for a save state made by a version without one, of a
+    /// game already past the boot ROM: its state lacks the intro's frames,
+    /// which would otherwise start again from power-on.
+    pub(crate) fn finish_intro(&mut self) {
+        self.intro_frames = INTRO_FRAMES;
+    }
+
+    /// Starts the intro again, as a state without its frames would.
+    #[cfg(test)]
+    pub(crate) fn restart_intro_for_tests(&mut self) {
+        self.intro_frames = 0;
     }
 
     /// Whether the last picture was drawn with colors a game set. Until a
@@ -546,10 +588,17 @@ impl Sgb {
             self.shown_screen = self.screen;
         }
 
-        self.frame_colorized = self.colorized;
+        let in_intro = self.intro_frames < INTRO_FRAMES;
         let colors = self.colors();
-        self.draw_game_screen(&colors, game_screen);
-        self.draw_border(&colors, game_screen);
+        if in_intro {
+            self.intro_frames += 1;
+            self.intro.draw(self.intro_frames, game_screen);
+            self.frame_colorized = true;
+        } else {
+            self.draw_game_screen(&colors, game_screen);
+            self.frame_colorized = self.colorized;
+        }
+        self.draw_border(&colors, game_screen, in_intro);
     }
 
     /// Reads the screen as tile data into the transfer's destination: each
@@ -630,8 +679,15 @@ impl Sgb {
     /// The border only changes with the fade, a new border or a new color 0,
     /// so only then is it drawn again (`BorderCache`); otherwise only the game
     /// screen is copied in.
-    fn draw_border(&mut self, colors: &[[u8; 4]; 16], game_screen: &mut [u8]) {
-        let fade = self.next_border_fade();
+    fn draw_border(&mut self, colors: &[[u8; 4]; 16], game_screen: &mut [u8], in_intro: bool) {
+        // The intro shows the border at full brightness while a fade runs on
+        // (SameBoy).
+        let fade = if in_intro {
+            self.next_border_fade();
+            0
+        } else {
+            self.next_border_fade()
+        };
         let active = if self.border.from_game {
             Some(&self.border)
         } else {
@@ -715,6 +771,7 @@ fn faded(color: u16, fade: u8) -> u16 {
 }
 
 mod border;
+mod intro;
 mod packets;
 #[cfg(test)]
 mod tests;

@@ -390,6 +390,18 @@ impl AddressBus {
         self.gpu.completed_frame()
     }
 
+    /// The PPU, for tests that change it.
+    #[cfg(test)]
+    pub(crate) fn gpu_mut_for_tests(&mut self) -> &mut Gpu {
+        &mut self.gpu
+    }
+
+    /// Whether a Super Game Boy still holds the Game Boy in reset after
+    /// power-on (`Sgb::holds_game_boy_in_reset`).
+    pub(crate) fn held_in_reset(&self) -> bool {
+        self.gpu.sgb().is_some_and(Sgb::holds_game_boy_in_reset)
+    }
+
     /// On a Super Game Boy, the most recent picture with its border (see
     /// `Sgb::bordered_frame`), as complete as `completed_frame`.
     pub(crate) fn completed_frame_with_border(&self) -> Option<&[u8]> {
@@ -1286,6 +1298,14 @@ impl AddressBus {
     pub(crate) fn finish_loading_save_state(&mut self) {
         self.cartridge.finish_loading_save_state(self.elapsed_dots);
         self.joypad.finish_loading_save_state();
+        // A state from before the Super Game Boy's intro existed lacks its
+        // frames; past the boot ROM, its intro is long over.
+        if !self.in_boot_rom
+            && self.held_in_reset()
+            && let Some(sgb) = self.gpu.sgb_mut()
+        {
+            sgb.finish_intro();
+        }
         self.update_rom_view();
         self.ppu_owed_dots = 0;
         self.ppu_quiet_dots = 0;

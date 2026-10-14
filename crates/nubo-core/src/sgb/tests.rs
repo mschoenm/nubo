@@ -13,6 +13,7 @@ impl Console {
     fn new() -> Self {
         let mut sgb = Sgb::new();
         sgb.start(0x03, 0x33);
+        sgb.finish_intro();
         Console { sgb, select: 0x30 }
     }
 
@@ -327,4 +328,28 @@ fn a_loaded_save_state_goes_on_like_the_super_game_boy_that_saved_it() {
         assert_eq!(console.frame_of_shade(3), loaded.frame_of_shade(3));
     }
     assert_eq!(format!("{:?}", console.sgb), format!("{:?}", loaded.sgb));
+}
+
+#[test]
+fn the_intro_holds_the_game_boy_in_reset_and_then_shows_its_picture() {
+    let mut console = Console::new();
+    console.sgb = Sgb::new();
+    for _ in 0..RESET_HOLD_FRAMES {
+        assert!(console.sgb.holds_game_boy_in_reset());
+        console.frame(None);
+    }
+    assert!(!console.sgb.holds_game_boy_in_reset());
+
+    for _ in RESET_HOLD_FRAMES..INTRO_FRAMES {
+        let game_screen = console.frame_of_shade(3);
+        assert_ne!(
+            pixel(&game_screen, 0, 0),
+            DMG_SHADES[3],
+            "the intro still shows"
+        );
+        assert!(console.sgb.frame_colorized());
+    }
+    let game_screen = console.frame_of_shade(3);
+    assert_eq!(pixel(&game_screen, 0, 0), DMG_SHADES[3]);
+    assert!(!console.sgb.frame_colorized());
 }

@@ -41,6 +41,13 @@ impl Cpu {
     /// runs one M-cycle instead, and while halted one M-cycle or a stretch of
     /// them in which nothing can wake the CPU (see `halted_step`).
     pub(crate) fn step(&mut self) {
+        if self.address_bus.held_in_reset() {
+            // A Super Game Boy holds the Game Boy in reset while its intro
+            // plays: only the switched-off PPU and APU count the time, as in
+            // STOP mode.
+            self.address_bus.sync_stopped();
+            return;
+        }
         if self.is_locked_up() {
             self.step_one_machine_cycle();
             return;
