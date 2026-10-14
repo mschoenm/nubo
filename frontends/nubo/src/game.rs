@@ -9,9 +9,9 @@ use nubo_frontend::save_states::Slot;
 use nubo_frontend::session::GameSession;
 use nubo_frontend::time::{Duration, Instant};
 
-/// How long the top bar stays after the mouse stops moving.
+/// How long the fullscreen bar stays after the mouse stops moving.
 const CONTROLS_TIMEOUT: Duration = Duration::from_millis(2500);
-/// While the mouse is this close to the bottom of the screen, the bar there
+/// While the mouse is this close to the top of the screen, the bar there
 /// stays.
 const CONTROLS_HOVER_HEIGHT: f32 = 64.0;
 
@@ -68,7 +68,7 @@ pub struct Game {
     /// In fullscreen the bar shows until this moment, after the mouse last
     /// moved.
     controls_shown_until: Instant,
-    /// Whether the mouse is over the bar along the bottom in fullscreen.
+    /// Whether the mouse is over the bar along the top in fullscreen.
     cursor_near_bar: bool,
     /// Whether the game keeps save states, cheats, screenshots, its
     /// thumbnail and where the player left off, which a run started with
@@ -142,7 +142,7 @@ impl Game {
     }
 
     /// Whether to show the bar in fullscreen: while paused, while the mouse
-    /// is near the bottom, and for a moment after it moved.
+    /// is near the top, and for a moment after it moved.
     pub fn controls_visible(&self) -> bool {
         self.is_paused() || self.cursor_near_bar || Instant::now() < self.controls_shown_until
     }
@@ -155,11 +155,11 @@ impl Game {
         !self.is_paused() && !self.cursor_near_bar && Instant::now() < self.controls_shown_until
     }
 
-    /// Shows the bar because the mouse moved to height `cursor_y` in a window
-    /// `window_height` high.
-    pub fn mouse_moved(&mut self, cursor_y: f32, window_height: f32) {
+    /// Shows the bar because the mouse moved to `cursor_y` pixels below the
+    /// top of the window.
+    pub fn mouse_moved(&mut self, cursor_y: f32) {
         self.controls_shown_until = Instant::now() + CONTROLS_TIMEOUT;
-        self.cursor_near_bar = window_height - cursor_y < CONTROLS_HOVER_HEIGHT;
+        self.cursor_near_bar = cursor_y < CONTROLS_HOVER_HEIGHT;
     }
 }
 

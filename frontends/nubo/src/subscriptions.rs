@@ -11,6 +11,7 @@ use iced::futures::{SinkExt, executor};
 use nubo_frontend::gamepads::{self, ControllerEvent};
 use nubo_frontend::library::WatchEvent;
 use nubo_frontend::settings::LibraryFolder;
+use std::path::PathBuf;
 
 /// News about the controllers: from a thread of their own on the desktop,
 /// which sleeps until a controller has something to report.
@@ -32,19 +33,20 @@ pub fn controllers() -> Subscription<ControllerEvent> {
     iced::window::frames().filter_map(|_| gamepads::next_event())
 }
 
-/// Changes to the ROMs in the library `folders`, which the folder watcher
-/// (`nubo_frontend::library::watch`) reports from a thread of its own. It
-/// starts over when the folders change, and watching stops when the
-/// subscription ends, which drops the watcher.
+/// Changes to the ROMs in the library `folders` and to the files of
+/// `games`, the recently played games outside them, which the folder
+/// watcher (`nubo_frontend::library::watch`) reports from a thread of its
+/// own. It starts over when the folders or those games change, and watching
+/// stops when the subscription ends, which drops the watcher.
 #[cfg(not(target_arch = "wasm32"))]
-pub fn library_changes(folders: &[LibraryFolder]) -> Subscription<WatchEvent> {
-    Subscription::run_with(folders.to_vec(), |folders| {
-        let folders = folders.clone();
+pub fn library_changes(folders: &[LibraryFolder], games: Vec<PathBuf>) -> Subscription<WatchEvent> {
+    Subscription::run_with((folders.to_vec(), games), |(folders, games)| {
+        let (folders, games) = (folders.clone(), games.clone());
         iced::stream::channel(16, async move |mut output| {
             // The watcher's thread may wait for room in the channel; this
             // task, which empties it, must not.
             let changes = output.clone();
-            let watching = nubo_frontend::library::watch(&folders, move |event| {
+            let watching = nubo_frontend::library::watch(&folders, &games, move |event| {
                 let _ = executor::block_on(changes.clone().send(event));
             });
             for failure in watching.failures {
@@ -59,7 +61,10 @@ pub fn library_changes(folders: &[LibraryFolder]) -> Subscription<WatchEvent> {
 
 /// The browser build has no folders to watch.
 #[cfg(target_arch = "wasm32")]
-pub fn library_changes(_folders: &[LibraryFolder]) -> Subscription<WatchEvent> {
+pub fn library_changes(
+    _folders: &[LibraryFolder],
+    _games: Vec<PathBuf>,
+) -> Subscription<WatchEvent> {
     Subscription::none()
 }
 

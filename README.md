@@ -99,7 +99,7 @@ These are the default keys. All of them but Esc can be changed under Settings > 
 | F11 | Fullscreen |
 | F12 | Screenshot |
 
-Ctrl+O opens a game, Ctrl+P pauses and resumes, Ctrl+R resets and Ctrl+, opens the settings (⌘ instead of Ctrl on macOS). Double-clicking the game screen switches between fullscreen and a window.
+Ctrl+O opens a game, Ctrl+P pauses and resumes, Ctrl+R resets and Ctrl+, opens the settings (⌘ instead of Ctrl on macOS). Double-clicking the game screen switches between fullscreen and a window, and right-clicking it opens the pause menu, which a click on the game outside it closes again.
 
 On a controller, the D-pad or left stick moves, and A and B sit where they are on a Game Boy: the right face button (B on Xbox, ○ on PlayStation) is A, and the bottom one (A on Xbox, ✕ on PlayStation) is B. L1 opens the pause menu, R1 fast forwards, and L2 and R2 are quick load and quick save.
 

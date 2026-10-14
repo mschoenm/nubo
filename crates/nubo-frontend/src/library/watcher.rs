@@ -1,13 +1,15 @@
 //! Watches the library folders, so games added to them (or removed from
-//! them) show up right away (the `desktop` feature). It uses the operating
-//! system's own change notifications, through `notify-debouncer-mini`, so it
-//! costs nothing while nothing changes.
+//! them) show up right away, and the files of the recently played games
+//! outside them, so a deleted one leaves "Continue playing" right away too
+//! (the `desktop` feature). It uses the operating system's own change
+//! notifications, through `notify-debouncer-mini`, so it costs nothing
+//! while nothing changes.
 
 use super::WatchEvent;
 use crate::settings::LibraryFolder;
 use notify_debouncer_mini::notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// Changes are collected for this long before the library hears about
@@ -35,18 +37,32 @@ pub struct Watching {
 }
 
 /// Reports changes to ROMs and folders in `folders`, including their
-/// subfolders where the folder says so, by calling `report` on the
-/// watcher's own thread, which may block until the app takes the event.
+/// subfolders where the folder says so, and to the files of `games` (the
+/// recently played games outside those folders, a handful), by calling
+/// `report` on the watcher's own thread, which may block until the app
+/// takes the event. A game's file is watched through the folder it is in,
+/// where only that file counts, so other files there cause no rescans.
 /// Watching goes on until the returned watcher is dropped, such as when the
 /// app stops listening because the folders changed.
 ///
 /// What goes wrong while starting (a folder that can't be watched, or no
 /// watcher at all) is returned instead of reported, so the caller can pass
 /// it on without blocking: `report` never runs on the caller's thread.
-pub fn watch(folders: &[LibraryFolder], report: impl Fn(WatchEvent) + Send + 'static) -> Watching {
+pub fn watch(
+    folders: &[LibraryFolder],
+    games: &[PathBuf],
+    report: impl Fn(WatchEvent) + Send + 'static,
+) -> Watching {
+    let (watched_folders, watched_games) = (folders.to_vec(), games.to_vec());
     let debouncer = new_debouncer(QUIET_TIME, move |result: DebounceEventResult| {
         let event = match result {
-            Ok(events) if events.iter().any(|event| matters(&event.path)) => WatchEvent::Changed,
+            Ok(events)
+                if events
+                    .iter()
+                    .any(|event| affects(&event.path, &watched_folders, &watched_games)) =>
+            {
+                WatchEvent::Changed
+            }
             Ok(_) => return,
             Err(error) => WatchEvent::Failed(error.to_string()),
         };
@@ -76,12 +92,58 @@ pub fn watch(folders: &[LibraryFolder], report: impl Fn(WatchEvent) + Send + 'st
         }
     }
 
+    for parent in game_folders(folders, games) {
+        if let Err(error) = debouncer
+            .watcher()
+            .watch(&parent, RecursiveMode::NonRecursive)
+        {
+            failures.push(error.to_string());
+        }
+    }
+
     Watching {
         watcher: Some(Watcher {
             _debouncer: debouncer,
         }),
         failures,
     }
+}
+
+/// The folders to watch for the files of `games`: each game's folder once,
+/// unless a library folder's watch already sees it. Watching a folder again
+/// would replace that watch, and could stop it from seeing subfolders.
+fn game_folders(folders: &[LibraryFolder], games: &[PathBuf]) -> Vec<PathBuf> {
+    let mut parents: Vec<PathBuf> = Vec::new();
+
+    for parent in games.iter().filter_map(|game| game.parent()) {
+        let seen = folders.iter().any(|folder| {
+            parent == folder.path || (folder.include_subfolders && parent.starts_with(&folder.path))
+        });
+        if !seen && parent.is_dir() && !parents.iter().any(|known| known == parent) {
+            parents.push(parent.to_path_buf());
+        }
+    }
+
+    parents
+}
+
+/// Whether a change at `path` can affect the library: a ROM or folder in a
+/// library folder, or in its subfolders where it includes them (see
+/// `matters`), or one of the `games` outside them, or the folder one of
+/// those is in, if it was removed itself.
+fn affects(path: &Path, folders: &[LibraryFolder], games: &[PathBuf]) -> bool {
+    let in_library_folder = |folder: &LibraryFolder| {
+        if folder.include_subfolders {
+            path.starts_with(&folder.path)
+        } else {
+            path == folder.path || path.parent() == Some(folder.path.as_path())
+        }
+    };
+
+    games
+        .iter()
+        .any(|game| game == path || game.parent() == Some(path))
+        || (matters(path) && folders.iter().any(in_library_folder))
 }
 
 /// Whether a change at `path` can affect the library: a ROM, or a folder
@@ -108,8 +170,9 @@ fn matters(path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::matters;
-    use std::path::Path;
+    use super::{affects, game_folders, matters};
+    use crate::settings::LibraryFolder;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn roms_and_folders_matter() {
@@ -125,5 +188,53 @@ mod tests {
         assert!(!matters(Path::new("/games/Tetris.gb.part")));
         assert!(!matters(Path::new("/games/.DS_Store")));
         assert!(!matters(Path::new("/games/.hidden.gb")));
+    }
+
+    fn folder(path: &str, include_subfolders: bool) -> LibraryFolder {
+        LibraryFolder {
+            path: PathBuf::from(path),
+            include_subfolders,
+        }
+    }
+
+    #[test]
+    fn only_the_played_files_count_in_their_folders() {
+        let folders = [folder("/games", true)];
+        let games = [PathBuf::from("/downloads/Mario.gb")];
+
+        assert!(affects(Path::new("/downloads/Mario.gb"), &folders, &games));
+        assert!(affects(Path::new("/downloads"), &folders, &games));
+        assert!(affects(Path::new("/games/Tetris.gb"), &folders, &games));
+        assert!(!affects(Path::new("/downloads/Zelda.gb"), &folders, &games));
+    }
+
+    #[test]
+    fn subfolders_count_only_in_folders_that_include_them() {
+        let folders = [folder("/games", false)];
+        let games = [PathBuf::from("/games/old/Mario.gb")];
+
+        assert!(affects(Path::new("/games/Tetris.gb"), &folders, &games));
+        assert!(affects(Path::new("/games/old/Mario.gb"), &folders, &games));
+        assert!(!affects(Path::new("/games/old/Zelda.gb"), &folders, &games));
+    }
+
+    #[test]
+    fn a_folder_a_library_folder_sees_isnt_watched_again() {
+        let root = std::env::temp_dir().join(format!("nubo-watcher-{}", std::process::id()));
+        let (games_folder, elsewhere) = (root.join("games"), root.join("elsewhere"));
+        std::fs::create_dir_all(games_folder.join("old")).unwrap();
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        let folders = [LibraryFolder {
+            path: games_folder.clone(),
+            include_subfolders: true,
+        }];
+        let games = [
+            games_folder.join("old").join("Tetris.gb"),
+            elsewhere.join("Mario.gb"),
+            elsewhere.join("Zelda.gb"),
+            root.join("gone").join("Kirby.gb"),
+        ];
+
+        assert_eq!(game_folders(&folders, &games), [elsewhere]);
     }
 }

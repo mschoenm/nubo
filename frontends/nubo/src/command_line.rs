@@ -35,7 +35,7 @@ const MAX_SCALE: u32 = 8;
 /// What the command line asked for.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Options {
-    /// The ROM to start.
+    /// The ROM to start, as an absolute path.
     pub rom_path: Option<PathBuf>,
     /// The model to run games on instead of the one the settings pick.
     pub model: Option<Model>,
@@ -67,7 +67,9 @@ pub fn parse(args: impl IntoIterator<Item = String>) -> Result<Options, String> 
             option if option.starts_with("--") => {
                 return Err(format!("{option} isn't an option"));
             }
-            _ => options.rom_path = Some(PathBuf::from(arg)),
+            // The library keeps the path and watches its folder, so it
+            // mustn't depend on the folder the app was started in.
+            _ => options.rom_path = Some(std::path::absolute(&arg).unwrap_or(PathBuf::from(arg))),
         }
     }
 

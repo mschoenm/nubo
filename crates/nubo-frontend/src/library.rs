@@ -574,6 +574,19 @@ impl Library {
         self.save()
     }
 
+    /// Takes the game at `path` off the recently played games, for a player
+    /// who doesn't want it there. A game in a library folder stays among
+    /// all games; one opened from elsewhere is forgotten at the next scan,
+    /// which only keeps such games while they count as played.
+    pub fn forget_played(&mut self, path: &Path) -> Result<(), String> {
+        let Some(entry) = self.entries.iter_mut().find(|entry| entry.path == path) else {
+            return Ok(());
+        };
+
+        entry.last_played = None;
+        self.save()
+    }
+
     /// Keeps `pixels`, the last frame of the game at `path`, as its thumbnail.
     pub fn set_thumbnail(&mut self, path: &Path, pixels: Vec<u8>) -> Result<(), String> {
         let saved = store::save_thumbnail(&self.cache, path, &pixels);
@@ -604,22 +617,24 @@ pub enum WatchEvent {
 }
 
 /// Combines a scan's `scanned` games with the library's `current` ones.
-/// Games keep the latest play time of either, and games started for the
-/// first time while the scan ran (so not among the `checked` games it knew
-/// about) are kept. Games it checked and left out are gone.
+/// Games keep their play time as the library has it now, which is newer
+/// than what the scan started from: games played during the scan keep it,
+/// and games taken off the recently played ones stay off. Games started for
+/// the first time while the scan ran (so not among the `checked` games it
+/// knew about) are kept. Games it checked and left out are gone.
 fn merge_scan(
     current: &[LibraryEntry],
     mut scanned: Vec<LibraryEntry>,
     checked: &HashSet<PathBuf>,
 ) -> Vec<LibraryEntry> {
-    let last_played: HashMap<&Path, u64> = current
+    let last_played: HashMap<&Path, Option<u64>> = current
         .iter()
-        .filter_map(|entry| Some((entry.path.as_path(), entry.last_played?)))
+        .map(|entry| (entry.path.as_path(), entry.last_played))
         .collect();
 
     for entry in &mut scanned {
         if let Some(&played) = last_played.get(entry.path.as_path()) {
-            entry.last_played = entry.last_played.max(Some(played));
+            entry.last_played = played;
         }
     }
 

@@ -2,10 +2,12 @@
 //! and the pause menu with its save state, cheats and Super Game Boy
 //! (`sgb.rs`) pages. In a window the bar sits
 //! above the picture. In fullscreen the picture fills the screen and the bar
-//! appears along the bottom when the mouse moves; at the top it would be
-//! hidden behind the menu bar that macOS slides down there. Double-clicking
-//! the picture switches between fullscreen and a window, as on a video
-//! site. With `--scale` the window shows the picture alone ([`screen_only`]).
+//! appears over its top when the mouse moves. Double-clicking the picture
+//! switches between fullscreen and a window, as on a video site. The pause menu works like a context menu: a right click on the
+//! picture opens it, as Esc does, and a click on the game outside it or a
+//! row that leaves it behind closes it. The bar's buttons work as usual
+//! while it's open. With `--scale` the window shows the picture alone
+//! ([`screen_only`]).
 
 use crate::app::{GameMessage, Message, SettingsMessage, WindowMessage};
 use crate::game::{Game, PauseMenu};
@@ -14,12 +16,12 @@ use crate::ui::icons::{Icon, icon};
 use crate::ui::pictures;
 use crate::ui::theme;
 use crate::ui::widgets::{
-    bottom_bar, icon_button, icon_button_at, secondary_button, shortcut, toggle_icon_button,
-    top_bar, truncated_text, whole_step_screen,
+    icon_button, secondary_button, shortcut, toggle_icon_button, top_bar, truncated_text,
+    whole_step_screen,
 };
 use iced::widget::{
-    self, Column, Stack, button, center, column, container, image, mouse_area, row, scrollable,
-    space, text, text_input, toggler, tooltip,
+    self, Column, Stack, button, center, column, container, image, mouse_area, opaque, row,
+    scrollable, space, text, text_input, toggler,
 };
 use iced::{Alignment, ContentFit, Element, Fill};
 use nubo_frontend::cheats;
@@ -56,6 +58,7 @@ pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Ele
                 .style(theme::screen_area),
         )
         .on_double_click(Message::Window(WindowMessage::ToggleFullscreen))
+        .on_right_press(Message::Game(GameMessage::OpenPauseMenu))
         .into(),
     ];
 
@@ -72,11 +75,7 @@ pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Ele
     }
 
     if game.controls_visible() {
-        layers.push(
-            container(bar(game, settings, true))
-                .align_bottom(Fill)
-                .into(),
-        );
+        layers.push(container(bar(game, settings, true)).align_top(Fill).into());
     }
 
     Stack::with_children(layers).into()
@@ -106,17 +105,10 @@ pub fn screen_only(game: Option<&Game>) -> Element<'_, Message> {
     }
 }
 
-/// The bar with the game's name and controls: at the top of the window, or
-/// along the bottom of the screen in fullscreen, with its tooltips above the
-/// buttons.
+/// The bar with the game's name and controls, at the top of the window, or
+/// over the top of the picture in fullscreen.
 fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<'a, Message> {
-    let tooltips = if fullscreen {
-        tooltip::Position::Top
-    } else {
-        tooltip::Position::Bottom
-    };
-    let button =
-        |icon, label: String, message| icon_button_at(icon, label, Some(message), tooltips);
+    let button = |icon, label: String, message| icon_button(icon, label, Some(message));
 
     let (pause_icon, pause_label) = if game.is_paused() {
         (Icon::Play, "Resume (Esc)")
@@ -146,7 +138,6 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
             String::from("Fast forward (hold Tab)"),
             game.session.is_fast_forward_on(),
             Message::Game(GameMessage::ToggleFastForward),
-            tooltips,
         ),
         button(
             volume_icon,
@@ -186,11 +177,7 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
         ),
     ]);
 
-    if fullscreen {
-        bottom_bar(controls)
-    } else {
-        top_bar(controls)
-    }
+    top_bar(controls)
 }
 
 /// The label in the top-right corner while fast forwarding.
@@ -292,7 +279,7 @@ pub fn main_entries(game: &Game, settings: &Settings, fullscreen: bool) -> Vec<M
         fullscreen_icon,
         fullscreen_label,
         key(Action::Fullscreen, ""),
-        Message::Window(WindowMessage::ToggleFullscreen),
+        closing_menu(Message::Window(WindowMessage::ToggleFullscreen)),
     ));
 
     entries.extend([
@@ -306,7 +293,7 @@ pub fn main_entries(game: &Game, settings: &Settings, fullscreen: bool) -> Vec<M
             Icon::Settings,
             "Settings",
             Some(shortcut(",")),
-            Message::Settings(SettingsMessage::Open),
+            closing_menu(Message::Settings(SettingsMessage::Open)),
         ),
         entry(
             Icon::House,
@@ -317,6 +304,14 @@ pub fn main_entries(game: &Game, settings: &Settings, fullscreen: bool) -> Vec<M
     ]);
 
     entries
+}
+
+/// `message`, after closing the pause menu, for a row that leaves the menu
+/// behind as a context menu does. The rows that resume the game, start it
+/// again or leave it close the menu by themselves, and the rows that open
+/// another page keep it open.
+fn closing_menu(message: Message) -> Message {
+    Message::Game(GameMessage::PickedFromMenu(Box::new(message)))
 }
 
 /// The slots listed on the save or load page. Loading doesn't list the
@@ -339,7 +334,9 @@ pub fn slot_message(info: &SlotInfo, saving: bool) -> Option<Message> {
     }
 }
 
-/// The pause menu over the dimmed game.
+/// The pause menu over the dimmed game. A click on the game outside the
+/// menu's panel, with either button, closes it, as it does a context menu;
+/// the bar isn't covered, so its buttons do what they always do.
 fn pause_menu<'a>(
     game: &'a Game,
     page: PauseMenu,
@@ -355,23 +352,31 @@ fn pause_menu<'a>(
         PauseMenu::SuperGameBoy => sgb::page(game, settings, selection),
     };
 
-    let panel = container(scrollable(content).id(pause_scroll_id()).spacing(12))
-        .padding(20)
-        .width(MENU_WIDTH)
-        .max_height(MENU_MAX_HEIGHT)
-        .style(theme::panel);
+    // Clicks anywhere on the panel, even between its rows, stay in it.
+    let panel = opaque(
+        container(scrollable(content).id(pause_scroll_id()).spacing(12))
+            .padding(20)
+            .width(MENU_WIDTH)
+            .max_height(MENU_MAX_HEIGHT)
+            .style(theme::panel),
+    );
 
     // The Super Game Boy page sits at the side over the undimmed game, so
     // the player sees the colors and border they pick.
-    if page == PauseMenu::SuperGameBoy {
-        return container(panel)
+    let layer = if page == PauseMenu::SuperGameBoy {
+        container(panel)
             .align_right(Fill)
             .center_y(Fill)
             .padding(16)
-            .into();
-    }
+    } else {
+        center(panel).style(theme::backdrop)
+    };
 
-    center(panel).style(theme::backdrop).into()
+    let close = Message::Game(GameMessage::ClosePauseMenu);
+    mouse_area(layer)
+        .on_press(close.clone())
+        .on_right_press(close)
+        .into()
 }
 
 fn main_page<'a>(
