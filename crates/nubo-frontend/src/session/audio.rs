@@ -1,13 +1,15 @@
-//! Sound output with cpal. Samples wait in a queue that the sound card's
+//! Sound output with cpal: the sound card's on the desktop, WebAudio in the
+//! browser build (cpal picks its backend by the target, and the `desktop` or
+//! `web` feature brings cpal). Samples wait in a queue that the sound card's
 //! callback drains; the emulator watches the queue's length to know when to
 //! produce more, which keeps emulation running at real-time speed. On the
 //! desktop the callback also wakes the emulator thread when the queue runs
 //! low, so the thread can sleep until then.
 
+use crate::notices::Notices;
+use crate::time::{Duration, Instant};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, FromSample, SampleFormat, SizedSample, Stream, StreamConfig};
-use nubo_frontend::notices::Notices;
-use nubo_frontend::time::{Duration, Instant};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread::Thread;

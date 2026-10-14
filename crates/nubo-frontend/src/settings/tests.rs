@@ -63,7 +63,7 @@ fn unknown_models_are_rejected() {
 
 #[test]
 fn without_saved_settings_the_defaults_load_quietly() {
-    let (settings, problem) = load(&storage::NoStorage, |contents| {
+    let (settings, problem) = load(&crate::storage::NoStorage, |contents| {
         toml::from_str::<Settings>(contents)
     });
 

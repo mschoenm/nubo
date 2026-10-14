@@ -1,7 +1,8 @@
 //! Colors for original Game Boy games. The emulator draws them in four
-//! shades of gray (`nubo_core::DMG_SHADES`); this swaps those for the colors
-//! of the player's chosen palette, such as the green of the original screen.
-//! The core always draws gray, and the palette is up to the app.
+//! evenly spaced shades of gray (`nubo_core::DMG_SHADES`); this swaps those
+//! for the colors of the player's chosen palette, such as the green of the
+//! original screen. The core always draws gray, and the palette is up to the
+//! app.
 
 use nubo_core::DMG_SHADES;
 use serde::{Deserialize, Serialize};

@@ -2,7 +2,8 @@
 //! and the pause menu with its save state pages. In a window the bar sits
 //! above the picture. In fullscreen the picture fills the screen and the bar
 //! appears along the bottom when the mouse moves; at the top it would be
-//! hidden behind the menu bar that macOS slides down there.
+//! hidden behind the menu bar that macOS slides down there. With `--scale`
+//! the window shows the picture alone ([`screen_only`]).
 
 use crate::app::{GameMessage, Message, SettingsMessage, WindowMessage};
 use crate::game::{Game, PauseMenu};
@@ -30,7 +31,7 @@ const SLOT_THUMBNAIL_WIDTH: f32 = 80.0;
 const SLOT_THUMBNAIL_HEIGHT: f32 = 72.0;
 
 pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<'a, Message> {
-    let picture: Element<'a, Message> = match game.screen().map(pictures::handle) {
+    let picture: Element<'a, Message> = match game.session.screen().map(pictures::handle) {
         Some(handle) if settings.integer_scaling => whole_step_screen(handle),
         Some(handle) => image(handle)
             .filter_method(image::FilterMethod::Nearest)
@@ -49,8 +50,8 @@ pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Ele
             .into(),
     ];
 
-    if game.is_fast_forwarding() {
-        layers.push(fast_forward_badge(settings));
+    if game.session.is_fast_forwarding() {
+        layers.push(fast_forward_badge(game, settings));
     }
 
     if let Some(page) = game.menu() {
@@ -70,6 +71,29 @@ pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Ele
     }
 
     Stack::with_children(layers).into()
+}
+
+/// The game screen alone, filling the window, for `--scale` (see
+/// `command_line`): nothing is drawn over it, and the window is sized to show
+/// it at a whole multiple of its size (see `app::screen_only_size`). Black
+/// until the game shows its first frame.
+pub fn screen_only(game: Option<&Game>) -> Element<'_, Message> {
+    match game
+        .and_then(|game| game.session.screen())
+        .map(pictures::handle)
+    {
+        Some(handle) => image(handle)
+            .filter_method(image::FilterMethod::Nearest)
+            .content_fit(ContentFit::Fill)
+            .width(Fill)
+            .height(Fill)
+            .into(),
+        None => container(space())
+            .width(Fill)
+            .height(Fill)
+            .style(|_| container::Style::default().background(iced::Color::BLACK))
+            .into(),
+    }
 }
 
 /// The bar with the game's name and controls: at the top of the window, or
@@ -106,11 +130,11 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
             String::from("Library"),
             Message::Game(GameMessage::CloseGame)
         ),
-        truncated_text(game.name(), 15.0, theme::HEADING_FONT),
+        truncated_text(game.session.name(), 15.0, theme::HEADING_FONT),
         toggle_icon_button(
             Icon::FastForward,
             String::from("Fast forward (hold Tab)"),
-            game.is_fast_forward_on(),
+            game.session.is_fast_forward_on(),
             Message::Game(GameMessage::ToggleFastForward),
             tooltips,
         ),
@@ -131,7 +155,7 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
         ),
     ];
 
-    if screenshots::AVAILABLE {
+    if screenshots::AVAILABLE && game.keeps_data {
         controls = controls.push(button(
             Icon::Camera,
             String::from("Screenshot (F12)"),
@@ -160,11 +184,16 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
 }
 
 /// The label in the top-right corner while fast forwarding.
-fn fast_forward_badge(settings: &Settings) -> Element<'_, Message> {
+fn fast_forward_badge<'a>(game: &Game, settings: &Settings) -> Element<'a, Message> {
     let badge = container(
         row![
             icon(Icon::FastForward).size(14),
-            text(settings.shared.fast_forward_speed.to_string()).size(13),
+            text(
+                game.session
+                    .fast_forward_speed(&settings.shared)
+                    .to_string()
+            )
+            .size(13),
         ]
         .spacing(6)
         .align_y(Alignment::Center),
@@ -186,8 +215,9 @@ pub struct MenuEntry {
 /// The rows of the pause menu's main page, in order. The D-pad moves through
 /// them and A picks one, so the view and the app both use this list.
 /// `fullscreen` says whether the window fills the screen; hints show the
-/// keys bound in `settings`.
-pub fn main_entries(settings: &Settings, fullscreen: bool) -> Vec<MenuEntry> {
+/// keys bound in `settings`. Save states and cheats are left out for a game
+/// that keeps neither (`--fresh`).
+pub fn main_entries(game: &Game, settings: &Settings, fullscreen: bool) -> Vec<MenuEntry> {
     let entry = |icon, label, hint: Option<String>, message| MenuEntry {
         icon,
         label,
@@ -210,7 +240,7 @@ pub fn main_entries(settings: &Settings, fullscreen: bool) -> Vec<MenuEntry> {
         Message::Game(GameMessage::TogglePause),
     )];
 
-    if save_states::AVAILABLE {
+    if save_states::AVAILABLE && game.keeps_data {
         entries.push(entry(
             Icon::Save,
             "Save state",
@@ -225,7 +255,7 @@ pub fn main_entries(settings: &Settings, fullscreen: bool) -> Vec<MenuEntry> {
         ));
     }
 
-    if cheats::AVAILABLE {
+    if cheats::AVAILABLE && game.keeps_data {
         entries.push(entry(
             Icon::WandSparkles,
             "Cheats",
@@ -273,7 +303,8 @@ pub fn main_entries(settings: &Settings, fullscreen: bool) -> Vec<MenuEntry> {
 /// The slots listed on the save or load page. Loading doesn't list the
 /// "where you left off" slot while it's empty.
 pub fn listed_slots(game: &Game, saving: bool) -> Vec<&SlotInfo> {
-    game.slots()
+    game.session
+        .slots()
         .iter()
         .filter(|info| saving || info.slot != Slot::Resume || info.saved_at.is_some())
         .collect()
@@ -321,13 +352,13 @@ fn main_page<'a>(
     settings: &Settings,
     fullscreen: bool,
 ) -> Element<'a, Message> {
-    let rows = main_entries(settings, fullscreen)
+    let rows = main_entries(game, settings, fullscreen)
         .into_iter()
         .enumerate()
         .map(|(index, entry)| menu_item(entry, index == selection));
 
     column![
-        text(game.name()).size(18).font(theme::HEADING_FONT),
+        text(game.session.name()).size(18).font(theme::HEADING_FONT),
         text("Paused").size(13).style(theme::muted_text),
         space().height(8),
         Column::with_children(rows).spacing(2),
@@ -428,13 +459,14 @@ fn slot_row(info: &SlotInfo, saving: bool, selected: bool) -> Element<'_, Messag
 /// The cheats page: the game's cheats with a switch each, and a form to add
 /// one.
 fn cheats_page(game: &Game, selection: usize) -> Element<'_, Message> {
-    let list: Element<'_, Message> = if game.cheats().is_empty() {
+    let cheats = game.session.cheats();
+    let list: Element<'_, Message> = if cheats.is_empty() {
         text("No cheats yet. Add a GameShark or Game Genie code below.")
             .size(13)
             .style(theme::muted_text)
             .into()
     } else {
-        Column::with_children(game.cheats().iter().enumerate().map(|(index, cheat)| {
+        Column::with_children(cheats.iter().enumerate().map(|(index, cheat)| {
             container(
                 row![
                     toggler(cheat.enabled)

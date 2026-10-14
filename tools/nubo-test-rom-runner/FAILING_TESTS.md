@@ -1,6 +1,6 @@
 # Failing test ROMs
 
-`cargo test-roms` passes 6773 of the 6804 tests it runs. This file explains the 31 that fail: what each
+`cargo test-roms` passes 6784 of the 6815 tests it runs. This file explains the 31 that fail: what each
 test checks, what Nubo does instead, and why it isn't fixed yet or can't be. `cargo test-roms --verbose`
 prints the same list with each test's symptom, and failing screenshot tests leave the emulator's
 screen and a diff in `target/test-roms/failures/<model>/`.
@@ -20,9 +20,8 @@ ported.
 | [Mooneye's MGB madness test](#mooneyes-mgb-madness-test) | 2 | Open, unexplained by its author |
 | [AGE oam-write on DMG-C](#age-oam-write-on-dmg-c) | 1 | Depends on state its author flags as unexplained |
 
-251 of the 258 GB Emulator Shootout tests that the runner runs pass; [the GB Emulator
-Shootout](#the-gb-emulator-shootout) explains the seven that fail, which are a matter of the colors
-Nubo shows rather than of emulation, and the six published tests it doesn't count.
+All 258 GB Emulator Shootout tests that the runner runs pass; [the GB Emulator
+Shootout](#the-gb-emulator-shootout) explains the six published tests it doesn't count.
 
 Tests are named as the runner prints them: the hardware model, then the ROM's path under
 `target/test-roms/v7.0/`.
@@ -289,31 +288,16 @@ behaviour behind those rows is known, there is nothing to model.
 
 The runner runs 258 of the 264 tests of the Shootout's published table (`shootout/...` in
 `passing.txt`), judged the way its harness judges them (`src/shootout.rs`): in grayscale, on a
-screenshot of the app, so in the colors the app shows. 251 pass: 251 of 264, level with Emulicious,
-where the leader, DocBoy, has 255.
+screenshot of the app, so in the colors the app shows. All 258 pass: 258 of 264, which would rank
+first, ahead of the leader, DocBoy, with 255.
 
-Seven DMG tests fail only because of the colors Nubo shows original Game Boy games in. The app's
-default palette shows the emulator's grays (`DMG_SHADES`: white, 0xD3, 0xA9, black), and the
-Shootout's screenshots use evenly spaced grays (white, 0xAA, 0x55, black). Its comparison allows 50
-steps of brightness: the light gray is 41 away, but the dark gray is 84 away, so every screenshot
-with dark gray in it fails. The emulation itself is right: the same ROMs pass where the collection
-or daid's tests compare them in the screenshots' own grays (`dmg acid/dmg-acid2.gb`, `dmg
-daid/ppu_scanline_bgp.gb` and the Mealybug tests on DMG).
+Seven DMG tests used to fail only because of the colors Nubo showed original Game Boy games in: the
+emulator's middle grays were 0xD3 and 0xA9, and the Shootout's screenshots use evenly spaced grays
+(white, 0xAA, 0x55, black). Its comparison allows 50 steps of brightness, and the dark gray was 84
+away. The emulator now draws the evenly spaced grays (`DMG_SHADES`), which the app's default palette
+shows as they are.
 
-- `shootout/acid/dmg-acid2.gb`
-- `shootout/daid/ppu_scanline_bgp.gb (DMG)`
-- `shootout/mealybug-tearoom-tests/ppu/m3_bgp_change.gb (DMG)`
-- `shootout/mealybug-tearoom-tests/ppu/m3_lcdc_obj_size_change.gb (DMG)`
-- `shootout/mealybug-tearoom-tests/ppu/m3_lcdc_tile_sel_change.gb (DMG)`
-- `shootout/mealybug-tearoom-tests/ppu/m3_lcdc_tile_sel_win_change.gb (DMG)`
-- `shootout/mealybug-tearoom-tests/ppu/m3_scy_change.gb (DMG)`
-
-What to try: show the original Game Boy's grays evenly spaced (a dark gray around 0x55, as SameBoy
-and the Shootout's screenshots do), either in the default palette or in the window `--fresh`
-starts (Part 1 of `docs/SHOOTOUT_PLAN.md`). That is a choice of how Nubo looks, so it waits for the
-maintainer. With it, Nubo would pass 258 of 264 and rank first.
-
-The other six published tests can't pass in the Shootout either:
+The six published tests the runner doesn't count can't pass in the Shootout either:
 
 - `samesuite/sgb/command_mlt_req.gb`, `samesuite/sgb/command_mlt_req_1_incrementing.gb` and
   `cpp/sgb-ext-test.gb` run on the Super Game Boy, whose commands Nubo doesn't emulate. The harness
@@ -327,7 +311,7 @@ The groups `docs/SHOOTOUT_PLAN.md` expected to fail are empty:
   leaves them out (they are commented out in its `mooneye.py` and `samesuite.py`), so none run.
 - **Bully on DMG.** The Shootout's build of Bully isn't the collection's, and Nubo passes it on the
   DMG. The collection's Bully still runs on the CGB only, since real DMGs fail it.
-- **Real Nubo bugs.** None; the seven failures above come from the colors Nubo shows. With the plan's first deadline, two seconds after the Shootout's
+- **Real Nubo bugs.** None. With the plan's first deadline, two seconds after the Shootout's
   `runtime`, 100 tests failed only because they ran out of time: the boot ROM takes 3.1 seconds on
   the CGB, and some tests need up to 8.5 seconds more than their `runtime` on Nubo (`rtc3test-3`,
   `cpu_instrs/11`, `oam_bug/8`). The runner now gives each test the harness's own deadline instead,

@@ -251,6 +251,7 @@ impl App {
     /// network nor the lists.
     fn download_box_art(&mut self) -> Task<Message> {
         if !box_art::AVAILABLE
+            || self.fresh
             || !self.settings.shared.download_box_art
             || !self.library.needs_downloads()
         {
@@ -286,11 +287,17 @@ impl App {
         )
     }
 
+    /// Whether this build keeps a library and this run may use it: not with
+    /// `--fresh`, which leaves the player's library alone.
+    fn keeps_library(&self) -> bool {
+        library::AVAILABLE && !self.fresh
+    }
+
     /// Reads and decodes the games' saved pictures on a background thread.
     /// With `missing_only`, only for games that have none on screen yet,
     /// such as games a scan just found.
     pub(super) fn load_pictures(&self, missing_only: bool) -> Task<Message> {
-        if !library::AVAILABLE {
+        if !self.keeps_library() {
             return Task::none();
         }
 
@@ -308,7 +315,7 @@ impl App {
     /// exist, so games that were deleted disappear right away, before the
     /// slower scan of the folders. The app runs it when it starts.
     pub(super) fn check_files(&self) -> Task<Message> {
-        if !library::AVAILABLE {
+        if !self.keeps_library() {
             return Task::none();
         }
 
@@ -324,7 +331,7 @@ impl App {
     /// scan runs, they lead to one more scan after it instead of a second
     /// scan at the same time.
     pub(super) fn rescan(&mut self) -> Task<Message> {
-        if !library::AVAILABLE {
+        if !self.keeps_library() {
             return Task::none();
         }
 

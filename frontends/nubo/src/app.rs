@@ -8,7 +8,7 @@
 //! the window itself (`app/window_events.rs`), and keys and controller
 //! buttons (`app/player_input.rs`).
 
-use crate::controllers::ControllerEvent;
+use crate::command_line::Options;
 use crate::game::{Game, PauseMenu};
 use crate::input::{self, KeyInput};
 use crate::menu_presses::MenuPresses;
@@ -24,18 +24,20 @@ use iced::{Element, Subscription, Task, Theme, event, keyboard, system, window};
 use nubo_core::{CartridgeHeader, ControllerState, Model};
 use nubo_frontend::background;
 use nubo_frontend::controls::{Action, Device};
+use nubo_frontend::gamepads::ControllerEvent;
 use nubo_frontend::library::Library;
 use nubo_frontend::library::box_art::GameList;
 use nubo_frontend::notices::Notices;
 use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states;
+use nubo_frontend::settings::FastForwardSpeed;
 use std::sync::Arc;
 
 pub use library_screen::LibraryMessage;
 pub use nubo_frontend::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
 pub use playing::GameMessage;
 pub use settings_window::SettingsMessage;
-pub use window_events::WindowMessage;
+pub use window_events::{WindowMessage, screen_only_size};
 
 /// How often the desktop build checks for toasts to take down and for the
 /// fullscreen bar to hide, while there are any.
@@ -55,6 +57,15 @@ pub struct App {
     /// A model picked on the command line, used instead of the settings
     /// until the user picks one in the settings.
     model_override: Option<Model>,
+    /// With `--scale`: the window shows only the game screen, this many
+    /// times its size, and nothing else can be brought up (see
+    /// `command_line`).
+    screen_scale: Option<u32>,
+    /// With `--fresh`: the app reads and writes nothing kept between runs,
+    /// like a new install (see `command_line`).
+    fresh: bool,
+    /// With `--speed`: games start fast forwarding at this speed.
+    speed: Option<FastForwardSpeed>,
     library: Library,
     /// The text in the library's search field.
     search: String,
@@ -118,23 +129,39 @@ pub enum Message {
     /// such as toasts expiring: the emulator finished a new frame, a timer
     /// check is due (desktop, see `App::check_interval`), or the window is
     /// about to draw (browser, which also emulates the frames due by then,
-    /// see `emulation/web.rs`).
+    /// see `nubo_frontend::session`).
     Tick,
     DismissToast(usize),
 }
 
 impl App {
-    /// Creates the application with the saved settings and library, starting
-    /// the ROM given on the command line if there is one. `model` overrides
-    /// the saved model for this run.
-    pub fn new(rom: Option<Result<Rom, String>>, model: Option<Model>) -> (Self, Task<Message>) {
-        let (settings, settings_error) = Settings::load();
-        let (library, library_error) = Library::load();
+    /// Creates the application with the saved settings and library (or the
+    /// defaults and an empty library with `--fresh`), starting the ROM given
+    /// on the command line if there is one, as the other `options` say.
+    pub fn new(rom: Option<Result<Rom, String>>, options: &Options) -> (Self, Task<Message>) {
+        let (settings, settings_error) = if options.fresh {
+            (Settings::default(), None)
+        } else {
+            Settings::load()
+        };
+        let (library, library_error) = if options.fresh {
+            (Library::default(), None)
+        } else {
+            Library::load()
+        };
+        let toasts = if options.fresh || options.scale.is_some() {
+            Toasts::printed()
+        } else {
+            Toasts::default()
+        };
 
         let mut app = App {
             settings,
             system_mode: Mode::None,
-            model_override: model,
+            model_override: options.model,
+            screen_scale: options.scale,
+            fresh: options.fresh,
+            speed: options.speed,
             library,
             search: String::new(),
             game: None,
@@ -146,7 +173,7 @@ impl App {
             minimized: false,
             library_selection: None,
             library_scroll: (0.0, 0.0),
-            toasts: Toasts::default(),
+            toasts,
             notices: Notices::default(),
             controllers: Vec::new(),
             controller_state: ControllerState::new(),
@@ -183,7 +210,7 @@ impl App {
     /// The window title, including the game's name while one is running.
     pub fn title(&self) -> String {
         match &self.game {
-            Some(game) => format!("{} — Nubo", game.name()),
+            Some(game) => format!("{} — Nubo", game.session.name()),
             None => String::from("Nubo"),
         }
     }
@@ -213,8 +240,8 @@ impl App {
             Message::Tick => {
                 if let Some(game) = self.game.as_mut().filter(|_| !self.minimized) {
                     #[cfg(target_arch = "wasm32")]
-                    game.advance();
-                    game.refresh_screen();
+                    game.session.run_due_frames();
+                    game.session.refresh_screen();
                 }
                 self.toasts.remove_expired(iced::time::Instant::now());
                 Task::none()
@@ -233,8 +260,10 @@ impl App {
     /// Reads the pictures of the save state slots a pause menu page that
     /// just opened lists, on a background thread.
     fn load_slot_thumbnails(&mut self) -> Task<Message> {
-        let Some((slot_listing, rom_path, slots)) =
-            self.game.as_mut().and_then(Game::thumbnails_to_load)
+        let Some((slot_listing, rom_path, slots)) = self
+            .game
+            .as_mut()
+            .and_then(|game| game.session.thumbnails_to_load())
         else {
             return Task::none();
         };
@@ -247,8 +276,12 @@ impl App {
     }
 
     /// The current screen with the settings, drop target and notifications
-    /// layered on top.
+    /// layered on top, or the game screen alone with `--scale`.
     pub fn view(&self) -> Element<'_, Message> {
+        if self.screen_scale.is_some() {
+            return views::game::screen_only(self.game.as_ref());
+        }
+
         let mut layers = vec![match &self.game {
             Some(game) => views::game::view(game, &self.settings, self.fullscreen),
             None => views::library::view(
@@ -324,7 +357,8 @@ impl App {
                 subscriptions.push(crate::ticks::every(interval).map(|()| Message::Tick));
             }
         }
-        // The browser build emulates on these ticks (see emulation/web.rs).
+        // The browser build emulates on these ticks (see
+        // `nubo_frontend::session`).
         #[cfg(target_arch = "wasm32")]
         if self.is_running() || !self.toasts.is_empty() {
             subscriptions.push(window::frames().map(|_| Message::Tick));
@@ -344,7 +378,7 @@ impl App {
     fn restart_needed(&self) -> bool {
         self.game
             .as_ref()
-            .is_some_and(|game| game.model() != self.model_for(game.header()))
+            .is_some_and(|game| game.session.model() != self.model_for(game.session.header()))
     }
 
     /// Whether the D-pad, A, B and Start move through menus instead of
@@ -395,15 +429,18 @@ impl App {
     fn apply_to_game(&mut self) {
         let running = self.is_running();
         if let Some(game) = &mut self.game {
-            game.apply(running, &self.settings);
+            game.session.apply(running, &self.settings.shared);
         }
     }
 
-    /// Changes the settings and saves them.
+    /// Changes the settings and saves them, unless the app keeps nothing
+    /// (`--fresh`).
     fn change_settings(&mut self, change: impl FnOnce(&mut Settings)) {
         change(&mut self.settings);
 
-        if let Err(error) = self.settings.save() {
+        if !self.fresh
+            && let Err(error) = self.settings.save()
+        {
             self.toasts.error(error);
         }
     }

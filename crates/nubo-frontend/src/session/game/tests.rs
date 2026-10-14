@@ -2,7 +2,7 @@
 //! for showing frames in the chosen palette.
 
 use super::*;
-use nubo_frontend::settings::FastForwardSpeed;
+use crate::settings::FastForwardSpeed;
 
 /// A whole frame in the lightest of `palette`'s colors.
 fn frame_in(palette: DmgPalette) -> Vec<u8> {
@@ -47,7 +47,7 @@ fn a_color_game_keeps_its_colors_and_no_second_copy() {
 #[test]
 fn nothing_is_sent_while_nothing_changes() {
     let settings = Settings::default();
-    let mut control = PlaybackControl::new(true, &settings);
+    let mut control = PlaybackControl::new(true, None, &settings);
 
     assert_eq!(control.change(true, &settings), None);
 }
@@ -55,7 +55,7 @@ fn nothing_is_sent_while_nothing_changes() {
 #[test]
 fn pausing_is_sent_once() {
     let settings = Settings::default();
-    let mut control = PlaybackControl::new(true, &settings);
+    let mut control = PlaybackControl::new(true, None, &settings);
 
     let paused = control.change(false, &settings).unwrap();
 
@@ -65,9 +65,11 @@ fn pausing_is_sent_once() {
 
 #[test]
 fn fast_forward_runs_at_the_speed_the_settings_pick() {
-    let mut settings = Settings::default();
-    settings.shared.fast_forward_speed = FastForwardSpeed::ALL[0];
-    let mut control = PlaybackControl::new(true, &settings);
+    let settings = Settings {
+        fast_forward_speed: FastForwardSpeed::ALL[0],
+        ..Settings::default()
+    };
+    let mut control = PlaybackControl::new(true, None, &settings);
 
     control.fast_forward_held = true;
     let fast = control.change(true, &settings).unwrap();
@@ -79,11 +81,32 @@ fn fast_forward_runs_at_the_speed_the_settings_pick() {
 }
 
 #[test]
-fn a_new_game_starts_muted_when_the_player_muted_the_sound() {
-    let mut settings = Settings::default();
-    settings.shared.muted = true;
+fn a_game_started_fast_forwarding_keeps_its_own_speed() {
+    let settings = Settings {
+        fast_forward_speed: FastForwardSpeed::ALL[0],
+        ..Settings::default()
+    };
+    let mut control = PlaybackControl::new(true, Some(FastForwardSpeed::ALL[3]), &settings);
 
-    let control = PlaybackControl::new(false, &settings);
+    // The emulator starts at that speed, so there's nothing more to send.
+    assert_eq!(control.sent.fast_forward, Some(FastForwardSpeed::ALL[3]));
+    assert_eq!(control.change(true, &settings), None);
+
+    control.fast_forward_on = false;
+    assert_eq!(control.change(true, &settings).unwrap().fast_forward, None);
+    control.fast_forward_held = true;
+    let held = control.change(true, &settings).unwrap();
+    assert_eq!(held.fast_forward, Some(FastForwardSpeed::ALL[3]));
+}
+
+#[test]
+fn a_new_game_starts_muted_when_the_player_muted_the_sound() {
+    let settings = Settings {
+        muted: true,
+        ..Settings::default()
+    };
+
+    let control = PlaybackControl::new(false, None, &settings);
 
     assert_eq!(control.sent.volume, 0.0);
     assert!(!control.sent.running);

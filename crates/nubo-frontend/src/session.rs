@@ -1,28 +1,49 @@
-//! Runs the emulator for the window. On the desktop it runs on a thread of
-//! its own that the sound card paces (`emulation/thread.rs`); in the
-//! browser, which gives WebAssembly a single thread, it runs the frames due
-//! on each frame tick (`emulation/web.rs`). Both kinds of session take the
-//! same [`Command`]s, which [`Machine::handle`] carries out.
+//! Running a game: the emulator with its sound and battery saves, played
+//! at the Game Boy's own speed, and what an app shows and keeps of it.
+//!
+//! - [`GameSession`] is what an app holds while a game runs: the game's
+//!   playback (pausing, fast forward, volume), its cheats, the palette, the
+//!   save state slots and the picture on screen.
+//! - `Session` runs the emulator underneath. It takes [`Command`]s, which
+//!   `Machine::handle` carries out, and comes in two kinds that pace the
+//!   game differently:
+//!   - **by the sound card** on the desktop (`session/sound_card.rs`): the
+//!     emulator runs on a thread of its own, which sleeps until the sound
+//!     card's queue runs low or a command comes, and tells the app about
+//!     each new frame through a callback (`FrameListener`);
+//!   - **by the screen's refreshes** in the browser, which gives
+//!     WebAssembly a single thread (`session/screen_refresh.rs`): the app
+//!     calls `Session::run_due_frames` on each refresh, and
+//!     `session/pacing.rs` decides how many frames are due.
+//!
+//! The sound goes out through cpal (`session/audio.rs`), so this module
+//! needs the `desktop` feature (the desktop's sound) or the `web` feature
+//! (the browser's).
 
-use crate::audio::AudioOutput;
-use nubo_core::{ControllerMapping, ControllerState, Emulator, Key, Model};
-use nubo_frontend::battery::{BatteryCartridgeEffects, BatterySaves};
-use nubo_frontend::cheats::Cheat;
-use nubo_frontend::notices::Notices;
-use nubo_frontend::rom::Rom;
-use nubo_frontend::settings::FastForwardSpeed;
-use nubo_frontend::time::Duration;
+use crate::battery::{BatteryCartridgeEffects, BatterySaves};
+use crate::cheats::Cheat;
+use crate::notices::Notices;
+use crate::rom::Rom;
+use crate::settings::FastForwardSpeed;
+use crate::time::Duration;
+use audio::AudioOutput;
+use nubo_core::{
+    CartridgeEffects, ControllerMapping, ControllerState, Emulator, Key, Model, NoSaves, RtcClock,
+};
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::mpsc::{self, Sender};
 
-#[cfg(not(target_arch = "wasm32"))]
-pub use thread::{ActivityCount, FrameListener, Session};
+pub use game::{GameSession, StartOptions};
 #[cfg(target_arch = "wasm32")]
-pub use web::Session;
+pub use screen_refresh::Session;
+#[cfg(not(target_arch = "wasm32"))]
+pub use sound_card::{ActivityCount, FrameListener, Session};
 
 /// Whether the game runs, how fast and how loud.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Playback {
+    /// Whether the game runs, rather than being paused.
     pub running: bool,
     /// The fast forward speed, or `None` for real time.
     pub fast_forward: Option<FastForwardSpeed>,
@@ -39,13 +60,67 @@ impl Playback {
     }
 }
 
-/// A request from the UI to the emulator.
+/// Where a game keeps its battery saves.
+#[derive(Clone)]
+pub enum Saves {
+    /// In these battery saves, with the cartridge clock on the wall clock.
+    Kept(Arc<BatterySaves>),
+    /// Nowhere: the game starts without save data and keeps none, and its
+    /// cartridge clock follows emulated time, so every run is the same. For
+    /// runs that must leave nothing behind, such as the GB Emulator
+    /// Shootout's.
+    Discarded,
+}
+
+impl Saves {
+    /// The battery saves of the ROM at `rom_path` in this build's storage
+    /// (see [`BatterySaves::for_rom`]), or none without `keep`.
+    pub fn for_rom(rom_path: &Path, keep: bool, notices: &Notices) -> Saves {
+        if keep {
+            Saves::Kept(BatterySaves::for_rom(rom_path, notices.clone()))
+        } else {
+            Saves::Discarded
+        }
+    }
+
+    /// What connects the emulated cartridge to these saves.
+    fn cartridge_effects(&self) -> Box<dyn CartridgeEffects> {
+        match self {
+            Saves::Kept(saves) => Box::new(BatteryCartridgeEffects::new(saves.clone())),
+            Saves::Discarded => Box::new(NoSaves {
+                rtc_clock: RtcClock::EmulatedTime,
+            }),
+        }
+    }
+
+    /// Writes the saves the game has stopped writing to for a moment (see
+    /// [`BatterySaves::flush_when_settled`]).
+    fn flush_when_settled(&self) {
+        if let Saves::Kept(saves) = self {
+            saves.flush_when_settled();
+        }
+    }
+
+    /// Writes the saves still waiting.
+    fn flush(&self) {
+        if let Saves::Kept(saves) = self {
+            saves.flush();
+        }
+    }
+}
+
+/// A request from the app to the emulator.
 #[derive(Debug)]
 pub enum Command {
+    /// Presses a Game Boy button.
     Press(Key),
+    /// Lets go of a Game Boy button.
     Release(Key),
+    /// Plays as this says from now on.
     SetPlayback(Playback),
+    /// What the controllers are doing now.
     SetControllerState(ControllerState),
+    /// Which controller buttons press which Game Boy buttons.
     SetControllerMapping(ControllerMapping),
     /// Turns a cheat on or off, as its `enabled` field says.
     SetCheat(Cheat),
@@ -58,37 +133,22 @@ pub enum Command {
 /// The emulated Game Boy with its sound output and battery saves, playing
 /// the way the last [`Playback`] said. Dropping it writes the battery saves
 /// still waiting.
-pub struct Machine {
+struct Machine {
     emulator: Emulator,
     audio: AudioOutput,
-    saves: Arc<BatterySaves>,
+    saves: Saves,
     playback: Playback,
 }
 
 impl Machine {
     /// Opens the sound output and loads `rom` on `model` with its battery
-    /// saves, returning the load error if it couldn't. It plays as
-    /// `playback` says from the start, so a muted player hears nothing.
-    /// Problems while it runs, such as a missing sound device, go to
-    /// `notices`.
-    #[cfg(target_arch = "wasm32")]
+    /// saves kept in `saves`, returning the load error if it couldn't. It
+    /// plays as `playback` says from the start, so a muted player hears
+    /// nothing. Problems while it runs, such as a missing sound device, go
+    /// to `notices`.
     fn start(
         rom: &Rom,
-        model: Model,
-        playback: Playback,
-        notices: &Notices,
-    ) -> Result<Machine, String> {
-        let saves = BatterySaves::for_rom(&rom.path, notices.clone());
-        Machine::start_with_saves(rom, saves, model, playback, notices)
-    }
-
-    /// Opens the sound output and loads `rom` on `model` with its battery
-    /// saves kept in `saves`, returning the load error if it couldn't. It
-    /// plays as `playback` says from the start. Problems while it runs go to
-    /// `notices`.
-    fn start_with_saves(
-        rom: &Rom,
-        saves: Arc<BatterySaves>,
+        saves: Saves,
         model: Model,
         playback: Playback,
         notices: &Notices,
@@ -101,7 +161,7 @@ impl Machine {
     /// keeping its battery saves in `saves`.
     fn new(
         rom: &[u8],
-        saves: Arc<BatterySaves>,
+        saves: Saves,
         mut audio: AudioOutput,
         model: Model,
         playback: Playback,
@@ -114,7 +174,7 @@ impl Machine {
         let mut emulator = Emulator::new(model);
         emulator.set_sample_rate(audio.sample_rate());
         emulator
-            .load_rom(rom, Box::new(BatteryCartridgeEffects::new(saves.clone())))
+            .load_rom(rom, saves.cartridge_effects())
             .map_err(|error| error.to_string())?;
 
         Ok(Machine {
@@ -204,6 +264,8 @@ fn stopped_error() -> String {
     String::from("the emulator stopped unexpectedly")
 }
 
+mod audio;
+mod game;
 #[cfg_attr(
     all(not(target_arch = "wasm32"), not(test)),
     expect(
@@ -212,9 +274,9 @@ fn stopped_error() -> String {
     )
 )]
 mod pacing;
+#[cfg(target_arch = "wasm32")]
+mod screen_refresh;
+#[cfg(not(target_arch = "wasm32"))]
+mod sound_card;
 #[cfg(test)]
 mod tests;
-#[cfg(not(target_arch = "wasm32"))]
-mod thread;
-#[cfg(target_arch = "wasm32")]
-mod web;

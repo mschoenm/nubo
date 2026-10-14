@@ -142,7 +142,8 @@ before.
      normally has exactly one new frame. Find out what the completed frame holds while the screen is
      off and match what the Iced app shows.
    - Tests:
-     - After N calls the dot count is within one instruction past the N-th boundary and never drifts
+     - After N calls the dot count is within one CPU step (an instruction, an interrupt dispatch or a
+       general-purpose VRAM DMA) past the N-th boundary and never drifts
        further, also while the CPU is halted and with the screen off.
      - Samples per emulated second equal the sample rate.
      - Saving a state after some calls, running on, loading it and running the same number of calls

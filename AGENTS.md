@@ -14,7 +14,7 @@ cargo test --workspace        # Every crate, frontends and xtask included
 cargo test-roms [filter]      # The test ROM suites, compared with tools/nubo-test-rom-runner/passing.txt (about 30 s)
 cargo cpu-tests               # Every CPU opcode, checked cycle by cycle
 cargo save-states             # The kept save states still load, and the stored layout is unchanged
-cargo play [rom] [--cgb | --model cgb-c]   # Run the desktop app (models: dmg-0, dmg, mgb, sgb, sgb2, cgb-0 to cgb-e, agb)
+cargo play [rom] [--cgb | --model cgb-c]   # Run the desktop app (models: dmg-0, dmg, mgb, sgb, sgb2, cgb-0 to cgb-e, agb; more options in frontends/nubo/src/command_line.rs)
 cargo screenshot rom.gb 5     # Run 5 emulated seconds headless, save a PNG to target/screenshots/
 cargo benchmark <roms> --record a.txt / --compare a.txt   # Speed, and fingerprints of every frame, sample and end state
 ```
@@ -46,7 +46,7 @@ These keep Nubo exact, and players' saves safe. Never break them.
 - **Players never lose a save state to an update.** A field or variant's stored name is permanent: when you rename it in the code, keep the stored name with `#[serializable(name = "...")]` (hand-written implementations and the PPU store names differently; see `crates/nubo-core/AGENTS.md`). A field whose type or meaning changes gets a new stored name. Stored values are fixed-size and little-endian, never `usize`. How: `crates/nubo-core/AGENTS.md`.
 - **Only GPLv3-compatible code and dependencies** (MIT, BSD, ISC, Zlib, Apache-2.0, MPL-2.0 and the like, never GPL-2.0-only). Gambatte is GPL-2.0-only: use it as a reference only (its test ROMs, traces of a local build, its behavior) and never port its code or tables. When you port code, tables or data, credit the project with its link and license at the top of the file, in `NOTICE` and in the README's Credits; SameBoy-derived files point to the Expat notice in `apu.rs`.
 - **Code the browser build shares** takes `Instant`, `SystemTime` and `Duration` from `nubo_frontend::time`, which re-exports the `web-time` crate (std's panic on wasm32; the UI code may use `iced::time`, the same types), and text that sets a font uses `theme::BODY_FONT` or `theme::HEADING_FONT`, never `Font::DEFAULT` or another font of its own, which draw nothing in the browser. Plain `text()` without `.font()` is fine, and so are the icons (`ui::icons`).
-- **No `unsafe`.** The workspace lints forbid it.
+- **No `unsafe`.** The workspace lints forbid it. The one planned exception is the RetroArch core's exported C functions (`docs/RETROARCH_PLAN.md`): they will live in `frontends/nubo-libretro/src/ffi.rs`, with that crate's own lint table and the `unsafe` in as few places as possible. Any later crate that binds Nubo to another language follows the same rule; every other crate, `nubo-core`, `nubo-frontend` and the apps included, keeps it forbidden.
 - **Newest stable versions** of Rust, crates, GitHub Actions and tools, never a pre-release unless nothing else works; test data stays pinned. Details, and the Flatpak's exception: `docs/CI.md`.
 - **Merging a pull request:** follow the `merge` skill (CI green, Codex's review done and handled). **Making a release:** follow the `release` skill.
 
@@ -64,7 +64,7 @@ These keep Nubo exact, and players' saves safe. Never break them.
 The root `Cargo.toml` is a virtual workspace whose default members are `nubo-core` and `nubo-serializable-derive`, so `cargo build` and `cargo test` don't build the apps, the tools or xtask. Libraries are in `crates/`, apps players use in `frontends/`, developer programs in `tools/`. Every package's name starts with `nubo` (except `xtask`), and every crate's folder is named after its package.
 
 - `crates/nubo-core/` (`AGENTS.md`): the emulator, a plain library with no platform dependencies. `Emulator` in `emulator.rs` is its API.
-- `crates/nubo-frontend/`: everything an app needs that isn't drawing, without a UI toolkit: the palettes for original Game Boy games, the rule that picks a game's model, browser-safe clocks (`time`), pictures as RGBA pixels (`picture`), what an app keeps between runs through its `Storage` trait (settings, controls, battery saves, save states, cheats, screenshots), and the game library (`library`: scans, its cache, the folder watcher, title screens and box art). Its `desktop` feature keeps them in files, watches the library folders and downloads box art, and its `web` feature keeps the settings and battery saves in localStorage; without either it keeps nothing. Running a game moves there next (`docs/RESTRUCTURE_PLAN.md`).
+- `crates/nubo-frontend/` (`AGENTS.md`): everything an app needs that isn't drawing, without a UI toolkit: what it keeps between runs (settings, controls, battery saves, save states, cheats, screenshots), the game library, running a game with its sound (`session`, paced by the sound card on the desktop and by the screen's refreshes in the browser), game controllers (`gamepads`), and the palettes and model rule the RetroArch core shares. Its features `desktop`, `web` and `gamepads` bring each platform's storage, sound and controllers.
 - `crates/nubo-serializable-derive/`: the derive macro behind save states.
 - `crates/nubo-logo/`: the logo, drawn from rounded rectangles, for the app's icons.
 - `frontends/nubo/` (`AGENTS.md`): the app, desktop and browser.

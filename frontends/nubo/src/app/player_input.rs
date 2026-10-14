@@ -3,19 +3,20 @@
 
 use super::window_events::toggle_fullscreen;
 use super::{App, GameMessage, Message};
-use crate::controllers::ControllerEvent;
 use crate::input::{self, KeyInput};
 use iced::Task;
 use iced::keyboard::{self, key::Named};
 use nubo_core::{ControllerButton, Key};
 use nubo_frontend::controls::{Action, Device, PadButton};
+use nubo_frontend::gamepads::ControllerEvent;
 use nubo_frontend::save_states::Slot;
 
 impl App {
     /// Handles a key going down or up: picking a key in the settings, the
-    /// fixed shortcuts, and then the player's controls.
+    /// fixed shortcuts, and then the player's controls. A window that shows
+    /// only the game (`--scale`) has no shortcuts.
     pub(super) fn handle_key(&mut self, input: &KeyInput) -> Task<Message> {
-        if input.pressed && !input.repeat {
+        if input.pressed && !input.repeat && self.screen_scale.is_none() {
             if let Some((device, action)) = self.capture {
                 match input.key.as_ref() {
                     keyboard::Key::Named(Named::Escape) => self.capture = None,
@@ -98,7 +99,8 @@ impl App {
 
                 self.menu_presses.update(&previous, &state, self.in_menus());
                 if let Some(game) = &mut self.game {
-                    game.set_controller_state(self.menu_presses.hide_from(&state));
+                    game.session
+                        .set_controller_state(self.menu_presses.hide_from(&state));
                 }
 
                 if let Some((device, action)) = self.capture {
@@ -192,14 +194,16 @@ impl App {
 
     /// Does what a key or controller button is bound to, as it goes down
     /// (`pressed`) or up. Game Boy buttons only go down while the game runs.
+    /// A window that shows only the game (`--scale`) only plays it and fast
+    /// forwards, so nothing can come up over the game.
     fn perform(&mut self, action: Action, pressed: bool) -> Task<Message> {
         if let Some(key) = action.game_boy_key() {
             let running = self.is_running();
             if let Some(game) = &mut self.game {
                 if !pressed {
-                    game.release(key);
+                    game.session.release(key);
                 } else if running {
-                    game.press(key);
+                    game.session.press(key);
                 }
             }
             return Task::none();
@@ -207,12 +211,12 @@ impl App {
 
         if action == Action::FastForward {
             if let Some(game) = &mut self.game {
-                game.hold_fast_forward(pressed);
+                game.session.hold_fast_forward(pressed);
             }
             return Task::none();
         }
 
-        if !pressed {
+        if !pressed || self.screen_scale.is_some() {
             return Task::none();
         }
 

@@ -210,7 +210,7 @@ fn report(nights: &[Value]) -> String {
 }
 
 /// Nubo's standing in the GB Emulator Shootout on `night`, such as "GB
-/// Emulator Shootout: 251 of 264, would rank 2nd (leader: DocBoy, 255;
+/// Emulator Shootout: 258 of 264, would rank 1st (leader: DocBoy, 255;
 /// published 2026-06-04).", or `None` if the night has none.
 fn shootout_line(night: &Value) -> Option<String> {
     let shootout = night.get("shootout")?;

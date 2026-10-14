@@ -13,7 +13,7 @@
 use crate::controls::Controls;
 use crate::model::ModelPreference;
 use crate::palettes::DmgPalette;
-use crate::storage::{self, Entry, Storage};
+use crate::storage::{Entry, Storage};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;
@@ -127,19 +127,6 @@ impl TryFrom<u32> for FastForwardSpeed {
 impl fmt::Display for FastForwardSpeed {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}×", self.0)
-    }
-}
-
-impl Settings {
-    /// Reads the saved settings from this build's storage (see [`load`]).
-    pub fn load() -> (Settings, Option<String>) {
-        load(&*storage::platform(), |contents| toml::from_str(contents))
-    }
-
-    /// Saves the settings in this build's storage, returning why if that
-    /// failed.
-    pub fn save(&self) -> Result<(), String> {
-        save(&*storage::platform(), self)
     }
 }
 

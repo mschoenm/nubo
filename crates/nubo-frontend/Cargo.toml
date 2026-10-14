@@ -1,6 +1,6 @@
 [package]
 name = "nubo-frontend"
-description = "Everything a Nubo app needs that isn't drawing: palettes, the model rule, clocks, pictures, settings, controls, battery saves, save states, cheats, the game library and, later, running a game."
+description = "Everything a Nubo app needs that isn't drawing: palettes, the model rule, clocks, pictures, settings, controls, battery saves, save states, cheats, the game library, running a game and game controllers."
 license.workspace = true
 repository.workspace = true
 version.workspace = true
@@ -10,17 +10,23 @@ rust-version.workspace = true
 [features]
 # Files in the user's folders: settings, battery saves, save states, cheats,
 # screenshots and the game library (see src/storage/files.rs), with the
-# library's folder watcher and box art downloads.
+# library's folder watcher and box art downloads; and the desktop's sound
+# for running a game (src/session/audio.rs).
 desktop = [
+    "dep:cpal",
     "dep:crc32fast",
     "dep:directories",
     "dep:image",
     "dep:notify-debouncer-mini",
     "dep:ureq",
 ]
+# Game controllers, read with gilrs (src/gamepads.rs). On the desktop a
+# thread reads them and waits on the app's channel (futures' executor).
+gamepads = ["dep:gilrs", "futures/executor"]
 # The browser's localStorage: settings and battery saves (see
-# src/storage/local_storage.rs).
-web = ["dep:base64", "dep:web-sys"]
+# src/storage/local_storage.rs); and the browser's sound for running a game
+# (cpal's WebAudio backend) and the clock that paces it (src/session/).
+web = ["dep:base64", "dep:cpal", "cpal/wasm-bindgen", "dep:web-sys"]
 
 [dependencies]
 nubo-core.workspace = true
@@ -37,6 +43,10 @@ image = { version = "0.25", default-features = false, features = ["png"], option
 notify-debouncer-mini = { version = "0.7", optional = true }
 # Box art downloads (src/library/box_art/download.rs).
 ureq = { version = "2.12", default-features = false, features = ["tls"], optional = true }
+# The sound of a running game (src/session/audio.rs).
+cpal = { version = "0.18", optional = true }
+# Game controllers (src/gamepads.rs).
+gilrs = { version = "0.11", optional = true }
 base64 = { version = "0.23", optional = true }
 web-sys = { version = "0.3", features = ["Window", "Storage"], optional = true }
 

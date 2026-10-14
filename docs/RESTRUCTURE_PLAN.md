@@ -1,6 +1,6 @@
 # Plan: restructuring the repository
 
-**Status: signed off by the maintainer on 2026-10-13. Steps 1 to 5 are done.**
+**Status: signed off by the maintainer on 2026-10-13, and done on 2026-10-14: all seven steps are merged.** What is left from "Order and dependencies" below is Parts 1 to 3 of the Shootout plan, then the RetroArch core.
 
 ## What is planned and what is only kept possible
 
@@ -336,6 +336,46 @@ without rescanning everything.
 
 ### Step 6: move running a game
 
+**Done.** What was decided along the way:
+
+- **`session`:** `GameSession` is the game half of `game.rs` (start, playback with fast forward,
+  cheats, palette, the save state slot listing with its `slot_listing` numbers and thumbnails, and the
+  screen picture). `Session` runs the emulator under it and takes the same `Command`s as before, paced
+  by the sound card (`session/sound_card.rs`, the old `emulation/thread.rs`, on every target but
+  wasm32) or by the screen's refreshes (`session/screen_refresh.rs`, the old `emulation/web.rs`, on
+  wasm32), with `pacing.rs` and `audio.rs` beside them. Which one a build gets still follows
+  `target_arch`, as before: the sound card one needs threads, the screen-refresh one the browser's
+  `requestAnimationFrame` clock.
+- **`run_due_frames`:** the browser session's `advance` is now `Session::run_due_frames()` (and
+  `GameSession::run_due_frames`), the name this plan gives it. It takes no timestamp: the session
+  keeps reading the refresh times from its own `requestAnimationFrame` clock (`refresh_clock.rs`),
+  since Iced's ticks come too unevenly to count refreshes with. A later app with a clock of its own
+  (iOS's `CADisplayLink`) would add a timestamp then.
+- **Features:** `session` is there with `desktop` (cpal for the desktop's sound) or `web` (cpal's
+  WebAudio backend, `cpal/wasm-bindgen`, and `web-sys` for the refresh clock); without either there is
+  no sound output and so no session, as the RetroArch core needs none. **`gamepads`** brings gilrs and
+  `futures`' executor (the desktop's controller thread waits on the app's channel). The Iced crate no
+  longer names cpal, gilrs, `futures` or `web-sys`, and turns on `desktop` and `gamepads` on the
+  desktop, `web` and `gamepads` in the browser.
+- **New frames:** `FrameListener::listen(callback)` calls the callback on the emulator thread for
+  each new, different frame, and once as it starts listening; `FrameListener` still hashes as the
+  session's number. `subscriptions::new_frames` keeps its `Subscription::run_with` on the listener,
+  and its callback only `try_send`s into a channel of 0, so it never blocks and calls the app hasn't
+  handled yet merge into one, exactly as the channel the session used to hold.
+- **`gamepads`** keeps `ControllerEvent`, `read_on_thread` (a `futures` channel, which the Iced crate's
+  subscription makes) and `next_event` (the browser, once per frame).
+- **The overlay** stays in the Iced crate's `game.rs`: `Game` holds the `GameSession` (as its public
+  `session` field) with the pause menu page and its highlighted row, the cheat being typed and the
+  auto-hiding bar. Opening a save or load page asks the session to list the slots
+  (`GameSession::list_slots`), which starts a new listing as the page opening did before.
+- **The efficiency harness** (`nubo --measure-efficiency`) stays in the Iced crate's `efficiency.rs`,
+  where the nightly run calls it, and uses `nubo_frontend::session`. Its numbers are the same before
+  and after this step: on `tobudx.gb` and `ucity.gbc --model cgb-e`, 86.2 wake-ups and buffers a
+  second while playing (6.0 and 22.8 frames), none while paused, and 344.6 buffers a second while
+  fast forwarding (62.8 and 122.0 frames).
+- **Tests:** the session's command tests keep their battery saves in a storage in memory instead of
+  files, so they run with `web` alone too.
+
 This is the largest step.
 
 1. Split `game.rs` into the game session (start, playback, cheats, palette, save slots, the screen
@@ -355,6 +395,11 @@ must not add wake-ups, buffers or frames.
 - The Iced crate holds only UI: views, theme, input translation, subscriptions and the overlay.
 
 ### Step 7: finish the docs
+
+**Done.** `crates/nubo-frontend` has an `AGENTS.md` of its own (how it fits together, the feature
+combinations to check, and the fixtures that keep players' data readable); the root `AGENTS.md` points
+to it and states the `unsafe` rule with its one planned exception; the README says where the app,
+`nubo-frontend` and the tools live; `docs/NIGHTLY_REVIEW.md` names the new folder.
 
 Each step keeps AGENTS.md true as it goes. This step checks the whole picture:
 

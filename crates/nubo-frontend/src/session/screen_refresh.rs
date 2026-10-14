@@ -1,6 +1,7 @@
-//! The browser session. Browsers give WebAssembly a single thread, so
-//! instead of a background thread the emulator runs on each frame tick,
-//! emulating the frames that are due by then.
+//! The session paced by the screen's refreshes, which the browser uses.
+//! Browsers give WebAssembly a single thread, so instead of a background
+//! thread the emulator runs on each frame tick, when the app calls
+//! [`Session::run_due_frames`], emulating the frames that are due by then.
 //!
 //! The browser's sound takes a whole buffer of samples from the queue at a
 //! time (2,048 with cpal's WebAudio backend, about 43 ms), so filling the
@@ -9,13 +10,13 @@
 //! shown. Instead the screen's refreshes, or the clock on screens frames
 //! can't be locked to, say how many frames are due, one at a time, and the
 //! queue's length only changes how many samples each emulated second makes
-//! (see `emulation/pacing.rs`).
+//! (see `session/pacing.rs`).
 
 use super::pacing::{FRAME_DURATION, Lock, RefreshRate, SampleRateControl};
-use super::{Command, Machine, Playback, ask};
+use super::{Command, Machine, Playback, Saves, ask};
+use crate::notices::Notices;
+use crate::rom::Rom;
 use nubo_core::Model;
-use nubo_frontend::notices::Notices;
-use nubo_frontend::rom::Rom;
 use refresh_clock::RefreshClock;
 
 /// How many sound buffers the audio queue holds on average. The sound takes
@@ -65,16 +66,18 @@ pub struct Session {
 }
 
 impl Session {
-    /// Creates the emulator and loads `rom` on `model`, playing as
-    /// `playback` says from the start, returning the load error if it
-    /// couldn't. Problems while the game runs go to `notices`.
+    /// Creates the emulator and loads `rom` on `model`, with its battery
+    /// saves kept in `saves`, playing as `playback` says from the start,
+    /// returning the load error if it couldn't. Problems while the game runs
+    /// go to `notices`.
     pub fn start(
         rom: &Rom,
+        saves: Saves,
         model: Model,
         playback: Playback,
         notices: &Notices,
     ) -> Result<Session, String> {
-        let machine = Machine::start(rom, model, playback, notices)?;
+        let machine = Machine::start(rom, saves, model, playback, notices)?;
         Ok(Session {
             emulator_sample_rate: machine.audio.sample_rate(),
             machine,
@@ -122,10 +125,13 @@ impl Session {
     }
 
     /// Emulates the frames that have come due by the screen's latest
-    /// refresh, and writes battery saves once they stop changing. To fast
-    /// forward, it emulates the speed's multiplier of frames for every one
-    /// due, and only plays the sound of the last.
-    pub fn advance(&mut self) {
+    /// refresh, and writes battery saves once they stop changing. The app
+    /// calls it on each frame tick. The time of the screen's latest refresh
+    /// comes from the session's own clock (see `refresh_clock.rs`), not from
+    /// the app's ticks, which come too unevenly. To fast forward, it emulates the
+    /// speed's multiplier of frames for every one due, and only plays the
+    /// sound of the last.
+    pub fn run_due_frames(&mut self) {
         if self.machine.playback.running {
             let at = self.refresh_clock.last_refresh();
             let elapsed = self
