@@ -59,6 +59,23 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.8.0" date="2026-10-14">
+      <description>
+        <p>Nubo is simpler to use: the game screen's bar keeps only what you reach for while playing, the pause menu opens with a right click, the settings are tidied into clear pages, and games continue where you left off.</p>
+        <ul>
+          <li>The game screen's bar now has a Library button, the game's name, fast forward, sound, fullscreen and a Pause button. Restart game, Screenshot and Settings are in the pause menu</li>
+          <li>A right click on the game opens the pause menu, as Esc does, and a click on the game outside the menu closes it and resumes the game</li>
+          <li>Double-click the game to switch fullscreen on and off. In fullscreen the bar is at the top of the screen again</li>
+          <li>The settings have five pages: Display, Playing, Controls, Library and About, each laid out the same way. No setting was added or removed, and your settings are kept</li>
+          <li>The library's bar has a named Open ROM button; Rescan is in the settings' Library page</li>
+          <li>Games can be taken off Continue playing with the X on their card, and games whose files are deleted leave the list at once</li>
+          <li>Continue games where you left off is now on for new installs</li>
+          <li>Automatic now starts Super Game Boy games on a plain Game Boy, or a Game Boy Color for color games. Pick the Super Game Boy in the settings for its colors and borders</li>
+          <li>Cartridges with RAM but no memory controller, which test programs use, now run</li>
+          <li>Save states made by Nubo 0.4.0 to 0.7.0 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.7.0" date="2026-10-14">
       <description>
         <p>Super Game Boy games can now be played by up to four players and get the Super Game Boy's colors, borders and intro, and Nubo for Windows now installs from an MSI, Windows' own installer format.</p>
