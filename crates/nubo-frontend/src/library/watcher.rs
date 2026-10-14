@@ -1,14 +1,12 @@
 //! Watches the library folders, so games added to them (or removed from
-//! them) show up right away (desktop build). It uses the operating system's
-//! own change notifications, through `notify-debouncer-mini`, so it costs
-//! nothing while nothing changes.
+//! them) show up right away (the `desktop` feature). It uses the operating
+//! system's own change notifications, through `notify-debouncer-mini`, so it
+//! costs nothing while nothing changes.
 
 use super::WatchEvent;
-use futures::channel::mpsc::Sender;
-use futures::{SinkExt, executor};
-use notify_debouncer_mini::notify::RecursiveMode;
-use notify_debouncer_mini::{DebounceEventResult, new_debouncer};
-use nubo_frontend::settings::LibraryFolder;
+use crate::settings::LibraryFolder;
+use notify_debouncer_mini::notify::{RecommendedWatcher, RecursiveMode};
+use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer};
 use std::path::Path;
 use std::time::Duration;
 
@@ -19,29 +17,52 @@ const QUIET_TIME: Duration = Duration::from_secs(1);
 /// The file extensions of ROMs and zipped ROMs.
 const EXTENSIONS: [&str; 3] = ["gb", "gbc", "zip"];
 
+/// Watches the library folders until it is dropped; see [`watch`].
+pub struct Watcher {
+    /// Collects the operating system's change notifications on a thread of
+    /// its own. Dropping it stops watching.
+    _debouncer: Debouncer<RecommendedWatcher>,
+}
+
+/// What starting to watch the library folders gave (see [`watch`]).
+pub struct Watching {
+    /// Watches until it is dropped, or `None` when watching couldn't start
+    /// at all.
+    pub watcher: Option<Watcher>,
+    /// Why folders can't be watched, or why watching couldn't start, for
+    /// the caller to report as [`WatchEvent::Failed`].
+    pub failures: Vec<String>,
+}
+
 /// Reports changes to ROMs and folders in `folders`, including their
-/// subfolders where the folder says so, to `output`. Unless watching can't
-/// start at all, the returned future never finishes: watching stops when it
-/// is dropped, which drops the debouncer, such as when the app stops
-/// listening because the folders changed.
-pub async fn watch(folders: Vec<LibraryFolder>, mut output: Sender<WatchEvent>) {
-    let sender = output.clone();
+/// subfolders where the folder says so, by calling `report` on the
+/// watcher's own thread, which may block until the app takes the event.
+/// Watching goes on until the returned watcher is dropped, such as when the
+/// app stops listening because the folders changed.
+///
+/// What goes wrong while starting (a folder that can't be watched, or no
+/// watcher at all) is returned instead of reported, so the caller can pass
+/// it on without blocking: `report` never runs on the caller's thread.
+pub fn watch(folders: &[LibraryFolder], report: impl Fn(WatchEvent) + Send + 'static) -> Watching {
     let debouncer = new_debouncer(QUIET_TIME, move |result: DebounceEventResult| {
         let event = match result {
             Ok(events) if events.iter().any(|event| matters(&event.path)) => WatchEvent::Changed,
             Ok(_) => return,
             Err(error) => WatchEvent::Failed(error.to_string()),
         };
-        let _ = executor::block_on(sender.clone().send(event));
+        report(event);
     });
 
     let mut debouncer = match debouncer {
         Ok(debouncer) => debouncer,
         Err(error) => {
-            let _ = output.send(WatchEvent::Failed(error.to_string())).await;
-            return;
+            return Watching {
+                watcher: None,
+                failures: vec![error.to_string()],
+            };
         }
     };
+    let mut failures = Vec::new();
 
     for folder in folders.iter().filter(|folder| folder.path.is_dir()) {
         let mode = if folder.include_subfolders {
@@ -51,12 +72,16 @@ pub async fn watch(folders: Vec<LibraryFolder>, mut output: Sender<WatchEvent>) 
         };
 
         if let Err(error) = debouncer.watcher().watch(&folder.path, mode) {
-            let _ = output.send(WatchEvent::Failed(error.to_string())).await;
+            failures.push(error.to_string());
         }
     }
 
-    std::future::pending::<()>().await;
-    drop(debouncer);
+    Watching {
+        watcher: Some(Watcher {
+            _debouncer: debouncer,
+        }),
+        failures,
+    }
 }
 
 /// Whether a change at `path` can affect the library: a ROM, or a folder

@@ -3,7 +3,6 @@
 //! any games yet it welcomes the user and offers to add a folder.
 
 use crate::app::{GameMessage, LibraryMessage, Message, SettingsMessage};
-use crate::library::{self, Library, LibraryEntry};
 use crate::settings::Settings;
 use crate::ui::icons::{self, Icon, icon};
 use crate::ui::logo::logo;
@@ -20,6 +19,7 @@ use iced::widget::{
 };
 use iced::{Alignment, ContentFit, Element, Fill, widget};
 use nubo_frontend::controls::Action;
+use nubo_frontend::library::{self, Library, LibraryEntry};
 
 /// The Game Boy controls the welcome screen explains, and the actions whose
 /// keys press them.

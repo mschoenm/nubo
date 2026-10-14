@@ -8,11 +8,9 @@
 //! the window itself (`app/window_events.rs`), and keys and controller
 //! buttons (`app/player_input.rs`).
 
-use crate::box_art::GameList;
 use crate::controllers::ControllerEvent;
 use crate::game::{Game, PauseMenu};
 use crate::input::{self, KeyInput};
-use crate::library::Library;
 use crate::menu_presses::MenuPresses;
 use crate::settings::Settings;
 use crate::subscriptions;
@@ -26,6 +24,8 @@ use iced::{Element, Subscription, Task, Theme, event, keyboard, system, window};
 use nubo_core::{CartridgeHeader, ControllerState, Model};
 use nubo_frontend::background;
 use nubo_frontend::controls::{Action, Device};
+use nubo_frontend::library::Library;
+use nubo_frontend::library::box_art::GameList;
 use nubo_frontend::notices::Notices;
 use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states;

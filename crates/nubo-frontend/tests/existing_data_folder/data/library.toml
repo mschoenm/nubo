@@ -1,0 +1,51 @@
+[[games]]
+path = "/home/player/Games/Game Boy/Color Quest.gbc"
+title = "COLOR QUEST"
+supports_cgb = true
+in_folder = true
+title_screen_checked = true
+box_art_checked = true
+size = 32768
+modified = 1791934250
+
+[[games]]
+path = "/media/player/USB stick/roms/Handheld Hero.gb"
+title = "HANDHELD HERO"
+supports_cgb = false
+in_folder = true
+title_screen_checked = true
+box_art_checked = true
+size = 32768
+modified = 1791934250
+
+[[games]]
+path = "/home/player/Games/Game Boy/Homebrew.gb"
+title = "HOMEBREW"
+supports_cgb = false
+in_folder = true
+title_screen_checked = false
+box_art_checked = false
+size = 32768
+modified = 1791934250
+
+[[games]]
+path = "/home/player/Games/Pocket Game.gbc"
+title = "POCKET GAME"
+supports_cgb = true
+in_folder = false
+last_played = 1791934250
+title_screen_checked = true
+box_art_checked = true
+size = 32768
+modified = 1791934250
+
+[[games]]
+path = "/home/player/Games/Game Boy/Puzzle/Puzzle Time.gb"
+title = "PUZZLE TIME"
+supports_cgb = false
+in_folder = true
+last_played = 1791934251
+title_screen_checked = true
+box_art_checked = true
+size = 32768
+modified = 1791934250

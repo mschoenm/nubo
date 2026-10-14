@@ -1,6 +1,6 @@
 [package]
 name = "nubo-frontend"
-description = "Everything a Nubo app needs that isn't drawing: palettes, the model rule, clocks, pictures, settings, controls, battery saves, save states, cheats and, later, the library and running a game."
+description = "Everything a Nubo app needs that isn't drawing: palettes, the model rule, clocks, pictures, settings, controls, battery saves, save states, cheats, the game library and, later, running a game."
 license.workspace = true
 repository.workspace = true
 version.workspace = true
@@ -8,9 +8,16 @@ edition.workspace = true
 rust-version.workspace = true
 
 [features]
-# Files in the user's folders: settings, battery saves, save states, cheats
-# and screenshots (see src/storage/files.rs).
-desktop = ["dep:directories", "dep:image"]
+# Files in the user's folders: settings, battery saves, save states, cheats,
+# screenshots and the game library (see src/storage/files.rs), with the
+# library's folder watcher and box art downloads.
+desktop = [
+    "dep:crc32fast",
+    "dep:directories",
+    "dep:image",
+    "dep:notify-debouncer-mini",
+    "dep:ureq",
+]
 # The browser's localStorage: settings and battery saves (see
 # src/storage/local_storage.rs).
 web = ["dep:base64", "dep:web-sys"]
@@ -22,8 +29,14 @@ futures = { version = "0.3", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["derive"] }
 toml = "1"
 web-time = "1.1"
+# The checksum box art is looked up by (src/library/box_art/download.rs).
+crc32fast = { version = "1.5", optional = true }
 directories = { version = "6", optional = true }
 image = { version = "0.25", default-features = false, features = ["png"], optional = true }
+# The library's folder watcher (src/library/watcher.rs).
+notify-debouncer-mini = { version = "0.7", optional = true }
+# Box art downloads (src/library/box_art/download.rs).
+ureq = { version = "2.12", default-features = false, features = ["tls"], optional = true }
 base64 = { version = "0.23", optional = true }
 web-sys = { version = "0.3", features = ["Window", "Storage"], optional = true }
 

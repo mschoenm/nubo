@@ -7,18 +7,18 @@
 //! game lists from the libretro database give the official name of a file
 //! name or of the ROM's CRC32 checksum. The lists are downloaded once.
 //!
-//! Only the desktop build downloads anything, and only when the player
-//! turns box art on in the settings.
+//! Only the desktop build (the `desktop` feature) downloads anything, and
+//! only when the player turns box art on in the settings.
 
-/// Whether this build can download box art.
-pub const AVAILABLE: bool = cfg!(not(target_arch = "wasm32"));
+/// Whether this build can download box art: only the desktop build can.
+pub const AVAILABLE: bool = cfg!(feature = "desktop");
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "desktop")]
 pub use download::{GameList, find, load_game_list};
-#[cfg(target_arch = "wasm32")]
+#[cfg(not(feature = "desktop"))]
 pub use unavailable::{GameList, find, load_game_list};
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "desktop")]
 mod download;
-#[cfg(target_arch = "wasm32")]
+#[cfg(not(feature = "desktop"))]
 mod unavailable;

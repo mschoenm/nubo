@@ -63,7 +63,7 @@ pub fn capture(rom: &[u8]) -> Option<Vec<u8>> {
 /// How busy a frame looks: the number of pixels whose color differs from
 /// the pixel to their right. A blank screen scores 0.
 fn detail(pixels: &[u8]) -> usize {
-    let width = nubo_frontend::picture::SCREEN_WIDTH as usize;
+    let width = crate::picture::SCREEN_WIDTH as usize;
     let (rows, _) = pixels.as_chunks::<4>();
 
     rows.chunks(width)

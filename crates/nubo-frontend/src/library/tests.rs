@@ -1,8 +1,8 @@
 //! Tests for scanning library folders. They write real files in the
-//! temporary directory, so they only run in the native build.
+//! temporary directory.
 
 use super::*;
-use nubo_frontend::settings::LibraryFolder;
+use crate::settings::LibraryFolder;
 use std::fs;
 use std::process;
 
@@ -229,4 +229,49 @@ fn a_file_check_older_than_the_last_scan_is_ignored() {
         .unwrap();
 
     assert!(!library.unavailable.contains(&unplugged));
+}
+
+/// The library file that `tests/existing_data_folder.rs` reads was written
+/// before the library moved to this crate. Its games are put at new paths,
+/// with the size and modification time the file has for them but a header
+/// that says something else: a scan that read them again would see that,
+/// so the scan must keep what the file knows.
+#[cfg(feature = "desktop")]
+#[test]
+fn a_scan_keeps_what_an_existing_library_file_knows_about_unchanged_games() {
+    use std::time::{Duration, UNIX_EPOCH};
+
+    let data_folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/existing_data_folder/data");
+    let known = store::load_entries(&Cache::in_folder(data_folder)).unwrap();
+    assert_eq!(known.len(), 5);
+
+    let root = temporary_folder("existing");
+    let known: Vec<LibraryEntry> = known
+        .into_iter()
+        .map(|mut entry| {
+            let path = root.join(entry.path.file_name().unwrap());
+            write_rom(&path, "CHANGED", false);
+            assert_eq!(fs::metadata(&path).unwrap().len(), entry.size);
+            fs::File::options()
+                .write(true)
+                .open(&path)
+                .unwrap()
+                .set_modified(UNIX_EPOCH + Duration::from_secs(entry.modified))
+                .unwrap();
+            entry.path = path;
+            entry
+        })
+        .collect();
+
+    let result = scan::scan(1, &[folder(&root, false)], known.clone());
+
+    let mut expected: Vec<LibraryEntry> = known
+        .into_iter()
+        .map(|entry| LibraryEntry {
+            in_folder: true,
+            ..entry
+        })
+        .collect();
+    expected.sort_by(|first, second| first.path.cmp(&second.path));
+    assert_eq!(result.entries, expected);
 }

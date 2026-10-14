@@ -1,21 +1,25 @@
 //! A player's data folder from before the stored data moved to
 //! `nubo-frontend` must keep working unchanged.
 //!
-//! `existing_data_folder/` was written by Nubo's app as of step 3 of
-//! `docs/RESTRUCTURE_PLAN.md`, through the same functions it saves with,
-//! into the folders `ProjectDirs` picked (`config/` and `data/` stand for
-//! `~/.config/nubo` and `~/.local/share/nubo` on Linux). It holds the
-//! settings, the battery save and clock of `Pocket Game.gbc`, two of its save
-//! states (one with its picture) and its cheats. These tests read all of it
-//! with this version, and check that saving the same things again writes the
-//! same bytes.
+//! `existing_data_folder/` was written by Nubo's app, through the same
+//! functions it saves with, into the folders `ProjectDirs` picked (`config/`
+//! and `data/` stand for `~/.config/nubo` and `~/.local/share/nubo` on
+//! Linux). As of step 3 of `docs/RESTRUCTURE_PLAN.md` it wrote the settings,
+//! the battery save and clock of `Pocket Game.gbc`, two of its save states
+//! (one with its picture) and its cheats. As of step 4 it wrote the game
+//! library: `library.toml` with five games (four found by a scan of the two
+//! library folders, one played from elsewhere), their thumbnails, title
+//! screens and box art. These tests read all of it with this version, and
+//! check that saving the same things again writes the same bytes.
 
 #![cfg(feature = "desktop")]
 
-use nubo_core::{CartridgeEffects, ControllerButton, Emulator, Model, RtcState};
+use futures::executor::block_on;
+use nubo_core::{CartridgeEffects, ControllerButton, DMG_SHADES, Emulator, Model, RtcState};
 use nubo_frontend::battery::{BatteryCartridgeEffects, BatterySaves};
 use nubo_frontend::cheats::{self, Cheat};
 use nubo_frontend::controls::{Action, KeyCode, PadButton};
+use nubo_frontend::library::{Cache, DownloadedArt, Library};
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::notices::Notices;
 use nubo_frontend::palettes::DmgPalette;
@@ -27,7 +31,17 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /// Where the game was when its data was saved; the file name names its data.
+/// The library has it as played from outside the library folders.
 const ROM_PATH: &str = "/home/player/Games/Pocket Game.gbc";
+/// A Game Boy Color game in the library with box art and a title screen.
+const COLOR_QUEST: &str = "/home/player/Games/Game Boy/Color Quest.gbc";
+/// An original Game Boy game in a subfolder, played, with a title screen and
+/// a thumbnail but no box art.
+const PUZZLE_TIME: &str = "/home/player/Games/Game Boy/Puzzle/Puzzle Time.gb";
+/// A game whose title screen and box art weren't looked for yet.
+const HOMEBREW: &str = "/home/player/Games/Game Boy/Homebrew.gb";
+/// A game on the USB stick, with neither a title screen nor box art.
+const HANDHELD_HERO: &str = "/media/player/USB stick/roms/Handheld Hero.gb";
 
 /// The data folder in the tests.
 fn existing() -> PathBuf {
@@ -74,6 +88,43 @@ fn saved_screen() -> Vec<u8> {
     (0..144_u32)
         .flat_map(|y| (0..160_u32).flat_map(move |x| [x as u8, y as u8, (x ^ y) as u8, 255]))
         .collect()
+}
+
+/// A frame of the Game Boy screen whose pixel at `(x, y)` is `pixel(x, y)`.
+fn screen(pixel: impl Fn(u32, u32) -> [u8; 4]) -> Vec<u8> {
+    (0..144_u32)
+        .flat_map(|y| (0..160_u32).map(move |x| (x, y)))
+        .flat_map(|(x, y)| pixel(x, y))
+        .collect()
+}
+
+/// The last screen played of Puzzle Time, in the emulator's grays.
+fn puzzle_time_thumbnail() -> Vec<u8> {
+    screen(|x, y| DMG_SHADES[((x / 8 + y / 8) % 4) as usize])
+}
+
+/// The title screen of Puzzle Time, in the emulator's grays.
+fn puzzle_time_title_screen() -> Vec<u8> {
+    screen(|x, _| DMG_SHADES[((x / 4) % 4) as usize])
+}
+
+/// The title screen of Color Quest.
+fn color_quest_title_screen() -> Vec<u8> {
+    screen(|x, y| [(x * 2) as u8, y as u8, 128, 255])
+}
+
+/// The box art of Color Quest, 64 by 80 pixels.
+fn color_quest_box_art() -> Vec<u8> {
+    (0..80_u32)
+        .flat_map(|y| (0..64_u32).flat_map(move |x| [(x * 4) as u8, (y * 3) as u8, 200, 255]))
+        .collect()
+}
+
+/// The library as the app finds it in the player's data folder.
+fn existing_library() -> Library {
+    let (library, problem) = Library::load_from(Cache::in_folder(existing().join("data")));
+    assert_eq!(problem, None);
+    library
 }
 
 /// The cheats that were saved.
@@ -238,6 +289,149 @@ fn a_save_state_and_its_picture_are_written_the_same() {
         assert_eq!(
             fs::read(folder.join(file)).unwrap(),
             fs::read(states.join(file)).unwrap(),
+            "{file}"
+        );
+    }
+}
+
+#[test]
+fn the_library_reads_the_same_without_a_scan() {
+    let mut library = existing_library();
+
+    let games: Vec<_> = library
+        .games("")
+        .map(|game| (game.name(), game.title.as_str(), game.supports_cgb))
+        .collect();
+    assert_eq!(
+        games,
+        [
+            (String::from("Color Quest"), "COLOR QUEST", true),
+            (String::from("Handheld Hero"), "HANDHELD HERO", false),
+            (String::from("Homebrew"), "HOMEBREW", false),
+            (String::from("Puzzle Time"), "PUZZLE TIME", false),
+        ]
+    );
+
+    let played: Vec<_> = library
+        .recently_played(10)
+        .into_iter()
+        .map(|game| (game.path.as_path(), game.in_folder, game.last_played))
+        .collect();
+    assert_eq!(
+        played,
+        [
+            (Path::new(PUZZLE_TIME), true, Some(1_791_934_251)),
+            (Path::new(ROM_PATH), false, Some(1_791_934_250)),
+        ]
+    );
+
+    // Only the game that was never looked at gets its title screen captured
+    // and its box art looked up.
+    assert_eq!(library.next_captures(), [PathBuf::from(HOMEBREW)]);
+    assert_eq!(library.next_downloads(), [(PathBuf::from(HOMEBREW), false)]);
+}
+
+#[test]
+fn the_library_pictures_read_the_same() {
+    let mut library = existing_library();
+
+    let pictures = block_on(library.load_pictures(DmgPalette::Pocket, true, false)).unwrap();
+    library.set_pictures(pictures);
+
+    let box_art = library.box_art(Path::new(COLOR_QUEST)).unwrap();
+    assert_eq!((box_art.width(), box_art.height()), (64, 80));
+    assert_eq!(box_art.pixels(), &color_quest_box_art()[..]);
+    let mut title_screen = puzzle_time_title_screen();
+    DmgPalette::Pocket.recolor(&mut title_screen);
+    assert_eq!(
+        library
+            .title_screen(Path::new(PUZZLE_TIME))
+            .unwrap()
+            .pixels(),
+        &title_screen[..]
+    );
+    assert_eq!(
+        library.thumbnail(Path::new(ROM_PATH)).unwrap().pixels(),
+        &saved_screen()[..]
+    );
+    for game in [HOMEBREW, HANDHELD_HERO] {
+        let game = Path::new(game);
+        assert!(library.box_art(game).is_none(), "{game:?}");
+        assert!(library.title_screen(game).is_none(), "{game:?}");
+        assert!(library.thumbnail(game).is_none(), "{game:?}");
+    }
+
+    let pictures = block_on(library.load_pictures(DmgPalette::Gray, false, false)).unwrap();
+    library.set_pictures(pictures);
+
+    assert!(library.box_art(Path::new(COLOR_QUEST)).is_none());
+    assert_eq!(
+        library
+            .title_screen(Path::new(COLOR_QUEST))
+            .unwrap()
+            .pixels(),
+        &color_quest_title_screen()[..]
+    );
+    assert_eq!(
+        library
+            .title_screen(Path::new(PUZZLE_TIME))
+            .unwrap()
+            .pixels(),
+        &puzzle_time_title_screen()[..]
+    );
+}
+
+#[test]
+fn the_library_and_its_pictures_are_written_the_same() {
+    let folder = temporary_folder("library");
+    fs::create_dir_all(&folder).unwrap();
+    fs::copy(
+        existing().join("data/library.toml"),
+        folder.join("library.toml"),
+    )
+    .unwrap();
+    let (mut library, problem) = Library::load_from(Cache::in_folder(folder.clone()));
+    assert_eq!(problem, None);
+    let box_art_png = fs::read(existing().join("data/box_art/Color Quest.gbc.png")).unwrap();
+
+    library
+        .finish_capture(
+            Path::new(COLOR_QUEST),
+            Some(color_quest_title_screen()),
+            DmgPalette::Pocket,
+        )
+        .unwrap();
+    library
+        .finish_capture(
+            Path::new(PUZZLE_TIME),
+            Some(puzzle_time_title_screen()),
+            DmgPalette::Pocket,
+        )
+        .unwrap();
+    library
+        .finish_download(
+            Path::new(COLOR_QUEST),
+            Ok(Some(DownloadedArt::decode(box_art_png).unwrap())),
+        )
+        .unwrap();
+    library
+        .set_thumbnail(Path::new(ROM_PATH), saved_screen())
+        .unwrap();
+    library
+        .set_thumbnail(Path::new(PUZZLE_TIME), puzzle_time_thumbnail())
+        .unwrap();
+
+    for file in [
+        "library.toml",
+        "title_screens/Color Quest.gbc.png",
+        "title_screens/Puzzle Time.gb.png",
+        "box_art/Color Quest.gbc.png",
+        "thumbnails/Pocket Game.gbc.png",
+        "thumbnails/Puzzle Time.gb.png",
+    ] {
+        assert_eq!(
+            fs::read(folder.join(file)).unwrap(),
+            fs::read(existing().join("data").join(file)).unwrap(),
             "{file}"
         );
     }
