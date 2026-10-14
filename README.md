@@ -87,6 +87,8 @@ The default controls are below; all of them but Esc can be changed under Setting
 | F11 | Fullscreen |
 | F12 | Screenshot |
 
+Double-clicking the game also switches between fullscreen and a window.
+
 On a controller, the D-pad or left stick moves, the right face button (B on Xbox, ○ on PlayStation) is A, the bottom face button (A on Xbox, ✕ on PlayStation) is B, L1 opens the pause menu and R1 fast forwards.
 
 ### Where Your Games' Saves Are
