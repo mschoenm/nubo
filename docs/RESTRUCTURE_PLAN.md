@@ -398,14 +398,14 @@ must not add wake-ups, buffers or frames.
 
 **Done.** `crates/nubo-frontend` has an `AGENTS.md` of its own (how it fits together, the feature
 combinations to check, and the fixtures that keep players' data readable); the root `AGENTS.md` points
-to it and states the `unsafe` rule with its one planned exception; the README says where the app,
+to it and states the `unsafe` rule with its one planned exception; `BUILDING.md` (once the README) says where the app,
 `nubo-frontend` and the tools live; `docs/NIGHTLY_REVIEW.md` names the new folder.
 
 Each step keeps AGENTS.md true as it goes. This step checks the whole picture:
 
 - **AGENTS.md:** the layout, `nubo-frontend`'s modules and features, the pacing, and the `unsafe` rule
   with its one exception.
-- **README:** where the app and tools live.
+- **README (now `BUILDING.md`):** where the app and tools live.
 - **`docs/NIGHTLY_REVIEW.md`:** any paths it names.
 - **This plan:** marked as done.
 
