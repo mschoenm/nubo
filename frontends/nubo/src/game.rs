@@ -3,18 +3,18 @@
 //! fast forward).
 
 use crate::app::{SCREEN_HEIGHT, SCREEN_WIDTH};
-use crate::cheats::{self, Cheat};
-use crate::controls::Controls;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::emulation::FrameListener;
 use crate::emulation::{Command, Playback, Session};
-use crate::notices::Notices;
-use crate::rom::Rom;
-use crate::save_states::{self, SaveState, Slot, SlotInfo};
 use crate::settings::Settings;
 use nubo_core::{CartridgeHeader, ControllerState, Key, Model};
+use nubo_frontend::cheats::{self, Cheat};
+use nubo_frontend::controls::Controls;
+use nubo_frontend::notices::Notices;
 use nubo_frontend::palettes::DmgPalette;
 use nubo_frontend::picture::Picture;
+use nubo_frontend::rom::Rom;
+use nubo_frontend::save_states::{self, SaveState, Slot, SlotInfo};
 use nubo_frontend::time::{Duration, Instant};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -472,7 +472,7 @@ impl PlaybackControl {
             sent: Playback {
                 running,
                 fast_forward: None,
-                volume: settings.effective_volume(),
+                volume: settings.shared.effective_volume(),
             },
         }
     }
@@ -489,8 +489,8 @@ impl PlaybackControl {
             running,
             fast_forward: self
                 .is_fast_forwarding()
-                .then_some(settings.fast_forward_speed),
-            volume: settings.effective_volume(),
+                .then_some(settings.shared.fast_forward_speed),
+            volume: settings.shared.effective_volume(),
         };
 
         (wanted != self.sent).then(|| {

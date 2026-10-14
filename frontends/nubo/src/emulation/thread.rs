@@ -5,11 +5,11 @@
 //! from a shared buffer, after the thread tells it a new one is there.
 
 use super::{Command, Machine, Playback, ask, stopped_error};
-use crate::battery::BatterySaves;
-use crate::notices::Notices;
-use crate::rom::Rom;
 use futures::channel::mpsc as frame_channel;
 use nubo_core::Model;
+use nubo_frontend::battery::BatterySaves;
+use nubo_frontend::notices::Notices;
+use nubo_frontend::rom::Rom;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};

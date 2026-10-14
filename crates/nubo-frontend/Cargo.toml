@@ -1,16 +1,34 @@
 [package]
 name = "nubo-frontend"
-description = "Everything a Nubo app needs that isn't drawing: palettes, the model rule, clocks, pictures and, later, settings, saves and running a game."
+description = "Everything a Nubo app needs that isn't drawing: palettes, the model rule, clocks, pictures, settings, controls, battery saves, save states, cheats and, later, the library and running a game."
 license.workspace = true
 repository.workspace = true
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
+[features]
+# Files in the user's folders: settings, battery saves, save states, cheats
+# and screenshots (see src/storage/files.rs).
+desktop = ["dep:directories", "dep:image"]
+# The browser's localStorage: settings and battery saves (see
+# src/storage/local_storage.rs).
+web = ["dep:base64", "dep:web-sys"]
+
 [dependencies]
 nubo-core.workspace = true
+# The oneshot channel that hands background work's result back.
+futures = { version = "0.3", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["derive"] }
+toml = "1"
 web-time = "1.1"
+directories = { version = "6", optional = true }
+image = { version = "0.25", default-features = false, features = ["png"], optional = true }
+base64 = { version = "0.23", optional = true }
+web-sys = { version = "0.3", features = ["Window", "Storage"], optional = true }
+
+[dev-dependencies]
+futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
 
 [lints]
 workspace = true

@@ -4,11 +4,11 @@
 //! nothing while nothing changes.
 
 use super::WatchEvent;
-use crate::settings::LibraryFolder;
 use futures::channel::mpsc::Sender;
 use futures::{SinkExt, executor};
 use notify_debouncer_mini::notify::RecursiveMode;
 use notify_debouncer_mini::{DebounceEventResult, new_debouncer};
+use nubo_frontend::settings::LibraryFolder;
 use std::path::Path;
 use std::time::Duration;
 

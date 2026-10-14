@@ -4,12 +4,12 @@
 use super::window_events::toggle_fullscreen;
 use super::{App, GameMessage, Message};
 use crate::controllers::ControllerEvent;
-use crate::controls::{Action, Device, PadButton};
 use crate::input::{self, KeyInput};
-use crate::save_states::Slot;
 use iced::Task;
 use iced::keyboard::{self, key::Named};
 use nubo_core::{ControllerButton, Key};
+use nubo_frontend::controls::{Action, Device, PadButton};
+use nubo_frontend::save_states::Slot;
 
 impl App {
     /// Handles a key going down or up: picking a key in the settings, the
@@ -48,7 +48,7 @@ impl App {
 
         let Some(action) = input
             .code
-            .and_then(|key| self.settings.controls.keyboard.action(key))
+            .and_then(|key| self.settings.shared.controls.keyboard.action(key))
         else {
             return Task::none();
         };
@@ -117,7 +117,7 @@ impl App {
                         // Waiting for a keyboard key: the controller's B
                         // cancels, and its other buttons are ignored.
                         (Device::Keyboard, Some(button))
-                            if self.settings.controls.controller.action(button)
+                            if self.settings.shared.controls.controller.action(button)
                                 == Some(Action::B) =>
                         {
                             self.capture = None;
@@ -139,6 +139,7 @@ impl App {
                         |&(button, _)| {
                             let action = self
                                 .settings
+                                .shared
                                 .controls
                                 .controller
                                 .action(PadButton(button))?;
@@ -157,6 +158,7 @@ impl App {
                     .filter_map(|(button, pressed)| {
                         let action = self
                             .settings
+                            .shared
                             .controls
                             .controller
                             .action(PadButton(button))?;

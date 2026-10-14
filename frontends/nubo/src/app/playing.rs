@@ -2,16 +2,17 @@
 //! with its save states and cheats, and opening ROMs.
 
 use super::{App, Message};
-use crate::cheats;
-use crate::controls::Action;
 use crate::game::{Game, PauseMenu};
-use crate::rom::{self, Rom};
-use crate::save_states::{self, Slot};
-use crate::screenshots;
+use crate::rom_picker;
 use crate::views;
 use iced::Task;
 use nubo_core::{CartridgeHeader, Emulator, Model};
+use nubo_frontend::cheats;
+use nubo_frontend::controls::Action;
 use nubo_frontend::picture::Picture;
+use nubo_frontend::rom::Rom;
+use nubo_frontend::save_states::{self, Slot};
+use nubo_frontend::screenshots;
 use std::path::{Path, PathBuf};
 
 /// What the player can do with games: open one, and control the one that
@@ -53,7 +54,7 @@ impl App {
     pub(super) fn update_game(&mut self, message: GameMessage) -> Task<Message> {
         match message {
             GameMessage::OpenRom => {
-                return Task::perform(rom::pick(), |rom| GameMessage::RomPicked(rom).into());
+                return Task::perform(rom_picker::pick(), |rom| GameMessage::RomPicked(rom).into());
             }
             GameMessage::RomPicked(Some(rom)) => self.start_game(rom, true),
             GameMessage::RomPicked(None) => {}
@@ -166,7 +167,7 @@ impl App {
             self.stop_game();
         }
 
-        let resume_state = if resume && self.settings.resume_games {
+        let resume_state = if resume && self.settings.shared.resume_games {
             save_states::load(&rom.path, Slot::Resume).unwrap_or_else(|error| {
                 self.keep_unloadable_state(&rom.path, Slot::Resume, error);
                 None
@@ -221,8 +222,8 @@ impl App {
         running: bool,
     ) -> Result<Game, String> {
         let mut game = Game::start(rom, header, model, &self.notices, running, &self.settings)?;
-        game.set_controls(&self.settings.controls);
-        game.set_palette(self.settings.dmg_palette);
+        game.set_controls(&self.settings.shared.controls);
+        game.set_palette(self.settings.shared.dmg_palette);
         match cheats::load(&game.rom().path) {
             Ok(cheats) => game.set_cheats(cheats),
             Err(error) => self.toasts.error(error),
@@ -238,7 +239,7 @@ impl App {
             return;
         };
 
-        if self.settings.resume_games
+        if self.settings.shared.resume_games
             && save_states::AVAILABLE
             && let Err(error) = game.save(Slot::Resume)
         {

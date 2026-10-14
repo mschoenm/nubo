@@ -3,16 +3,16 @@
 
 use super::playing::read_rom;
 use super::{App, Message};
-use crate::background;
 use crate::box_art::{self, GameList};
-use crate::controls::Action;
 use crate::library::{self, DownloadedArt, FileCheck, LoadedPicture, ScanResult, WatchEvent};
-use crate::settings::LibraryFolder;
 use crate::title_screens;
 use crate::views;
 use iced::Task;
 use iced::widget;
 use iced::widget::scrollable::AbsoluteOffset;
+use nubo_frontend::background;
+use nubo_frontend::controls::Action;
+use nubo_frontend::settings::LibraryFolder;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -76,12 +76,13 @@ impl App {
             LibraryMessage::FolderPicked(Some(path)) => {
                 if !self
                     .settings
+                    .shared
                     .library_folders
                     .iter()
                     .any(|folder| folder.path == path)
                 {
                     self.change_settings(|settings| {
-                        settings.library_folders.push(LibraryFolder {
+                        settings.shared.library_folders.push(LibraryFolder {
                             path,
                             include_subfolders: true,
                         });
@@ -91,17 +92,17 @@ impl App {
             }
             LibraryMessage::FolderPicked(None) => {}
             LibraryMessage::RemoveFolder(index) => {
-                if index < self.settings.library_folders.len() {
+                if index < self.settings.shared.library_folders.len() {
                     self.change_settings(|settings| {
-                        settings.library_folders.remove(index);
+                        settings.shared.library_folders.remove(index);
                     });
                     return self.rescan();
                 }
             }
             LibraryMessage::IncludeSubfolders(index, include) => {
-                if index < self.settings.library_folders.len() {
+                if index < self.settings.shared.library_folders.len() {
                     self.change_settings(|settings| {
-                        settings.library_folders[index].include_subfolders = include;
+                        settings.shared.library_folders[index].include_subfolders = include;
                     });
                     return self.rescan();
                 }
@@ -135,7 +136,7 @@ impl App {
                 self.library_selection = None;
             }
             LibraryMessage::DownloadBoxArtToggled(enabled) => {
-                self.change_settings(|settings| settings.download_box_art = enabled);
+                self.change_settings(|settings| settings.shared.download_box_art = enabled);
                 return Task::batch([self.load_pictures(false), self.download_box_art()]);
             }
             LibraryMessage::GameListLoaded(result) => {
@@ -163,7 +164,7 @@ impl App {
             LibraryMessage::TitleScreenCaptured(path, pixels) => {
                 if let Err(error) =
                     self.library
-                        .finish_capture(&path, pixels, self.settings.dmg_palette)
+                        .finish_capture(&path, pixels, self.settings.shared.dmg_palette)
                 {
                     self.toasts.error(error);
                 }
@@ -252,7 +253,9 @@ impl App {
     /// them, so a library whose box art is all looked up touches neither the
     /// network nor the lists.
     fn download_box_art(&mut self) -> Task<Message> {
-        if !box_art::AVAILABLE || !self.settings.download_box_art || !self.library.needs_downloads()
+        if !box_art::AVAILABLE
+            || !self.settings.shared.download_box_art
+            || !self.library.needs_downloads()
         {
             return Task::none();
         }
@@ -301,8 +304,8 @@ impl App {
 
         Task::perform(
             self.library.load_pictures(
-                self.settings.dmg_palette,
-                self.settings.download_box_art,
+                self.settings.shared.dmg_palette,
+                self.settings.shared.download_box_art,
                 missing_only,
             ),
             |pictures| LibraryMessage::PicturesLoaded(pictures).into(),
@@ -319,7 +322,7 @@ impl App {
 
         Task::perform(
             self.library
-                .start_check(self.settings.library_folders.clone()),
+                .start_check(self.settings.shared.library_folders.clone()),
             |check| LibraryMessage::FilesChecked(check).into(),
         )
     }
@@ -335,7 +338,7 @@ impl App {
 
         match self
             .library
-            .start_scan(self.settings.library_folders.clone())
+            .start_scan(self.settings.shared.library_folders.clone())
         {
             Some(scan) => Task::perform(scan, |result| LibraryMessage::Scanned(result).into()),
             None => Task::none(),

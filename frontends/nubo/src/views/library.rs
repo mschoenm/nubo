@@ -3,7 +3,6 @@
 //! any games yet it welcomes the user and offers to add a folder.
 
 use crate::app::{GameMessage, LibraryMessage, Message, SettingsMessage};
-use crate::controls::Action;
 use crate::library::{self, Library, LibraryEntry};
 use crate::settings::Settings;
 use crate::ui::icons::{self, Icon, icon};
@@ -20,6 +19,7 @@ use iced::widget::{
     text_input,
 };
 use iced::{Alignment, ContentFit, Element, Fill, widget};
+use nubo_frontend::controls::Action;
 
 /// The Game Boy controls the welcome screen explains, and the actions whose
 /// keys press them.
@@ -71,7 +71,7 @@ impl<'a> Shelves<'a> {
         } else {
             Vec::new()
         };
-        let games = if settings.library_folders.is_empty() {
+        let games = if settings.shared.library_folders.is_empty() {
             Vec::new()
         } else {
             library.games(search).collect()
@@ -193,7 +193,7 @@ pub fn view<'a>(
     selection: Option<usize>,
 ) -> Element<'a, Message> {
     let shelves = Shelves::new(library, settings, search);
-    let has_folders = !settings.library_folders.is_empty();
+    let has_folders = !settings.shared.library_folders.is_empty();
 
     if !library::AVAILABLE || (!has_folders && library.recently_played(1).is_empty()) {
         return column![bar(None), welcome(settings)].into();
@@ -208,7 +208,7 @@ pub fn view<'a>(
             .push(card_grid(
                 library,
                 shelves.recent,
-                settings.download_box_art,
+                settings.shared.download_box_art,
                 0,
                 selection,
             ))
@@ -235,7 +235,7 @@ pub fn view<'a>(
         content.push(card_grid(
             library,
             games,
-            settings.download_box_art,
+            settings.shared.download_box_art,
             recent_count,
             selection,
         ))
@@ -394,7 +394,7 @@ fn controls_help(settings: &Settings) -> Element<'_, Message> {
     let groups = CONTROLS.iter().filter_map(|(actions, button)| {
         let keys: Vec<_> = actions
             .iter()
-            .filter_map(|&action| settings.controls.keyboard.input(action))
+            .filter_map(|&action| settings.shared.controls.keyboard.input(action))
             .collect();
         if keys.is_empty() {
             return None;

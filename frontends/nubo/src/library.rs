@@ -9,9 +9,9 @@
 //! The browser build has no folders to scan, so its library stays empty.
 
 use crate::app::{SCREEN_HEIGHT, SCREEN_WIDTH};
-use crate::background;
 use jobs::Jobs;
 use nubo_core::CartridgeHeader;
+use nubo_frontend::background;
 use nubo_frontend::palettes::DmgPalette;
 use nubo_frontend::picture::Picture;
 use nubo_frontend::time::SystemTime;
@@ -349,7 +349,7 @@ impl Library {
     /// result to [`Library::finish_scan`].
     pub fn start_scan(
         &mut self,
-        folders: Vec<crate::settings::LibraryFolder>,
+        folders: Vec<nubo_frontend::settings::LibraryFolder>,
     ) -> Option<impl Future<Output = ScanResult> + use<>> {
         if self.scanning {
             self.rescan_wanted = true;
@@ -401,7 +401,7 @@ impl Library {
     /// after it catches up.
     pub fn start_check(
         &self,
-        folders: Vec<crate::settings::LibraryFolder>,
+        folders: Vec<nubo_frontend::settings::LibraryFolder>,
     ) -> impl Future<Output = FileCheck> + use<> {
         let entries = self.entries.clone();
         let finished_scans = self.finished_scans;

@@ -1,10 +1,10 @@
 //! Finding and downloading box art (desktop build), with `ureq`. The game
 //! lists are kept in `box_art/lists` in the user's data folder.
 
-use crate::storage::files::{project_directories, write_atomically};
 use image::ImageFormat;
 use image::imageops::FilterType;
 use nubo_core::extract_rom;
+use nubo_frontend::storage::files::{project_directories, write_atomically};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Cursor, Read};

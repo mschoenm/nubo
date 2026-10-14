@@ -13,9 +13,9 @@
 
 use super::pacing::{FRAME_DURATION, Lock, RefreshRate, SampleRateControl};
 use super::{Command, Machine, Playback, ask};
-use crate::notices::Notices;
-use crate::rom::Rom;
 use nubo_core::Model;
+use nubo_frontend::notices::Notices;
+use nubo_frontend::rom::Rom;
 use refresh_clock::RefreshClock;
 
 /// How many sound buffers the audio queue holds on average. The sound takes

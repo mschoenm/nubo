@@ -2,7 +2,7 @@
 //! temporary directory, so they only run in the native build.
 
 use super::*;
-use crate::settings::LibraryFolder;
+use nubo_frontend::settings::LibraryFolder;
 use std::fs;
 use std::process;
 

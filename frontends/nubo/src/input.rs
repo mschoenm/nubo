@@ -1,12 +1,12 @@
 //! Keyboard input: turns key events into messages, with Iced's key codes
 //! turned into Nubo's own ([`KeyCode`]), and finds the fixed app shortcuts.
 //! Which key presses which Game Boy button is up to the player (see
-//! `controls.rs`).
+//! `nubo_frontend::controls`).
 
 use crate::app::{GameMessage, Message, SettingsMessage, WindowMessage};
-use crate::controls::KeyCode;
 use iced::keyboard::key::{Code, Named, Physical};
 use iced::keyboard::{self, Event, Modifiers};
+use nubo_frontend::controls::KeyCode;
 
 /// A key going down or up.
 #[derive(Debug, Clone)]

@@ -1,6 +1,6 @@
 # Plan: restructuring the repository
 
-**Status: signed off by the maintainer on 2026-10-13. Steps 1 to 3 are done.**
+**Status: signed off by the maintainer on 2026-10-13. Steps 1 to 4 are done.**
 
 ## What is planned and what is only kept possible
 
@@ -261,6 +261,31 @@ the same settings and writes back byte for byte.
 (`cargo xtask web`), and the fixture test passes.
 
 ### Step 4: move the stored data
+
+**Done.** What was decided along the way:
+
+- **`storage`** is a `Storage` trait that reads and writes whole `Entry`s (the settings, a game's
+  battery RAM and clock, its cheats), with `Files` (`desktop` feature), `LocalStorage` (`web`) and
+  `NoStorage` (neither, for the RetroArch core). `storage::platform()` picks the build's own; with
+  both features `desktop` wins. The entries keep their file paths and localStorage keys. Save states
+  and screenshots aren't entries: they are desktop only and need more than whole entries (renaming,
+  file times, pictures), so they use `storage::files` directly, as the library will.
+- **`desktop`** brings `directories` and `image` so far, **`web`** `web-sys` and `base64`; the rest
+  of the plan's list comes with steps 5 and 6. `background` keeps `cfg(target_arch = "wasm32")`,
+  since that is about having threads, not about where data goes.
+- **`settings`:** the Iced crate's `Settings` is `appearance`, the shared settings under
+  `#[serde(flatten)]`, then `integer_scaling`. TOML writes plain values before tables either way,
+  so `settings.toml` comes out byte for byte the same; the fixture test runs in both crates. It
+  reads its own two settings and the shared ones separately from the same text
+  (`Settings::from_toml`), since reading through flatten reports a mistake in the shared settings
+  at line 1 instead of where it is. `nubo_frontend::settings::load` takes that parse function, and
+  `save` any type that holds the shared settings.
+- **`rom`:** the file dialog (`rom::pick`, with rfd) stays in the Iced crate as `rom_picker.rs`,
+  since picking a file is the app's UI. The screen size (`SCREEN_WIDTH`, `SCREEN_HEIGHT`) moved to
+  `picture`, for the PNG pictures.
+- **An existing data folder:** `crates/nubo-frontend/tests/existing_data_folder/` was written by the
+  step 3 build through the app's own save functions, and the tests read all of it back and write it
+  again byte for byte. The hand test on the desktop and in the browser is still to do.
 
 Move `storage`, `settings`, `controls`, `cheats`, `battery`, `save_states`, `screenshots`, `rom`, `notices`
 and `background` into `nubo-frontend`, with their tests. Split `settings.rs` so the two Iced-only

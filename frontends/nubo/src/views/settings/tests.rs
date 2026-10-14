@@ -32,7 +32,7 @@ fn drawn_rows(
 fn every_page_draws_its_rows_in_the_order_the_d_pad_moves_through_them() {
     let mut settings = Settings::default();
     for name in ["a", "b"] {
-        settings.library_folders.push(LibraryFolder {
+        settings.shared.library_folders.push(LibraryFolder {
             path: name.into(),
             include_subfolders: true,
         });
@@ -81,7 +81,7 @@ fn the_controls_rows_follow_the_device() {
 fn every_library_folder_is_a_row() {
     let mut settings = Settings::default();
     for name in ["a", "b"] {
-        settings.library_folders.push(LibraryFolder {
+        settings.shared.library_folders.push(LibraryFolder {
             path: name.into(),
             include_subfolders: true,
         });

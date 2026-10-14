@@ -2,15 +2,16 @@
 //! its pages, and moving through them with the D-pad.
 
 use super::{App, GameMessage, LibraryMessage, Message, cycle};
-use crate::controls::{Action, Controls, Device};
-use crate::settings::{Appearance, FastForwardSpeed};
+use crate::settings::Appearance;
 use crate::views;
 use crate::views::settings::{SettingsFocus, SettingsRow, SettingsTab};
 use iced::Task;
 use iced::widget;
 use iced::widget::scrollable::RelativeOffset;
+use nubo_frontend::controls::{Action, Controls, Device};
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::palettes::DmgPalette;
+use nubo_frontend::settings::FastForwardSpeed;
 
 /// How much the D-pad changes the volume per press.
 const VOLUME_STEP: f32 = 0.05;
@@ -73,7 +74,7 @@ impl App {
                 self.change_settings(|settings| settings.appearance = appearance);
             }
             SettingsMessage::PaletteSelected(palette) => {
-                self.change_settings(|settings| settings.dmg_palette = palette);
+                self.change_settings(|settings| settings.shared.dmg_palette = palette);
                 if let Some(game) = &mut self.game {
                     game.set_palette(palette);
                 }
@@ -84,29 +85,29 @@ impl App {
             }
             SettingsMessage::ModelSelected(model) => {
                 self.model_override = None;
-                self.change_settings(|settings| settings.model = model);
+                self.change_settings(|settings| settings.shared.model = model);
             }
             SettingsMessage::ResumeGamesToggled(resume) => {
-                self.change_settings(|settings| settings.resume_games = resume);
+                self.change_settings(|settings| settings.shared.resume_games = resume);
             }
             SettingsMessage::FastForwardSpeedSelected(speed) => {
-                self.change_settings(|settings| settings.fast_forward_speed = speed);
+                self.change_settings(|settings| settings.shared.fast_forward_speed = speed);
             }
             SettingsMessage::VolumeChanged(volume) => {
-                self.settings.volume = volume;
-                self.settings.muted = false;
+                self.settings.shared.volume = volume;
+                self.settings.shared.muted = false;
             }
             SettingsMessage::VolumeReleased => self.change_settings(|_| {}),
             SettingsMessage::VolumeStepped(step) => {
-                let volume = (self.settings.effective_volume() + step).clamp(0.0, 1.0);
+                let volume = (self.settings.shared.effective_volume() + step).clamp(0.0, 1.0);
                 self.change_settings(|settings| {
-                    settings.volume = volume;
-                    settings.muted = false;
+                    settings.shared.volume = volume;
+                    settings.shared.muted = false;
                 });
             }
             SettingsMessage::ToggleMute => {
-                let muted = !self.settings.muted;
-                self.change_settings(|settings| settings.muted = muted);
+                let muted = !self.settings.shared.muted;
+                self.change_settings(|settings| settings.shared.muted = muted);
             }
             SettingsMessage::ControlsDeviceSelected(device) => {
                 self.controls_device = device;
@@ -130,9 +131,9 @@ impl App {
 
     /// Changes the controls, saves them and hands them to the running game.
     pub(super) fn change_controls(&mut self, change: impl FnOnce(&mut Controls)) {
-        self.change_settings(|settings| change(&mut settings.controls));
+        self.change_settings(|settings| change(&mut settings.shared.controls));
         if let Some(game) = &mut self.game {
-            game.set_controls(&self.settings.controls);
+            game.set_controls(&self.settings.shared.controls);
         }
     }
 
@@ -235,19 +236,19 @@ impl App {
             )),
             SettingsRow::Palette => SettingsMessage::PaletteSelected(cycle(
                 &DmgPalette::ALL,
-                settings.dmg_palette,
+                settings.shared.dmg_palette,
                 step,
                 wrap,
             )),
             SettingsRow::Model => SettingsMessage::ModelSelected(cycle(
                 &views::settings::model_choices(),
-                settings.model,
+                settings.shared.model,
                 step,
                 wrap,
             )),
             SettingsRow::FastForwardSpeed => SettingsMessage::FastForwardSpeedSelected(cycle(
                 &FastForwardSpeed::ALL,
-                settings.fast_forward_speed,
+                settings.shared.fast_forward_speed,
                 step,
                 wrap,
             )),
@@ -273,20 +274,24 @@ impl App {
             }
             SettingsRow::RestartNow => GameMessage::Reset.into(),
             SettingsRow::ResumeGames => {
-                SettingsMessage::ResumeGamesToggled(!settings.resume_games).into()
+                SettingsMessage::ResumeGamesToggled(!settings.shared.resume_games).into()
             }
             SettingsRow::Volume => SettingsMessage::ToggleMute.into(),
             SettingsRow::ResetControls => SettingsMessage::ResetControls(device).into(),
             SettingsRow::Binding(action) => SettingsMessage::CaptureBinding(device, action).into(),
             SettingsRow::Folder(index) => LibraryMessage::IncludeSubfolders(
                 index,
-                !settings.library_folders.get(index)?.include_subfolders,
+                !settings
+                    .shared
+                    .library_folders
+                    .get(index)?
+                    .include_subfolders,
             )
             .into(),
             SettingsRow::AddFolder => LibraryMessage::AddFolder.into(),
             SettingsRow::Rescan => LibraryMessage::Rescan.into(),
             SettingsRow::BoxArt => {
-                LibraryMessage::DownloadBoxArtToggled(!settings.download_box_art).into()
+                LibraryMessage::DownloadBoxArtToggled(!settings.shared.download_box_art).into()
             }
             _ => return self.adjust_setting(row, 1, true),
         })
