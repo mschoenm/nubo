@@ -26,7 +26,7 @@ nubo-frontend = { workspace = true, features = ["desktop", "gamepads"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 nubo-frontend = { workspace = true, features = ["web", "gamepads"] }
-iced = { version = "0.14", features = ["image", "canvas", "webgl", "fira-sans"] }
+iced = { version = "0.14", features = ["image", "canvas", "webgl"] }
 console_error_panic_hook = "0.1"
 # Not used directly: pins wasm-bindgen to the version of the bindings
 # generator in xtask, which must match it exactly.

@@ -9,25 +9,27 @@ use iced::widget::{button, container, text, text_input};
 use iced::{Background, Border, Color, Font, Shadow, Theme, Vector};
 use std::sync::LazyLock;
 
-/// The font for body text. The desktop build uses the system's sans-serif
-/// font. The browser has no system fonts, so the browser build bundles Fira
-/// Sans and has to ask for it by name.
-pub const BODY_FONT: Font = if cfg!(target_arch = "wasm32") {
-    Font::with_name("Fira Sans")
-} else {
-    Font::DEFAULT
+/// The font for body text: DejaVu Sans, bundled with the app (`fonts/`), so
+/// Nubo looks the same on every system and in the browser, which has no
+/// system fonts. The app makes it the default font, so plain `text()` draws
+/// in it too.
+pub const BODY_FONT: Font = Font::with_name("DejaVu Sans");
+
+/// The font for titles and the app's name: Liberation Sans Bold, also
+/// bundled. It is narrower than DejaVu Sans Bold, so game titles fit the top
+/// bar better.
+pub const HEADING_FONT: Font = Font {
+    weight: Weight::Bold,
+    ..Font::with_name("Liberation Sans")
 };
 
-/// The font for titles and the app's name. The browser build only bundles
-/// Fira Sans in its regular weight, so its titles aren't semibold.
-pub const HEADING_FONT: Font = if cfg!(target_arch = "wasm32") {
-    BODY_FONT
-} else {
-    Font {
-        weight: Weight::Semibold,
-        ..Font::DEFAULT
-    }
-};
+/// The bundled fonts, loaded when the app starts: DejaVu Sans, and
+/// Liberation Sans Bold for titles. Their licenses are in `fonts/` and in
+/// `NOTICE`.
+pub const FONT_BYTES: [&[u8]; 2] = [
+    include_bytes!("../../fonts/DejaVuSans.ttf"),
+    include_bytes!("../../fonts/LiberationSans-Bold.ttf"),
+];
 
 const CORNER_RADIUS: f32 = 8.0;
 const PANEL_CORNER_RADIUS: f32 = 14.0;

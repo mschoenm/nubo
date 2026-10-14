@@ -95,6 +95,9 @@ fn run(rom: Option<Result<Rom, String>>, options: Options) -> iced::Result {
     .subscription(App::subscription)
     .theme(App::theme)
     .font(ui::icons::FONT_BYTES)
+    .font(ui::theme::FONT_BYTES[0])
+    .font(ui::theme::FONT_BYTES[1])
+    .default_font(ui::theme::BODY_FONT)
     .window(window)
     .run()
 }
