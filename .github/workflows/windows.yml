@@ -147,11 +147,9 @@ jobs:
           # The installed Nubos, found by the UpgradeCode that every Nubo MSI
           # shares.
           $upgradeCode = Get-MsiProperty $msi "UpgradeCode"
+          # PowerShell unrolls the list of product codes into strings.
           function Get-InstalledNubo {
-            $codes = Get-ComMember $installer "RelatedProducts" @($upgradeCode)
-            $count = Get-ComMember $codes "Count"
-            for ($index = 0; $index -lt $count; $index++) {
-              $code = Get-ComMember $codes "Item" @($index)
+            foreach ($code in @(Get-ComMember $installer "RelatedProducts" @($upgradeCode))) {
               [pscustomobject]@{
                 Code = $code
                 Version = Get-ComMember $installer "ProductInfo" @($code, "VersionString")
