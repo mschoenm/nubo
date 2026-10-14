@@ -145,7 +145,7 @@ impl App {
 
     /// Starts `rom` on the model the settings pick for it. With `resume` and
     /// the "resume games" setting on, it continues from where the player
-    /// left it, on the model it ran on then.
+    /// left it, on the model it ran on then (never with `--fresh`).
     ///
     /// Restarting the same ROM stops it first, so its battery save and
     /// where the player left off are written before it loads again and
@@ -169,7 +169,7 @@ impl App {
             self.stop_game();
         }
 
-        let resume_state = if resume && self.settings.shared.resume_games {
+        let resume_state = if resume && self.settings.shared.resume_games && !self.fresh {
             save_states::load(&rom.path, Slot::Resume).unwrap_or_else(|error| {
                 self.keep_unloadable_state(&rom.path, Slot::Resume, error);
                 None
@@ -198,7 +198,9 @@ impl App {
 
                 self.stop_game();
 
-                if let Err(error) = self.library.record_played(&path, game.session.header()) {
+                if !self.fresh
+                    && let Err(error) = self.library.record_played(&path, game.session.header())
+                {
                     self.toasts.error(error);
                 }
 
@@ -215,7 +217,10 @@ impl App {
     }
 
     /// Starts an emulator for `rom` with the player's controls, running (or
-    /// paused, without `running`) as loud as the settings say.
+    /// paused, without `running`) as loud as the settings say, and fast
+    /// forwarding at the speed asked for on the command line, if any. With
+    /// `--fresh` it keeps no battery saves, cheats, save states or
+    /// screenshots.
     fn start_session(
         &mut self,
         rom: Rom,
@@ -227,26 +232,36 @@ impl App {
             rom,
             header,
             model,
+            !self.fresh,
             &self.notices,
             running,
             &self.settings.shared,
         )?;
         session.set_controls(&self.settings.shared.controls);
         session.set_palette(self.settings.shared.dmg_palette);
-        match cheats::load(&session.rom().path) {
-            Ok(cheats) => session.set_cheats(cheats),
-            Err(error) => self.toasts.error(error),
+        if !self.fresh {
+            match cheats::load(&session.rom().path) {
+                Ok(cheats) => session.set_cheats(cheats),
+                Err(error) => self.toasts.error(error),
+            }
+        }
+        if let Some(speed) = self.speed {
+            session.fast_forward_at(speed);
         }
         session.set_controller_state(self.menu_presses.hide_from(&self.controller_state));
-        Ok(Game::new(session))
+        Ok(Game::new(session, !self.fresh))
     }
 
     /// Stops the running game. It saves where the player left off (if the
-    /// settings say so) and keeps the last frame as the game's thumbnail.
+    /// settings say so) and keeps the last frame as the game's thumbnail,
+    /// unless it keeps nothing (`--fresh`).
     pub(super) fn stop_game(&mut self) {
         let Some(mut game) = self.game.take() else {
             return;
         };
+        if !game.keeps_data {
+            return;
+        }
 
         if self.settings.shared.resume_games
             && save_states::AVAILABLE
@@ -264,9 +279,10 @@ impl App {
         }
     }
 
-    /// Saves the running game in `slot` and resumes it.
+    /// Saves the running game in `slot` and resumes it, unless it keeps no
+    /// save states (`--fresh`).
     pub(super) fn save_state(&mut self, slot: Slot) {
-        let Some(game) = &mut self.game else {
+        let Some(game) = self.game.as_mut().filter(|game| game.keeps_data) else {
             return;
         };
 
@@ -284,7 +300,7 @@ impl App {
     /// running one before the new one starts so its battery save is written
     /// before the new one reads it.
     pub(super) fn load_state(&mut self, slot: Slot) {
-        let Some(game) = &self.game else {
+        let Some(game) = self.game.as_ref().filter(|game| game.keeps_data) else {
             return;
         };
 
@@ -350,9 +366,10 @@ impl App {
         }
     }
 
-    /// Saves the current screen to the Pictures folder.
+    /// Saves the current screen to the Pictures folder, unless the game
+    /// keeps no screenshots (`--fresh`).
     pub(super) fn take_screenshot(&mut self) {
-        let Some(game) = &mut self.game else {
+        let Some(game) = self.game.as_mut().filter(|game| game.keeps_data) else {
             return;
         };
         // A controller can ask for this while the window is minimized and
@@ -383,7 +400,9 @@ impl App {
 
         let saving = page == PauseMenu::Save;
         let rows = match page {
-            PauseMenu::Main => views::game::main_entries(&self.settings, self.fullscreen).len(),
+            PauseMenu::Main => {
+                views::game::main_entries(game, &self.settings, self.fullscreen).len()
+            }
             PauseMenu::Save | PauseMenu::Load => views::game::listed_slots(game, saving).len(),
             PauseMenu::Cheats => game.session.cheats().len(),
         };
@@ -395,10 +414,12 @@ impl App {
             Action::A | Action::Start => {
                 let selection = game.menu_selection();
                 let message = match page {
-                    PauseMenu::Main => views::game::main_entries(&self.settings, self.fullscreen)
-                        .into_iter()
-                        .nth(selection)
-                        .map(|entry| entry.message),
+                    PauseMenu::Main => {
+                        views::game::main_entries(game, &self.settings, self.fullscreen)
+                            .into_iter()
+                            .nth(selection)
+                            .map(|entry| entry.message)
+                    }
                     PauseMenu::Save | PauseMenu::Load => views::game::listed_slots(game, saving)
                         .get(selection)
                         .and_then(|info| views::game::slot_message(info, saving)),

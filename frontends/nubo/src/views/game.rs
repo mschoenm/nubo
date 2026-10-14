@@ -2,7 +2,8 @@
 //! and the pause menu with its save state pages. In a window the bar sits
 //! above the picture. In fullscreen the picture fills the screen and the bar
 //! appears along the bottom when the mouse moves; at the top it would be
-//! hidden behind the menu bar that macOS slides down there.
+//! hidden behind the menu bar that macOS slides down there. With `--scale`
+//! the window shows the picture alone ([`screen_only`]).
 
 use crate::app::{GameMessage, Message, SettingsMessage, WindowMessage};
 use crate::game::{Game, PauseMenu};
@@ -50,7 +51,7 @@ pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Ele
     ];
 
     if game.session.is_fast_forwarding() {
-        layers.push(fast_forward_badge(settings));
+        layers.push(fast_forward_badge(game, settings));
     }
 
     if let Some(page) = game.menu() {
@@ -70,6 +71,29 @@ pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Ele
     }
 
     Stack::with_children(layers).into()
+}
+
+/// The game screen alone, filling the window, for `--scale` (see
+/// `command_line`): nothing is drawn over it, and the window is sized to show
+/// it at a whole multiple of its size (see `app::screen_only_size`). Black
+/// until the game shows its first frame.
+pub fn screen_only(game: Option<&Game>) -> Element<'_, Message> {
+    match game
+        .and_then(|game| game.session.screen())
+        .map(pictures::handle)
+    {
+        Some(handle) => image(handle)
+            .filter_method(image::FilterMethod::Nearest)
+            .content_fit(ContentFit::Fill)
+            .width(Fill)
+            .height(Fill)
+            .into(),
+        None => container(space())
+            .width(Fill)
+            .height(Fill)
+            .style(|_| container::Style::default().background(iced::Color::BLACK))
+            .into(),
+    }
 }
 
 /// The bar with the game's name and controls: at the top of the window, or
@@ -131,7 +155,7 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
         ),
     ];
 
-    if screenshots::AVAILABLE {
+    if screenshots::AVAILABLE && game.keeps_data {
         controls = controls.push(button(
             Icon::Camera,
             String::from("Screenshot (F12)"),
@@ -160,11 +184,16 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
 }
 
 /// The label in the top-right corner while fast forwarding.
-fn fast_forward_badge(settings: &Settings) -> Element<'_, Message> {
+fn fast_forward_badge<'a>(game: &Game, settings: &Settings) -> Element<'a, Message> {
     let badge = container(
         row![
             icon(Icon::FastForward).size(14),
-            text(settings.shared.fast_forward_speed.to_string()).size(13),
+            text(
+                game.session
+                    .fast_forward_speed(&settings.shared)
+                    .to_string()
+            )
+            .size(13),
         ]
         .spacing(6)
         .align_y(Alignment::Center),
@@ -186,8 +215,9 @@ pub struct MenuEntry {
 /// The rows of the pause menu's main page, in order. The D-pad moves through
 /// them and A picks one, so the view and the app both use this list.
 /// `fullscreen` says whether the window fills the screen; hints show the
-/// keys bound in `settings`.
-pub fn main_entries(settings: &Settings, fullscreen: bool) -> Vec<MenuEntry> {
+/// keys bound in `settings`. Save states and cheats are left out for a game
+/// that keeps neither (`--fresh`).
+pub fn main_entries(game: &Game, settings: &Settings, fullscreen: bool) -> Vec<MenuEntry> {
     let entry = |icon, label, hint: Option<String>, message| MenuEntry {
         icon,
         label,
@@ -210,7 +240,7 @@ pub fn main_entries(settings: &Settings, fullscreen: bool) -> Vec<MenuEntry> {
         Message::Game(GameMessage::TogglePause),
     )];
 
-    if save_states::AVAILABLE {
+    if save_states::AVAILABLE && game.keeps_data {
         entries.push(entry(
             Icon::Save,
             "Save state",
@@ -225,7 +255,7 @@ pub fn main_entries(settings: &Settings, fullscreen: bool) -> Vec<MenuEntry> {
         ));
     }
 
-    if cheats::AVAILABLE {
+    if cheats::AVAILABLE && game.keeps_data {
         entries.push(entry(
             Icon::WandSparkles,
             "Cheats",
@@ -322,7 +352,7 @@ fn main_page<'a>(
     settings: &Settings,
     fullscreen: bool,
 ) -> Element<'a, Message> {
-    let rows = main_entries(settings, fullscreen)
+    let rows = main_entries(game, settings, fullscreen)
         .into_iter()
         .enumerate()
         .map(|(index, entry)| menu_item(entry, index == selection));

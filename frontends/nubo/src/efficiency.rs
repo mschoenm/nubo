@@ -14,7 +14,7 @@ use nubo_core::Model;
 use nubo_frontend::battery::BatterySaves;
 use nubo_frontend::notices::Notices;
 use nubo_frontend::rom::Rom;
-use nubo_frontend::session::{ActivityCount, Command, Playback, Session};
+use nubo_frontend::session::{ActivityCount, Command, Playback, Saves, Session};
 use nubo_frontend::settings::FastForwardSpeed;
 use std::env;
 use std::path::{Path, PathBuf};
@@ -146,7 +146,13 @@ fn measure_session(
     playback: Playback,
     prepare: impl FnOnce(&Session),
 ) -> Result<Rates, String> {
-    let session = Session::start_with_saves(rom, saves, model, playback, &Notices::default())?;
+    let session = Session::start(
+        rom,
+        Saves::Kept(saves),
+        model,
+        playback,
+        &Notices::default(),
+    )?;
     thread::sleep(SETTLE_TIME);
     prepare(&session);
     // A command takes effect on the thread's next pass; a moment later the

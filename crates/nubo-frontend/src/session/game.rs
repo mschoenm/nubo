@@ -5,7 +5,7 @@
 
 #[cfg(not(target_arch = "wasm32"))]
 use super::FrameListener;
-use super::{Command, Playback, Session};
+use super::{Command, Playback, Saves, Session};
 use crate::cheats::{self, Cheat};
 use crate::controls::Controls;
 use crate::notices::Notices;
@@ -13,7 +13,7 @@ use crate::palettes::DmgPalette;
 use crate::picture::{Picture, SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::rom::Rom;
 use crate::save_states::{self, SaveState, Slot, SlotInfo};
-use crate::settings::Settings;
+use crate::settings::{FastForwardSpeed, Settings};
 use nubo_core::{CartridgeHeader, ControllerState, Key, Model};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -50,18 +50,21 @@ pub struct GameSession {
 impl GameSession {
     /// Starts `rom` on `model`, running (or paused, without `running`) at
     /// normal speed and as loud as `settings` say, returning the load error
-    /// if it couldn't. Problems while the game runs, such as a missing sound
-    /// device, go to `notices`.
+    /// if it couldn't. With `keep_saves` it reads and writes its battery
+    /// saves; without, it keeps none (see [`Saves::Discarded`]). Problems
+    /// while the game runs, such as a missing sound device, go to `notices`.
     pub fn start(
         rom: Rom,
         header: CartridgeHeader,
         model: Model,
+        keep_saves: bool,
         notices: &Notices,
         running: bool,
         settings: &Settings,
     ) -> Result<GameSession, String> {
         let playback = PlaybackControl::new(running, settings);
-        let session = Session::start(&rom, model, playback.sent, notices)?;
+        let saves = Saves::for_rom(&rom.path, keep_saves, notices);
+        let session = Session::start(&rom, saves, model, playback.sent, notices)?;
 
         Ok(GameSession {
             session,
@@ -229,6 +232,12 @@ impl GameSession {
         self.playback.is_fast_forwarding()
     }
 
+    /// How fast the game fast forwards: at its own speed (see
+    /// [`GameSession::fast_forward_at`]) or else the one in `settings`.
+    pub fn fast_forward_speed(&self, settings: &Settings) -> FastForwardSpeed {
+        self.playback.speed.unwrap_or(settings.fast_forward_speed)
+    }
+
     /// Whether fast forward is switched on (see
     /// [`GameSession::toggle_fast_forward`]).
     pub fn is_fast_forward_on(&self) -> bool {
@@ -243,6 +252,14 @@ impl GameSession {
     /// Switches fast forward on or off, such as with a button.
     pub fn toggle_fast_forward(&mut self) {
         self.playback.fast_forward_on = !self.playback.fast_forward_on;
+    }
+
+    /// Switches fast forward on, at `speed` instead of the settings' speed
+    /// for as long as this game runs, such as for a speed asked for on the
+    /// command line.
+    pub fn fast_forward_at(&mut self, speed: FastForwardSpeed) {
+        self.playback.speed = Some(speed);
+        self.playback.fast_forward_on = true;
     }
 
     /// Applies the settings and pause state to the emulator: it runs only
@@ -394,6 +411,9 @@ struct PlaybackControl {
     fast_forward_held: bool,
     /// Whether fast forward was switched on, such as with a button.
     fast_forward_on: bool,
+    /// The fast forward speed for this game instead of the settings' one
+    /// (see [`GameSession::fast_forward_at`]).
+    speed: Option<FastForwardSpeed>,
     /// How the emulator was last told to play.
     sent: Playback,
 }
@@ -405,6 +425,7 @@ impl PlaybackControl {
         PlaybackControl {
             fast_forward_held: false,
             fast_forward_on: false,
+            speed: None,
             sent: Playback {
                 running,
                 fast_forward: None,
@@ -418,14 +439,14 @@ impl PlaybackControl {
     }
 
     /// How the game should play now: only while `running`, at the fast
-    /// forward speed in `settings` while fast forwarding. Returns `None` if
-    /// the emulator already plays that way.
+    /// forward speed in `settings` (or this game's own) while fast
+    /// forwarding. Returns `None` if the emulator already plays that way.
     fn change(&mut self, running: bool, settings: &Settings) -> Option<Playback> {
         let wanted = Playback {
             running,
             fast_forward: self
                 .is_fast_forwarding()
-                .then_some(settings.fast_forward_speed),
+                .then_some(self.speed.unwrap_or(settings.fast_forward_speed)),
             volume: settings.effective_volume(),
         };
 

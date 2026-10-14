@@ -81,6 +81,21 @@ fn fast_forward_runs_at_the_speed_the_settings_pick() {
 }
 
 #[test]
+fn a_games_own_speed_wins_over_the_settings() {
+    let settings = Settings {
+        fast_forward_speed: FastForwardSpeed::ALL[0],
+        ..Settings::default()
+    };
+    let mut control = PlaybackControl::new(true, &settings);
+
+    control.speed = Some(FastForwardSpeed::ALL[3]);
+    control.fast_forward_on = true;
+    let fast = control.change(true, &settings).unwrap();
+
+    assert_eq!(fast.fast_forward, Some(FastForwardSpeed::ALL[3]));
+}
+
+#[test]
 fn a_new_game_starts_muted_when_the_player_muted_the_sound() {
     let settings = Settings {
         muted: true,

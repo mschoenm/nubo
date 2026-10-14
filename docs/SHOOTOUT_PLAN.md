@@ -16,7 +16,8 @@ The work has five parts:
   first, right after steps 1 and 2 of [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md). **Done**: Nubo passes
   258 of the 264 published tests, which would rank it first, ahead of DocBoy's 255, now that it draws
   evenly spaced grays (see "What Part 5 found"). Parts 1 to 3 follow
-  once the restructuring is finished. That plan's "Order and dependencies" has the whole order the
+  once the restructuring is finished. **Part 1 is built** (see "What Part 1 found"); it waits for the
+  maintainer's check on Windows and a release. That plan's "Order and dependencies" has the whole order the
   maintainer agreed to.
 
 ## Where the code lives
@@ -95,7 +96,7 @@ What already works:
   evenly spaced grays (white, 0xAA, 0x55, black, `DMG_SHADES`), the same as the references'.
 - Nubo has its own boot ROMs, so the harness doesn't need to download any.
 
-What's missing:
+What was missing before Part 1 (which added all three):
 
 1. **The window shows more than the game screen.** It opens at 4× with 24 px of padding and a 52 px
    top bar, and can't be made smaller than 480×420 (`frontends/nubo/src/main.rs`, `DEFAULT_SCALE_FACTOR`,
@@ -174,6 +175,36 @@ scaling, and to take a screenshot of the window to confirm it is exactly 160×14
 
 Then a release (the `release` skill), because the harness downloads the latest one.
 Before releasing, Part 3 can use a locally built `nubo.exe` put in `emu/nubo/Nubo/` by hand.
+
+### What Part 1 found
+
+Built on 2026-10-14. `frontends/nubo/src/command_line.rs` reads the options and explains them. Where
+the build differs from the steps above, and what was checked:
+
+- **`--scale`.** Iced 0.14's `scale_factor` multiplies the display's own scale factor, which isn't
+  known before the window opens. So the window opens at 160·n × 144·n logical pixels, and when it
+  opens (and whenever the display's scaling changes) the app asks for the scale factor and resizes it
+  to 160·n ÷ factor logical pixels, which winit rounds to exactly 160·n physical pixels
+  (`app::screen_only_size`, with a unit test for every scale at the usual factors). The window can't
+  be resized by hand, and keeps its title bar, since the harness finds it by its title.
+- **Checked on a virtual X display (Xvfb)** in a cloud session, with `WINIT_X11_SCALE_FACTOR` for
+  the display's scaling: `--scale 2` gives an inside of exactly 320×288 pixels at 100%, 125%, 150%
+  and 200%, filled by the picture with nearest-neighbour scaling. With `--scale 1 --fresh --speed 4`,
+  the window's pixels match the Shootout's `dmg-acid2` reference exactly, and `cgb-acid2`'s within 38
+  of the 50 the harness allows. Nubo wrote no files.
+- **`--fresh` keeps more out than the plan listed.** Besides settings, battery saves, the resume slot,
+  the library and the folder watcher, a `--fresh` game offers no save states, cheats or screenshots
+  (`Game::keeps_data`), and settings changed in the window aren't saved. Battery saves are discarded
+  through `nubo_frontend::session::Saves::Discarded`, which also puts the cartridge clock on emulated
+  time.
+- **`--speed`** takes the fast forward speeds the settings offer (2, 3, 4 and 8) and turns fast
+  forward on at that speed for the run, without changing the saved speed
+  (`GameSession::fast_forward_at`).
+- **Mistakes on the command line now stop the app** with a message and exit code 2, `--model`'s
+  included, which used to be ignored. With `--scale`, a ROM that can't be read or started stops the
+  app with exit code 1 before the window opens, since the window has nowhere to show why.
+
+Still to do: the maintainer's check of the window on Windows (above), then a release.
 
 **Done when:** the three options are merged and documented, and a screenshot taken by hand shows a
 160×144 window with only the game in it.

@@ -45,6 +45,7 @@ cargo play                          # Run the desktop app
 cargo play path/to/rom.gb           # Run a specific ROM (.gb, .gbc, or a .zip containing one)
 cargo play path/to/rom.gbc --cgb    # Run in Game Boy Color mode
 cargo play path/to/rom.gb --model mgb  # Run on another model: dmg-0, dmg, mgb, sgb, sgb2, cgb-0 to cgb-e, agb
+cargo play path/to/rom.gb --scale 2 --fresh --speed 4  # Only the screen at 2×, keeping nothing, fast forwarding at 4× (for test harnesses)
 cargo xtask web                     # Build the app for the browser and serve it at http://127.0.0.1:8080
 cargo xtask bundle                  # Build Nubo.app with its icon into target/bundle/ (macOS)
 cargo xtask flatpak                 # Build the app as a Flatpak, install it for your user and write a .flatpak file into target/bundle/

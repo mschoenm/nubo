@@ -13,7 +13,7 @@
 //! (see `session/pacing.rs`).
 
 use super::pacing::{FRAME_DURATION, Lock, RefreshRate, SampleRateControl};
-use super::{Command, Machine, Playback, ask};
+use super::{Command, Machine, Playback, Saves, ask};
 use crate::notices::Notices;
 use crate::rom::Rom;
 use nubo_core::Model;
@@ -66,16 +66,18 @@ pub struct Session {
 }
 
 impl Session {
-    /// Creates the emulator and loads `rom` on `model`, playing as
-    /// `playback` says from the start, returning the load error if it
-    /// couldn't. Problems while the game runs go to `notices`.
+    /// Creates the emulator and loads `rom` on `model`, with its battery
+    /// saves kept in `saves`, playing as `playback` says from the start,
+    /// returning the load error if it couldn't. Problems while the game runs
+    /// go to `notices`.
     pub fn start(
         rom: &Rom,
+        saves: Saves,
         model: Model,
         playback: Playback,
         notices: &Notices,
     ) -> Result<Session, String> {
-        let machine = Machine::start(rom, model, playback, notices)?;
+        let machine = Machine::start(rom, saves, model, playback, notices)?;
         Ok(Session {
             emulator_sample_rate: machine.audio.sample_rate(),
             machine,
