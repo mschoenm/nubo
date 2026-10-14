@@ -18,7 +18,7 @@ Commands taking longer than a minute or two (builds, `cargo test-roms`, benchmar
 
 ## 2. Find tonight's work
 
-1. Read `AGENTS.md` first, especially its Rules and Style, and the `AGENTS.md` in the folders of the code you review (`crates/nubo-core/`, `frontends/*/`, `tools/*/`, `xtask/`), which describe it.
+1. Read `AGENTS.md` first, especially its Rules and Style, and the `AGENTS.md` in the folders of the code you review (`crates/nubo-core/`, `crates/nubo-frontend/`, `frontends/*/`, `tools/*/`, `xtask/`), which describe it.
 2. Clone the wiki: `git clone --depth 1 https://github.com/mschoenm/nubo.wiki.git /tmp/wiki`. Its `tonight.json` says what to review: `part.files` (the part to read in detail), `changes_since` (the commit the day's changes start after; `null` on the first night) and `changed_files`. Use it if its `date` is today or yesterday (UTC).
 3. If the wiki or a recent `tonight.json` is missing, pick the part yourself: copy `/tmp/wiki/rotation.json` to `/tmp/rotation.json` if it exists, run `cargo xtask review-units next --state /tmp/rotation.json --date "$(date -u +%F)" --commit "$(git rev-parse HEAD)"`, and say in your report that the wiki wasn't up to date.
 4. The day's changes are `git log --reverse <changes_since>..origin/main`; without `changes_since`, the commits of the last 26 hours. Read their diffs, all files including docs. Beyond about 3,000 changed lines, review the files with the most changes and list the rest as not reviewed.
