@@ -1,8 +1,9 @@
 //! The settings window, drawn over the current screen, with a tab per
 //! group of settings. Every page is built the same way: titled groups of
 //! rows in a rounded card, each row with its name and a short description
-//! at the left and its control at the right, and any longer note under its
-//! group. The window grows with the app's window, up to [`MAX_HEIGHT`].
+//! at the left and its control at the right (or under them, for a control
+//! too wide to share the row), and any longer note under its group. The
+//! window grows with the app's window, up to [`MAX_HEIGHT`].
 
 use crate::app::{GameMessage, LibraryMessage, Message, SettingsMessage};
 use crate::settings::{Appearance, Settings};
@@ -609,17 +610,17 @@ fn playing<'a>(
 
     let mut console = vec![
         rings.row(
-            setting(
-                "Game Boy model",
-                Some(String::from(model_description)),
+            column![
+                label("Game Boy model", Some(String::from(model_description))),
                 pick_list(
                     choices,
                     Some(ModelChoice(settings.shared.model)),
                     |choice| Message::Settings(SettingsMessage::ModelSelected(choice.0)),
                 )
                 .text_size(13)
-                .width(220),
-            ),
+                .width(Fill),
+            ]
+            .spacing(10),
             SettingsRow::Model,
         ),
     ];
