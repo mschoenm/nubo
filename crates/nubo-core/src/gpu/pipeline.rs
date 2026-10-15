@@ -631,7 +631,7 @@ impl Gpu {
         if y > line || y + height <= line {
             return;
         }
-        self.add_visible_object(index, oam_x, oam_y);
+        self.pipeline.add_visible_object(index as u8, oam_x, oam_y);
     }
 
     /// `scan_oam_entry` for each entry in `entries`. While nothing keeps the scan from reading
@@ -652,14 +652,20 @@ impl Gpu {
         // The object covers the line when the line is 0 to `height - 1` rows below its top
         // (OAM y - 16), which one unsigned comparison checks.
         let line_plus_16 = u16::from(self.ly) + 16;
-        for index in entries.clone() {
-            if usize::from(self.pipeline.visible_object_count) == MAX_VISIBLE_OBJECTS {
-                break;
-            }
-            let oam_y = self.object_attribute_memory[usize::from(index) * 4];
-            if line_plus_16.wrapping_sub(u16::from(oam_y)) < height {
-                let oam_x = self.object_attribute_memory[usize::from(index) * 4 + 1];
-                self.add_visible_object(index, oam_x, oam_y);
+        let pipeline = &mut self.pipeline;
+        if usize::from(pipeline.visible_object_count) < MAX_VISIBLE_OBJECTS {
+            let objects = self.object_attribute_memory.as_chunks::<4>().0;
+            let first = usize::from(entries.start);
+            let scanned = objects
+                .get(first..usize::from(entries.end))
+                .unwrap_or_default();
+            for (index, &[oam_y, oam_x, ..]) in (first..).zip(scanned) {
+                if line_plus_16.wrapping_sub(u16::from(oam_y)) < height {
+                    pipeline.add_visible_object(index as u8, oam_x, oam_y);
+                    if usize::from(pipeline.visible_object_count) == MAX_VISIBLE_OBJECTS {
+                        break;
+                    }
+                }
             }
         }
         // The scan reads every entry's Y and X over the same latches, so they hold the last.
@@ -668,29 +674,29 @@ impl Gpu {
             self.oam_scan_x_bus = self.object_attribute_memory[usize::from(last) * 4 + 1];
         }
     }
+}
 
+impl Pipeline {
     /// Adds OAM entry `index` to the objects found on the line, keeping them sorted by x.
-    fn add_visible_object(&mut self, index: u16, oam_x: u8, oam_y: u8) {
-        let pipeline = &mut self.pipeline;
-        let count = usize::from(pipeline.visible_object_count);
+    fn add_visible_object(&mut self, index: u8, oam_x: u8, oam_y: u8) {
+        let count = usize::from(self.visible_object_count);
         let insert_at = (0..count)
-            .find(|&j| pipeline.visible_object_x[j] <= oam_x)
+            .find(|&j| self.visible_object_x[j] <= oam_x)
             .unwrap_or(count);
-        pipeline
-            .visible_object_indices
+        self.visible_object_indices
             .copy_within(insert_at..count, insert_at + 1);
-        pipeline
-            .visible_object_x
+        self.visible_object_x
             .copy_within(insert_at..count, insert_at + 1);
-        pipeline
-            .visible_object_y
+        self.visible_object_y
             .copy_within(insert_at..count, insert_at + 1);
-        pipeline.visible_object_indices[insert_at] = index as u8;
-        pipeline.visible_object_x[insert_at] = oam_x;
-        pipeline.visible_object_y[insert_at] = oam_y;
-        pipeline.visible_object_count += 1;
+        self.visible_object_indices[insert_at] = index;
+        self.visible_object_x[insert_at] = oam_x;
+        self.visible_object_y[insert_at] = oam_y;
+        self.visible_object_count += 1;
     }
+}
 
+impl Gpu {
     /// A PPU read of OAM in mode 3. While OAM DMA copies, the PPU sees the pair of bytes the
     /// transfer writes next instead (SameBoy).
     fn ppu_oam_read(&self, address: usize) -> u8 {

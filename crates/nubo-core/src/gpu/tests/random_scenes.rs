@@ -2,7 +2,8 @@
 //! CGB and CGB in double speed, with register writes at random dots.
 //!
 //! They check that the bulk runs (`Gpu::run_dots` with its steady stretches and plain pixels) give
-//! exactly what running dot by dot does, and that a save state taken at any dot carries on
+//! exactly what running dot by dot does, down to every byte of a save state after each stretch,
+//! often ended near a line's timing events, and that a save state taken at any dot carries on
 //! exactly like the PPU it came from and can't make the PPU panic when corrupted.
 //!
 //! `NUBO_RANDOM_SCENES` sets how many scenes the comparison of bulk runs with running dot by dot
@@ -11,7 +12,7 @@
 
 use crate::address_bus::MemoryMapped;
 use crate::address_bus::hdma::HdmaState;
-use crate::gpu::{DOTS_PER_FRAME, Gpu};
+use crate::gpu::{DOTS_PER_FRAME, DOTS_PER_LINE, Gpu};
 use crate::model::Model;
 use crate::serializable::Serializable;
 
@@ -135,6 +136,17 @@ fn tick_dots(gpu: &mut Gpu, hdma: &mut HdmaState, dots: u32) {
     }
 }
 
+/// The first line of the two PPUs' debug output that differs, to show what a failed comparison
+/// found.
+fn first_difference(expected: &Gpu, actual: &Gpu) -> Option<(String, String)> {
+    let (expected, actual) = (format!("{expected:#?}"), format!("{actual:#?}"));
+    expected
+        .lines()
+        .zip(actual.lines())
+        .find(|(expected, actual)| expected != actual)
+        .map(|(expected, actual)| (expected.to_owned(), actual.to_owned()))
+}
+
 fn serialize(gpu: &Gpu) -> Vec<u8> {
     let mut bytes = Vec::new();
     gpu.serialize(&mut bytes)
@@ -159,10 +171,27 @@ fn bulk_runs_match_running_dot_by_dot() {
         let scene = random_scene(&mut random, model, double_speed);
         let (mut by_dot, mut in_bulk) = (scene.clone(), scene);
         let (mut by_dot_hdma, mut in_bulk_hdma) = (HdmaState::new(), HdmaState::new());
+        if model.is_cgb() && random.chance(50) {
+            // An HBlank DMA of 128 blocks, so that the PPU tells it when HBlank starts.
+            by_dot_hdma.write_byte(0xFF55, 0xFF);
+            in_bulk_hdma.write_byte(0xFF55, 0xFF);
+        }
         for frame in 0..2 {
             let mut left = DOTS_PER_FRAME;
             while left > 0 {
-                let stretch = (1 + random.below(4000)).min(left);
+                // Some stretches end where most timing events are: in the first dots of the next
+                // line, or about where its mode 3 ends.
+                let stretch = if random.chance(30) {
+                    let dot = if random.chance(50) {
+                        random.below(8)
+                    } else {
+                        240 + random.below(100)
+                    };
+                    u32::from(DOTS_PER_LINE - by_dot.line_dot) + dot
+                } else {
+                    1 + random.below(4000)
+                }
+                .min(left);
                 tick_dots(&mut by_dot, &mut by_dot_hdma, stretch);
                 let mut bulk_left = stretch;
                 while bulk_left > 0 {
@@ -172,8 +201,17 @@ fn bulk_runs_match_running_dot_by_dot() {
                 }
                 left -= stretch;
 
-                // Interrupt requests are compared and cleared after every stretch, so that one
-                // requested on one side only can't be hidden by a later one on both.
+                // What a save state holds is compared after every stretch, as a save state
+                // taken there would show what a shortcut left out even when a later dot puts it
+                // right. Interrupt requests are compared and cleared, so that one requested on one
+                // side only can't be hidden by a later one on both.
+                assert!(
+                    serialize(&by_dot) == serialize(&in_bulk),
+                    "seed {seed}, case {case}, frame {frame}, line {} dot {}: {:?}",
+                    by_dot.line,
+                    by_dot.line_dot,
+                    first_difference(&by_dot, &in_bulk)
+                );
                 let requests = |gpu: &Gpu| {
                     (
                         gpu.line,
@@ -190,6 +228,15 @@ fn bulk_runs_match_running_dot_by_dot() {
                 for gpu in [&mut by_dot, &mut in_bulk] {
                     gpu.stat_interrupt = false;
                     gpu.vblank_interrupt = false;
+                }
+                // Likewise HBlank's start for HBlank DMA, which the address bus would take.
+                assert_eq!(
+                    format!("{by_dot_hdma:?}"),
+                    format!("{in_bulk_hdma:?}"),
+                    "seed {seed}, case {case}, frame {frame}"
+                );
+                for hdma in [&mut by_dot_hdma, &mut in_bulk_hdma] {
+                    hdma.set_hblank_started(false);
                 }
 
                 if random.chance(40) {
