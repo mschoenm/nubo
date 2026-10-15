@@ -4,6 +4,7 @@
 
 use crate::app::{
     GameMessage, LibraryMessage, Message, SCREEN_HEIGHT, SCREEN_WIDTH, SettingsMessage,
+    WindowMessage,
 };
 use crate::settings::{LibrarySort, Settings};
 use crate::ui::icons::{self, Icon, icon};
@@ -220,17 +221,13 @@ pub fn view<'a>(
     selection: Option<usize>,
     controllers: &'a [String],
     remembered: Option<&'a Rom>,
-    newer_version: Option<&'a str>,
+    top: TopBar<'a>,
 ) -> Element<'a, Message> {
     let shelves = Shelves::new(library, settings, search);
     let has_folders = !settings.shared.library_folders.is_empty();
 
     if !library::AVAILABLE || (!has_folders && library.recently_played(1).is_empty()) {
-        return column![
-            bar(None, newer_version),
-            welcome(settings, controllers, remembered)
-        ]
-        .into();
+        return column![bar(None, top), welcome(settings, controllers, remembered)].into();
     }
 
     let mut content = Column::new().spacing(SECTION_SPACING);
@@ -305,13 +302,23 @@ pub fn view<'a>(
         })
         .height(Fill);
 
-    column![bar(Some(search), newer_version), page].into()
+    column![bar(Some(search), top), page].into()
+}
+
+/// What the library's top bar shows besides the search and its buttons.
+#[derive(Debug, Clone, Copy)]
+pub struct TopBar<'a> {
+    /// A newer Nubo, if one is out.
+    pub newer_version: Option<&'a str>,
+    /// Whether the window fills the screen, which shows a button to leave it.
+    pub fullscreen: bool,
 }
 
 /// The top bar: with games to search, a search field and Open game; on the
 /// welcome screen, whose own buttons open games, only the settings on the
-/// right. With a newer version out, a small note says so and opens its page.
-fn bar<'a>(search: Option<&'a str>, newer_version: Option<&'a str>) -> Element<'a, Message> {
+/// right. With a newer version out, a small note says so and opens its page,
+/// and a fullscreen window gets a button back to a window.
+fn bar<'a>(search: Option<&'a str>, top: TopBar<'a>) -> Element<'a, Message> {
     let mut bar = row![brand()];
     bar = match search {
         Some(search) => bar.push(search_field(search)).push(bar_button(
@@ -323,7 +330,7 @@ fn bar<'a>(search: Option<&'a str>, newer_version: Option<&'a str>) -> Element<'
         )),
         None => bar.push(space::horizontal()),
     };
-    if let Some(version) = newer_version {
+    if let Some(version) = top.newer_version {
         bar = bar.push(space().width(6)).push(
             button(
                 row![
@@ -337,6 +344,14 @@ fn bar<'a>(search: Option<&'a str>, newer_version: Option<&'a str>) -> Element<'
             .style(theme::chip(true))
             .on_press(Message::OpenLink(updates::RELEASES_PAGE)),
         );
+    }
+
+    if top.fullscreen {
+        bar = bar.push(space().width(6)).push(icon_button(
+            Icon::Minimize,
+            String::from("Exit fullscreen (F11)"),
+            Some(Message::Window(WindowMessage::ToggleFullscreen)),
+        ));
     }
 
     top_bar(bar.push(space().width(6)).push(icon_button(

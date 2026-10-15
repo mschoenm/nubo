@@ -64,7 +64,12 @@ impl App {
                 });
             }
             WindowMessage::Rescaled(id) => return self.fit_to_screen(id),
-            WindowMessage::FullscreenChanged(fullscreen) => self.fullscreen = fullscreen,
+            WindowMessage::FullscreenChanged(fullscreen) => {
+                if fullscreen != self.fullscreen {
+                    self.fullscreen_for_game = fullscreen && self.game.is_some();
+                }
+                self.fullscreen = fullscreen;
+            }
             WindowMessage::FileHovered => self.file_hovered = true,
             WindowMessage::FileHoverLeft => self.file_hovered = false,
             WindowMessage::FileDropped(path) => {
@@ -146,6 +151,16 @@ impl App {
 pub fn screen_only_size(scale: u32, scale_factor: f32, (width, height): (u32, u32)) -> Size {
     let pixels = |length: u32| (length * scale) as f32 / scale_factor;
     Size::new(pixels(width), pixels(height))
+}
+
+/// Puts a window that went fullscreen for a game back to a normal window,
+/// as the game closes: fullscreen is for playing.
+pub(super) fn leave_fullscreen_for_game(app: &mut App) -> Task<Message> {
+    if !(app.fullscreen && app.fullscreen_for_game) {
+        return Task::none();
+    }
+    app.fullscreen_for_game = false;
+    window::latest().and_then(|id| window::set_mode(id, window::Mode::Windowed))
 }
 
 /// Switches the window between fullscreen and a normal window.
