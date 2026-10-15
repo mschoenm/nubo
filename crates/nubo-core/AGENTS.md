@@ -15,7 +15,7 @@ The emulator itself: a plain Rust library with no platform dependencies and no C
 | PPU | `gpu.rs`, `gpu/` | Line timeline, pixel pipeline (SameBoy port), bulk stretches (`steady.rs`), palettes |
 | APU | `apu.rs`, `apu/` | Four channels (SameBoy port), lazy catch-up (`catch_up.rs`), band-limited output |
 | Input, serial | `joypad.rs`, `controller.rs`, `serial.rs` | |
-| Super Game Boy | `sgb.rs`, `sgb/` | The Super Nintendo's side: commands sent through JOYP, colors, transfers, borders (SameBoy port), Nubo's intro, the menu's settings and the attraction mode (`attraction.rs`). The PPU owns it and hands it each finished frame |
+| Super Game Boy | `sgb.rs`, `sgb/` | The Super Nintendo's side: commands sent through JOYP, colors, transfers, borders (SameBoy port), Nubo's own border with its night and day looks (`nubo_border.rs`), Nubo's intro, the menu's settings and the attraction mode (`attraction.rs`). The PPU owns it and hands it each finished frame |
 | Boot ROMs | `bios.rs`, and their sources in `crates/nubo-core/boot_roms/` | Nubo's own, timed to the cycle like the ones they replaced |
 
 ## How Time Moves

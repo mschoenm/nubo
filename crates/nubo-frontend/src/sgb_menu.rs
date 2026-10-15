@@ -6,9 +6,13 @@
 //! until the game starts again, also when a save state loads, since they are
 //! the player's rather than the game's. Each app draws a page of its own for
 //! them.
+//!
+//! Nubo's own border has a night and a day look, which follow the player's
+//! clock ([`BorderClock`]) rather than a choice in the menu.
 
 use crate::palettes::DmgPalette;
-use nubo_core::{Emulator, SgbBorder};
+use chrono::Timelike;
+use nubo_core::{Emulator, SgbBorder, SgbBorderTime};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// What the emulator's Super Game Boy says about its menu, taken with each
@@ -46,6 +50,73 @@ impl SgbMenu {
                 .into_iter()
                 .find(|preset| preset.rgb555() == palette)
                 .map_or(SgbColors::Own, SgbColors::Preset),
+        }
+    }
+}
+
+/// The hour of the day, on the player's clock, at which Nubo's Super Game
+/// Boy border turns to its day look.
+pub const DAY_STARTS_AT: u32 = 7;
+/// The hour at which it turns back to its night look.
+pub const NIGHT_STARTS_AT: u32 = 19;
+/// How many frames go by between looks at the clock: about ten seconds of
+/// play.
+const FRAMES_BETWEEN_CHECKS: u32 = 600;
+
+/// Which look Nubo's Super Game Boy border has at `hour` (0 to 23) of the
+/// day.
+pub fn border_time_at(hour: u32) -> SgbBorderTime {
+    if (DAY_STARTS_AT..NIGHT_STARTS_AT).contains(&hour) {
+        SgbBorderTime::Day
+    } else {
+        SgbBorderTime::Night
+    }
+}
+
+/// Which look Nubo's Super Game Boy border has now, by the player's local
+/// clock.
+pub fn border_time_now() -> SgbBorderTime {
+    border_time_at(chrono::Local::now().hour())
+}
+
+/// Keeps Nubo's Super Game Boy border in step with the player's clock: its
+/// day look from [`DAY_STARTS_AT`] and its night look from
+/// [`NIGHT_STARTS_AT`]. It looks at the clock when a game starts and every
+/// ten seconds or so of play after that. Other models have no border and
+/// are left alone.
+#[derive(Debug, Default)]
+pub struct BorderClock {
+    /// Frames since the clock was last looked at.
+    frames_since_check: u32,
+}
+
+impl BorderClock {
+    /// Gives `emulator`'s border the look for the time now, for a game that
+    /// just started.
+    pub fn start(emulator: &mut Emulator) -> BorderClock {
+        let mut clock = BorderClock::default();
+        clock.check(emulator);
+        clock
+    }
+
+    /// Counts a finished frame, and every 600 frames (about ten seconds)
+    /// turns the border to the look the clock says.
+    pub fn frame_finished(&mut self, emulator: &mut Emulator) {
+        self.frames_since_check += 1;
+        if self.frames_since_check >= FRAMES_BETWEEN_CHECKS {
+            self.check(emulator);
+        }
+    }
+
+    /// Gives the border the look for the time now, if it has another.
+    fn check(&mut self, emulator: &mut Emulator) {
+        self.frames_since_check = 0;
+        if !emulator.model().is_sgb() {
+            return;
+        }
+        let time = border_time_now();
+        if emulator.sgb_border_time() != time {
+            emulator.set_sgb_border_time(time);
         }
     }
 }

@@ -7,7 +7,7 @@
 //! game's picture takes over.
 
 use crate::sgb::INTRO_FRAMES;
-use crate::sgb::border::nubo_colors;
+use crate::sgb::nubo_border::nubo_colors;
 
 /// The screen's width in pixels.
 const SCREEN_WIDTH: usize = 160;

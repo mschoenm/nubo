@@ -12,7 +12,7 @@ use crate::error::{CheatError, LoadRomError};
 use crate::joypad::Key;
 use crate::model::Model;
 use crate::rom_archive;
-use crate::sgb::{Sgb, SgbBorder};
+use crate::sgb::{Sgb, SgbBorder, SgbBorderTime};
 use std::ops::Range;
 
 /// Where the cartridge header starts: the entry point the boot ROM jumps to.
@@ -456,6 +456,24 @@ impl Emulator {
     pub fn set_sgb_border(&mut self, border: SgbBorder) {
         self.address_bus_mut()
             .change_sgb_menu(|sgb| sgb.set_border_choice(border));
+    }
+
+    /// On the Super Game Boy models, whether Nubo's own border shows its
+    /// night or its day look ([`Emulator::set_sgb_border_time`]).
+    /// [`SgbBorderTime::Night`] on other models.
+    pub fn sgb_border_time(&self) -> SgbBorderTime {
+        self.address_bus()
+            .sgb()
+            .map_or(SgbBorderTime::Night, Sgb::border_time)
+    }
+
+    /// On the Super Game Boy models, shows Nubo's own border with its night
+    /// sky or its day sky; frontends pick it from the player's clock. It
+    /// starts at night. The last frame shows it at once, and like the border
+    /// choice ([`Emulator::set_sgb_border`]) save states don't keep it.
+    pub fn set_sgb_border_time(&mut self, time: SgbBorderTime) {
+        self.address_bus_mut()
+            .change_sgb_menu(|sgb| sgb.set_border_time(time));
     }
 
     /// Chooses which controller buttons act as which Game Boy buttons.

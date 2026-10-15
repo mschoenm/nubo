@@ -36,6 +36,9 @@ futures = { version = "0.3", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["derive"] }
 toml = "1"
 web-time = "1.1"
+# The player's local hour, which picks the night or day look of Nubo's Super
+# Game Boy border (src/sgb_menu.rs); in the browser it asks JavaScript's Date.
+chrono = { version = "0.4", default-features = false, features = ["clock", "wasmbind"] }
 # The checksum box art is looked up by (src/library/box_art/download.rs).
 crc32fast = { version = "1.5", optional = true }
 directories = { version = "6", optional = true }

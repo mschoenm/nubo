@@ -29,7 +29,7 @@ use nubo_core::{
     validate_gamegenie_code,
 };
 use nubo_frontend::picture::Frame;
-use nubo_frontend::sgb_menu::DEFAULT_OWN_PALETTE;
+use nubo_frontend::sgb_menu::{BorderClock, DEFAULT_OWN_PALETTE};
 use std::collections::BTreeMap;
 use std::ffi::CStr;
 use std::sync::Arc;
@@ -233,6 +233,9 @@ pub struct Core {
     memory: MemorySnapshot,
     /// The rumble motor's strength during the latest frame, 0 to 0xFFFF.
     rumble: u16,
+    /// Turns a Super Game Boy's border to its night or day look as the
+    /// player's clock says.
+    border_clock: BorderClock,
 }
 
 impl Core {
@@ -246,7 +249,8 @@ impl Core {
         let rom = extract_rom(rom)?;
         let header = Emulator::read_rom_header(&rom)?;
         let requests = Arc::new(SaveRequests::default());
-        let emulator = start(&rom, &header, options, &requests)?;
+        let mut emulator = start(&rom, &header, options, &requests)?;
+        let border_clock = BorderClock::start(&mut emulator);
         let mut core = Core {
             rom,
             header,
@@ -271,6 +275,7 @@ impl Core {
             state_size: 0,
             memory: MemorySnapshot::new(),
             rumble: 0,
+            border_clock,
         };
         if core.header.has_battery {
             core.save_ram = core.emulator.cartridge_ram().to_vec();
@@ -339,6 +344,7 @@ impl Core {
         self.right.clear();
         self.emulator.run_frame(&mut self.left, &mut self.right);
         self.emulator.take_frame();
+        self.border_clock.frame_finished(&mut self.emulator);
 
         self.pass_on_game_saves();
         self.draw_frame();
@@ -354,6 +360,7 @@ impl Core {
         self.take_frontend_changes();
         let clock = self.emulator.rtc_state(RtcClock::WallClock);
         let mut emulator = start(&self.rom, &self.header, self.options, &self.requests)?;
+        self.border_clock = BorderClock::start(&mut emulator);
         if self.header.has_battery {
             emulator.set_cartridge_ram(self.emulator.cartridge_ram());
             if let Some(clock) = clock {
