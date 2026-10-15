@@ -1,12 +1,15 @@
-//! Tests for the app's small helpers, and for resetting the settings in a
-//! `--fresh` app, which keeps nothing.
+//! Tests for the app's small helpers, for resetting the settings in a
+//! `--fresh` app, which keeps nothing, and for controller shortcuts while
+//! the settings are open.
 
 use super::settings_window::reset_summary;
-use super::{App, GameMessage, SettingsMessage, cycle};
+use super::{App, GameMessage, Message, SettingsMessage, cycle};
 use crate::command_line::Options;
 use crate::dialog::{DialogKind, ResetChoices};
 use crate::settings::Appearance;
 use crate::views::settings::SettingsTab;
+use nubo_core::{ControllerButton, ControllerState};
+use nubo_frontend::gamepads::{ControllerEvent, Controllers};
 use nubo_frontend::rom::Rom;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -189,4 +192,42 @@ fn picking_another_settings_tab_scrolls_its_page_to_the_top() {
 
     let task = app.update(SettingsMessage::TabSelected(SettingsTab::Controls).into());
     assert_eq!(task.units(), 0);
+}
+
+#[test]
+fn controller_shortcuts_wait_while_the_settings_are_open() {
+    let (mut app, _) = App::new(
+        None,
+        &Options {
+            fresh: true,
+            ..Options::default()
+        },
+    );
+    app.remembered = Some(Rom {
+        path: PathBuf::from("game.gb"),
+        bytes: Arc::from(vec![0; 0x8000]),
+    });
+    let _ = app.update(GameMessage::PlayRemembered.into());
+    let pad = |buttons: &[ControllerButton]| {
+        let mut state = ControllerState::new();
+        for &button in buttons {
+            state.set_button(button, true);
+        }
+        Message::Controller(ControllerEvent::Changed(Controllers::from(vec![state])))
+    };
+    let rewinding = |app: &App| app.game.as_ref().unwrap().session.is_rewinding();
+
+    let _ = app.update(SettingsMessage::Open.into());
+    let _ = app.update(pad(&[ControllerButton::West]));
+    assert!(!rewinding(&app));
+    let _ = app.update(pad(&[ControllerButton::LeftShoulder]));
+    assert!(!app.game.as_ref().unwrap().is_paused());
+    let _ = app.update(pad(&[]));
+
+    let _ = app.update(SettingsMessage::Close.into());
+    let _ = app.update(pad(&[ControllerButton::West]));
+    assert!(rewinding(&app));
+    let _ = app.update(SettingsMessage::Open.into());
+    let _ = app.update(pad(&[]));
+    assert!(!rewinding(&app));
 }

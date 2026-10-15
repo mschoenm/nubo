@@ -216,9 +216,13 @@ impl App {
     }
 
     /// Does what a key or controller button is bound to, as it goes down
-    /// (`pressed`) or up. Game Boy buttons only go down while the game runs.
-    /// A window that shows only the game (`--scale`) only plays it and fast
-    /// forwards (no rewinding either), so nothing can come up over the game.
+    /// (`pressed`) or up. Game Boy buttons only go down while the game runs,
+    /// and shortcuts other than fullscreen don't go down while the settings
+    /// or a dialog are open, so trying out a button there doesn't save, load
+    /// or rewind the game. Letting go always counts, so a shortcut held as
+    /// they open still stops. A window that shows only the game (`--scale`) only plays it
+    /// and fast forwards (no rewinding either), so nothing can come up over
+    /// the game.
     fn perform(&mut self, action: Action, pressed: bool) -> Task<Message> {
         if let Some(key) = action.game_boy_key() {
             let running = self.is_running();
@@ -229,6 +233,13 @@ impl App {
                     game.session.press(key);
                 }
             }
+            return Task::none();
+        }
+
+        if pressed
+            && action != Action::Fullscreen
+            && (self.settings_tab.is_some() || self.dialog.is_some())
+        {
             return Task::none();
         }
 
