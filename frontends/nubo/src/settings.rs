@@ -112,7 +112,7 @@ impl fmt::Display for Appearance {
 /// from their default. TOML puts plain values before tables, so the shared
 /// tables (the library folders and the controls) still come last.
 /// Reading goes through [`Settings::from_toml`].
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Settings {
     pub appearance: Appearance,
     /// The settings every app shares, stored next to this app's own.
@@ -127,6 +127,40 @@ pub struct Settings {
     /// Which games the library lists.
     #[serde(skip_serializing_if = "is_default")]
     pub library_filter: LibraryFilter,
+    /// Whether the game pauses while the window isn't the one in front, and
+    /// goes on when it is again. On until the player turns it off, and only
+    /// saved then.
+    #[serde(skip_serializing_if = "is_true")]
+    pub pause_in_background: bool,
+    /// The window's size when the app last closed, in logical pixels, which
+    /// it opens at next time. Not kept in the browser, whose window is the
+    /// page.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub window_size: Option<(f32, f32)>,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        let own = OwnSettings::default();
+        Settings {
+            appearance: own.appearance,
+            shared: nubo_frontend::settings::Settings::default(),
+            integer_scaling: own.integer_scaling,
+            library_sort: own.library_sort,
+            library_filter: own.library_filter,
+            pause_in_background: own.pause_in_background,
+            window_size: own.window_size,
+        }
+    }
+}
+
+/// Whether `value` is true, for settings saved only when they are off.
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde's skip_serializing_if passes a reference"
+)]
+fn is_true(value: &bool) -> bool {
+    *value
 }
 
 /// Whether `value` is its type's default, which isn't saved.
@@ -135,13 +169,30 @@ fn is_default<T: Default + PartialEq>(value: &T) -> bool {
 }
 
 /// This app's own settings, read from the same text as the shared ones.
-#[derive(Default, Deserialize)]
+/// What a file leaves out gets the default here: a file that never said
+/// whether to scale in whole steps gets them, as new players do.
+#[derive(Deserialize)]
 #[serde(default)]
 struct OwnSettings {
     appearance: Appearance,
     integer_scaling: bool,
     library_sort: LibrarySort,
     library_filter: LibraryFilter,
+    pause_in_background: bool,
+    window_size: Option<(f32, f32)>,
+}
+
+impl Default for OwnSettings {
+    fn default() -> Self {
+        OwnSettings {
+            appearance: Appearance::default(),
+            integer_scaling: true,
+            library_sort: LibrarySort::default(),
+            library_filter: LibraryFilter::default(),
+            pause_in_background: true,
+            window_size: None,
+        }
+    }
 }
 
 impl Settings {
@@ -165,6 +216,8 @@ impl Settings {
             integer_scaling: own.integer_scaling,
             library_sort: own.library_sort,
             library_filter: own.library_filter,
+            pause_in_background: own.pause_in_background,
+            window_size: own.window_size,
         })
     }
 

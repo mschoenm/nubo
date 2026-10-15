@@ -83,7 +83,8 @@ fn main() -> ExitCode {
 fn run(rom: Option<Result<Rom, String>>, options: Options) -> iced::Result {
     let window = match options.scale {
         Some(scale) => screen_only_window(scale),
-        None => default_window(),
+        None if options.fresh => default_window(None),
+        None => default_window(settings::Settings::load().0.window_size),
     };
 
     iced::application(
@@ -102,15 +103,22 @@ fn run(rom: Option<Result<Rom, String>>, options: Options) -> iced::Result {
     .run()
 }
 
-/// The window the app usually opens: wide enough for a whole row of library
-/// cards, and high enough for the game screen at four times its size.
-fn default_window() -> iced::window::Settings {
-    iced::window::Settings {
-        size: iced::Size::new(
+/// The window the app usually opens: at `saved_size`, the size it had when
+/// it last closed, or else wide enough for a whole row of library cards and
+/// high enough for the game screen at four times its size.
+fn default_window(saved_size: Option<(f32, f32)>) -> iced::window::Settings {
+    let size = match saved_size {
+        Some((width, height)) => {
+            iced::Size::new(width.max(MINIMUM_SIZE.0), height.max(MINIMUM_SIZE.1))
+        }
+        None => iced::Size::new(
             (app::SCREEN_WIDTH as f32 * DEFAULT_SCALE_FACTOR + SCREEN_PADDING)
                 .max(views::library::FULL_ROW_WINDOW_WIDTH),
             app::SCREEN_HEIGHT as f32 * DEFAULT_SCALE_FACTOR + SCREEN_PADDING + TOP_BAR_HEIGHT,
         ),
+    };
+    iced::window::Settings {
+        size,
         min_size: Some(MINIMUM_SIZE.into()),
         ..window_settings()
     }

@@ -147,6 +147,13 @@ impl Game {
         self.is_paused() || self.cursor_near_bar || Instant::now() < self.controls_shown_until
     }
 
+    /// Whether to hide the mouse pointer over the picture: while the game
+    /// runs and the mouse hasn't moved for a moment, as for the fullscreen
+    /// bar.
+    pub fn pointer_hidden(&self) -> bool {
+        !self.is_paused() && !self.cursor_near_bar && Instant::now() >= self.controls_shown_until
+    }
+
     /// Whether the fullscreen bar is shown only until a moment still to
     /// come, so the window has to be redrawn then to hide it. The browser
     /// build redraws on every frame anyway.

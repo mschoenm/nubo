@@ -80,6 +80,9 @@ pub struct App {
     /// Whether the window fills the screen. The game's top bar then hides
     /// until the mouse moves.
     fullscreen: bool,
+    /// Whether the window is the one in front, which the game only runs in
+    /// if the settings say to pause in the background.
+    focused: bool,
     /// The window's size, as it last had one.
     window_width: f32,
     window_height: f32,
@@ -122,6 +125,8 @@ pub struct App {
     box_art_problem: Option<String>,
     /// The dialog over the screen, if one is open.
     dialog: Option<Dialog>,
+    /// What the newest toast's Undo button puts back, if it has one.
+    undo: Option<playing::UndoPoint>,
 }
 
 /// Everything the user or the window can ask the application to do.
@@ -180,6 +185,7 @@ impl App {
             settings_tab: None,
             file_hovered: false,
             fullscreen: false,
+            focused: true,
             window_width: 0.0,
             window_height: 0.0,
             minimized: false,
@@ -198,6 +204,7 @@ impl App {
             loading_game_list: false,
             box_art_problem: None,
             dialog: None,
+            undo: None,
         };
 
         for error in [settings_error, library_error].into_iter().flatten() {
@@ -331,7 +338,12 @@ impl App {
         }
 
         if !self.toasts.is_empty() {
-            layers.push(self.toasts.view(Message::DismissToast));
+            let over_game = self.game.is_some() && self.settings_tab.is_none();
+            layers.push(self.toasts.view(
+                Message::DismissToast,
+                GameMessage::Undo.into(),
+                over_game,
+            ));
         }
 
         Stack::with_children(layers).into()
@@ -458,11 +470,16 @@ impl App {
         }
     }
 
-    /// Whether a game is running: not paused, and not behind the settings
-    /// or a dialog.
+    /// Whether a game is running: not paused, not behind the settings or a
+    /// dialog, and not in a window in the background if the settings pause
+    /// it there.
     fn is_running(&self) -> bool {
+        let in_background = !self.focused && self.settings.pause_in_background;
         self.game.as_ref().is_some_and(|game| {
-            !game.is_paused() && self.settings_tab.is_none() && self.dialog.is_none()
+            !game.is_paused()
+                && self.settings_tab.is_none()
+                && self.dialog.is_none()
+                && !in_background
         })
     }
 

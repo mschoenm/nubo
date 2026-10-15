@@ -105,18 +105,11 @@ pub fn divider(theme: &Theme) -> container::Style {
     }
 }
 
-/// The area around the Game Boy screen: nearly black in the dark theme, so
-/// the picture stands out, and a soft gray in the light theme.
-pub fn screen_area(theme: &Theme) -> container::Style {
-    let palette = theme.extended_palette();
-    let background = if palette.is_dark {
-        Color::from_rgb8(0x0c, 0x0d, 0x11)
-    } else {
-        palette.background.weak.color
-    };
-
+/// The area around the Game Boy screen: nearly black in both themes, as
+/// around a video, so the picture stands out.
+pub fn screen_area(_theme: &Theme) -> container::Style {
     container::Style {
-        background: Some(background.into()),
+        background: Some(Color::from_rgb8(0x0c, 0x0d, 0x11).into()),
         ..container::Style::default()
     }
 }

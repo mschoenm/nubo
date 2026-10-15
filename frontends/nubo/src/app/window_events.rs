@@ -26,6 +26,8 @@ pub enum WindowMessage {
     FileHovered,
     FileHoverLeft,
     FileDropped(PathBuf),
+    /// The window became the one in front (`true`) or stopped being it.
+    Focused(bool),
     SystemThemeChanged(Mode),
     CloseRequested,
 }
@@ -72,13 +74,33 @@ impl App {
                 }
             }
             WindowMessage::SystemThemeChanged(mode) => self.system_mode = mode,
+            WindowMessage::Focused(focused) => self.focused = focused,
             WindowMessage::CloseRequested => {
                 self.stop_game();
+                self.remember_window_size();
                 return iced::exit();
             }
         }
 
         Task::none()
+    }
+
+    /// Keeps the window's size in the settings, so it opens at that size
+    /// next time, unless it fills the screen, is minimized, shows only the
+    /// game (`--scale`) or the app keeps nothing (`--fresh`).
+    fn remember_window_size(&mut self) {
+        let size = (self.window_width, self.window_height);
+        if cfg!(target_arch = "wasm32")
+            || self.fresh
+            || self.screen_scale.is_some()
+            || self.fullscreen
+            || self.minimized
+            || size.0 <= 0.0
+            || self.settings.window_size == Some(size)
+        {
+            return;
+        }
+        self.change_settings(|settings| settings.window_size = Some(size));
     }
 
     /// Sizes a window that shows only the game (`--scale`) so its inside is
@@ -132,8 +154,8 @@ pub(super) fn toggle_fullscreen() -> Task<Message> {
     })
 }
 
-/// Turns mouse movements, window sizes and scaling, and file drag-and-drop
-/// events into messages.
+/// Turns mouse movements, window sizes, scaling and focus, and file
+/// drag-and-drop events into messages.
 pub(super) fn message_for(
     event: Event,
     _status: event::Status,
@@ -149,6 +171,8 @@ pub(super) fn message_for(
         Event::Window(window::Event::FileHovered(_)) => WindowMessage::FileHovered,
         Event::Window(window::Event::FilesHoveredLeft) => WindowMessage::FileHoverLeft,
         Event::Window(window::Event::FileDropped(path)) => WindowMessage::FileDropped(path),
+        Event::Window(window::Event::Focused) => WindowMessage::Focused(true),
+        Event::Window(window::Event::Unfocused) => WindowMessage::Focused(false),
         _ => return None,
     };
     Some(message.into())

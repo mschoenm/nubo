@@ -186,6 +186,7 @@ pub enum SettingsRow {
     ModelRevision,
     RestartNow,
     ResumeGames,
+    PauseInBackground,
     FastForwardSpeed,
     Volume,
     /// The keyboard or controller switch on the Controls tab.
@@ -225,6 +226,7 @@ pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec
             if save_states::AVAILABLE {
                 rows.push(SettingsRow::ResumeGames);
             }
+            rows.push(SettingsRow::PauseInBackground);
             rows.extend([SettingsRow::FastForwardSpeed, SettingsRow::Volume]);
         }
         SettingsTab::Controls => {
@@ -601,7 +603,8 @@ fn display<'a>(settings: &'a Settings, rings: &Rings) -> Element<'a, Message> {
                         "Sharp pixels",
                         Some(String::from(
                             "Grow the screen only in whole steps (2×, 3×, …), so every pixel \
-                             is the same size."
+                             is the same size. Off, the picture fills the window, and some \
+                             pixels come out a little bigger than others."
                         )),
                         switch(settings.integer_scaling, |enabled| {
                             Message::Settings(SettingsMessage::IntegerScalingToggled(enabled))
@@ -716,6 +719,19 @@ fn playing<'a>(
             SettingsRow::ResumeGames,
         ));
     }
+    games.push(rings.row(
+        setting(
+            "Pause in the background",
+            Some(String::from(
+                "The game waits while another window is in front, and goes on when you \
+                 come back.",
+            )),
+            switch(settings.pause_in_background, |pause| {
+                Message::Settings(SettingsMessage::PauseInBackgroundToggled(pause))
+            }),
+        ),
+        SettingsRow::PauseInBackground,
+    ));
 
     let fast_forward_key = settings
         .shared

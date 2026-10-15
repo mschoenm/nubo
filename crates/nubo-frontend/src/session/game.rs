@@ -349,6 +349,15 @@ impl GameSession {
         save_states::save(&self.rom.path, slot, &state, self.last_frame().as_deref())
     }
 
+    /// The game's state right now, kept in memory rather than in a slot,
+    /// such as to undo a load or a restart.
+    pub fn snapshot(&mut self) -> Result<SaveState, String> {
+        Ok(SaveState {
+            model: self.model,
+            data: self.session.save_state()?,
+        })
+    }
+
     /// Restores a save state made on this game's model.
     pub fn load(&mut self, data: Vec<u8>) -> Result<(), String> {
         self.session.load_state(data)

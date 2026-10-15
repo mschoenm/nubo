@@ -12,7 +12,7 @@ use nubo_frontend::cheats;
 use nubo_frontend::controls::Action;
 use nubo_frontend::picture::Picture;
 use nubo_frontend::rom::Rom;
-use nubo_frontend::save_states::{self, Slot};
+use nubo_frontend::save_states::{self, SaveState, Slot};
 use nubo_frontend::screenshots;
 use nubo_frontend::session::{GameSession, StartOptions};
 use nubo_frontend::sgb_menu::{ColorChannel, SgbColors};
@@ -66,6 +66,22 @@ pub enum GameMessage {
     /// read, for this opening of the page (see
     /// `GameSession::thumbnails_to_load`).
     ThumbnailsLoaded(u64, Vec<(Slot, Option<Picture>)>),
+    /// Undoes the last load, restart or save that offered it (see
+    /// `UndoPoint`).
+    Undo,
+}
+
+/// What the Undo button of the newest toast puts back.
+pub enum UndoPoint {
+    /// The game as it was before a state was loaded or it restarted.
+    Game { rom_path: PathBuf, state: SaveState },
+    /// What a slot held before a save replaced it, with its picture.
+    Slot {
+        rom_path: PathBuf,
+        slot: Slot,
+        state: SaveState,
+        picture: Option<Vec<u8>>,
+    },
 }
 
 impl From<GameMessage> for Message {
@@ -85,11 +101,26 @@ impl App {
             GameMessage::RomRead(rom) => self.open(rom),
             GameMessage::PlayGame(path) => return read_rom(path),
             GameMessage::Reset => {
-                if let Some(game) = &self.game {
+                if let Some(game) = &mut self.game {
                     let rom = game.session.rom().clone();
-                    self.start_game(rom, false);
+                    let before = game.keeps_data.then(|| game.session.snapshot());
+                    self.start_game(rom.clone(), false);
+                    let restarted = self
+                        .game
+                        .as_ref()
+                        .is_some_and(|game| game.session.rom().path == rom.path);
+                    if let Some(Ok(state)) = before
+                        && restarted
+                    {
+                        self.undo = Some(UndoPoint::Game {
+                            rom_path: rom.path,
+                            state,
+                        });
+                        self.toasts.info_with_undo("Restarted");
+                    }
                 }
             }
+            GameMessage::Undo => self.undo(),
             GameMessage::TogglePause => {
                 if let Some(game) = &mut self.game {
                     let page = if game.is_paused() {
@@ -353,6 +384,8 @@ impl App {
         let Some(mut game) = self.game.take() else {
             return;
         };
+        self.undo = None;
+        self.toasts.forget_undo();
         if !game.keeps_data {
             return;
         }
@@ -378,21 +411,94 @@ impl App {
             return;
         };
 
+        // What the slot held, so the save can be undone.
+        let rom_path = game.session.rom().path.clone();
+        let previous = save_states::load(&rom_path, slot).ok().flatten();
+        let picture = previous.as_ref().and_then(|_| {
+            save_states::thumbnails(&rom_path, &[slot])
+                .into_iter()
+                .find_map(|(_, picture)| picture)
+                .map(|picture| picture.pixels().to_vec())
+        });
+
         match game.session.save(slot) {
             Ok(()) => {
                 game.show_menu(None);
-                self.toasts.info(format!("Saved to {slot}"));
+                match previous {
+                    Some(state) => {
+                        self.undo = Some(UndoPoint::Slot {
+                            rom_path,
+                            slot,
+                            state,
+                            picture,
+                        });
+                        self.toasts.info_with_undo(format!("Saved to {slot}"));
+                    }
+                    None => self.toasts.info(format!("Saved to {slot}")),
+                }
             }
             Err(error) => self.toasts.error(error),
         }
     }
 
-    /// Loads the state in `slot` and resumes the game. A state made on
-    /// another model restarts the game on that model first, stopping the
-    /// running one before the new one starts so its battery save is written
-    /// before the new one reads it.
+    /// Puts back what the newest toast's Undo button offers: the game as it
+    /// was before a load or a restart, or a slot as it was before a save.
+    fn undo(&mut self) {
+        self.toasts.forget_undo();
+        match self.undo.take() {
+            Some(UndoPoint::Game { rom_path, state }) => {
+                if self
+                    .game
+                    .as_ref()
+                    .is_some_and(|game| game.session.rom().path == rom_path)
+                {
+                    match self.restore_state(state) {
+                        Ok(()) => self.toasts.info("Undone"),
+                        Err(error) => self.toasts.error(format!("Couldn't undo: {error}")),
+                    }
+                }
+            }
+            Some(UndoPoint::Slot {
+                rom_path,
+                slot,
+                state,
+                picture,
+            }) => match save_states::save(&rom_path, slot, &state, picture.as_deref()) {
+                Ok(()) => self.toasts.info(format!("Put the earlier {slot} back")),
+                Err(error) => self.toasts.error(format!("Couldn't undo: {error}")),
+            },
+            None => {}
+        }
+    }
+
+    /// Loads `state` into the running game, restarting it first on the
+    /// state's model if that differs, stopping the running one before the
+    /// new one starts so its battery save is written before the new one
+    /// reads it. The game resumes, unless the settings are open.
+    fn restore_state(&mut self, state: SaveState) -> Result<(), String> {
+        let Some(game) = self.game.as_ref() else {
+            return Ok(());
+        };
+
+        if state.model != game.session.model() {
+            let (rom, header) = (game.session.rom().clone(), game.session.header().clone());
+            self.game = None;
+            let running = self.settings_tab.is_none();
+            self.game = Some(self.start_session(rom, header, state.model, running)?);
+        }
+
+        let Some(game) = &mut self.game else {
+            return Ok(());
+        };
+        game.session.load(state.data)?;
+        game.show_menu(None);
+        Ok(())
+    }
+
+    /// Loads the state in `slot` and resumes the game (see
+    /// [`App::restore_state`]), offering to undo it.
     pub(super) fn load_state(&mut self, slot: Slot) {
-        let Some(game) = self.game.as_ref().filter(|game| game.keeps_data) else {
+        let Some(game) = self.game.as_mut().filter(|game| game.keeps_data) else {
             return;
         };
 
@@ -408,30 +514,16 @@ impl App {
                 return;
             }
         };
+        let before = game.session.snapshot();
 
-        if state.model != game.session.model() {
-            let (rom, header) = (game.session.rom().clone(), game.session.header().clone());
-            self.game = None;
-            // The game resumes once the state has loaded, unless the
-            // settings are open.
-            let running = self.settings_tab.is_none();
-            match self.start_session(rom, header, state.model, running) {
-                Ok(restarted) => self.game = Some(restarted),
-                Err(error) => {
-                    self.toasts.error(error);
-                    return;
-                }
-            }
-        }
-
-        let Some(game) = &mut self.game else {
-            return;
-        };
-
-        match game.session.load(state.data) {
+        match self.restore_state(state) {
             Ok(()) => {
-                game.show_menu(None);
-                self.toasts.info(format!("Loaded {slot}"));
+                if let Ok(state) = before {
+                    self.undo = Some(UndoPoint::Game { rom_path, state });
+                    self.toasts.info_with_undo(format!("Loaded {slot}"));
+                } else {
+                    self.toasts.info(format!("Loaded {slot}"));
+                }
             }
             Err(error) => {
                 self.keep_unloadable_state(

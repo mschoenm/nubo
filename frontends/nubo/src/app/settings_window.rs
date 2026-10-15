@@ -30,6 +30,7 @@ pub enum SettingsMessage {
     SgbBorderToggled(bool),
     ModelSelected(ModelPreference),
     ResumeGamesToggled(bool),
+    PauseInBackgroundToggled(bool),
     FastForwardSpeedSelected(FastForwardSpeed),
     /// The volume slider moved; the setting is saved once it's released.
     VolumeChanged(f32),
@@ -94,6 +95,9 @@ impl App {
             SettingsMessage::ModelSelected(model) => {
                 self.model_override = None;
                 self.change_settings(|settings| settings.shared.model = model);
+            }
+            SettingsMessage::PauseInBackgroundToggled(pause) => {
+                self.change_settings(|settings| settings.pause_in_background = pause);
             }
             SettingsMessage::ResumeGamesToggled(resume) => {
                 self.change_settings(|settings| settings.shared.resume_games = resume);
@@ -295,6 +299,9 @@ impl App {
             SettingsRow::RestartNow => GameMessage::Reset.into(),
             SettingsRow::ResumeGames => {
                 SettingsMessage::ResumeGamesToggled(!settings.shared.resume_games).into()
+            }
+            SettingsRow::PauseInBackground => {
+                SettingsMessage::PauseInBackgroundToggled(!settings.pause_in_background).into()
             }
             SettingsRow::Volume => SettingsMessage::ToggleMute.into(),
             SettingsRow::ResetControls => SettingsMessage::ResetControls(device).into(),
