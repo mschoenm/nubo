@@ -11,7 +11,8 @@
 //! 0x6000-0x7FFF latches (games write 0 and then 1): that is when Nubo brings
 //! the clock up to date with the frontend's clock (or, with
 //! [`RtcClock::EmulatedTime`], with the time the emulator has run). The bank
-//! and latch behaviour follows SameBoy (MIT, see `apu.rs`) and
+//! and latch behaviour follows SameBoy (<https://github.com/LIJI32/SameBoy>,
+//! Expat License, see the notice in `apu.rs`) and
 //! CasualPokePlayer's latch-rtc-test and rtc-invalid-banks-test.
 
 use crate::address_bus::bank_utils::{banked_read, banked_write};
