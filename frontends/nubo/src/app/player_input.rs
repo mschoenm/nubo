@@ -24,9 +24,16 @@ impl App {
             .collect()
     }
 
+    /// Whether the settings or a dialog cover the game, so shortcuts that
+    /// pause, restart, save or rewind it wait until they close.
+    fn covers_game(&self) -> bool {
+        self.settings_tab.is_some() || self.dialog.is_some()
+    }
+
     /// Handles a key going down or up: picking a key in the settings, the
-    /// fixed shortcuts, and then the player's controls. A window that shows
-    /// only the game (`--scale`) has no shortcuts.
+    /// fixed shortcuts (pausing and restarting the game wait while the
+    /// settings or a dialog cover it), and then the player's controls. A
+    /// window that shows only the game (`--scale`) has no shortcuts.
     pub(super) fn handle_key(&mut self, input: &KeyInput) -> Task<Message> {
         if input.pressed && !input.repeat && self.screen_scale.is_none() {
             if let Some((device, action)) = self.capture {
@@ -51,6 +58,13 @@ impl App {
             }
 
             if let Some(message) = input::fixed_shortcut(&input.key, input.modifiers) {
+                let acts_on_game = matches!(
+                    message,
+                    Message::Game(GameMessage::TogglePause | GameMessage::Reset)
+                );
+                if acts_on_game && self.covers_game() {
+                    return Task::none();
+                }
                 return self.update(message);
             }
         }
@@ -236,10 +250,7 @@ impl App {
             return Task::none();
         }
 
-        if pressed
-            && action != Action::Fullscreen
-            && (self.settings_tab.is_some() || self.dialog.is_some())
-        {
+        if pressed && action != Action::Fullscreen && self.covers_game() {
             return Task::none();
         }
 

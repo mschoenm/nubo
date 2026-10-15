@@ -1,13 +1,15 @@
 //! Tests for the app's small helpers, for resetting the settings in a
-//! `--fresh` app, which keeps nothing, and for controller shortcuts while
-//! the settings are open.
+//! `--fresh` app, which keeps nothing, and for shortcuts while the settings
+//! are open.
 
 use super::settings_window::reset_summary;
 use super::{App, GameMessage, Message, SettingsMessage, cycle};
 use crate::command_line::Options;
 use crate::dialog::{DialogKind, ResetChoices};
+use crate::input::KeyInput;
 use crate::settings::Appearance;
 use crate::views::settings::SettingsTab;
+use iced::keyboard::{self, Modifiers};
 use nubo_core::{ControllerButton, ControllerState};
 use nubo_frontend::gamepads::{ControllerEvent, Controllers};
 use nubo_frontend::rom::Rom;
@@ -230,4 +232,35 @@ fn controller_shortcuts_wait_while_the_settings_are_open() {
     let _ = app.update(SettingsMessage::Open.into());
     let _ = app.update(pad(&[]));
     assert!(!rewinding(&app));
+}
+
+#[test]
+fn pausing_with_the_command_key_waits_while_the_settings_are_open() {
+    let (mut app, _) = App::new(
+        None,
+        &Options {
+            fresh: true,
+            ..Options::default()
+        },
+    );
+    app.remembered = Some(Rom {
+        path: PathBuf::from("game.gb"),
+        bytes: Arc::from(vec![0; 0x8000]),
+    });
+    let _ = app.update(GameMessage::PlayRemembered.into());
+    let command_p = Message::Key(KeyInput {
+        code: None,
+        key: keyboard::Key::Character("p".into()),
+        modifiers: Modifiers::COMMAND,
+        pressed: true,
+        repeat: false,
+    });
+
+    let _ = app.update(SettingsMessage::Open.into());
+    let _ = app.update(command_p.clone());
+    assert!(!app.game.as_ref().unwrap().is_paused());
+
+    let _ = app.update(SettingsMessage::Close.into());
+    let _ = app.update(command_p);
+    assert!(app.game.as_ref().unwrap().is_paused());
 }
