@@ -450,10 +450,10 @@ impl App {
         )
     }
 
-    /// Starts scanning the library folders in the background. The Rescan
-    /// button in the settings, the folder watcher and folder changes all
-    /// come here; while a scan runs, they lead to one more scan after it instead of a second
-    /// scan at the same time.
+    /// Starts scanning the library folders in the background. The Rescan button
+    /// in the settings, the folder watcher and folder changes all come here;
+    /// while a scan runs, they lead to one more scan after it instead of a
+    /// second scan at the same time.
     pub(super) fn rescan(&mut self) -> Task<Message> {
         if !self.keeps_library() {
             return Task::none();

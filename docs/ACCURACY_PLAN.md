@@ -52,8 +52,9 @@ What is missing or unproven:
 - **Super Game Boy.** Command packets, palettes, attribute maps, transfers, borders, masking and
   multiplayer requests are emulated (`crates/nubo-core/src/sgb.rs`, ported from SameBoy), and pass
   SameSuite's `sgb` tests and CasualPokePlayer's `sgb-ext-test`, with controllers for up to four
-  players and the startup's reset hold behind an intro of Nubo's own. Not emulated yet: the menu's
-  functions, and a boot ROM of the Super Game Boy's own (Phase 4, step 1). Not planned: see that step. None of this is checked on hardware yet.
+  players and the startup's reset hold behind an intro of Nubo's own. The menu's palette
+  and border choices are emulated in Nubo's own design (Phase 4). Not emulated yet: a boot ROM of the
+  Super Game Boy's own (Phase 4, step 1). Not planned: see that step. None of this is checked on hardware yet.
 - **Link cable.** The serial port always behaves as if no cable is plugged in. Two Nubo instances can't
   be linked, and the Game Boy Printer isn't emulated.
 - **Infrared.** The CGB's RP register (0xFF56) isn't emulated. HuC1's infrared port always sees no light.

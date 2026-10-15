@@ -50,7 +50,7 @@ It also writes `Nubo-<version>-linux-<architecture>.flatpak`, a single file to g
 
 ### Licenses
 
-The macOS app, the web version and the RetroArch core come with `THIRD_PARTY_LICENSES.txt`, the licenses of the Rust crates Nubo is built from. `cargo xtask licenses <folder>` writes it with the other license files; the packaging tasks run it for you.
+Every package (the macOS app, the Windows installer and zip, the Flatpak, the web version and the RetroArch core) comes with `THIRD_PARTY_LICENSES.txt`, the licenses of the Rust crates Nubo is built from. `cargo xtask licenses <folder>` writes it with the other license files; the packaging tasks run it for you.
 
 ## Testing
 
