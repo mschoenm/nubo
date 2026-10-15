@@ -148,6 +148,7 @@ pub fn validate_gamegenie_code(code: &str) -> Result<(), CheatError> {
 }
 
 impl CheatState {
+    /// No cheats turned on.
     pub(super) fn new() -> CheatState {
         CheatState {
             registered: Vec::new(),
@@ -175,11 +176,13 @@ impl CheatState {
         Ok(())
     }
 
+    /// Turns off the cheat registered under `cheat_id`, if there is one.
     pub(crate) fn unregister(&mut self, cheat_id: &str) {
         self.registered
             .retain(|registered| registered.id != cheat_id);
     }
 
+    /// Parses a GameShark `code` and turns it on under `cheat_id`.
     pub(crate) fn register_gameshark_cheat(
         &mut self,
         cheat_id: &str,
@@ -189,6 +192,7 @@ impl CheatState {
         self.register(cheat_id, cheat)
     }
 
+    /// Parses a Game Genie `code` and turns it on under `cheat_id`.
     pub(crate) fn register_gamegenie_cheat(
         &mut self,
         cheat_id: &str,

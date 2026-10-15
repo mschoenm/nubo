@@ -46,6 +46,7 @@ pub(super) struct DmaState {
 
 /// How many bytes one OAM DMA transfer copies: the whole of OAM.
 pub(super) const DMA_TRANSFER_BYTES: u8 = 160;
+/// M-cycles from a write to the DMA register until its transfer begins.
 const DMA_START_DELAY: u8 = 2;
 const ECHO_RAM_START: u16 = 0xE000;
 const ECHO_RAM_OFFSET: u16 = 0x2000;
@@ -76,7 +77,9 @@ enum Bus {
 enum SourceKind {
     /// ROM or cartridge RAM, and on the CGB also echo RAM.
     Cartridge,
+    /// Video RAM (0x8000-0x9FFF).
     VideoRam,
+    /// Work RAM, and on monochrome models also echo RAM.
     WorkRam,
 }
 
@@ -397,6 +400,7 @@ impl AddressBus {
         }
     }
 
+    /// Replaces the OAM byte the transfer copied last.
     fn set_last_copied_oam_byte(&mut self, value: u8) {
         let index = u16::from(self.dma.offset) - 1;
         self.gpu.set_object_attribute_memory_byte(index, value);
