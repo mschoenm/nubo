@@ -58,9 +58,11 @@ pub enum SettingsMessage {
     /// Resets every setting and what else the player ticked, as they
     /// confirmed.
     Reset(ResetChoices),
-    /// The saves a reset deletes in the background are gone: the kinds that
-    /// went, and why any didn't.
+    /// The saves a reset deletes in the background are gone: what else the
+    /// reset did, what it deleted, and why anything wasn't (see
+    /// `reset_summary`).
     SavesDeleted {
+        done: Vec<&'static str>,
         deleted: Vec<&'static str>,
         errors: Vec<String>,
     },
@@ -172,16 +174,19 @@ impl App {
                 return self.ask_reset();
             }
             SettingsMessage::Reset(choices) => return self.reset_settings(choices),
-            SettingsMessage::SavesDeleted { deleted, errors } => {
+            SettingsMessage::SavesDeleted {
+                mut done,
+                deleted,
+                errors,
+            } => {
                 self.deletions_running = self.deletions_running.saturating_sub(1);
                 for error in errors {
                     self.toasts.error(error);
                 }
-                self.toasts.info(if deleted.is_empty() {
-                    String::from("Settings are back to how they started")
-                } else {
-                    format!("Settings reset, and the {} deleted", deleted.join(" and "))
-                });
+                done.extend(deleted);
+                if !done.is_empty() {
+                    self.toasts.info(reset_summary(&done));
+                }
                 if self.deletions_running == 0
                     && let Some((rom, resume)) = self.start_after_deleting.take()
                 {
@@ -193,69 +198,98 @@ impl App {
         Task::none()
     }
 
-    /// Puts every setting back to how it started (see `Settings::reset`),
-    /// forgets the model picked for each game, and does what else `choices`
-    /// ticks, as far as this build and run offer it (see
-    /// `App::reset_offers`). Saves are deleted in the background, which can
+    /// Starts over with what `choices` ticks, as far as this build and run
+    /// offer it (see `App::reset_offers`): puts every setting back to how
+    /// it started (see `Settings::reset`) and forgets the model picked for
+    /// each game, removes the library folders, clears "Continue playing" and
+    /// deletes the saves. Saves are deleted in the background, which can
     /// take a while with many games (see `SettingsMessage::SavesDeleted`).
-    /// Unless something was deleted, the toast that says so offers to undo
-    /// it all.
+    /// Unless something was deleted, the toast that says what was done
+    /// offers to undo it all.
     fn reset_settings(&mut self, choices: ResetChoices) -> Task<Message> {
-        let offers = self.reset_offers();
+        let choices = choices.within(self.reset_offers());
         let before = UndoPoint::Settings {
             settings: Box::new(self.settings.clone()),
             library: self.keeps_library().then(|| self.library.snapshot()),
             remembered: self.remembered.clone(),
         };
 
-        let delete_battery_saves = choices.delete_battery_saves && offers.delete_battery_saves;
-        let delete_save_states = choices.delete_save_states && offers.delete_save_states;
-        let clear_recent = choices.clear_recently_played && offers.clear_recently_played;
+        let mut done = Vec::new();
+        if choices.reset_settings {
+            done.push("settings reset");
+        }
         if self.keeps_library()
-            && let Err(error) = self.library.reset_games(clear_recent)
+            && (choices.reset_settings || choices.clear_recently_played)
+            && let Err(error) = self
+                .library
+                .reset_games(choices.reset_settings, choices.clear_recently_played)
         {
             self.toasts.error(error);
         }
-        if clear_recent && rom::REMEMBERS_LAST_GAME {
-            match rom::forget() {
-                Ok(()) => self.remembered = None,
-                Err(error) => self.toasts.error(error),
+        if choices.clear_recently_played {
+            if rom::REMEMBERS_LAST_GAME {
+                match rom::forget() {
+                    Ok(()) => {
+                        self.remembered = None;
+                        done.push("last game forgotten");
+                    }
+                    Err(error) => self.toasts.error(error),
+                }
+            } else {
+                done.push("Continue playing cleared");
             }
         }
+        if choices.remove_folders {
+            done.push("game folders removed");
+        }
 
-        let remove_folders = choices.remove_folders && offers.remove_folders;
-        let reset = self.settings.reset(remove_folders);
-        self.model_override = None;
-        self.change_settings(|settings| *settings = reset);
+        if choices.reset_settings || choices.remove_folders {
+            let mut settings = if choices.reset_settings {
+                self.model_override = None;
+                self.settings.reset(false)
+            } else {
+                self.settings.clone()
+            };
+            if choices.remove_folders {
+                settings.shared.library_folders.clear();
+            }
+            self.change_settings(|current| *current = settings);
+        }
 
-        let deletion = if delete_battery_saves || delete_save_states {
+        let (delete_battery_saves, delete_save_states) =
+            (choices.delete_battery_saves, choices.delete_save_states);
+        let deletion = if choices.deletes() {
+            // An earlier reset's Undo would put back settings and games from
+            // before this reset, next to saves it can't put back. The toast
+            // comes once the saves are deleted.
+            self.undo = None;
+            self.toasts.forget_undo();
             self.deletions_running += 1;
+            let done = done.clone();
             Task::perform(
                 background::run(move || delete_saves(delete_battery_saves, delete_save_states)),
-                |result| {
+                move |result| {
                     let (deleted, errors) = result.unwrap_or_else(|error| {
                         (
                             Vec::new(),
                             vec![format!("Couldn't delete the saves: {error}")],
                         )
                     });
-                    SettingsMessage::SavesDeleted { deleted, errors }.into()
+                    SettingsMessage::SavesDeleted {
+                        done,
+                        deleted,
+                        errors,
+                    }
+                    .into()
                 },
             )
         } else {
+            if !done.is_empty() {
+                self.undo = Some(before);
+                self.toasts.info_with_undo(reset_summary(&done));
+            }
             Task::none()
         };
-        if delete_battery_saves || delete_save_states {
-            // An earlier reset's Undo would put back settings and games from
-            // before this reset, next to saves it can't put back. The toast
-            // comes once the saves are deleted.
-            self.undo = None;
-            self.toasts.forget_undo();
-        } else {
-            self.undo = Some(before);
-            self.toasts
-                .info_with_undo("Settings are back to how they started");
-        }
         Task::batch([deletion, self.settings_replaced()])
     }
 
@@ -279,7 +313,7 @@ impl App {
             }
             self.remembered = Some(rom);
         }
-        self.toasts.info("Settings put back");
+        self.toasts.info("Put back as it was");
         self.settings_replaced()
     }
 
@@ -531,8 +565,25 @@ fn scroll_settings(index: usize, count: usize) -> Task<Message> {
     scroll_in_proportion(views::settings::scroll_id(), index, count)
 }
 
+/// What a reset did, as a sentence for its toast: the `done` parts, such as
+/// "settings reset" and "save states deleted", joined with commas and a
+/// final "and", starting with a capital.
+pub(super) fn reset_summary(done: &[&str]) -> String {
+    let sentence = match done {
+        [] => String::new(),
+        [only] => String::from(*only),
+        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+    };
+    let mut letters = sentence.chars();
+    match letters.next() {
+        Some(first) => first.to_uppercase().chain(letters).collect(),
+        None => sentence,
+    }
+}
+
 /// Deletes every game's battery saves and save states, as asked, returning
-/// the kinds that went and why any didn't. It runs in the background.
+/// what went, such as "save states deleted", and why anything didn't. It
+/// runs in the background.
 fn delete_saves(
     delete_battery_saves: bool,
     delete_save_states: bool,
@@ -541,13 +592,13 @@ fn delete_saves(
     let mut errors = Vec::new();
     if delete_battery_saves {
         match battery::delete_all() {
-            Ok(()) => deleted.push("in-game saves"),
+            Ok(()) => deleted.push("in-game saves deleted"),
             Err(error) => errors.push(error),
         }
     }
     if delete_save_states {
         match save_states::delete_all() {
-            Ok(()) => deleted.push("save states"),
+            Ok(()) => deleted.push("save states deleted"),
             Err(error) => errors.push(error),
         }
     }

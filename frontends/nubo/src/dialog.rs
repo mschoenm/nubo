@@ -29,15 +29,18 @@ pub enum DialogKind {
     FolderMenu(usize),
     /// Asks whether to delete the save states of the game at the path.
     DeleteSaveStates(PathBuf),
-    /// Asks whether to reset every setting, with what else to reset ticked
-    /// so far.
+    /// Asks what to start over with, ticked as so far: the settings, the
+    /// saves, the library's folders and "Continue playing".
     ResetSettings(ResetChoices),
 }
 
-/// What "Reset all settings" does besides putting the settings back, as
-/// the player ticks it in its dialog. Everything starts unticked.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+/// What "Start over" resets, as the player ticks it in its dialog. Only
+/// the settings start ticked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResetChoices {
+    /// Puts every setting back to how it started and forgets the model
+    /// picked for each game.
+    pub reset_settings: bool,
     /// Deletes every game's battery saves: the progress games save
     /// themselves.
     pub delete_battery_saves: bool,
@@ -48,6 +51,18 @@ pub struct ResetChoices {
     /// Empties "Continue playing", or in the browser forgets the last game
     /// played.
     pub clear_recently_played: bool,
+}
+
+impl Default for ResetChoices {
+    fn default() -> Self {
+        ResetChoices {
+            reset_settings: true,
+            delete_battery_saves: false,
+            delete_save_states: false,
+            remove_folders: false,
+            clear_recently_played: false,
+        }
+    }
 }
 
 /// A page of a library game's menu.
@@ -126,6 +141,9 @@ pub struct Choice {
     pub checkbox: bool,
     /// What a checkbox does, in small print under its label.
     pub description: Option<String>,
+    /// Whether the choice can be picked; a question's button that would do
+    /// nothing is greyed out.
+    pub enabled: bool,
     pub action: DialogAction,
 }
 
@@ -146,6 +164,7 @@ impl Choice {
             starts_group: false,
             checkbox: false,
             description: None,
+            enabled: true,
             action,
         }
     }
@@ -164,6 +183,11 @@ impl Choice {
             description: Some(description.into()),
             ..Choice::new(Icon::Square, label, style, action).checked(checked)
         }
+    }
+
+    pub fn enabled(mut self, enabled: bool) -> Choice {
+        self.enabled = enabled;
+        self
     }
 
     pub fn hint(mut self, hint: impl Into<String>) -> Choice {

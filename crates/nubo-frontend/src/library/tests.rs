@@ -379,13 +379,25 @@ fn a_model_picked_during_a_scan_stays() {
 
 #[cfg(feature = "desktop")]
 #[test]
-fn a_reset_forgets_the_picked_models_and_keeps_the_play_times_unless_asked() {
+fn a_reset_forgets_the_picked_models_and_the_play_times_each_as_asked() {
     let mut library = library_with_two_played_games("reset-models");
     library
         .set_model(Path::new("/games/Tetris.gb"), Some(Model::Sgb2))
         .unwrap();
 
-    library.reset_games(false).unwrap();
+    library.reset_games(false, true).unwrap();
+
+    assert_eq!(
+        library
+            .entry(Path::new("/games/Tetris.gb"))
+            .unwrap()
+            .model(),
+        Some(Model::Sgb2)
+    );
+    assert!(library.recently_played(4).is_empty());
+    assert!(!library.any_played());
+
+    library.reset_games(true, false).unwrap();
 
     assert_eq!(
         library
@@ -394,12 +406,6 @@ fn a_reset_forgets_the_picked_models_and_keeps_the_play_times_unless_asked() {
             .model(),
         None
     );
-    assert_eq!(library.recently_played(4).len(), 2);
-
-    library.reset_games(true).unwrap();
-
-    assert!(library.recently_played(4).is_empty());
-    assert!(!library.any_played());
 }
 
 #[cfg(feature = "desktop")]
@@ -424,7 +430,7 @@ fn a_restored_snapshot_brings_back_the_games_and_ignores_the_running_scan() {
         .set_model(Path::new("/games/Tetris.gb"), Some(Model::Sgb2))
         .unwrap();
     let snapshot = library.snapshot();
-    library.reset_games(true).unwrap();
+    library.reset_games(true, true).unwrap();
     let scan = library.start_scan(Vec::new());
     assert!(scan.is_some());
     let generation = library.scan_generation;
