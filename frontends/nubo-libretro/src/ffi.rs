@@ -15,8 +15,9 @@
 //! - **State.** The loaded game is a `static Mutex<Option<Core>>` and the
 //!   callbacks a `static Mutex<Frontend>`, so keeping them needs no
 //!   `unsafe`. RetroArch calls a core from one thread at a time.
-//! - **Panics.** Every exported function runs its body under
-//!   `catch_unwind`, so a panic fails the call (a game doesn't load, a frame
+//! - **Panics.** Every exported function that does more than store a
+//!   callback or return a constant runs its body under `catch_unwind`
+//!   (`guard`), so a panic fails the call (a game doesn't load, a frame
 //!   is skipped) and is logged, instead of crossing into C, which would
 //!   abort RetroArch.
 //! - **Logging** goes through RetroArch's log interface
@@ -279,6 +280,7 @@ struct Frontend {
 }
 
 impl Frontend {
+    /// No callbacks yet, as before RetroArch hands them over.
     const NONE: Frontend = Frontend {
         environment: None,
         video_refresh: None,
@@ -293,7 +295,9 @@ impl Frontend {
     };
 }
 
+/// The callbacks RetroArch gave, shared by every exported function.
 static FRONTEND: Mutex<Frontend> = Mutex::new(Frontend::NONE);
+/// The loaded game, or `None` when there is none.
 static CORE: Mutex<Option<Core>> = Mutex::new(None);
 /// The picture size RetroArch was last told about, in `retro_get_system_av_info`
 /// or with `RETRO_ENVIRONMENT_SET_GEOMETRY`.
@@ -329,14 +333,14 @@ fn guard<T>(name: &str, fallback: T, body: impl FnOnce() -> T) -> T {
 }
 
 /// Calls RetroArch's environment callback, if it gave one.
-fn environment(cmd: c_uint, data: *mut c_void) -> bool {
+fn environment(command: c_uint, data: *mut c_void) -> bool {
     let Some(callback) = frontend().environment else {
         return false;
     };
     // SAFETY: RetroArch's callback takes any command, with the data that
     // command's documentation in libretro.h asks for, which every caller here
     // passes.
-    unsafe { callback(cmd, data) }
+    unsafe { callback(command, data) }
 }
 
 /// Logs `message` through RetroArch's log interface, or to standard error.

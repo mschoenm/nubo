@@ -424,6 +424,8 @@ impl Core {
         }
     }
 
+    /// Copies the emulator's clock, on the wall clock, into `rtc_memory`
+    /// (RetroArch's `.rtc` buffer) and `rtc_copy`.
     fn copy_clock_to_buffers(&mut self) {
         if let Some(clock) = self.emulator.rtc_state(RtcClock::WallClock) {
             self.rtc_memory.copy_from_slice(&clock.to_bytes());
