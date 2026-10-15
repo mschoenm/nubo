@@ -36,10 +36,10 @@ fn the_grid_fits_as_many_columns_as_iced_does() {
 
 #[test]
 fn the_starting_window_fits_a_whole_continue_playing_row() {
-    assert_eq!(columns(FULL_ROW_WINDOW_WIDTH), RECENT_LIMIT);
+    assert_eq!(columns(FULL_ROW_WINDOW_WIDTH), STARTING_COLUMNS);
     // The cards are at their full size.
-    let full_height = CARD_MAX_WIDTH * CARD_ASPECT.1 / CARD_ASPECT.0;
-    assert!((card_height(FULL_ROW_WINDOW_WIDTH) - full_height).abs() < 0.01);
+    let full_height = CARD_MAX_WIDTH * RECENT_CARD_ASPECT.1 / RECENT_CARD_ASPECT.0;
+    assert!((card_height(FULL_ROW_WINDOW_WIDTH, true) - full_height).abs() < 0.01);
 }
 
 #[test]
@@ -120,4 +120,41 @@ fn lower_cards_sit_lower_on_the_page() {
     assert!(games_top > first_bottom);
     assert!(second_row_top > games_top);
     assert_eq!(shelves.card_bounds(3, WIDTH), shelves.card_bounds(2, WIDTH));
+}
+
+#[test]
+fn continue_playing_shows_a_row_of_the_widest_window_at_most() {
+    assert_eq!(most_recent_shown(), 5);
+    assert_eq!(columns(1280.0), most_recent_shown());
+}
+
+#[test]
+fn down_from_a_full_row_of_five_lands_under_the_same_card() {
+    let recent = entries(5);
+    let games = entries(5);
+    let shelves = shelves(&recent, &games);
+
+    assert_eq!(shelves.step(4, Action::Down, 1280.0, false), 9);
+    assert_eq!(shelves.step(9, Action::Up, 1280.0, false), 4);
+}
+
+#[test]
+fn a_resize_keeps_the_same_game_selected() {
+    let games = entries(6);
+    let wide = Shelves {
+        recent: games[..5].iter().collect(),
+        games: games.iter().collect(),
+    };
+    let narrow = Shelves {
+        recent: games[..3].iter().collect(),
+        games: games.iter().collect(),
+    };
+
+    // A game still in "Continue playing" stays there.
+    assert_eq!(narrow.same_card(&wide, 1), Some(1));
+    // One that no longer fits moves to the same game on All games.
+    assert_eq!(narrow.same_card(&wide, 4), Some(3 + 4));
+    // A card on All games stays on the same game there.
+    assert_eq!(narrow.same_card(&wide, 5 + 2), Some(3 + 2));
+    assert_eq!(wide.same_card(&narrow, 3 + 2), Some(5 + 2));
 }

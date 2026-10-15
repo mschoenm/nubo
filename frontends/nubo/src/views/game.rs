@@ -20,7 +20,7 @@ use crate::ui::pictures;
 use crate::ui::theme;
 use crate::ui::widgets::{
     bar_button, bar_separator, icon_button, menu_separator, secondary_button, shortcut,
-    toggle_icon_button, top_bar, truncated_text, whole_step_screen,
+    steady_bar_button, toggle_icon_button, top_bar, truncated_text, whole_step_screen,
 };
 use iced::widget::{
     self, Column, Stack, button, center, column, container, image, mouse_area, opaque, row,
@@ -39,6 +39,9 @@ const VOLUME_SLIDER_WIDTH: f32 = 80.0;
 const MENU_MAX_HEIGHT: f32 = 560.0;
 const SLOT_THUMBNAIL_WIDTH: f32 = 80.0;
 const SLOT_THUMBNAIL_HEIGHT: f32 = 72.0;
+/// The wider of the Pause button's two labels, which sets its width so the
+/// bar doesn't move when the game pauses or resumes.
+const PAUSE_WIDEST: &str = "Resume";
 
 pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<'a, Message> {
     let screen = game.session.screen();
@@ -140,17 +143,17 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
         ("Home", "Back to the start screen")
     };
     let pause = if game.is_paused() {
-        bar_button(
+        steady_bar_button(
             Icon::Play,
-            "Resume",
+            ("Resume", PAUSE_WIDEST),
             String::from("Resume (Esc)"),
             true,
             Message::Game(GameMessage::TogglePause),
         )
     } else {
-        bar_button(
+        steady_bar_button(
             Icon::Pause,
-            "Pause",
+            ("Pause", PAUSE_WIDEST),
             String::from("Pause and open the menu (Esc)"),
             false,
             Message::Game(GameMessage::TogglePause),

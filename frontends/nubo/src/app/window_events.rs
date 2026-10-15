@@ -59,8 +59,10 @@ impl App {
             WindowMessage::Resized(size) => {
                 self.minimized = size.width <= 0.0 || size.height <= 0.0;
                 if !self.minimized {
+                    let old_width = self.window_width;
                     self.window_width = size.width;
                     self.window_height = size.height;
+                    self.keep_library_selection(old_width);
                 }
                 return window::latest().and_then(window::mode).map(|mode| {
                     WindowMessage::FullscreenChanged(mode == window::Mode::Fullscreen).into()
