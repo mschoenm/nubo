@@ -144,7 +144,7 @@ fn clone_with_rom_matches_a_real_boot() {
     });
 }
 
-const CART_TYPE_MBC1_RAM_BATTERY: u8 = 0x03;
+const CARTRIDGE_TYPE_MBC1_RAM_BATTERY: u8 = 0x03;
 /// Audio buffers to run before giving up on the game writing its RAM; the
 /// boot ROM takes a few hundred.
 const BUFFER_LIMIT: usize = 2_000;
@@ -165,7 +165,7 @@ impl CartridgeEffects for RecordingEffects {
 /// A battery-backed MBC1 game that writes `ram_enable` to the RAM enable
 /// register, then writes 0xA000 over and over with a counter.
 fn ram_writing_rom(ram_enable: u8) -> Vec<u8> {
-    let header = header(0x00, 0x00, CART_TYPE_MBC1_RAM_BATTERY, 0x33);
+    let header = header(0x00, 0x00, CARTRIDGE_TYPE_MBC1_RAM_BATTERY, 0x33);
     let mut rom = vec![0; ROM_SIZE];
     rom[HEADER_START..HEADER_START + header.len()].copy_from_slice(&header);
     let program = [
@@ -221,7 +221,7 @@ fn battery_ram_is_not_saved_when_the_game_cannot_write_it() {
     assert!(saves.is_empty());
 }
 
-const CART_TYPE_MBC5_RAM_BATTERY: u8 = 0x1B;
+const CARTRIDGE_TYPE_MBC5_RAM_BATTERY: u8 = 0x1B;
 const BUSY_PROGRAM_START: usize = 0x0150;
 /// Where the busy program's loop starts.
 const BUSY_LOOP: u16 = 0x0194;
@@ -234,7 +234,7 @@ const STEPS_INTO_THE_LOOP: usize = 20;
 /// group select, work RAM bank 3, IE, an undocumented CGB register, HRAM,
 /// cartridge RAM, KEY1, an HBlank VRAM DMA and an OAM DMA.
 fn busy_rom() -> Vec<u8> {
-    let header = header(0x80, 0x00, CART_TYPE_MBC5_RAM_BATTERY, 0x33);
+    let header = header(0x80, 0x00, CARTRIDGE_TYPE_MBC5_RAM_BATTERY, 0x33);
     let mut rom = vec![0; ROM_SIZE];
     rom[HEADER_START..HEADER_START + header.len()].copy_from_slice(&header);
     #[rustfmt::skip]
@@ -647,8 +647,8 @@ fn assert_state_with_field_does_not_load(name: &[u8], value: &[u8]) {
     emulator.run_frame(&mut Vec::new(), &mut Vec::new());
 }
 
-const CART_TYPE_MBC3_TIMER_RAM_BATTERY: u8 = 0x10;
-const CART_TYPE_MBC5_RUMBLE: u8 = 0x1C;
+const CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY: u8 = 0x10;
+const CARTRIDGE_TYPE_MBC5_RUMBLE: u8 = 0x1C;
 /// A wall-clock time in milliseconds, about 2001.
 const WALL_CLOCK_NOW: f64 = 1_000_000_000_000.0;
 /// Milliseconds in an hour.
@@ -684,7 +684,7 @@ impl CartridgeEffects for ClockEffects {
 /// `clock`, and the wall clock it reads.
 fn clock_game(clock: crate::RtcClock) -> (Emulator, Arc<Mutex<f64>>) {
     let wall_clock = Arc::new(Mutex::new(WALL_CLOCK_NOW));
-    let rom = cartridge_rom(CART_TYPE_MBC3_TIMER_RAM_BATTERY, &[0x18, 0xFE]); // JR -2
+    let rom = cartridge_rom(CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY, &[0x18, 0xFE]); // JR -2
     let mut emulator = Emulator::new(Model::Dmg);
     emulator
         .load_rom(
@@ -840,7 +840,7 @@ fn rumble_rom(on: u8, off: u8) -> Vec<u8> {
         0x05, 0x20, 0xFA,             // DEC B; JR NZ, wait_off
         0x18, 0xE5,                   // JR loop
     ];
-    cartridge_rom(CART_TYPE_MBC5_RUMBLE, &program)
+    cartridge_rom(CARTRIDGE_TYPE_MBC5_RUMBLE, &program)
 }
 
 #[test]
@@ -849,7 +849,7 @@ fn the_rumble_level_is_the_share_of_the_time_the_motor_was_on() {
         let off = if off == 0 { 1 } else { off };
         let rom = if expected == 1.0 {
             cartridge_rom(
-                CART_TYPE_MBC5_RUMBLE,
+                CARTRIDGE_TYPE_MBC5_RUMBLE,
                 &[0x3E, 0x08, 0xEA, 0x00, 0x40, 0x18, 0xFE], // motor on; JR -2
             )
         } else {
@@ -879,7 +879,7 @@ fn games_without_a_rumble_motor_never_rumble() {
 #[test]
 fn the_rumble_level_follows_a_loaded_save_state() {
     let rom = cartridge_rom(
-        CART_TYPE_MBC5_RUMBLE,
+        CARTRIDGE_TYPE_MBC5_RUMBLE,
         &[0x3E, 0x08, 0xEA, 0x00, 0x40, 0x18, 0xFE], // motor on; JR -2
     );
     let mut emulator = booted(Model::Dmg, &rom);
@@ -948,7 +948,7 @@ fn a_state_from_before_the_clock_source_was_stored_loads_its_clock_as_it_is() {
     }
 }
 
-const CART_TYPE_MBC1_RAM: u8 = 0x02;
+const CARTRIDGE_TYPE_MBC1_RAM: u8 = 0x02;
 
 /// A game that turns the screen off and enables cartridge RAM, then copies
 /// 0xC123, 0xFF90, 0x8010, 0xFE04 and 0xA000 to 0xC000-0xC004, forever.
@@ -964,7 +964,7 @@ fn memory_reading_rom() -> Vec<u8> {
         0xFA, 0x00, 0xA0, 0xEA, 0x04, 0xC0,  // 0xC004 = (0xA000)
         0x18, 0xE1,                          // JR loop
     ];
-    cartridge_rom(CART_TYPE_MBC1_RAM, &program)
+    cartridge_rom(CARTRIDGE_TYPE_MBC1_RAM, &program)
 }
 
 #[test]

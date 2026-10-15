@@ -71,6 +71,10 @@ pub struct App {
     /// couldn't be, the app saves nothing on its own, such as the window's
     /// size, so it doesn't write the defaults over the player's settings.
     settings_read: bool,
+    /// Whether the D-pad changed the player's own Super Game Boy colors
+    /// since the settings were last saved: they are saved once the player
+    /// leaves the editor, not on every step of a held key.
+    sgb_colors_unsaved: bool,
     /// With `--speed`: games start fast forwarding at this speed.
     speed: Option<FastForwardSpeed>,
     library: Library,
@@ -195,6 +199,7 @@ impl App {
             screen_scale: options.scale,
             fresh: options.fresh,
             settings_read: settings_error.is_none(),
+            sgb_colors_unsaved: false,
             speed: options.speed,
             library,
             search: String::new(),
@@ -321,6 +326,7 @@ impl App {
         };
 
         self.apply_to_game();
+        self.save_stepped_sgb_colors();
         self.show_notices();
         Task::batch([task, self.load_slot_thumbnails()])
     }
@@ -478,6 +484,7 @@ impl App {
             controllers: &self.controllers,
             box_art_problem: self.box_art_problem.as_deref(),
             newer_version: self.newer_version.as_deref(),
+            layout: views::settings::SettingsLayout::new(self.window_width),
         }
     }
 
@@ -549,11 +556,23 @@ impl App {
     /// (`--fresh`).
     fn change_settings(&mut self, change: impl FnOnce(&mut Settings)) {
         change(&mut self.settings);
+        self.sgb_colors_unsaved = false;
 
         if !self.fresh
             && let Err(error) = self.settings.save()
         {
             self.toasts.error(error);
+        }
+    }
+
+    /// Saves the Super Game Boy colors the D-pad changed once the player has
+    /// left their editor (or the game), rather than on every step.
+    fn save_stepped_sgb_colors(&mut self) {
+        let editing = self.game.as_ref().is_some_and(|game| {
+            game.sgb_editor_open && game.menu() == Some(PauseMenu::SuperGameBoy)
+        });
+        if self.sgb_colors_unsaved && !editing {
+            self.change_settings(|_| {});
         }
     }
 

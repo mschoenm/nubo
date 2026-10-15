@@ -74,7 +74,7 @@ impl App {
                 if self.settings_tab.is_none() {
                     self.settings_focus = None;
                 } else if self.settings_focus.is_some() {
-                    self.settings_focus = Some(SettingsFocus::Sidebar);
+                    self.settings_focus = Some(SettingsFocus::Tabs);
                 }
                 self.settings_tab = Some(tab);
                 self.capture = None;
@@ -192,50 +192,54 @@ impl App {
     }
 
     /// Moves through the settings window. On the tabs, up and down switch
-    /// tabs, and right or A goes into the page. On the page, up and down
-    /// move between rows, left and right change the row's value, A picks it,
-    /// Select clears a key or removes a folder, and B goes back to the tabs
-    /// (and from there closes the window).
+    /// tabs in the sidebar and left and right in the row above the page, and
+    /// right or down (toward the page) or A goes into it (see
+    /// `SettingsLayout`). On the page, up and down move between rows (up
+    /// from the first goes back to a row of tabs above it), left and right
+    /// change the row's value, A picks it, Select clears a key or removes a
+    /// folder, and B goes back to the tabs (and from there closes the
+    /// window).
     pub(super) fn navigate_settings(&mut self, action: Action) -> Task<Message> {
         let Some(tab) = self.settings_tab else {
             return Task::none();
         };
         let Some(focus) = self.settings_focus else {
             // The first press only shows where the D-pad is.
-            self.settings_focus = Some(SettingsFocus::Sidebar);
+            self.settings_focus = Some(SettingsFocus::Tabs);
             return Task::none();
         };
-        let rows = views::settings::rows(tab, &self.settings, &self.settings_page_state());
+        let state = self.settings_page_state();
+        let layout = state.layout;
+        let rows = views::settings::rows(tab, &self.settings, &state);
 
         match focus {
-            SettingsFocus::Sidebar => match action {
-                Action::Up | Action::Down => {
+            SettingsFocus::Tabs => {
+                if let Some(step) = layout.tab_step(action) {
                     let tabs = SettingsTab::all();
                     let current = tabs.iter().position(|&known| known == tab).unwrap_or(0);
-                    let step = if action == Action::Up { -1 } else { 1 };
                     let next = current.saturating_add_signed(step).min(tabs.len() - 1);
                     self.settings_tab = Some(tabs[next]);
                     self.capture = None;
-                }
-                Action::Right | Action::A | Action::Start if !rows.is_empty() => {
+                } else if layout.enters_page(action) && !rows.is_empty() {
                     self.settings_focus = Some(SettingsFocus::Row(0));
                     return scroll_settings(0, rows.len());
-                }
-                Action::B => {
+                } else if action == Action::B {
                     self.settings_tab = None;
                     self.settings_focus = None;
                     self.capture = None;
                 }
-                _ => {}
-            },
+            }
             SettingsFocus::Row(index) => {
                 let Some(&row) = rows.get(index.min(rows.len().saturating_sub(1))) else {
-                    self.settings_focus = Some(SettingsFocus::Sidebar);
+                    self.settings_focus = Some(SettingsFocus::Tabs);
                     return Task::none();
                 };
                 let index = index.min(rows.len() - 1);
 
                 match action {
+                    Action::Up if index == 0 && layout.up_leaves_page() => {
+                        self.settings_focus = Some(SettingsFocus::Tabs);
+                    }
                     Action::Up | Action::Down => {
                         let step = if action == Action::Up { -1 } else { 1 };
                         let next = index.saturating_add_signed(step).min(rows.len() - 1);
@@ -247,7 +251,7 @@ impl App {
                         match self.adjust_setting(row, step, false) {
                             Some(message) => return self.update(message),
                             None if action == Action::Left => {
-                                self.settings_focus = Some(SettingsFocus::Sidebar);
+                                self.settings_focus = Some(SettingsFocus::Tabs);
                             }
                             None => {}
                         }
@@ -262,7 +266,7 @@ impl App {
                             return self.update(message);
                         }
                     }
-                    Action::B => self.settings_focus = Some(SettingsFocus::Sidebar),
+                    Action::B => self.settings_focus = Some(SettingsFocus::Tabs),
                     _ => {}
                 }
             }

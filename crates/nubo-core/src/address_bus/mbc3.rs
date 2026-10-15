@@ -16,8 +16,8 @@
 
 use crate::address_bus::bank_utils::{banked_read, banked_write};
 use crate::address_bus::constants::{
-    CART_TYPE_MBC3_RAM, CART_TYPE_MBC3_RAM_BATTERY, CART_TYPE_MBC3_TIMER_BATTERY,
-    CART_TYPE_MBC3_TIMER_RAM_BATTERY, RAM_BANK_SIZE,
+    CARTRIDGE_TYPE_MBC3_RAM, CARTRIDGE_TYPE_MBC3_RAM_BATTERY, CARTRIDGE_TYPE_MBC3_TIMER_BATTERY,
+    CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY, RAM_BANK_SIZE,
 };
 use crate::address_bus::effects::{CartridgeEffects, RtcClock};
 use nubo_serializable_derive::Serializable;
@@ -144,7 +144,13 @@ impl RtcState {
     /// brought up to date. The fraction of a millisecond left over stays in
     /// `base_timestamp`, so a game that latches the clock very often doesn't
     /// lose it. A halted clock doesn't count. Returns whether the clock moved.
+    /// A `base_timestamp` that isn't a number, as a damaged `.rtc` file or
+    /// save state can hold, starts counting from `current_time` instead.
     fn catch_up(&mut self, current_time: f64) -> bool {
+        if !self.base_timestamp.is_finite() {
+            self.base_timestamp = current_time;
+            return false;
+        }
         let elapsed_ms = (current_time - self.base_timestamp).floor();
         if self.halted || elapsed_ms < 1.0 {
             return false;
@@ -279,11 +285,13 @@ impl Mbc3CartridgeMapper {
             is_mbc30: rom_size > MBC3_MAX_ROM_SIZE || ram_size > MBC3_MAX_RAM_SIZE,
             has_ram: matches!(
                 cartridge_type,
-                CART_TYPE_MBC3_RAM | CART_TYPE_MBC3_RAM_BATTERY | CART_TYPE_MBC3_TIMER_RAM_BATTERY
+                CARTRIDGE_TYPE_MBC3_RAM
+                    | CARTRIDGE_TYPE_MBC3_RAM_BATTERY
+                    | CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY
             ),
             has_timer: matches!(
                 cartridge_type,
-                CART_TYPE_MBC3_TIMER_RAM_BATTERY | CART_TYPE_MBC3_TIMER_BATTERY
+                CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY | CARTRIDGE_TYPE_MBC3_TIMER_BATTERY
             ),
             rtc_changed: false,
         }
@@ -523,11 +531,10 @@ mod tests {
     use crate::address_bus::cartridge::test_utils::*;
     use crate::address_bus::cartridge::*;
     use crate::address_bus::constants::{
-        CART_TYPE_MBC3, RAM_SIZE_2KB, RAM_SIZE_8KB, RAM_SIZE_32KB, RAM_SIZE_64KB, ROM_SIZE_2MB,
-        ROM_SIZE_4MB, ROM_SIZE_64KB,
+        CARTRIDGE_TYPE_MBC3, RAM_SIZE_2KB, RAM_SIZE_8KB, RAM_SIZE_32KB, RAM_SIZE_64KB,
+        ROM_SIZE_2MB, ROM_SIZE_4MB, ROM_SIZE_64KB,
     };
-    use crate::address_bus::effects::Shared;
-    use crate::address_bus::effects::{CartridgeEffects, empty_cartridge_effects};
+    use crate::address_bus::effects::{CartridgeEffects, Shared, empty_cartridge_effects};
     use crate::address_bus::test_utils::*;
 
     /// Starts the clock at 10:10:10 and `milliseconds`, last updated at
@@ -566,7 +573,7 @@ mod tests {
 
     fn latched_clock(effects: ClockEffects) -> Cartridge {
         let mut mapper = build_cartridge_mapper_with_effects(
-            CART_TYPE_MBC3_TIMER_BATTERY,
+            CARTRIDGE_TYPE_MBC3_TIMER_BATTERY,
             ROM_SIZE_64KB,
             0,
             Box::new(effects),
@@ -621,6 +628,23 @@ mod tests {
         state.rebase(3_500.5, 20.0);
         assert_eq!((state.seconds, state.milliseconds), (12, 500));
         assert_eq!(state.base_timestamp, 20.0 - 0.25);
+    }
+
+    #[test]
+    fn a_damaged_timestamp_starts_the_clock_again_from_now() {
+        for damaged in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut state = RtcState {
+                seconds: 10,
+                base_timestamp: damaged,
+                ..RtcState::default()
+            };
+            assert!(!state.catch_up(5_000.0));
+            assert_eq!(state.seconds, 10);
+            assert_eq!(state.base_timestamp, 5_000.0);
+
+            assert!(state.catch_up(7_000.0));
+            assert_eq!(state.seconds, 12);
+        }
     }
 
     #[test]
@@ -681,7 +705,7 @@ mod tests {
         let now = Shared::new(0.0);
         let saves = Shared::new(0);
         let mut mapper = build_cartridge_mapper_with_effects(
-            CART_TYPE_MBC3_TIMER_BATTERY,
+            CARTRIDGE_TYPE_MBC3_TIMER_BATTERY,
             ROM_SIZE_64KB,
             0,
             Box::new(AdjustableClock {
@@ -833,7 +857,7 @@ mod tests {
 
     #[test]
     fn reads_from_rom_bank_0() {
-        let mut rom = build_rom(CART_TYPE_MBC3, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC3, ROM_SIZE_64KB, RAM_SIZE_2KB);
         rom[0] = 0xB1;
         rom[1] = 0xD2;
         let mapper = load_cartridge(rom, empty_cartridge_effects()).unwrap();
@@ -844,7 +868,7 @@ mod tests {
 
     #[test]
     fn reads_from_rom_bank_2() {
-        let mut rom = build_rom(CART_TYPE_MBC3, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC3, ROM_SIZE_64KB, RAM_SIZE_2KB);
         rom[0x8000] = 0xB1;
         rom[0x8001] = 0xD2;
         let mut mapper = load_cartridge(rom, empty_cartridge_effects()).unwrap();
@@ -857,7 +881,8 @@ mod tests {
 
     #[test]
     fn reads_from_ram_bank_1() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_MBC3_RAM, ROM_SIZE_64KB, RAM_SIZE_32KB);
+        let mut mapper =
+            build_cartridge_mapper(CARTRIDGE_TYPE_MBC3_RAM, ROM_SIZE_64KB, RAM_SIZE_32KB);
 
         let mut ram = vec![0; 0x8000];
         ram[0x2001] = 0xDD;
@@ -875,8 +900,11 @@ mod tests {
 
     #[test]
     fn does_not_read_from_ram_if_not_supported() {
-        let mut mapper =
-            build_cartridge_mapper(CART_TYPE_MBC3_TIMER_BATTERY, ROM_SIZE_64KB, RAM_SIZE_32KB);
+        let mut mapper = build_cartridge_mapper(
+            CARTRIDGE_TYPE_MBC3_TIMER_BATTERY,
+            ROM_SIZE_64KB,
+            RAM_SIZE_32KB,
+        );
 
         let mut ram = vec![0; 0x8000];
         ram[0x2001] = 0xDD;
@@ -894,7 +922,8 @@ mod tests {
 
     #[test]
     fn writes_to_ram_bank_1() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_MBC3_RAM, ROM_SIZE_64KB, RAM_SIZE_32KB);
+        let mut mapper =
+            build_cartridge_mapper(CARTRIDGE_TYPE_MBC3_RAM, ROM_SIZE_64KB, RAM_SIZE_32KB);
 
         // Enable RAM
         mapper.write_rom(0x0000, 0xA);
@@ -910,8 +939,11 @@ mod tests {
 
     #[test]
     fn does_not_write_to_ram_if_not_supported() {
-        let mut mapper =
-            build_cartridge_mapper(CART_TYPE_MBC3_TIMER_BATTERY, ROM_SIZE_64KB, RAM_SIZE_32KB);
+        let mut mapper = build_cartridge_mapper(
+            CARTRIDGE_TYPE_MBC3_TIMER_BATTERY,
+            ROM_SIZE_64KB,
+            RAM_SIZE_32KB,
+        );
 
         // Enable RAM
         mapper.write_rom(0x0000, 0xA);
@@ -927,7 +959,7 @@ mod tests {
 
     #[test]
     fn changes_rom_bank_number_to_bank_1_when_writing_0() {
-        let mut rom = build_rom(CART_TYPE_MBC3, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC3, ROM_SIZE_64KB, RAM_SIZE_2KB);
         rom[0x4000] = 0xB1;
         rom[0x4001] = 0xD2;
         let mut mapper = load_cartridge(rom, empty_cartridge_effects()).unwrap();
@@ -942,7 +974,7 @@ mod tests {
 
     #[test]
     fn selects_bank_1_when_the_seven_bank_bits_are_0() {
-        let mut rom = build_rom(CART_TYPE_MBC3, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC3, ROM_SIZE_64KB, RAM_SIZE_2KB);
         rom[0x4001] = 0xD2;
         let mut mapper = load_cartridge(rom, empty_cartridge_effects()).unwrap();
 
@@ -956,7 +988,7 @@ mod tests {
     #[test]
     fn reads_from_minutes_rtc_register() {
         let mut mapper = build_cartridge_mapper_with_effects(
-            CART_TYPE_MBC3_TIMER_RAM_BATTERY,
+            CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY,
             ROM_SIZE_64KB,
             RAM_SIZE_2KB,
             fake_cartridge_effects(),
@@ -977,7 +1009,7 @@ mod tests {
     #[test]
     fn a_clock_register_without_a_clock_selects_a_ram_bank() {
         let mut mapper = build_cartridge_mapper_with_effects(
-            CART_TYPE_MBC3_RAM_BATTERY,
+            CARTRIDGE_TYPE_MBC3_RAM_BATTERY,
             ROM_SIZE_64KB,
             RAM_SIZE_32KB,
             fake_cartridge_effects(),
@@ -996,7 +1028,7 @@ mod tests {
     #[test]
     fn a_written_clock_register_reads_back_after_the_next_latch() {
         let mut mapper = build_cartridge_mapper_with_effects(
-            CART_TYPE_MBC3_TIMER_RAM_BATTERY,
+            CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY,
             ROM_SIZE_64KB,
             RAM_SIZE_2KB,
             fake_cartridge_effects(),
@@ -1015,7 +1047,7 @@ mod tests {
     fn any_write_to_the_latch_register_latches_the_clock() {
         for value in [0x00, 0x01, 0x5A] {
             let mut mapper = build_cartridge_mapper_with_effects(
-                CART_TYPE_MBC3_TIMER_BATTERY,
+                CARTRIDGE_TYPE_MBC3_TIMER_BATTERY,
                 ROM_SIZE_64KB,
                 0,
                 fake_cartridge_effects(),
@@ -1032,7 +1064,7 @@ mod tests {
     #[test]
     fn the_bank_register_keeps_its_four_lower_bits() {
         let mut mapper = build_cartridge_mapper_with_effects(
-            CART_TYPE_MBC3_TIMER_RAM_BATTERY,
+            CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY,
             ROM_SIZE_64KB,
             RAM_SIZE_32KB,
             fake_cartridge_effects(),
@@ -1077,7 +1109,7 @@ mod tests {
     fn writes_to_the_missing_clock_registers_change_nothing() {
         let saves = Shared::new(0);
         let mut mapper = build_cartridge_mapper_with_effects(
-            CART_TYPE_MBC3_TIMER_BATTERY,
+            CARTRIDGE_TYPE_MBC3_TIMER_BATTERY,
             ROM_SIZE_64KB,
             0,
             Box::new(RtcSaveCounter(saves.clone())),
@@ -1099,8 +1131,11 @@ mod tests {
 
     #[test]
     fn ram_banks_4_to_7_wrap_around_without_a_clock() {
-        let mut mapper =
-            build_cartridge_mapper(CART_TYPE_MBC3_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_32KB);
+        let mut mapper = build_cartridge_mapper(
+            CARTRIDGE_TYPE_MBC3_RAM_BATTERY,
+            ROM_SIZE_64KB,
+            RAM_SIZE_32KB,
+        );
         mapper.write_rom(0x0000, 0xA);
         mapper.write_rom(0x4000, 0x1);
         mapper.write_ram(0x0000, 0x5A);
@@ -1111,11 +1146,11 @@ mod tests {
 
     #[test]
     fn an_mbc3_with_more_than_2_mib_of_rom_uses_all_eight_rom_bank_bits() {
-        let mut mbc3 = build_cartridge_mapper(CART_TYPE_MBC3, ROM_SIZE_2MB, 0);
+        let mut mbc3 = build_cartridge_mapper(CARTRIDGE_TYPE_MBC3, ROM_SIZE_2MB, 0);
         mbc3.write_rom(0x2000, 0x85);
         assert_eq!(mbc3.rom_banks(), [0, 0x05]);
 
-        let mut mbc30 = build_cartridge_mapper(CART_TYPE_MBC3, ROM_SIZE_4MB, 0);
+        let mut mbc30 = build_cartridge_mapper(CARTRIDGE_TYPE_MBC3, ROM_SIZE_4MB, 0);
         mbc30.write_rom(0x2000, 0x85);
         assert_eq!(mbc30.rom_banks(), [0, 0x85]);
         mbc30.write_rom(0x2000, 0x00);
@@ -1125,7 +1160,7 @@ mod tests {
     #[test]
     fn an_mbc3_with_64_kib_of_ram_has_eight_ram_banks() {
         let mut mbc30 = build_cartridge_mapper_with_effects(
-            CART_TYPE_MBC3_TIMER_RAM_BATTERY,
+            CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY,
             ROM_SIZE_64KB,
             RAM_SIZE_64KB,
             fake_cartridge_effects(),
@@ -1141,7 +1176,7 @@ mod tests {
         }
 
         let mut mbc3 =
-            build_cartridge_mapper(CART_TYPE_MBC3_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_8KB);
+            build_cartridge_mapper(CARTRIDGE_TYPE_MBC3_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_8KB);
         mbc3.write_rom(0x0000, 0xA);
         mbc3.write_rom(0x4000, 0x7);
         mbc3.write_ram(0x0000, 0x33);
@@ -1151,15 +1186,21 @@ mod tests {
 
     #[test]
     fn battery_backed_ram_is_saved_once_per_report_while_enabled() {
-        assert_eq!(ram_saves_after_writing(CART_TYPE_MBC3_RAM_BATTERY, 0x0A), 1);
         assert_eq!(
-            ram_saves_after_writing(CART_TYPE_MBC3_TIMER_RAM_BATTERY, 0x0A),
+            ram_saves_after_writing(CARTRIDGE_TYPE_MBC3_RAM_BATTERY, 0x0A),
             1
         );
-        assert_eq!(ram_saves_after_writing(CART_TYPE_MBC3_RAM_BATTERY, 0x00), 0);
-        assert_eq!(ram_saves_after_writing(CART_TYPE_MBC3_RAM, 0x0A), 0);
         assert_eq!(
-            ram_saves_after_writing(CART_TYPE_MBC3_TIMER_BATTERY, 0x0A),
+            ram_saves_after_writing(CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY, 0x0A),
+            1
+        );
+        assert_eq!(
+            ram_saves_after_writing(CARTRIDGE_TYPE_MBC3_RAM_BATTERY, 0x00),
+            0
+        );
+        assert_eq!(ram_saves_after_writing(CARTRIDGE_TYPE_MBC3_RAM, 0x0A), 0);
+        assert_eq!(
+            ram_saves_after_writing(CARTRIDGE_TYPE_MBC3_TIMER_BATTERY, 0x0A),
             0
         );
     }

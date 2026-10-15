@@ -3,17 +3,19 @@
 //! rows in a rounded card, each row with its name and a short description
 //! at the left and its control at the right (or under them, for a control
 //! too wide to share the row), and any longer note under its group. The
-//! window grows with the app's window, up to [`MAX_HEIGHT`].
+//! window grows with the app's window, up to [`MAX_HEIGHT`], and arranges
+//! itself for the window's width (see [`SettingsLayout`]): the tabs are in a
+//! sidebar in a wide window and in a row above the page in a narrow one.
 
 use crate::app::{GameMessage, LibraryMessage, Message, SettingsMessage};
 use crate::settings::{Appearance, Settings};
 use crate::ui::icons::{Icon, icon};
 use crate::ui::logo::logo;
 use crate::ui::theme;
-use crate::ui::widgets::{chips, icon_button, segmented};
+use crate::ui::widgets::{chips, icon_button, segmented, with_tooltip};
 use iced::widget::text::Wrapping;
 use iced::widget::{
-    Column, button, column, container, row, scrollable, slider, space, text, toggler,
+    Column, Row, button, column, container, row, scrollable, slider, space, text, toggler, tooltip,
 };
 use iced::{Alignment, Color, Element, Fill, Padding, Theme, widget};
 use nubo_core::Model;
@@ -36,6 +38,23 @@ const RELEASE_NOTES: &str = concat!(
 /// the margin `views::modal` leaves around it.
 const MAX_HEIGHT: f32 = 640.0;
 const SIDEBAR_WIDTH: f32 = 170.0;
+/// The space between the settings window's edge and what it shows.
+const PANEL_PADDING: f32 = 24.0;
+/// The space between the tabs and the page.
+const BODY_SPACING: f32 = 20.0;
+/// The space around the tabs that the D-pad's outline takes.
+const RING_PADDING: f32 = 4.0;
+/// The width a page loses to its own padding and its scroll bar.
+const PAGE_GUTTER: f32 = 30.0;
+/// The least width a page needs next to the sidebar. In a narrower window
+/// the tabs go in a row above the page instead.
+const SIDEBAR_MIN_PAGE_WIDTH: f32 = 400.0;
+/// The width the row of tabs needs to name every tab. In a narrower window
+/// only the open tab shows its name, and the others only their icons.
+const TAB_ROW_NAMED_WIDTH: f32 = 560.0;
+/// Below this page width, controls too wide to share a row with their
+/// setting's name go under it.
+const STACK_BELOW_PAGE_WIDTH: f32 = 420.0;
 /// The space inside a row of a group, around its text and control.
 const ROW_PADDING: Padding = Padding {
     top: 10.0,
@@ -170,11 +189,12 @@ pub fn revisions(preference: ModelPreference) -> &'static [Model] {
     }
 }
 
-/// Where the D-pad is in the settings window: on the tabs at the left, or on
-/// a row of the page (counting from 0, see [`rows`]).
+/// Where the D-pad is in the settings window: on the tabs (in the sidebar or
+/// the row above the page, see [`SettingsLayout`]), or on a row of the page
+/// (counting from 0, see [`rows`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingsFocus {
-    Sidebar,
+    Tabs,
     Row(usize),
 }
 
@@ -298,6 +318,85 @@ pub struct PageState<'a> {
     pub box_art_problem: Option<&'a str>,
     /// A newer version than this one, if the app found one is out.
     pub newer_version: Option<&'a str>,
+    /// How the window arranges itself for the app window's width.
+    pub layout: SettingsLayout,
+}
+
+/// How the settings window arranges itself in an app window of a given
+/// width. In a wide window the tabs are in a sidebar next to the page. In a
+/// narrower one they go in a row above it, so the page keeps the room its
+/// settings need; in the narrowest only the open tab shows its name there,
+/// and controls too wide to share a row with their name go under it. The
+/// view and the app's D-pad handling use the same layout.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SettingsLayout {
+    /// The width of the app's window, or 0 while it isn't known yet.
+    window_width: f32,
+}
+
+impl SettingsLayout {
+    pub fn new(window_width: f32) -> Self {
+        SettingsLayout { window_width }
+    }
+
+    /// Whether the tabs are in a sidebar next to the page. They are while
+    /// the window's width isn't known yet, as in the window the app opens.
+    pub fn has_sidebar(self) -> bool {
+        self.window_width <= 0.0 || self.page_width(true) >= SIDEBAR_MIN_PAGE_WIDTH
+    }
+
+    /// How many tabs `action` moves along while the D-pad is on the tabs:
+    /// up and down in the sidebar, left and right in the row above the page.
+    pub fn tab_step(self, action: Action) -> Option<isize> {
+        match (self.has_sidebar(), action) {
+            (true, Action::Up) | (false, Action::Left) => Some(-1),
+            (true, Action::Down) | (false, Action::Right) => Some(1),
+            _ => None,
+        }
+    }
+
+    /// Whether `action` goes from the tabs into the page: right from the
+    /// sidebar, down from the row above the page, and A or Start from both.
+    pub fn enters_page(self, action: Action) -> bool {
+        match action {
+            Action::A | Action::Start => true,
+            Action::Right => self.has_sidebar(),
+            Action::Down => !self.has_sidebar(),
+            _ => false,
+        }
+    }
+
+    /// Whether up on a page's first row goes back to the tabs, which it does
+    /// when they are in the row above the page.
+    pub fn up_leaves_page(self) -> bool {
+        !self.has_sidebar()
+    }
+
+    /// The width of what the settings window shows inside its padding.
+    fn inner_width(self) -> f32 {
+        WIDTH.min(self.window_width - 2.0 * super::MODAL_MARGIN) - 2.0 * PANEL_PADDING
+    }
+
+    /// The width a page gets, with the sidebar next to it or without.
+    fn page_width(self, sidebar: bool) -> f32 {
+        let beside = if sidebar {
+            SIDEBAR_WIDTH + 2.0 * RING_PADDING + BODY_SPACING
+        } else {
+            0.0
+        };
+        self.inner_width() - beside - PAGE_GUTTER
+    }
+
+    /// Whether every tab shows its name, not only the open one.
+    fn names_every_tab(self) -> bool {
+        self.has_sidebar() || self.inner_width() >= TAB_ROW_NAMED_WIDTH
+    }
+
+    /// Whether controls too wide to share a row with their setting's name
+    /// go under it.
+    fn stacks_wide_controls(self) -> bool {
+        !self.has_sidebar() && self.page_width(false) < STACK_BELOW_PAGE_WIDTH
+    }
 }
 
 /// The settings window showing `tab`.
@@ -325,14 +424,23 @@ pub fn view<'a>(
     };
     let page = page(tab, settings, library, state, &Rings::new(focused));
 
-    let body = row![
-        sidebar(tab, focus == Some(SettingsFocus::Sidebar)),
-        scrollable(container(page).padding([0, 4]))
-            .id(scroll_id())
-            .spacing(12)
-            .height(Fill)
-    ]
-    .spacing(20);
+    let page = scrollable(container(page).padding([0, 4]))
+        .id(scroll_id())
+        .spacing(12)
+        .height(Fill);
+    let tabs_focused = focus == Some(SettingsFocus::Tabs);
+    let body: Element<'a, Message> = if state.layout.has_sidebar() {
+        row![sidebar(tab, tabs_focused), page]
+            .spacing(BODY_SPACING)
+            .into()
+    } else {
+        column![
+            tab_row(tab, tabs_focused, state.layout.names_every_tab()),
+            page
+        ]
+        .spacing(12)
+        .into()
+    };
 
     let mut panel = column![header, body].spacing(20);
     if focus.is_some() {
@@ -344,7 +452,7 @@ pub fn view<'a>(
     }
 
     container(panel)
-        .padding(24)
+        .padding(PANEL_PADDING)
         .width(WIDTH)
         .height(Fill)
         .max_height(MAX_HEIGHT)
@@ -378,6 +486,42 @@ fn sidebar<'a>(selected: SettingsTab, focused: bool) -> Element<'a, Message> {
     focus_ring(tabs, focused)
 }
 
+/// The tabs in a row above the page, for a window too narrow for the
+/// sidebar, with About at the far end and outlined while the D-pad is on
+/// them. Unless `name_every_tab`, only the open tab shows its name and the
+/// others show their icons, with their names as tooltips.
+fn tab_row<'a>(selected: SettingsTab, focused: bool, name_every_tab: bool) -> Element<'a, Message> {
+    let mut tabs = Row::new().spacing(4).align_y(Alignment::Center);
+
+    for &tab in SettingsTab::all() {
+        if tab == SettingsTab::About {
+            tabs = tabs.push(space::horizontal());
+        }
+
+        let named = name_every_tab || tab == selected;
+        let mut label = row![icon(tab.icon())].spacing(8).align_y(Alignment::Center);
+        if named {
+            label = label.push(text(tab.label()).wrapping(Wrapping::None));
+        }
+
+        let tab_button = button(label)
+            .padding([8, 12])
+            .style(theme::segment(tab == selected))
+            .on_press(Message::Settings(SettingsMessage::TabSelected(tab)));
+        tabs = tabs.push(if named {
+            tab_button.into()
+        } else {
+            with_tooltip(
+                tab_button,
+                String::from(tab.label()),
+                tooltip::Position::Bottom,
+            )
+        });
+    }
+
+    focus_ring(tabs.width(Fill), focused)
+}
+
 /// The page of settings for `tab`, which draws its rows in the order
 /// [`rows`] lists them.
 fn page<'a>(
@@ -389,7 +533,12 @@ fn page<'a>(
 ) -> Element<'a, Message> {
     match tab {
         SettingsTab::Display => display(settings, rings),
-        SettingsTab::Playing => playing(settings, state.restart_needed, rings),
+        SettingsTab::Playing => playing(
+            settings,
+            state.restart_needed,
+            state.layout.stacks_wide_controls(),
+            rings,
+        ),
         SettingsTab::Controls => controls(settings, state, rings),
         SettingsTab::Library => library_page(settings, library, state.box_art_problem, rings),
         SettingsTab::About => about(settings, state.newer_version, rings),
@@ -682,9 +831,11 @@ fn display<'a>(settings: &'a Settings, rings: &Rings) -> Element<'a, Message> {
 
 /// The model games start on (with a restart while the running game uses
 /// another one), continuing games, the fast forward speed and the volume.
+/// With `stack_wide_controls` the fast forward speeds go under their name.
 fn playing<'a>(
     settings: &'a Settings,
     restart_needed: bool,
+    stack_wide_controls: bool,
     rings: &Rings,
 ) -> Element<'a, Message> {
     let preference = settings.shared.model;
@@ -782,19 +933,23 @@ fn playing<'a>(
         Some(key) => format!("Hold {key}, or use the button in the top bar."),
         None => String::from("Use the button in the top bar."),
     };
-    games.push(rings.row(
-        setting(
-            "Fast forward speed",
-            Some(fast_forward_description),
-            segmented(
-                &FastForwardSpeed::ALL,
-                settings.shared.fast_forward_speed,
-                |_| None,
-                |speed| Message::Settings(SettingsMessage::FastForwardSpeedSelected(speed)),
-            ),
-        ),
-        SettingsRow::FastForwardSpeed,
-    ));
+    let speeds = segmented(
+        &FastForwardSpeed::ALL,
+        settings.shared.fast_forward_speed,
+        |_| None,
+        |speed| Message::Settings(SettingsMessage::FastForwardSpeedSelected(speed)),
+    );
+    let fast_forward: Element<'a, Message> = if stack_wide_controls {
+        column![
+            label("Fast forward speed", Some(fast_forward_description)),
+            speeds
+        ]
+        .spacing(10)
+        .into()
+    } else {
+        setting("Fast forward speed", Some(fast_forward_description), speeds)
+    };
+    games.push(rings.row(fast_forward, SettingsRow::FastForwardSpeed));
 
     column![
         group("Console", None, console, None),

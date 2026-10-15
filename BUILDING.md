@@ -50,7 +50,7 @@ It also writes `Nubo-<version>-linux-<architecture>.flatpak`, a single file to g
 
 ### Licenses
 
-The macOS app, the web version and the RetroArch core come with `THIRD_PARTY_LICENSES.txt`, the licenses of the Rust crates Nubo is built from. `cargo xtask licenses <folder>` writes it with the other license files; the packaging tasks run it for you.
+Every package (the macOS app, the Windows installer and zip, the Flatpak, the web version and the RetroArch core) comes with `THIRD_PARTY_LICENSES.txt`, the licenses of the Rust crates Nubo is built from. `cargo xtask licenses <folder>` writes it with the other license files; the packaging tasks run it for you.
 
 ## Testing
 
@@ -69,7 +69,7 @@ cargo cpu-tests                     # Every CPU instruction, checked cycle by cy
 - `crates/nubo-frontend`: everything an app needs besides drawing: settings, saves, the game library and running a game with its sound.
 - `frontends/nubo`: the desktop and browser app, drawn with [Iced](https://iced.rs).
 - `frontends/nubo-libretro`: the RetroArch core.
-- `tools/`: the developer tools, such as the test ROM runner and the benchmark.
+- `tools/`: the developer tools, such as the test ROM runner and the benchmark, with `crates/nubo-download`, which downloads their test data.
 - `xtask/`: the web build, packaging and the other project tasks ([`xtask/AGENTS.md`](xtask/AGENTS.md) lists them all).
 
 ## Contributing

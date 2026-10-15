@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn selects_rom_bank_only_when_address_bit_eight_is_set() {
-        let mut rom = build_rom(CART_TYPE_MBC2, ROM_SIZE_256KB, 0);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC2, ROM_SIZE_256KB, 0);
         rom[0xC005] = 0xA1;
         let mut mapper = load_cartridge(rom, empty_cartridge_effects()).unwrap();
 
@@ -100,7 +100,7 @@ mod tests {
 
     #[test]
     fn stores_only_the_lower_nibble_and_repeats_ram_across_the_area() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_MBC2, ROM_SIZE_256KB, 0);
+        let mut mapper = build_cartridge_mapper(CARTRIDGE_TYPE_MBC2, ROM_SIZE_256KB, 0);
         mapper.write_rom(0x0000, 0x0A);
 
         mapper.write_ram(0xA005, 0x3C);
@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     fn reads_ff_while_ram_is_disabled() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_MBC2, ROM_SIZE_256KB, 0);
+        let mut mapper = build_cartridge_mapper(CARTRIDGE_TYPE_MBC2, ROM_SIZE_256KB, 0);
         mapper.write_rom(0x0000, 0x0A);
         mapper.write_ram(0xA005, 0x03);
 
@@ -123,8 +123,14 @@ mod tests {
 
     #[test]
     fn battery_backed_ram_is_saved_once_per_report_while_enabled() {
-        assert_eq!(ram_saves_after_writing(CART_TYPE_MBC2_BATTERY, 0x0A), 1);
-        assert_eq!(ram_saves_after_writing(CART_TYPE_MBC2_BATTERY, 0x00), 0);
-        assert_eq!(ram_saves_after_writing(CART_TYPE_MBC2, 0x0A), 0);
+        assert_eq!(
+            ram_saves_after_writing(CARTRIDGE_TYPE_MBC2_BATTERY, 0x0A),
+            1
+        );
+        assert_eq!(
+            ram_saves_after_writing(CARTRIDGE_TYPE_MBC2_BATTERY, 0x00),
+            0
+        );
+        assert_eq!(ram_saves_after_writing(CARTRIDGE_TYPE_MBC2, 0x0A), 0);
     }
 }

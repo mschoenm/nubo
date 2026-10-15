@@ -213,7 +213,8 @@ impl Emulator {
         self.address_bus().high_ram()
     }
 
-    /// Video RAM (0x8000-0x9FFF; on a CGB bank 0 followed by bank 1) and
+    /// Video RAM (0x8000-0x9FFF; bank 0 followed by bank 1, which only a CGB
+    /// uses) and
     /// OAM (0xFE00-0xFE9F, the objects' attributes), as stored, whether or
     /// not the CPU could read them right now. It takes `&mut self` because
     /// the PPU runs behind until something looks at it (see

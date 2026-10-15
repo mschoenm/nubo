@@ -1,3 +1,9 @@
+/*
+    How a game's border is decoded (the tiles, the map entries with their palette and flip bits)
+    is ported from SameBoy's sgb.c (https://github.com/LIJI32/SameBoy, Expat License,
+    Copyright (c) 2015-2026 Lior Halphon; see the notice in apu.rs).
+*/
+
 //! The border around the Game Boy screen on a Super Game Boy: a game's own,
 //! sent as Super Nintendo tiles, or Nubo's.
 //!
@@ -108,7 +114,7 @@ pub(super) mod nubo_colors {
     /// The raised panel the screen sits in.
     pub(super) const PANEL: [u8; 3] = [0x34, 0x29, 0x8A];
     /// The thin dark rim right around the screen.
-    pub(super) const RIM: [u8; 3] = [0x14, 0x0E, 0x38];
+    pub(in crate::sgb) const RIM: [u8; 3] = [0x14, 0x0E, 0x38];
 }
 
 /// The panel the screen sits in: its left, top, right and bottom edges and
@@ -116,8 +122,9 @@ pub(super) mod nubo_colors {
 const PANEL: (f32, f32, f32, f32, f32) = (36.0, 28.0, 220.0, 196.0, 10.0);
 /// The rim around the screen.
 const RIM: (f32, f32, f32, f32, f32) = (44.0, 36.0, 212.0, 188.0, 4.0);
-/// The size of the logo below the panel, and where its top-left corner is.
+/// The size of the logo below the panel, in pixels.
 const LOGO_SIZE: usize = 20;
+/// Where the logo's top-left corner is, in pixels.
 const LOGO_POSITION: (usize, usize) = (118, 200);
 /// How many samples per pixel edge the shapes are drawn with, to smooth their
 /// edges.
@@ -141,6 +148,8 @@ pub(super) struct NuboBorder {
 }
 
 impl NuboBorder {
+    /// Draws Nubo's border once: the panel and the rim around the screen,
+    /// the logo below them, and the clouds of the attraction mode.
     pub(super) fn new() -> Self {
         let mut colors = vec![nubo_colors::BACKGROUND; BORDERED_WIDTH * BORDERED_HEIGHT];
         let mut open_frame = vec![1.0; BORDERED_WIDTH * BORDERED_HEIGHT];

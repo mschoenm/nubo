@@ -32,9 +32,13 @@ struct Record {
     input_descriptors: Vec<(c_uint, String)>,
     /// The port of every input descriptor.
     descriptor_ports: Vec<c_uint>,
+    /// Where every input descriptor's name is, which RetroArch keeps.
+    descriptor_names: Vec<usize>,
     /// `RETRO_ENVIRONMENT_SET_CONTROLLER_INFO`: the device ids each port
     /// offers.
     controller_ports: Vec<Vec<c_uint>>,
+    /// Where each port's list of controller types is, which RetroArch keeps.
+    controller_types: Vec<usize>,
     /// `RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2` and `_SET_CORE_OPTIONS`: each
     /// option's key, default and values.
     options: Vec<(String, String, Vec<String>)>,
@@ -105,6 +109,8 @@ unsafe extern "C" fn test_environment(cmd: c_uint, data: *mut c_void) -> bool {
                     let types =
                         std::slice::from_raw_parts((*port).types, (*port).num_types as usize);
                     ports.push(types.iter().map(|device| device.id).collect());
+                    let types = (*port).types.addr();
+                    record(|record| record.controller_types.push(types));
                     port = port.add(1);
                 }
                 record(|record| record.controller_ports = ports);
@@ -118,6 +124,8 @@ unsafe extern "C" fn test_environment(cmd: c_uint, data: *mut c_void) -> bool {
                         record(|record| record.input_descriptors.push(entry));
                     }
                     record(|record| record.descriptor_ports.push((*descriptor).port));
+                    let name = (*descriptor).description.addr();
+                    record(|record| record.descriptor_names.push(name));
                     descriptor = descriptor.add(1);
                 }
                 true
@@ -412,6 +420,13 @@ fn the_core_describes_itself() {
         vec![vec![RETRO_DEVICE_JOYPAD]; 4],
         "four ports, each a Game Boy's buttons"
     );
+    assert!(
+        record
+            .controller_types
+            .iter()
+            .all(|&types| types == CONTROLLER_TYPES.0.as_ptr().addr()),
+        "RetroArch keeps the controller types, so they must outlive the call"
+    );
     let keys: Vec<&str> = record
         .options
         .iter()
@@ -470,6 +485,17 @@ fn a_game_plays_in_retroarchs_order_with_one_frame_and_its_sound_per_run() {
             "the buttons of port {port}"
         );
     }
+    let lasting_names: Vec<usize> = BUTTONS
+        .iter()
+        .map(|(_, _, name)| name.as_ptr().addr())
+        .collect();
+    assert!(
+        record
+            .descriptor_names
+            .iter()
+            .all(|name| lasting_names.contains(name)),
+        "RetroArch keeps the names, so they must outlive the call"
+    );
     assert_eq!(record.achievements, Some(true));
     assert!(!record.memory_maps.is_empty());
 

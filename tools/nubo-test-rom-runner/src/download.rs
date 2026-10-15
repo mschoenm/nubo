@@ -5,13 +5,10 @@
 //! step is skipped when its result is already on disk.
 
 use crate::suites::Source;
-use sha2::{Digest, Sha256};
+use nubo_download::{download_all, has_checksum, sha256_hex};
 use std::env;
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::thread;
 
 const VERSION: &str = "v7.0";
 const ARCHIVE_URL: &str =
@@ -25,7 +22,6 @@ const SHOOTOUT_MANIFEST: &str = include_str!("../shootout.sha256");
 /// A file written after a download or extraction succeeds, so an interrupted
 /// one is redone on the next run.
 const COMPLETE_MARKER: &str = ".complete";
-const PARALLEL_DOWNLOADS: usize = 16;
 
 /// The folders the test ROMs are in.
 pub(crate) struct RomDirs {
@@ -148,73 +144,6 @@ fn ensure_shootout() -> Result<PathBuf, String> {
     fs::write(&marker, manifest_checksum)
         .map_err(|error| format!("failed to write to {}: {error}", shootout_dir.display()))?;
     Ok(shootout_dir)
-}
-
-/// Whether the file at `path` exists and has the SHA-256 checksum `expected`.
-fn has_checksum(path: &Path, expected: &str) -> bool {
-    let Ok(bytes) = fs::read(path) else {
-        return false;
-    };
-    sha256_hex(&bytes) == expected
-}
-
-/// The SHA-256 checksum of `bytes` in lowercase hexadecimal.
-fn sha256_hex(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
-}
-
-/// Downloads each URL to its destination, several at a time.
-fn download_all(downloads: &[(PathBuf, String)]) -> Result<(), String> {
-    let agent = agent();
-    let next = AtomicUsize::new(0);
-    thread::scope(|scope| {
-        let workers: Vec<_> = (0..PARALLEL_DOWNLOADS.min(downloads.len()))
-            .map(|_| {
-                scope.spawn(|| {
-                    while let Some((destination, url)) =
-                        downloads.get(next.fetch_add(1, Ordering::Relaxed))
-                    {
-                        download(&agent, url, destination)?;
-                    }
-                    Ok(())
-                })
-            })
-            .collect();
-        workers
-            .into_iter()
-            .try_for_each(|worker| worker.join().expect("a download thread panicked"))
-    })
-}
-
-/// An HTTP client that finds a proxy and trusted certificates the way the
-/// system's own tools do, from the `HTTPS_PROXY` variable and the system's
-/// certificate store.
-fn agent() -> ureq::Agent {
-    ureq::Agent::new_with_config(
-        ureq::Agent::config_builder()
-            .tls_config(
-                ureq::tls::TlsConfig::builder()
-                    .root_certs(ureq::tls::RootCerts::PlatformVerifier)
-                    .build(),
-            )
-            .build(),
-    )
-}
-
-/// Downloads `url` to `destination`.
-fn download(agent: &ureq::Agent, url: &str, destination: &Path) -> Result<(), String> {
-    let response = agent
-        .get(url)
-        .call()
-        .map_err(|error| format!("failed to download {url}: {error}"))?;
-    let mut file = fs::File::create(destination)
-        .map_err(|error| format!("failed to create {}: {error}", destination.display()))?;
-    io::copy(&mut response.into_body().into_reader(), &mut file)
-        .map_err(|error| format!("failed to download {url}: {error}"))?;
-    Ok(())
 }
 
 /// Unpacks the archive into a fresh `destination` and marks it complete.

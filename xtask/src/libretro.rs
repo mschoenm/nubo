@@ -42,7 +42,11 @@ pub fn build_libretro_core() -> Result<PathBuf> {
         let mut build = cargo();
         build.args(["build", "--release", "--locked", "--package", PACKAGE]);
         if cfg!(target_env = "msvc") {
-            build.env("RUSTFLAGS", "-C target-feature=+crt-static");
+            let existing = env::var("RUSTFLAGS").ok();
+            build.env(
+                "RUSTFLAGS",
+                with_flag(existing.as_deref(), "-C target-feature=+crt-static"),
+            );
         }
         run(&mut build)?;
         copy(&built_library(&target_dir().join("release")), &core)?;
@@ -140,5 +144,29 @@ fn write_zip(parent: &Path, name: &str, zip: &Path) -> Result {
             .arg(zip)
             .arg(name)
             .current_dir(parent))
+    }
+}
+
+/// `flag` added to the RUSTFLAGS the user set, if any, so building the core
+/// keeps them.
+fn with_flag(existing: Option<&str>, flag: &str) -> String {
+    match existing.map(str::trim) {
+        Some(existing) if !existing.is_empty() => format!("{existing} {flag}"),
+        _ => flag.to_owned(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_static_runtime_flag_joins_the_users_rustflags() {
+        assert_eq!(with_flag(None, "-C a"), "-C a");
+        assert_eq!(with_flag(Some(" "), "-C a"), "-C a");
+        assert_eq!(
+            with_flag(Some("-C target-cpu=native"), "-C a"),
+            "-C target-cpu=native -C a"
+        );
     }
 }

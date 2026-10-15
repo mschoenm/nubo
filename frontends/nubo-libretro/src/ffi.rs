@@ -15,8 +15,9 @@
 //! - **State.** The loaded game is a `static Mutex<Option<Core>>` and the
 //!   callbacks a `static Mutex<Frontend>`, so keeping them needs no
 //!   `unsafe`. RetroArch calls a core from one thread at a time.
-//! - **Panics.** Every exported function runs its body under
-//!   `catch_unwind`, so a panic fails the call (a game doesn't load, a frame
+//! - **Panics.** Every exported function that does more than store a
+//!   callback or return a constant runs its body under `catch_unwind`
+//!   (`guard`), so a panic fails the call (a game doesn't load, a frame
 //!   is skipped) and is logged, instead of crossing into C, which would
 //!   abort RetroArch.
 //! - **Logging** goes through RetroArch's log interface
@@ -279,6 +280,7 @@ struct Frontend {
 }
 
 impl Frontend {
+    /// No callbacks yet, as before RetroArch hands them over.
     const NONE: Frontend = Frontend {
         environment: None,
         video_refresh: None,
@@ -293,7 +295,9 @@ impl Frontend {
     };
 }
 
+/// The callbacks RetroArch gave, shared by every exported function.
 static FRONTEND: Mutex<Frontend> = Mutex::new(Frontend::NONE);
+/// The loaded game, or `None` when there is none.
 static CORE: Mutex<Option<Core>> = Mutex::new(None);
 /// The picture size RetroArch was last told about, in `retro_get_system_av_info`
 /// or with `RETRO_ENVIRONMENT_SET_GEOMETRY`.
@@ -329,14 +333,14 @@ fn guard<T>(name: &str, fallback: T, body: impl FnOnce() -> T) -> T {
 }
 
 /// Calls RetroArch's environment callback, if it gave one.
-fn environment(cmd: c_uint, data: *mut c_void) -> bool {
+fn environment(command: c_uint, data: *mut c_void) -> bool {
     let Some(callback) = frontend().environment else {
         return false;
     };
     // SAFETY: RetroArch's callback takes any command, with the data that
     // command's documentation in libretro.h asks for, which every caller here
     // passes.
-    unsafe { callback(cmd, data) }
+    unsafe { callback(command, data) }
 }
 
 /// Logs `message` through RetroArch's log interface, or to standard error.
@@ -380,19 +384,12 @@ fn read_options() -> Options {
 
 /// The C strings of the option definitions, kept alive while RetroArch
 /// copies them.
+#[derive(Default)]
 struct OptionStrings {
-    definitions: Vec<OptionDefinition>,
     strings: Vec<CString>,
 }
 
 impl OptionStrings {
-    fn new() -> Self {
-        OptionStrings {
-            definitions: options::definitions(),
-            strings: Vec::new(),
-        }
-    }
-
     /// A C string of `text`, kept until `self` is dropped.
     fn c_string(&mut self, text: &str) -> *const c_char {
         let string = CString::new(text).unwrap_or_default();
@@ -401,14 +398,16 @@ impl OptionStrings {
         pointer
     }
 
-    /// The values of the definition at `index`, ended by an empty one.
-    fn values(&mut self, index: usize) -> [RetroCoreOptionValue; RETRO_NUM_CORE_OPTION_VALUES_MAX] {
+    /// The values of `definition`, ended by an empty one.
+    fn values(
+        &mut self,
+        definition: &OptionDefinition,
+    ) -> [RetroCoreOptionValue; RETRO_NUM_CORE_OPTION_VALUES_MAX] {
         let mut values = NO_VALUES;
-        let pairs = self.definitions[index].values.clone();
-        for (slot, (value, label)) in values.iter_mut().zip(pairs) {
+        for (slot, (value, label)) in values.iter_mut().zip(&definition.values) {
             *slot = RetroCoreOptionValue {
-                value: self.c_string(&value),
-                label: self.c_string(&label),
+                value: self.c_string(value),
+                label: self.c_string(label),
             };
         }
         values
@@ -424,22 +423,20 @@ fn set_core_options() {
     ) {
         version = 0;
     }
-    let mut strings = OptionStrings::new();
-    let count = strings.definitions.len();
+    let option_definitions = options::definitions();
+    let mut strings = OptionStrings::default();
     if version >= 2 {
-        let mut definitions: Vec<RetroCoreOptionV2Definition> = (0..count)
-            .map(|index| {
-                let definition = strings.definitions[index].clone();
-                RetroCoreOptionV2Definition {
-                    key: strings.c_string(definition.key),
-                    desc: strings.c_string(definition.description),
-                    desc_categorized: ptr::null(),
-                    info: strings.c_string(definition.info),
-                    info_categorized: ptr::null(),
-                    category_key: ptr::null(),
-                    values: strings.values(index),
-                    default_value: strings.c_string(definition.default_value()),
-                }
+        let mut definitions: Vec<RetroCoreOptionV2Definition> = option_definitions
+            .iter()
+            .map(|definition| RetroCoreOptionV2Definition {
+                key: strings.c_string(definition.key),
+                desc: strings.c_string(definition.description),
+                desc_categorized: ptr::null(),
+                info: strings.c_string(definition.info),
+                info_categorized: ptr::null(),
+                category_key: ptr::null(),
+                values: strings.values(definition),
+                default_value: strings.c_string(definition.default_value()),
             })
             .collect();
         definitions.push(RetroCoreOptionV2Definition {
@@ -466,16 +463,14 @@ fn set_core_options() {
             (&raw mut options).cast(),
         );
     } else if version >= 1 {
-        let mut definitions: Vec<RetroCoreOptionDefinition> = (0..count)
-            .map(|index| {
-                let definition = strings.definitions[index].clone();
-                RetroCoreOptionDefinition {
-                    key: strings.c_string(definition.key),
-                    desc: strings.c_string(definition.description),
-                    info: strings.c_string(definition.info),
-                    values: strings.values(index),
-                    default_value: strings.c_string(definition.default_value()),
-                }
+        let mut definitions: Vec<RetroCoreOptionDefinition> = option_definitions
+            .iter()
+            .map(|definition| RetroCoreOptionDefinition {
+                key: strings.c_string(definition.key),
+                desc: strings.c_string(definition.description),
+                info: strings.c_string(definition.info),
+                values: strings.values(definition),
+                default_value: strings.c_string(definition.default_value()),
             })
             .collect();
         definitions.push(RetroCoreOptionDefinition {
@@ -492,9 +487,9 @@ fn set_core_options() {
     } else {
         // The oldest form: "Description; first|second|...", the first value
         // being the default.
-        let mut variables: Vec<RetroVariable> = (0..count)
-            .map(|index| {
-                let definition = strings.definitions[index].clone();
+        let mut variables: Vec<RetroVariable> = option_definitions
+            .iter()
+            .map(|definition| {
                 let values: Vec<&str> = definition
                     .values
                     .iter()
@@ -523,18 +518,13 @@ fn set_core_options() {
 
 /// Names the Game Boy's buttons in RetroArch's remapping menu.
 fn set_input_descriptors() {
-    let names: Vec<CString> = BUTTONS
-        .iter()
-        .map(|(_, _, name)| CString::new(*name).unwrap_or_default())
-        .collect();
     // The same buttons on all four ports: the second to fourth are the other
     // players of a Super Game Boy's multitap.
     let mut descriptors: Vec<RetroInputDescriptor> = (0..4)
         .flat_map(|port| {
             BUTTONS
                 .iter()
-                .zip(&names)
-                .map(move |((id, _, _), name)| RetroInputDescriptor {
+                .map(move |(id, _, name)| RetroInputDescriptor {
                     port,
                     device: RETRO_DEVICE_JOYPAD,
                     index: 0,
@@ -801,15 +791,24 @@ pub extern "C" fn retro_set_environment(callback: Option<RetroEnvironment>) {
     });
 }
 
+/// The one kind of controller every port offers. RetroArch copies the list
+/// of ports but keeps pointing at this, so it lives as long as the core.
+struct ControllerTypes([RetroControllerDescription; 1]);
+
+// SAFETY: the description only points at a C string literal, which lives
+// as long as the program, and nothing ever writes to it.
+unsafe impl Sync for ControllerTypes {}
+
+static CONTROLLER_TYPES: ControllerTypes = ControllerTypes([RetroControllerDescription {
+    desc: c"Game Boy".as_ptr(),
+    id: RETRO_DEVICE_JOYPAD,
+}]);
+
 /// Declares the core's four controller ports, each a Game Boy's buttons: the
 /// first player's, and the other players of a Super Game Boy's multitap.
 fn set_controller_info() {
-    let joypad = [RetroControllerDescription {
-        desc: c"Game Boy".as_ptr(),
-        id: RETRO_DEVICE_JOYPAD,
-    }];
     let port = || RetroControllerInfo {
-        types: joypad.as_ptr(),
+        types: CONTROLLER_TYPES.0.as_ptr(),
         num_types: 1,
     };
     let mut ports = [

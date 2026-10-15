@@ -5,7 +5,8 @@
 //! ```
 //!
 //! - `--cgb` and `--model <name>` start the game on that hardware model
-//!   instead of the one the settings pick.
+//!   instead of the one the settings pick. Only one of them may be given,
+//!   once.
 //! - `--scale <n>` shows only the game screen, `n` times its size (1 to 8),
 //!   in a window whose inside is exactly 160·n × 144·n pixels of the
 //!   display, whatever its scaling (256·n × 224·n on a Super Game Boy, with
@@ -57,6 +58,12 @@ pub fn parse(args: impl IntoIterator<Item = String>) -> Result<Options, String> 
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         let mut value = || args.next().ok_or_else(|| format!("{arg} needs a value"));
+
+        if matches!(arg.as_str(), "--cgb" | "--model") && options.model.is_some() {
+            return Err(String::from(
+                "give the model once, with --cgb or --model, not both",
+            ));
+        }
 
         match arg.as_str() {
             "--cgb" => options.model = Some(Model::CgbE),

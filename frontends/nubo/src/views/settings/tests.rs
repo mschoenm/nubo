@@ -11,6 +11,7 @@ fn state(restart_needed: bool, device: Device, box_art_problem: bool) -> PageSta
         controllers: &[],
         box_art_problem: box_art_problem.then_some("offline"),
         newer_version: None,
+        layout: SettingsLayout::new(936.0),
     }
 }
 
@@ -37,13 +38,19 @@ fn every_page_draws_its_rows_in_the_order_the_d_pad_moves_through_them() {
         for restart_needed in [false, true] {
             for device in Device::ALL {
                 for box_art_problem in [false, true] {
-                    let state = state(restart_needed, device, box_art_problem);
-                    assert_eq!(
-                        drawn_rows(tab, &settings, &state),
-                        rows(tab, &settings, &state),
-                        "{tab:?} with restart_needed {restart_needed}, {device:?} and \
-                         box_art_problem {box_art_problem}"
-                    );
+                    for window_width in [936.0, 620.0, 480.0] {
+                        let state = PageState {
+                            layout: SettingsLayout::new(window_width),
+                            ..state(restart_needed, device, box_art_problem)
+                        };
+                        assert_eq!(
+                            drawn_rows(tab, &settings, &state),
+                            rows(tab, &settings, &state),
+                            "{tab:?} with restart_needed {restart_needed}, {device:?}, \
+                             box_art_problem {box_art_problem} and a window \
+                             {window_width} wide"
+                        );
+                    }
                 }
             }
         }
@@ -172,4 +179,54 @@ fn picking_a_console_keeps_its_revision_or_picks_the_recommended_one() {
         ModelOption::Automatic.preference(color_c),
         ModelPreference::Automatic
     );
+}
+
+#[test]
+fn the_tabs_move_above_the_page_in_a_narrow_window() {
+    let usual = SettingsLayout::new(936.0);
+    assert!(usual.has_sidebar());
+    assert!(usual.names_every_tab());
+    assert!(!usual.stacks_wide_controls());
+
+    assert!(
+        SettingsLayout::new(0.0).has_sidebar(),
+        "width not known yet"
+    );
+    assert!(SettingsLayout::new(760.0).has_sidebar());
+
+    let medium = SettingsLayout::new(700.0);
+    assert!(!medium.has_sidebar());
+    assert!(medium.names_every_tab());
+    assert!(!medium.stacks_wide_controls());
+
+    let narrow = SettingsLayout::new(620.0);
+    assert!(!narrow.has_sidebar());
+    assert!(!narrow.names_every_tab());
+    assert!(!narrow.stacks_wide_controls());
+
+    let smallest = SettingsLayout::new(480.0);
+    assert!(!smallest.has_sidebar());
+    assert!(!smallest.names_every_tab());
+    assert!(smallest.stacks_wide_controls());
+}
+
+#[test]
+fn the_d_pad_follows_the_tabs_along_the_sidebar_or_the_row() {
+    let sidebar = SettingsLayout::new(936.0);
+    assert_eq!(sidebar.tab_step(Action::Up), Some(-1));
+    assert_eq!(sidebar.tab_step(Action::Down), Some(1));
+    assert_eq!(sidebar.tab_step(Action::Left), None);
+    assert!(sidebar.enters_page(Action::Right));
+    assert!(!sidebar.enters_page(Action::Down));
+    assert!(sidebar.enters_page(Action::A));
+    assert!(!sidebar.up_leaves_page());
+
+    let row = SettingsLayout::new(480.0);
+    assert_eq!(row.tab_step(Action::Left), Some(-1));
+    assert_eq!(row.tab_step(Action::Right), Some(1));
+    assert_eq!(row.tab_step(Action::Up), None);
+    assert!(row.enters_page(Action::Down));
+    assert!(!row.enters_page(Action::Right));
+    assert!(row.enters_page(Action::Start));
+    assert!(row.up_leaves_page());
 }

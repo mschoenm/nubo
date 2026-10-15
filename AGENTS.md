@@ -67,6 +67,7 @@ The root `Cargo.toml` is a virtual workspace whose default members are `nubo-cor
 - `crates/nubo-frontend/` (`AGENTS.md`): everything an app needs that isn't drawing, without a UI toolkit: what it keeps between runs (settings, controls, battery saves, save states, cheats, screenshots), the game library, running a game with its sound (`session`, paced by the sound card on the desktop and by the screen's refreshes in the browser), game controllers (`gamepads`), and the palettes and model rule the RetroArch core shares. Its features `desktop`, `web` and `gamepads` bring each platform's storage, sound and controllers.
 - `crates/nubo-serializable-derive/`: the derive macro behind save states.
 - `crates/nubo-logo/`: the logo, drawn from rounded rectangles, for the app's icons.
+- `crates/nubo-download/`: downloading test data over HTTPS and checking its SHA-256 checksums, shared by the test ROM runner, the CPU test runner and xtask.
 - `frontends/nubo/` (`AGENTS.md`): the app, desktop and browser.
 - `frontends/nubo-libretro/` (`AGENTS.md`): the RetroArch (libretro) core, a dynamic library; `cargo xtask libretro` packages it.
 - `tools/nubo-test-rom-runner/` (`AGENTS.md`): `cargo test-roms`.
@@ -80,7 +81,7 @@ The root `Cargo.toml` is a virtual workspace whose default members are `nubo-cor
 
 Claude Code and Codex both read these `AGENTS.md` files; keep them the only instruction files. Claude Code ignores `AGENTS.md` in a folder that also has a `CLAUDE.md`, so don't add one. The `merge` and `release` skills are written in `.claude/skills/`, where Claude Code reads them; `.agents/skills/` holds pointers to them for Codex, so change the steps only in `.claude/skills/`. Each skill's `name` and `description` appear in both places; keep them the same.
 
-**See your pull requests through.** After opening a pull request, watch it without being asked (in Claude Code on the web, subscribe to its activity) and fix what comes up: red CI, a conflict with `main`, Codex's findings and reviewers' comments, until CI is green and Codex's review is handled. Merging still waits until the maintainer asks for it (the `merge` skill).
+**See your pull requests through.** After opening a pull request, watch it without being asked (in Claude Code on the web, subscribe to its activity) and fix what comes up: red CI, a conflict with `main`, Codex's findings and reviewers' comments, until CI is green and Codex's review is handled. Merging still waits until the maintainer asks for it (the `merge` skill). A pull request that fixes an open issue, such as one the nightly review opened, says `Fixes #<number>` in its description, so GitHub closes the issue when it merges.
 
 ## More Documentation
 

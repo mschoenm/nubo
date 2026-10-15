@@ -38,10 +38,15 @@ struct Options {
 }
 
 impl Options {
+    /// Reads the options after `cargo xtask windows`: `--nightly` and
+    /// `--version`, each followed by its value.
     fn parse(args: &[String]) -> Result<Options> {
         let mut options = Options::default();
         let mut args = args.iter();
         while let Some(arg) = args.next() {
+            if !matches!(arg.as_str(), "--nightly" | "--version") {
+                return Err(format!("unknown option {arg}"));
+            }
             let value = args
                 .next()
                 .ok_or_else(|| format!("{arg} needs a value"))?
@@ -51,8 +56,7 @@ impl Options {
                 "--nightly" => {
                     return Err(format!("--nightly needs a YYYY-MM-DD date, not {value}"));
                 }
-                "--version" => options.version = Some(value),
-                _ => return Err(format!("unknown option {arg}")),
+                _ => options.version = Some(value),
             }
         }
         Ok(options)
@@ -76,6 +80,8 @@ struct Naming {
 }
 
 impl Naming {
+    /// The names for a build for `arch` (such as `x64`) with `options`,
+    /// or an error for a version Windows Installer can't compare.
     fn new(options: &Options, arch: &str) -> Result<Naming> {
         let version = options
             .version
@@ -313,7 +319,10 @@ mod tests {
     fn wrong_options_are_refused() {
         assert!(Options::parse(&args("--nightly 14-10-2026")).is_err());
         assert!(Options::parse(&args("--nightly")).is_err());
-        assert!(Options::parse(&args("--quick")).is_err());
+        assert_eq!(
+            Options::parse(&args("--quick")),
+            Err(String::from("unknown option --quick"))
+        );
         let options = Options::parse(&args("--version 1.0.0-beta")).unwrap();
         assert!(Naming::new(&options, "x64").is_err());
     }

@@ -400,8 +400,9 @@ part again.
    - **ID:** `shootout/<name as the Shootout writes it>`, for example
      `shootout/mealybug-tearoom-tests/ppu/m3_scy_change.gb (CGB RevD)`. It can't clash with the tests
      that already run, and it matches the scoreboard's names.
-   - **Model:** `DMG` runs on `Model::Dmg` and `CGB` on `Model::CgbE`, the models the harness class
-     starts. `SGB` tests are skipped, as in the Shootout, where they count as not run.
+   - **Model:** `DMG` runs on `Model::Dmg`, `CGB` on `Model::CgbE` and `SGB` on `Model::Sgb`, the
+     models the harness class starts. (`SGB` tests were skipped at first, as in the Shootout, where
+     they count as not run; they run since Nubo emulates the Super Game Boy.)
    - **Check:** pass when a pass image matches under the Shootout's rule (grayscale, no pixel more than
      50 off), fail when a `.fail.png` matches, and fail at the deadline.
    - **Sampling like the harness:** the harness takes a screenshot only every 0.1 s of real time, which

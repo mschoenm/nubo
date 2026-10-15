@@ -1,0 +1,14 @@
+[package]
+name = "nubo-download"
+description = "Downloads test data over HTTPS and checks its SHA-256 checksums, for Nubo's developer tools"
+license.workspace = true
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+sha2 = "0.11"
+ureq.workspace = true
+
+[lints]
+workspace = true

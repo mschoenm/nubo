@@ -163,7 +163,8 @@ pub struct MemoryMut<'a> {
     pub work_ram: &'a mut [u8],
     /// High RAM (0xFF80-0xFFFE).
     pub high_ram: &'a mut [u8],
-    /// Video RAM (0x8000-0x9FFF): bank 0, then on a CGB bank 1.
+    /// Video RAM (0x8000-0x9FFF): bank 0 followed by bank 1, 8 KiB each;
+    /// only a CGB uses bank 1.
     pub video_ram: &'a mut [u8],
     /// OAM (0xFE00-0xFE9F), the objects' attributes.
     pub object_attribute_memory: &'a mut [u8],
@@ -251,7 +252,8 @@ pub struct AddressBus {
 
     /// Dots the PPU still has to run (or, when negative, ran ahead) because a
     /// register write was timed off the M-cycle boundary. Paid back on the
-    /// next M-cycle (`take_cycle_dots`); see `write_timing.rs`. Dot counts are
+    /// next M-cycle, or rarely the one after (`take_cycle_dots`); see
+    /// `write_timing.rs`. Dot counts are
     /// unsigned everywhere else. Usually 0 between calls into the emulator,
     /// but not always: the byte after a HALT that an HBlank DMA block
     /// interrupted is fetched again without an M-cycle, so a write it makes
@@ -415,8 +417,9 @@ impl AddressBus {
     }
 
     /// Whether the game screen in `completed_frame` uses only the four
-    /// `DMG_SHADES`: on the DMG family, until a Super Game Boy game sets
-    /// colors.
+    /// `DMG_SHADES`: on the DMG family, and on a Super Game Boy outside its
+    /// intro until a game sets colors or the player picks a palette from
+    /// the menu.
     pub(crate) fn completed_frame_in_dmg_shades(&self) -> bool {
         match self.gpu.sgb() {
             Some(sgb) => !sgb.frame_colorized(),

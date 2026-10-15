@@ -59,7 +59,7 @@ Commands:
                 ends in .ico, else a 256 pixel PNG
   licenses <folder>
                 Write Nubo's license files and the licenses of the crates the desktop app is built
-                from into <folder> (the app bundle, the Flatpak and the web version include them)
+                from into <folder> (every package includes them)
   release-notes [tag]
                 Check that the newest release in the AppStream file is the version in Cargo.toml
                 (and that the tag, such as v1.2.3, names it) and print its notes as Markdown
@@ -403,7 +403,6 @@ mod tests {
 mod benchmark_roms;
 mod compare_emulators;
 mod flatpak;
-mod http;
 mod icon;
 mod libretro;
 mod licenses;

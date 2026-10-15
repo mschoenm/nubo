@@ -346,7 +346,7 @@ impl std::fmt::Debug for PowerOnState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::address_bus::constants::{CART_TYPE_MBC1, RAM_SIZE_2KB, ROM_SIZE_64KB};
+    use crate::address_bus::constants::{CARTRIDGE_TYPE_MBC1, RAM_SIZE_2KB, ROM_SIZE_64KB};
     use crate::address_bus::effects::empty_cartridge_effects;
     use crate::address_bus::test_utils::build_rom;
     use crate::model::Model;
@@ -355,7 +355,7 @@ mod tests {
         let mut emulator = Emulator::new(Model::Dmg);
         emulator
             .load_rom(
-                &build_rom(CART_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB),
+                &build_rom(CARTRIDGE_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB),
                 empty_cartridge_effects(),
             )
             .unwrap();
@@ -560,7 +560,7 @@ mod tests {
     #[test]
     fn rejects_a_state_of_another_version_of_the_game() {
         let saved = emulator_with_game().save_state();
-        let mut revision = build_rom(CART_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut revision = build_rom(CARTRIDGE_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
         revision[0x014E] = 0x12;
         let mut emulator = Emulator::new(Model::Dmg);
         emulator
@@ -583,7 +583,7 @@ mod tests {
         let mut emulator = Emulator::new(Model::CgbE);
         emulator
             .load_rom(
-                &build_rom(CART_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB),
+                &build_rom(CARTRIDGE_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB),
                 empty_cartridge_effects(),
             )
             .unwrap();

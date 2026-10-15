@@ -46,7 +46,8 @@ Where the code differs from the plan below:
   and take a clock state on either source, and loading a state made on the other source rebases it.
 - **Rumble is a level, not a hook:** `Emulator::take_rumble_level` is the share of the time the motor was on since the
   last call, which games use to rumble more gently, and the core passes it on as the strength.
-- **Save states are padded to the first state's length plus 16 KiB.** No length bound is proven; a test measures how
+- **Save states are padded to the longest first state of the game on any model plus 16 KiB**, so a restart onto a
+  Super Game Boy, whose states are tens of kilobytes longer, still fits. No length bound is proven; a test measures how
   much states vary (well under 2 KiB over thousands of states of busy test programs).
 - **Saving and loading got faster** for run-ahead: lists of bytes are written and read in one go, and the power-on
   state a load starts from is made once per game. Saving went from about 1 ms to 60 µs and loading from 5-7 ms to

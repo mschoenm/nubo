@@ -2,15 +2,15 @@
 //! and the pause menu with its save state, cheats and Super Game Boy
 //! (`sgb.rs`) pages. The bar keeps only what a player reaches for while
 //! playing: the way back to the library on the left, and fast forward,
-//! sound with its volume, fullscreen and Pause on the right. Pause opens the pause menu,
-//! which holds everything else. In a window the bar sits
-//! above the picture. In fullscreen the picture fills the screen and the bar
+//! sound with its volume, fullscreen and Pause on the right. Pause opens the
+//! pause menu, which holds everything else. In a window the bar sits above
+//! the picture. In fullscreen the picture fills the screen and the bar
 //! appears over its top when the mouse moves. Double-clicking the picture
-//! switches between fullscreen and a window, as on a video site. The pause menu works like a context menu: a right click on the
-//! picture opens it, as Esc does, and a click on the game outside it or a
-//! row that leaves it behind closes it. The bar's buttons work as usual
-//! while it's open. With `--scale` the window shows the picture alone
-//! ([`screen_only`]).
+//! switches between fullscreen and a window, as on a video site. The pause
+//! menu works like a context menu: a right click on the picture opens it, as
+//! Esc does, and a click on the game outside it or a row that leaves it
+//! behind closes it. The bar's buttons work as usual while it's open. With
+//! `--scale` the window shows the picture alone ([`screen_only`]).
 
 use crate::app::{GameMessage, Message, SettingsMessage, WindowMessage};
 use crate::game::{Game, PauseMenu};
@@ -334,7 +334,12 @@ pub fn main_entries(game: &Game, settings: &Settings, fullscreen: bool) -> Vec<M
         ),
         entry(
             Icon::ArrowLeft,
-            "Back to library",
+            // The browser has no library, as in the bar.
+            if library::AVAILABLE {
+                "Back to library"
+            } else {
+                "Back to the start screen"
+            },
             None,
             Message::Game(GameMessage::CloseGame),
         ),
