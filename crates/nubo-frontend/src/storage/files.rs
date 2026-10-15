@@ -68,6 +68,7 @@ impl Files {
                 "no data folder to keep saves in",
             ),
             Entry::Cheats(_) => (&self.data_folder, Some("cheats"), "no data folder for us"),
+            Entry::LastGame => return Err(String::from("the desktop keeps no last game")),
         };
         let folder = folder
             .as_ref()

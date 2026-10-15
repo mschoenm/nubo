@@ -9,10 +9,12 @@ use crate::views::settings::{SettingsFocus, SettingsRow, SettingsTab};
 use iced::Task;
 use iced::widget;
 use iced::widget::scrollable::RelativeOffset;
+use nubo_frontend::background;
 use nubo_frontend::controls::{Action, Controls, Device};
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::palettes::DmgPalette;
 use nubo_frontend::settings::FastForwardSpeed;
+use nubo_frontend::updates;
 
 /// How much the D-pad changes the volume per press.
 const VOLUME_STEP: f32 = 0.05;
@@ -28,6 +30,8 @@ pub enum SettingsMessage {
     PaletteSelected(DmgPalette),
     IntegerScalingToggled(bool),
     ColorCorrectionToggled(bool),
+    /// The player turned looking for newer versions on or off.
+    CheckForUpdatesToggled(bool),
     FrameBlendingToggled(bool),
     SgbBorderToggled(bool),
     ModelSelected(ModelPreference),
@@ -84,6 +88,10 @@ impl App {
                     game.session.set_palette(palette);
                 }
                 return self.load_pictures(false);
+            }
+            SettingsMessage::CheckForUpdatesToggled(check) => {
+                self.change_settings(|settings| settings.shared.check_for_updates = Some(check));
+                return self.look_for_updates();
             }
             SettingsMessage::ColorCorrectionToggled(enabled) => {
                 self.change_settings(|settings| settings.shared.color_correction = enabled);
@@ -152,6 +160,21 @@ impl App {
     }
 
     /// Changes the controls, saves them and hands them to the running game.
+    /// Looks for a newer version in the background, if the player wants
+    /// that and this run hasn't yet.
+    pub(super) fn look_for_updates(&mut self) -> Task<Message> {
+        if !updates::AVAILABLE
+            || self.fresh
+            || self.settings.shared.check_for_updates != Some(true)
+            || self.newer_version.is_some()
+        {
+            return Task::none();
+        }
+        Task::perform(background::run(updates::latest_version), |version| {
+            Message::LatestVersion(version.flatten())
+        })
+    }
+
     /// Shows the running game with the screen effects the settings pick.
     fn apply_screen_effects(&mut self) {
         let shared = &self.settings.shared;
@@ -337,6 +360,10 @@ impl App {
                 LibraryMessage::DownloadBoxArtToggled(!settings.shared.download_box_art).into()
             }
             SettingsRow::RetryBoxArt => LibraryMessage::RetryBoxArt.into(),
+            SettingsRow::CheckForUpdates => SettingsMessage::CheckForUpdatesToggled(
+                settings.shared.check_for_updates != Some(true),
+            )
+            .into(),
             _ => return self.adjust_setting(row, 1, true),
         })
     }

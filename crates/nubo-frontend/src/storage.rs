@@ -28,6 +28,10 @@ pub enum Entry<'a> {
     /// The cheat list of the game at this path, as TOML text
     /// (`<rom file name>.toml`).
     Cheats(&'a Path),
+    /// The last game played, kept so it can start again without picking
+    /// its file (see `rom::remember`). Only the browser keeps it
+    /// (`last-game`).
+    LastGame,
 }
 
 impl Entry<'_> {
@@ -42,6 +46,7 @@ impl Entry<'_> {
                 file_name.push(".toml");
                 PathBuf::from(file_name)
             }
+            Entry::LastGame => PathBuf::from("last-game"),
         }
     }
 }

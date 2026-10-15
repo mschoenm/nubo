@@ -10,6 +10,7 @@ fn state(restart_needed: bool, device: Device, box_art_problem: bool) -> PageSta
         capture: None,
         controllers: &[],
         box_art_problem: box_art_problem.then_some("offline"),
+        newer_version: None,
     }
 }
 
@@ -119,12 +120,13 @@ fn every_library_folder_is_a_row() {
 }
 
 #[test]
-fn every_tab_but_about_has_rows() {
+fn every_tab_has_rows_but_about_without_update_checks() {
     let settings = Settings::default();
 
     for &tab in SettingsTab::all() {
         let tab_rows = rows(tab, &settings, &state(false, Device::Keyboard, false));
-        assert_eq!(tab_rows.is_empty(), tab == SettingsTab::About, "{tab:?}");
+        let expected_empty = tab == SettingsTab::About && !updates::AVAILABLE;
+        assert_eq!(tab_rows.is_empty(), expected_empty, "{tab:?}");
     }
 }
 

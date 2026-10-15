@@ -41,7 +41,8 @@ Point it at your games folder and your games appear in a library with their titl
 
 - **Windows:** the files aren't signed yet, so SmartScreen may warn you the first time. Choose More info, then Run anyway.
 - **Linux:** open the `.flatpak` file with your software center, or run `flatpak install --user Nubo-linux-x86_64.flatpak` (`Nubo-linux-aarch64.flatpak` on ARM). Flatpak fetches the runtime Nubo needs from Flathub the first time.
-- **Browser:** plays one game at a time and keeps its in-game saves in the browser. The library, save states, cheats and screenshots are in the desktop app.
+- **Browser:** plays one game at a time, keeps its in-game saves in the browser and remembers the last game (up to 2 MB), so it starts again without picking the file. The library, save states, cheats and screenshots are in the desktop app.
+- **New versions:** the desktop app can tell you when a new version is out. It asks first, since it looks on GitHub.
 - **Nightly build:** the [nightly build](https://github.com/mschoenm/nubo/releases/tag/nightly) has the newest changes that passed every check.
 
 ## Features

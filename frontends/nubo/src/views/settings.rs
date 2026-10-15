@@ -23,6 +23,7 @@ use nubo_frontend::model::{self, Console, ModelPreference};
 use nubo_frontend::palettes::DmgPalette;
 use nubo_frontend::save_states;
 use nubo_frontend::settings::{FastForwardSpeed, LibraryFolder};
+use nubo_frontend::updates;
 
 const WIDTH: f32 = 700.0;
 /// The page of this version's release notes.
@@ -204,6 +205,8 @@ pub enum SettingsRow {
     BoxArt,
     /// Tries to download box art again after it failed.
     RetryBoxArt,
+    /// The switch that looks for newer versions.
+    CheckForUpdates,
 }
 
 /// The rows of `tab` in the order the D-pad moves through them, which is
@@ -256,7 +259,11 @@ pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec
                 }
             }
         }
-        SettingsTab::About => {}
+        SettingsTab::About => {
+            if updates::AVAILABLE {
+                rows.push(SettingsRow::CheckForUpdates);
+            }
+        }
     }
 
     rows
@@ -289,6 +296,8 @@ pub struct PageState<'a> {
     pub controllers: &'a [String],
     /// Why box art couldn't be downloaded this run, if it couldn't.
     pub box_art_problem: Option<&'a str>,
+    /// A newer version than this one, if the app found one is out.
+    pub newer_version: Option<&'a str>,
 }
 
 /// The settings window showing `tab`.
@@ -383,7 +392,7 @@ fn page<'a>(
         SettingsTab::Playing => playing(settings, state.restart_needed, rings),
         SettingsTab::Controls => controls(settings, state, rings),
         SettingsTab::Library => library_page(settings, library, state.box_art_problem, rings),
-        SettingsTab::About => about(),
+        SettingsTab::About => about(settings, state.newer_version, rings),
     }
 }
 
@@ -855,7 +864,11 @@ fn volume<'a>(settings: &Settings) -> Element<'a, Message> {
 
 /// The version, the copyright, the license, where to read it and where to get
 /// the source code, which the GPL asks every copy to show.
-fn about<'a>() -> Element<'a, Message> {
+fn about<'a>(
+    settings: &'a Settings,
+    newer_version: Option<&'a str>,
+    rings: &Rings,
+) -> Element<'a, Message> {
     let title = row![
         logo(48.0),
         column![
@@ -868,6 +881,37 @@ fn about<'a>() -> Element<'a, Message> {
     ]
     .spacing(16)
     .align_y(Alignment::Center);
+
+    let mut versions = Vec::new();
+    if updates::AVAILABLE {
+        versions.push(rings.row(
+            setting(
+                "Tell me when a new Nubo is out",
+                Some(String::from(
+                    "When Nubo starts, it asks GitHub for the newest version.",
+                )),
+                switch(settings.shared.check_for_updates == Some(true), |check| {
+                    Message::Settings(SettingsMessage::CheckForUpdatesToggled(check))
+                }),
+            ),
+            SettingsRow::CheckForUpdates,
+        ));
+        if let Some(version) = newer_version {
+            versions.push(group_row(
+                setting(
+                    "A new version is out",
+                    Some(format!("Nubo {version} is ready to download.")),
+                    small_button(
+                        Icon::ExternalLink,
+                        "Open",
+                        Message::OpenLink(updates::RELEASES_PAGE),
+                    ),
+                ),
+                ROW_PADDING,
+                false,
+            ));
+        }
+    }
 
     let rows = vec![
         group_row(
@@ -919,21 +963,21 @@ fn about<'a>() -> Element<'a, Message> {
         ),
     ];
 
-    column![
-        container(title).padding([4, 2]),
-        group(
-            "Source and license",
-            None,
-            rows,
-            Some(
-                "Copyright 2026 Michel Schoenmakers. Based on RetroBoy, copyright 2023-2026 \
+    let mut page = column![container(title).padding([4, 2])].spacing(20);
+    if !versions.is_empty() {
+        page = page.push(group("New versions", None, versions, None));
+    }
+    page.push(group(
+        "Source and license",
+        None,
+        rows,
+        Some(
+            "Copyright 2026 Michel Schoenmakers. Based on RetroBoy, copyright 2023-2026 \
                  Samuel Parsons. Nubo is free software: you can share and change it under \
                  the GNU General Public License, version 3 or later. It comes with no \
-                 warranty."
-            ),
+                 warranty.",
         ),
-    ]
-    .spacing(20)
+    ))
     .into()
 }
 

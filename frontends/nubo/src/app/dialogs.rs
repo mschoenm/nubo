@@ -2,7 +2,7 @@
 //! says and offers, picking a choice, and moving between the choices with
 //! the D-pad.
 
-use super::{App, GameMessage, LibraryMessage, Message};
+use super::{App, GameMessage, LibraryMessage, Message, SettingsMessage};
 use crate::dialog::{
     Choice, ChoiceStyle, Dialog, DialogAction, DialogContent, DialogKind, GameMenuPage, Layout,
 };
@@ -15,6 +15,7 @@ use nubo_frontend::links;
 use nubo_frontend::model::{self, Console, ModelPreference};
 use nubo_frontend::save_states;
 use nubo_frontend::settings::LibraryFolder;
+use nubo_frontend::updates;
 use std::path::{Path, PathBuf};
 
 /// What happens to the open dialog.
@@ -86,6 +87,7 @@ impl App {
         let dialog = self.dialog.as_ref()?;
         match &dialog.kind {
             DialogKind::BoxArt => Some(box_art_question()),
+            DialogKind::Updates => Some(updates_question()),
             DialogKind::SortMenu => Some(sort_menu(&self.settings)),
             DialogKind::FolderMenu(index) => {
                 let folder = self.settings.shared.library_folders.get(*index)?;
@@ -257,6 +259,20 @@ impl App {
         Task::none()
     }
 
+    /// Asks whether to look for newer versions, once: on a start after the
+    /// player has played a game, so it never comes on top of the first
+    /// questions.
+    pub(super) fn ask_about_updates(&mut self) {
+        if updates::AVAILABLE
+            && !self.fresh
+            && self.screen_scale.is_none()
+            && self.settings.shared.check_for_updates.is_none()
+            && !self.library.recently_played(1).is_empty()
+        {
+            self.open_dialog(DialogKind::Updates);
+        }
+    }
+
     /// Asks whether to download box art, once the library has a folder and
     /// the player hasn't answered yet. Box art waits for the answer.
     pub(super) fn ask_about_box_art(&mut self) {
@@ -268,6 +284,34 @@ impl App {
         {
             self.open_dialog(DialogKind::BoxArt);
         }
+    }
+}
+
+/// The question whether to look for newer versions.
+fn updates_question() -> DialogContent {
+    DialogContent {
+        title: String::from("Tell you when a new Nubo is out?"),
+        text: Some(String::from(
+            "When Nubo starts, it can ask GitHub for the newest version and say when there \
+             is one. You can change this later in Settings › About.",
+        )),
+        layout: Layout::Buttons,
+        choices: vec![
+            Choice::new(
+                Icon::BellRing,
+                "Yes, tell me",
+                ChoiceStyle::Primary,
+                DialogAction::CloseThen(SettingsMessage::CheckForUpdatesToggled(true).into()),
+            ),
+            Choice::new(
+                Icon::X,
+                "No thanks",
+                ChoiceStyle::Secondary,
+                DialogAction::CloseThen(SettingsMessage::CheckForUpdatesToggled(false).into()),
+            ),
+        ],
+        dismiss: DialogAction::CloseThen(SettingsMessage::CheckForUpdatesToggled(false).into()),
+        click_outside_dismisses: false,
     }
 }
 

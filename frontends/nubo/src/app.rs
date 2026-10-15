@@ -127,6 +127,11 @@ pub struct App {
     dialog: Option<Dialog>,
     /// What the newest toast's Undo button puts back, if it has one.
     undo: Option<playing::UndoPoint>,
+    /// The last game played, which the browser's start screen offers to
+    /// play again (see `nubo_frontend::rom::remember`).
+    remembered: Option<Rom>,
+    /// A newer version than this one, once the app found one is out.
+    newer_version: Option<String>,
 }
 
 /// Everything the user or the window can ask the application to do.
@@ -151,6 +156,8 @@ pub enum Message {
     DismissToast(usize),
     /// Opens this web page in the player's browser.
     OpenLink(&'static str),
+    /// The newest version was looked up: its number, or why not.
+    LatestVersion(Result<String, String>),
 }
 
 impl App {
@@ -207,6 +214,12 @@ impl App {
             box_art_problem: None,
             dialog: None,
             undo: None,
+            newer_version: None,
+            remembered: if options.fresh {
+                None
+            } else {
+                nubo_frontend::rom::remembered()
+            },
         };
 
         // Saving over settings that couldn't be read would lose them.
@@ -225,7 +238,9 @@ impl App {
             app.open(rom);
         }
         app.ask_about_box_art();
+        app.ask_about_updates();
 
+        let updates = app.look_for_updates();
         let check = app.check_files();
         let scan = app.rescan();
         let pictures = app.load_pictures(false);
@@ -236,6 +251,7 @@ impl App {
                 check,
                 scan,
                 pictures,
+                updates,
             ]),
         )
     }
@@ -277,6 +293,14 @@ impl App {
                 self.toasts.remove_expired(iced::time::Instant::now());
                 Task::none()
             }
+            Message::LatestVersion(Ok(version)) => {
+                if nubo_frontend::updates::is_newer(&version, env!("CARGO_PKG_VERSION")) {
+                    self.newer_version = Some(version);
+                }
+                Task::none()
+            }
+            // Nothing the player can do about it; Nubo looks again next time.
+            Message::LatestVersion(Err(_)) => Task::none(),
             Message::OpenLink(url) => {
                 if let Err(error) = nubo_frontend::links::open(url) {
                     self.toasts.error(error);
@@ -327,6 +351,8 @@ impl App {
                 &self.search,
                 self.library_selection,
                 &self.controllers,
+                self.remembered.as_ref(),
+                self.newer_version.as_deref(),
             ),
         }];
 
@@ -441,6 +467,7 @@ impl App {
             capture: self.capture,
             controllers: &self.controllers,
             box_art_problem: self.box_art_problem.as_deref(),
+            newer_version: self.newer_version.as_deref(),
         }
     }
 

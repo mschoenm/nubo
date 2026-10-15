@@ -11,7 +11,7 @@ use nubo_core::{CartridgeHeader, Emulator, Model, SgbBorder};
 use nubo_frontend::cheats;
 use nubo_frontend::controls::Action;
 use nubo_frontend::picture::Picture;
-use nubo_frontend::rom::Rom;
+use nubo_frontend::rom::{self, Rom};
 use nubo_frontend::save_states::{self, SaveState, Slot};
 use nubo_frontend::screenshots;
 use nubo_frontend::session::{GameSession, StartOptions};
@@ -28,6 +28,9 @@ pub enum GameMessage {
     RomRead(Result<Rom, String>),
     /// Starts the library game at this path.
     PlayGame(PathBuf),
+    /// Starts the last game played again, in the browser (see
+    /// `nubo_frontend::rom::remember`).
+    PlayRemembered,
     Reset,
     TogglePause,
     /// Opens the pause menu on its main page, from a right click on the
@@ -103,6 +106,11 @@ impl App {
             GameMessage::RomPicked(None) => {}
             GameMessage::RomRead(rom) => self.open(rom),
             GameMessage::PlayGame(path) => return read_rom(path),
+            GameMessage::PlayRemembered => {
+                if let Some(rom) = self.remembered.clone() {
+                    self.start_game(rom, true);
+                }
+            }
             GameMessage::Reset => {
                 if let Some(game) = &mut self.game {
                     let rom = game.session.rom().clone();
@@ -326,6 +334,13 @@ impl App {
                     self.toasts.error(error);
                 }
 
+                if rom::REMEMBERS_LAST_GAME && !self.fresh {
+                    let rom = game.session.rom().clone();
+                    if let Err(error) = rom::remember(&rom) {
+                        self.toasts.error(error);
+                    }
+                    self.remembered = Some(rom);
+                }
                 self.game = Some(game);
                 self.settings_tab = None;
                 self.search.clear();

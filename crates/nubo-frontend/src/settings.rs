@@ -48,6 +48,11 @@ pub struct Settings {
     /// Box art waits for the answer. Only saved once answered.
     #[serde(skip_serializing_if = "is_false")]
     pub box_art_asked: bool,
+    /// Whether to look for a newer Nubo when the app starts (see
+    /// `updates`), or `None` until the player answers the question about
+    /// it. Only saved once answered.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub check_for_updates: Option<bool>,
     /// Whether leaving a game saves its state, so it continues there the
     /// next time it starts. On until the player turns it off, on the
     /// settings' Playing tab.
@@ -151,6 +156,7 @@ impl Default for Settings {
             library_folders: Vec::new(),
             download_box_art: true,
             box_art_asked: false,
+            check_for_updates: None,
             resume_games: true,
             fast_forward_speed: FastForwardSpeed::default(),
             volume: 1.0,

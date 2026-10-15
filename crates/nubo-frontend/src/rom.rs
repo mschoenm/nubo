@@ -36,6 +36,48 @@ impl Rom {
     }
 }
 
+/// Whether this build keeps the last game played, to start it again
+/// without picking its file: only the browser build does, since the desktop
+/// has the library.
+pub const REMEMBERS_LAST_GAME: bool = cfg!(all(feature = "web", not(feature = "desktop")));
+
+/// The largest game kept as the last game played. The browser keeps about
+/// five megabytes for a site, and the battery saves need room too.
+const MAX_REMEMBERED_SIZE: usize = 2 * 1024 * 1024;
+
+/// Keeps `rom` as the last game played, if this build keeps one and the
+/// game isn't too big. The file name goes first, then a zero byte, then
+/// the file's contents.
+pub fn remember(rom: &Rom) -> Result<(), String> {
+    if !REMEMBERS_LAST_GAME || rom.bytes.len() > MAX_REMEMBERED_SIZE {
+        return Ok(());
+    }
+    let name = rom.path.file_name().unwrap_or_default().to_string_lossy();
+    let mut contents = Vec::with_capacity(name.len() + 1 + rom.bytes.len());
+    contents.extend_from_slice(name.as_bytes());
+    contents.push(0);
+    contents.extend_from_slice(&rom.bytes);
+    crate::storage::platform()
+        .write(crate::storage::Entry::LastGame, &contents)
+        .map_err(|error| format!("Couldn't keep the game for next time: {error}"))
+}
+
+/// The last game played, if this build keeps one and it was kept.
+pub fn remembered() -> Option<Rom> {
+    if !REMEMBERS_LAST_GAME {
+        return None;
+    }
+    let contents = crate::storage::platform()
+        .read(crate::storage::Entry::LastGame)
+        .ok()??;
+    let split = contents.iter().position(|&byte| byte == 0)?;
+    let name = String::from_utf8_lossy(&contents[..split]).into_owned();
+    Some(Rom {
+        path: PathBuf::from(name),
+        bytes: Arc::from(&contents[split + 1..]),
+    })
+}
+
 /// The game's name for the ROM at `path`, made from its file name.
 pub fn display_name(path: &Path) -> String {
     game_name(

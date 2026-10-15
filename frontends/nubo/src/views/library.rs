@@ -23,8 +23,10 @@ use iced::widget::{
 use iced::{Alignment, ContentFit, Element, Fill, widget};
 use nubo_frontend::controls::{Action, Device};
 use nubo_frontend::library::{self, Library, LibraryEntry};
+use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states;
 use nubo_frontend::time::{Duration, SystemTime};
+use nubo_frontend::updates;
 use std::cmp::Reverse;
 
 /// The Game Boy controls the welcome screen explains, and the actions whose
@@ -217,12 +219,18 @@ pub fn view<'a>(
     search: &'a str,
     selection: Option<usize>,
     controllers: &'a [String],
+    remembered: Option<&'a Rom>,
+    newer_version: Option<&'a str>,
 ) -> Element<'a, Message> {
     let shelves = Shelves::new(library, settings, search);
     let has_folders = !settings.shared.library_folders.is_empty();
 
     if !library::AVAILABLE || (!has_folders && library.recently_played(1).is_empty()) {
-        return column![bar(None), welcome(settings, controllers)].into();
+        return column![
+            bar(None, newer_version),
+            welcome(settings, controllers, remembered)
+        ]
+        .into();
     }
 
     let mut content = Column::new().spacing(SECTION_SPACING);
@@ -297,13 +305,13 @@ pub fn view<'a>(
         })
         .height(Fill);
 
-    column![bar(Some(search)), page].into()
+    column![bar(Some(search), newer_version), page].into()
 }
 
 /// The top bar: with games to search, a search field and Open game; on the
 /// welcome screen, whose own buttons open games, only the settings on the
-/// right.
-fn bar(search: Option<&str>) -> Element<'_, Message> {
+/// right. With a newer version out, a small note says so and opens its page.
+fn bar<'a>(search: Option<&'a str>, newer_version: Option<&'a str>) -> Element<'a, Message> {
     let mut bar = row![brand()];
     bar = match search {
         Some(search) => bar.push(search_field(search)).push(bar_button(
@@ -315,6 +323,21 @@ fn bar(search: Option<&str>) -> Element<'_, Message> {
         )),
         None => bar.push(space::horizontal()),
     };
+    if let Some(version) = newer_version {
+        bar = bar.push(space().width(6)).push(
+            button(
+                row![
+                    icon(Icon::Sparkles).size(14),
+                    text(format!("Nubo {version} is out")).size(13),
+                ]
+                .spacing(6)
+                .align_y(Alignment::Center),
+            )
+            .padding([4, 10])
+            .style(theme::chip(true))
+            .on_press(Message::OpenLink(updates::RELEASES_PAGE)),
+        );
+    }
 
     top_bar(bar.push(space().width(6)).push(icon_button(
         Icon::Settings,
@@ -376,8 +399,28 @@ fn brand<'a>() -> Element<'a, Message> {
 /// The first screen a new user sees: what to do first, where to get free
 /// games, and which keys (or, with one connected, which controller buttons)
 /// press the Game Boy's buttons.
-fn welcome<'a>(settings: &'a Settings, controllers: &'a [String]) -> Element<'a, Message> {
-    let actions: Element<'_, Message> = if library::AVAILABLE {
+fn welcome<'a>(
+    settings: &'a Settings,
+    controllers: &'a [String],
+    remembered: Option<&'a Rom>,
+) -> Element<'a, Message> {
+    let actions: Element<'_, Message> = if let Some(rom) = remembered {
+        column![
+            primary_button(
+                Icon::Play,
+                format!("Play {} again", rom.name()),
+                Message::Game(GameMessage::PlayRemembered),
+            ),
+            secondary_button(
+                Icon::FolderOpen,
+                "Open another game",
+                Message::Game(GameMessage::OpenRom)
+            ),
+        ]
+        .spacing(10)
+        .align_x(Alignment::Center)
+        .into()
+    } else if library::AVAILABLE {
         row![
             primary_button(
                 Icon::FolderPlus,

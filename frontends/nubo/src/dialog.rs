@@ -17,6 +17,8 @@ pub enum DialogKind {
     /// Asks once whether to download box art for the library (see
     /// `nubo_frontend::settings::Settings::box_art_asked`).
     BoxArt,
+    /// Asks once whether to look for a newer Nubo when the app starts.
+    Updates,
     /// The menu that sorts and filters the library's games.
     SortMenu,
     /// The menu of the library game at the path, on one of its pages.
