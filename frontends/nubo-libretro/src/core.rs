@@ -69,8 +69,10 @@ const STATE_LENGTH_BYTES: usize = 4;
 /// with the button each one presses. Libretro's B and A are the bottom and
 /// right face buttons, where the Game Boy has its B and A. The names are C
 /// strings that live as long as the core, since RetroArch keeps pointing at
-/// them for its controls menus.
-pub const BUTTONS: [(u32, Key, &CStr); 8] = [
+/// them for its controls menus. A static rather than a constant, so the
+/// names have one address: each use of a constant may get its own copy of
+/// them, and on Windows does.
+pub static BUTTONS: [(u32, Key, &CStr); 8] = [
     (0, Key::B, c"B"),
     (2, Key::Select, c"Select"),
     (3, Key::Start, c"Start"),
