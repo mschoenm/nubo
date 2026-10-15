@@ -220,7 +220,10 @@ pub(crate) struct Sgb {
     attribute_map: [u8; ATTRIBUTE_SQUARES],
     /// The attribute maps `ATTR_SET` picks from, which `ATTR_TRN` sends.
     attribute_files: [u8; ATTRIBUTE_TRANSFER_SIZE],
+    /// What `MASK_EN` does to the picture now.
     mask: Mask,
+    /// The `_TRN` command waiting for the frame in which the screen is read,
+    /// if any.
     transfer: Option<Transfer>,
     /// The border on the picture.
     border: Border,

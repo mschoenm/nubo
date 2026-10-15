@@ -18,8 +18,7 @@ use crate::address_bus::constants::{
     RAM_BANK_SIZE, RAM_SIZE_ADDRESS, ROM_BANK_SIZE, ROM_SIZE_ADDRESS, SGB_SUPPORT_ADDRESS,
     TITLE_END_ADDRESS, TITLE_START_ADDRESS,
 };
-use crate::address_bus::effects::RtcClock;
-use crate::address_bus::effects::{CartridgeEffects, empty_cartridge_effects};
+use crate::address_bus::effects::{CartridgeEffects, RtcClock, empty_cartridge_effects};
 use crate::address_bus::huc1::Huc1CartridgeMapper;
 use crate::address_bus::mbc1::Mbc1CartridgeMapper;
 use crate::address_bus::mbc2::{MBC2_RAM_SIZE, Mbc2CartridgeMapper};

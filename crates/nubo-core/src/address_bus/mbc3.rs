@@ -528,8 +528,7 @@ mod tests {
         CARTRIDGE_TYPE_MBC3, RAM_SIZE_2KB, RAM_SIZE_8KB, RAM_SIZE_32KB, RAM_SIZE_64KB,
         ROM_SIZE_2MB, ROM_SIZE_4MB, ROM_SIZE_64KB,
     };
-    use crate::address_bus::effects::Shared;
-    use crate::address_bus::effects::{CartridgeEffects, empty_cartridge_effects};
+    use crate::address_bus::effects::{CartridgeEffects, Shared, empty_cartridge_effects};
     use crate::address_bus::test_utils::*;
 
     /// Starts the clock at 10:10:10 and `milliseconds`, last updated at
