@@ -177,6 +177,12 @@ fn earlier_settings() -> Settings {
         Some(PadButton(ControllerButton::LeftShoulder)),
     );
     controller.bind(Action::QuickSave, None);
+    // The file was written while quick load was on the left trigger by
+    // default.
+    controller.bind(
+        Action::QuickLoad,
+        Some(PadButton(ControllerButton::LeftTrigger)),
+    );
     controller.bind(Action::Fullscreen, Some(PadButton(ControllerButton::North)));
     controller.bind(
         Action::Screenshot,
