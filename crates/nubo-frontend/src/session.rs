@@ -307,7 +307,9 @@ impl Machine {
         if self.rewind_time < step {
             return (playing_time, false);
         }
-        self.rewind_time = Duration::ZERO;
+        // The time past the step counts towards the next one, so the speed
+        // doesn't depend on how the buffers' length divides into it.
+        self.rewind_time = (self.rewind_time - step).min(step);
 
         let Some(state) = self.history.pop() else {
             return (playing_time, false);

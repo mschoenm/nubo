@@ -358,6 +358,26 @@ impl GameSession {
         self.session.send(Command::Release(key));
     }
 
+    /// Lets go of every Game Boy button the keyboard holds, and of fast
+    /// forward and rewind, such as when the window loses focus and won't
+    /// hear the keys come up. Controllers' buttons stay as they are.
+    pub fn release_held_keys(&mut self) {
+        for key in [
+            Key::Down,
+            Key::Up,
+            Key::Left,
+            Key::Right,
+            Key::Start,
+            Key::Select,
+            Key::B,
+            Key::A,
+        ] {
+            self.release(key);
+        }
+        self.hold_fast_forward(false);
+        self.hold_rewind(false);
+    }
+
     /// Saves the game's state in `slot`, with the current screen as its
     /// picture.
     pub fn save(&mut self, slot: Slot) -> Result<(), String> {

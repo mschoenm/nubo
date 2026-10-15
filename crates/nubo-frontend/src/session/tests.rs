@@ -207,6 +207,37 @@ fn rewinding_steps_back_through_the_states_kept_while_playing() {
 }
 
 #[test]
+fn rewinding_keeps_its_speed_whatever_the_buffers_length() {
+    let (mut machine, _) = machine_with(Arc::new(Memory::default()));
+    let mut frames = 0;
+    while frames < history::FRAMES_PER_STATE * 20 {
+        if machine.play_buffer().1 {
+            frames += 1;
+        }
+    }
+
+    machine.handle(Command::SetPlayback(Playback {
+        rewinding: true,
+        ..NORMAL_SPEED
+    }));
+    let step = FRAME_DURATION.mul_f64(f64::from(history::FRAMES_PER_STATE) / REWIND_SPEED);
+    let (mut time, mut buffer, mut shown) = (Duration::ZERO, Duration::ZERO, 0);
+    while shown < 16 {
+        let (playing_time, new_frame) = machine.rewind_buffer();
+        time += playing_time;
+        buffer = playing_time;
+        if new_frame {
+            shown += 1;
+        }
+    }
+
+    assert!(
+        time < step * 16 + buffer,
+        "{time:?} for 16 steps of {step:?}"
+    );
+}
+
+#[test]
 fn loading_a_state_forgets_the_history_before_it() {
     let (mut machine, _) = machine_with(Arc::new(Memory::default()));
     let state = machine.emulator.save_state();

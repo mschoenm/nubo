@@ -74,7 +74,13 @@ impl App {
                 }
             }
             WindowMessage::SystemThemeChanged(mode) => self.system_mode = mode,
-            WindowMessage::Focused(focused) => self.focused = focused,
+            WindowMessage::Focused(focused) => {
+                self.focused = focused;
+                // Keys let go of in another window never come up here.
+                if !focused && let Some(game) = &mut self.game {
+                    game.session.release_held_keys();
+                }
+            }
             WindowMessage::CloseRequested => {
                 self.stop_game();
                 self.remember_window_size();
