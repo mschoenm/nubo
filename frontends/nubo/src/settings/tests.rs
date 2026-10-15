@@ -113,3 +113,23 @@ fn the_window_size_and_pausing_are_kept() {
     );
     assert_eq!(Settings::from_toml(&contents).unwrap(), settings);
 }
+
+#[test]
+fn a_reset_keeps_the_window_size() {
+    let settings = Settings {
+        appearance: Appearance::Light,
+        integer_scaling: false,
+        library_sort: LibrarySort::RecentlyAdded,
+        pause_in_background: false,
+        window_size: Some((800.0, 600.0)),
+        ..Settings::default()
+    };
+
+    assert_eq!(
+        settings.reset(false),
+        Settings {
+            window_size: Some((800.0, 600.0)),
+            ..Settings::default()
+        }
+    );
+}

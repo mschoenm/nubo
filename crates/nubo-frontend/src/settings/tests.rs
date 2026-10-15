@@ -245,3 +245,36 @@ fn the_raw_screen_is_the_look_with_every_effect_off() {
     };
     assert_eq!(plain.screen_look(), ScreenLook::RAW);
 }
+
+#[test]
+fn a_reset_keeps_only_the_folders_unless_asked_and_asks_the_questions_again() {
+    let folders = vec![LibraryFolder {
+        path: PathBuf::from("/games/gb"),
+        include_subfolders: false,
+    }];
+    let settings = Settings {
+        model: ModelPreference::Fixed(Model::CgbC),
+        library_folders: folders.clone(),
+        download_box_art: false,
+        box_art_asked: true,
+        check_for_updates: Some(true),
+        volume: 0.5,
+        controls_revision: 1,
+        dmg_palette: DmgPalette::Pocket,
+        ..Settings::default()
+    };
+
+    let reset = settings.reset(false);
+
+    assert_eq!(
+        reset,
+        Settings {
+            library_folders: folders,
+            controls_revision: 1,
+            ..Settings::default()
+        }
+    );
+    assert!(!reset.box_art_asked);
+    assert_eq!(reset.check_for_updates, None);
+    assert!(settings.reset(true).library_folders.is_empty());
+}

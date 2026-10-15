@@ -107,4 +107,34 @@ mod files {
         );
         assert_eq!(files.location(entry), "game.sav");
     }
+
+    #[test]
+    fn deleting_battery_saves_leaves_the_other_files() {
+        let folder = temporary_folder("delete-saves");
+        let files = Files::in_folders(Some(folder.join("config")), Some(folder.join("data")));
+        let rom_path = Path::new("game.gb");
+        files.write(Entry::BatteryRam(rom_path), &[1]).unwrap();
+        files.write(Entry::BatteryClock(rom_path), &[2]).unwrap();
+        files.write(Entry::Cheats(rom_path), b"cheats").unwrap();
+        files.write(Entry::Settings, b"settings").unwrap();
+        let notes = folder.join("data").join("saves").join("notes.txt");
+        fs::write(&notes, "mine").unwrap();
+
+        files.delete_battery_saves().unwrap();
+
+        assert_eq!(files.read(Entry::BatteryRam(rom_path)), Ok(None));
+        assert_eq!(files.read(Entry::BatteryClock(rom_path)), Ok(None));
+        assert!(files.read(Entry::Cheats(rom_path)).unwrap().is_some());
+        assert!(files.read(Entry::Settings).unwrap().is_some());
+        assert!(notes.is_file());
+    }
+
+    #[test]
+    fn deleting_battery_saves_that_were_never_kept_is_fine() {
+        let folder = temporary_folder("delete-no-saves");
+        let files = Files::in_folders(None, Some(folder));
+
+        assert_eq!(files.delete_battery_saves(), Ok(()));
+        assert_eq!(Files::default().delete_battery_saves(), Ok(()));
+    }
 }

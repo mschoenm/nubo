@@ -33,3 +33,12 @@ fn cheats_are_not_kept() {
 
     assert_eq!(error, "cheats aren't available in the browser");
 }
+
+#[test]
+fn battery_save_keys_are_told_apart() {
+    assert!(is_battery_save_key("nubo:Pocket Game.sav"));
+    assert!(is_battery_save_key("nubo:Pocket Game.rtc"));
+    assert!(!is_battery_save_key("nubo:settings.toml"));
+    assert!(!is_battery_save_key("nubo:last-game"));
+    assert!(!is_battery_save_key("other-app:game.sav"));
+}

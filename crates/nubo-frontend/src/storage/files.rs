@@ -100,6 +100,40 @@ impl Storage for Files {
             .display()
             .to_string()
     }
+
+    /// Deletes the `.sav` and `.rtc` files in `saves/`, leaving anything
+    /// else the player put there.
+    fn delete_battery_saves(&self) -> Result<(), String> {
+        let Some(data_folder) = &self.data_folder else {
+            return Ok(());
+        };
+        let files = match fs::read_dir(data_folder.join("saves")) {
+            Ok(files) => files,
+            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error.to_string()),
+        };
+
+        let mut failures = 0;
+        let mut first_error = None;
+        for file in files {
+            let result = file.and_then(|file| {
+                let path = file.path();
+                let is_save = path
+                    .extension()
+                    .is_some_and(|extension| extension == "sav" || extension == "rtc");
+                if is_save && file.file_type()?.is_file() {
+                    fs::remove_file(path)
+                } else {
+                    Ok(())
+                }
+            });
+            if let Err(error) = result {
+                failures += 1;
+                first_error.get_or_insert_with(|| error.to_string());
+            }
+        }
+        super::deleted(failures, first_error)
+    }
 }
 
 /// Replaces the contents of `path`, creating its folder if needed. It writes

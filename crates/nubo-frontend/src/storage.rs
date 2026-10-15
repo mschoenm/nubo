@@ -69,6 +69,11 @@ pub trait Storage: Send + Sync {
     /// Where `entry` is kept, for messages such as a save that couldn't be
     /// written.
     fn location(&self, entry: Entry<'_>) -> String;
+
+    /// Deletes the battery saves of every game, RAM and clock alike, which
+    /// the player asks for when they reset the settings. It goes on past an
+    /// entry it can't delete, and then says how many it couldn't.
+    fn delete_battery_saves(&self) -> Result<(), String>;
 }
 
 /// The storage of this build: files in the user's folders with the
@@ -102,6 +107,23 @@ impl Storage for NoStorage {
 
     fn location(&self, entry: Entry<'_>) -> String {
         entry.file_name().display().to_string()
+    }
+
+    fn delete_battery_saves(&self) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+/// Why some entries couldn't be deleted: how many, and the first reason.
+/// `Ok` when every one was.
+#[cfg(any(feature = "desktop", feature = "web"))]
+fn deleted(failures: usize, first_error: Option<String>) -> Result<(), String> {
+    match first_error {
+        None => Ok(()),
+        Some(error) if failures == 1 => Err(error),
+        Some(error) => Err(format!(
+            "{failures} couldn't be deleted, the first because {error}"
+        )),
     }
 }
 

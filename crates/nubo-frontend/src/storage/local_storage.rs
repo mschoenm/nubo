@@ -85,6 +85,34 @@ impl Storage for LocalStorage {
             Err(_) => String::from("localStorage"),
         }
     }
+
+    fn delete_battery_saves(&self) -> Result<(), String> {
+        let storage = local_storage()?;
+        let length = storage.length().map_err(|error| format!("{error:?}"))?;
+        let keys: Vec<String> = (0..length)
+            .filter_map(|index| storage.key(index).ok().flatten())
+            .filter(|key| is_battery_save_key(key))
+            .collect();
+
+        let mut failures = 0;
+        let mut first_error = None;
+        for key in keys {
+            if let Err(error) = storage.remove_item(&key) {
+                failures += 1;
+                first_error.get_or_insert_with(|| format!("{error:?}"));
+            }
+        }
+        super::deleted(failures, first_error)
+    }
+}
+
+/// Whether `key` holds a battery save, RAM or clock (see
+/// [`LocalStorage::key`]).
+pub fn is_battery_save_key(key: &str) -> bool {
+    key.starts_with(KEY_PREFIX)
+        && std::path::Path::new(key)
+            .extension()
+            .is_some_and(|extension| extension == "sav" || extension == "rtc")
 }
 
 /// Whether `entry` is kept as text as it is, rather than as base64.

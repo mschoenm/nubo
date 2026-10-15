@@ -2,17 +2,20 @@
 //! says and offers, picking a choice, and moving between the choices with
 //! the D-pad.
 
-use super::{App, GameMessage, LibraryMessage, Message, SettingsMessage};
+use super::{App, GameMessage, LibraryMessage, Message, SettingsMessage, scroll_in_proportion};
 use crate::dialog::{
     Choice, ChoiceStyle, Dialog, DialogAction, DialogContent, DialogKind, GameMenuPage, Layout,
+    Notice, ResetChoices,
 };
 use crate::settings::{LibraryFilter, LibrarySort, Settings};
 use crate::ui::icons::Icon;
+use crate::views;
 use iced::Task;
 use nubo_frontend::controls::Action;
-use nubo_frontend::library::{LibraryEntry, box_art};
+use nubo_frontend::library::{self, LibraryEntry, box_art};
 use nubo_frontend::links;
 use nubo_frontend::model::{self, Console, ModelPreference};
+use nubo_frontend::rom;
 use nubo_frontend::save_states;
 use nubo_frontend::settings::LibraryFolder;
 use nubo_frontend::updates;
@@ -26,6 +29,9 @@ pub enum DialogMessage {
     Closed(Option<Box<Message>>),
     /// Shows another page of a library game's menu.
     ShowGameMenu(PathBuf, GameMenuPage),
+    /// The player ticked or unticked a box of the question whether to reset
+    /// the settings, leaving these ticked.
+    ResetChoicesChanged(ResetChoices),
 }
 
 impl From<DialogMessage> for Message {
@@ -57,8 +63,72 @@ impl App {
                 }
             }
             DialogMessage::ShowGameMenu(path, page) => self.show_game_menu(path, page),
+            DialogMessage::ResetChoicesChanged(choices) => {
+                if let Some(dialog) = &mut self.dialog
+                    && matches!(dialog.kind, DialogKind::ResetSettings(_))
+                {
+                    dialog.kind = DialogKind::ResetSettings(choices);
+                }
+            }
         }
         Task::none()
+    }
+
+    /// Asks whether to reset every setting, with nothing else ticked and
+    /// the D-pad on Cancel, so a stray press of A deletes nothing, scrolled
+    /// to Cancel in a window too short for the whole question.
+    pub(super) fn ask_reset(&mut self) -> Task<Message> {
+        if self.dialog.is_some() {
+            return Task::none();
+        }
+        self.dialog = Some(Dialog::new(DialogKind::ResetSettings(
+            ResetChoices::default(),
+        )));
+        let cancel = self
+            .dialog_content()
+            .and_then(|content| content.choices.iter().position(|choice| !choice.checkbox));
+        if let (Some(dialog), Some(cancel)) = (&mut self.dialog, cancel) {
+            dialog.selection = cancel;
+        }
+        self.scroll_to_selection()
+    }
+
+    /// Scrolls a question so the choice the D-pad is on is in view, in a
+    /// window too short for all of it. A menu scrolls its rows by itself.
+    fn scroll_to_selection(&self) -> Task<Message> {
+        match (&self.dialog, self.dialog_content()) {
+            (Some(dialog), Some(content)) if content.layout == Layout::Buttons => {
+                scroll_in_proportion(
+                    views::dialog::scroll_id(),
+                    dialog.selection,
+                    content.choices.len(),
+                )
+            }
+            _ => Task::none(),
+        }
+    }
+
+    /// What the reset can do besides the settings in this build and this
+    /// run. Saves can't be deleted while a game is open, which would write
+    /// its own again, and nothing kept between runs is touched with
+    /// `--fresh`.
+    pub(super) fn reset_offers(&self) -> ResetOffers {
+        let keeps_data = !self.fresh;
+        let no_game = self.game.is_none();
+        ResetOffers {
+            delete_battery_saves: keeps_data && no_game,
+            delete_save_states: keeps_data && no_game && save_states::AVAILABLE,
+            remove_folders: keeps_data
+                && library::AVAILABLE
+                && !self.settings.shared.library_folders.is_empty(),
+            clear_recently_played: keeps_data
+                && if library::AVAILABLE {
+                    self.library.any_played()
+                } else {
+                    rom::REMEMBERS_LAST_GAME && self.remembered.is_some()
+                },
+            close_game_first: keeps_data && !no_game,
+        }
     }
 
     /// Opens (or turns to) `page` of the menu of the game at `path`, with the
@@ -103,6 +173,9 @@ impl App {
             }
             DialogKind::DeleteSaveStates(path) => {
                 Some(delete_question(path, self.library.entry(path)))
+            }
+            DialogKind::ResetSettings(choices) => {
+                Some(reset_question(*choices, self.reset_offers()))
             }
         }
     }
@@ -158,6 +231,7 @@ impl App {
         DialogContent {
             title: entry.name(),
             text: None,
+            notice: None,
             layout: Layout::List,
             choices,
             dismiss: DialogAction::Close,
@@ -207,6 +281,7 @@ impl App {
         DialogContent {
             title: format!("Play {} on", entry.name()),
             text: None,
+            notice: None,
             layout: Layout::List,
             choices,
             dismiss: DialogAction::Stay(
@@ -246,8 +321,14 @@ impl App {
         let last = content.choices.len().saturating_sub(1);
 
         match action {
-            Action::Up | Action::Left => dialog.selection = dialog.selection.saturating_sub(1),
-            Action::Down | Action::Right => dialog.selection = (dialog.selection + 1).min(last),
+            Action::Up | Action::Left => {
+                dialog.selection = dialog.selection.saturating_sub(1);
+                return self.scroll_to_selection();
+            }
+            Action::Down | Action::Right => {
+                dialog.selection = (dialog.selection + 1).min(last);
+                return self.scroll_to_selection();
+            }
             Action::A | Action::Start => {
                 if let Some(choice) = content.choices.into_iter().nth(dialog.selection) {
                     return self.update(choice.action.into_message());
@@ -295,6 +376,7 @@ fn updates_question() -> DialogContent {
             "When Nubo starts, it can ask GitHub for the newest version and say when there \
              is one. You can change this later in Settings › About.",
         )),
+        notice: None,
         layout: Layout::Buttons,
         choices: vec![
             Choice::new(
@@ -324,6 +406,7 @@ fn box_art_question() -> DialogContent {
              sends their names to libretro's thumbnail server. You can change this later in \
              Settings › Library.",
         )),
+        notice: None,
         layout: Layout::Buttons,
         choices: vec![
             Choice::new(
@@ -376,6 +459,7 @@ fn sort_menu(settings: &Settings) -> DialogContent {
     DialogContent {
         title: String::from("Sort and show"),
         text: None,
+        notice: None,
         layout: Layout::List,
         choices: sorts.into_iter().chain(filters).collect(),
         dismiss: DialogAction::Close,
@@ -430,6 +514,7 @@ fn folder_menu(index: usize, folder: &LibraryFolder) -> DialogContent {
         text: Some(String::from(
             "Removing the folder only takes its games out of the library. The files stay.",
         )),
+        notice: None,
         layout: Layout::List,
         choices,
         dismiss: DialogAction::Close,
@@ -469,11 +554,132 @@ fn revisions_page(entry: &LibraryEntry, console: Console) -> DialogContent {
                 .filter(|&model| Console::of(model) == console)
                 .unwrap_or(console.recommended()),
         ))),
+        notice: None,
         layout: Layout::List,
         choices,
         dismiss: DialogAction::Stay(
             DialogMessage::ShowGameMenu(path.clone(), GameMenuPage::Consoles).into(),
         ),
+        click_outside_dismisses: true,
+    }
+}
+
+/// What the question whether to reset the settings offers to do besides
+/// (see `App::reset_offers`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResetOffers {
+    pub delete_battery_saves: bool,
+    pub delete_save_states: bool,
+    pub remove_folders: bool,
+    pub clear_recently_played: bool,
+    /// Whether to say that closing the game would offer to delete saves too.
+    pub close_game_first: bool,
+}
+
+/// The question whether to reset every setting, with a box for each other
+/// thing `offers` lets it reset, ticked as in `choices`. A box ticks or
+/// unticks itself with `DialogMessage::ResetChoicesChanged`.
+fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
+    let toggle = |change: fn(&mut ResetChoices)| {
+        let mut changed = choices;
+        change(&mut changed);
+        DialogAction::Stay(DialogMessage::ResetChoicesChanged(changed).into())
+    };
+
+    let mut boxes = Vec::new();
+    if offers.delete_battery_saves {
+        boxes.push(Choice::checkbox(
+            "Delete in-game saves",
+            "What every game saved itself, so each one starts from the beginning again.",
+            choices.delete_battery_saves,
+            ChoiceStyle::Danger,
+            toggle(|choices| choices.delete_battery_saves = !choices.delete_battery_saves),
+        ));
+    }
+    if offers.delete_save_states {
+        boxes.push(Choice::checkbox(
+            "Delete save states",
+            "Where you left off, the quick save and slots 1 to 3, for every game.",
+            choices.delete_save_states,
+            ChoiceStyle::Danger,
+            toggle(|choices| choices.delete_save_states = !choices.delete_save_states),
+        ));
+    }
+    if offers.remove_folders {
+        boxes.push(Choice::checkbox(
+            "Remove game folders",
+            "The library forgets its folders. Your ROM files stay where they are.",
+            choices.remove_folders,
+            ChoiceStyle::Secondary,
+            toggle(|choices| choices.remove_folders = !choices.remove_folders),
+        ));
+    }
+    if offers.clear_recently_played {
+        let (label, description) = if library::AVAILABLE {
+            (
+                "Clear Continue playing",
+                "The library forgets which games you played last.",
+            )
+        } else {
+            (
+                "Forget the last game played",
+                "The start screen stops offering to play it again.",
+            )
+        };
+        boxes.push(Choice::checkbox(
+            label,
+            description,
+            choices.clear_recently_played,
+            ChoiceStyle::Secondary,
+            toggle(|choices| choices.clear_recently_played = !choices.clear_recently_played),
+        ));
+    }
+
+    let mut text = String::from(
+        "The theme, colors, model, controls, sound and every other setting go back to how \
+         they started, and Nubo asks again about box art and new versions.",
+    );
+    if offers.close_game_first {
+        text.push_str(" To delete saves too, close the game first.");
+    }
+    // Only a box on show counts: a game that opened meanwhile takes the
+    // deleting ones away.
+    let deletes = (choices.delete_battery_saves && offers.delete_battery_saves)
+        || (choices.delete_save_states && offers.delete_save_states);
+    let notice = if deletes {
+        Notice {
+            text: String::from("Deleted saves can't be brought back."),
+            warning: true,
+        }
+    } else {
+        Notice {
+            text: String::from("You can undo this right after."),
+            warning: false,
+        }
+    };
+
+    boxes.extend([
+        Choice::new(
+            Icon::X,
+            "Cancel",
+            ChoiceStyle::Secondary,
+            DialogAction::Close,
+        ),
+        Choice::new(
+            Icon::RotateCcw,
+            if deletes { "Reset and delete" } else { "Reset" },
+            ChoiceStyle::Danger,
+            DialogAction::CloseThen(SettingsMessage::Reset(choices).into()),
+        ),
+    ]);
+
+    DialogContent {
+        title: String::from("Reset all settings?"),
+        text: Some(text),
+        notice: Some(notice),
+        layout: Layout::Buttons,
+        choices: boxes,
+        dismiss: DialogAction::Close,
         click_outside_dismisses: true,
     }
 }
@@ -490,6 +696,7 @@ fn delete_question(path: &Path, entry: Option<&LibraryEntry>) -> DialogContent {
             "This deletes where you left off, the quick save and slots 1 to 3. The game's own \
              saves stay. This can't be undone.",
         )),
+        notice: None,
         layout: Layout::Buttons,
         choices: vec![
             Choice::new(
@@ -511,3 +718,6 @@ fn delete_question(path: &Path, entry: Option<&LibraryEntry>) -> DialogContent {
         click_outside_dismisses: true,
     }
 }
+
+#[cfg(test)]
+mod tests;

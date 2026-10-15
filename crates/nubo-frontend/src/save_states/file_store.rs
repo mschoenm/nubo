@@ -105,6 +105,19 @@ pub fn delete_in(directory: &Path, rom_path: &Path, slot: Slot) -> Result<(), St
     Ok(())
 }
 
+pub fn delete_all() -> Result<(), String> {
+    delete_all_in(&states_directory()?)
+}
+
+/// Deletes `directory` (the folder for every game's states) and everything
+/// in it. A folder that was never made is fine.
+pub fn delete_all_in(directory: &Path) -> Result<(), String> {
+    match fs::remove_dir_all(directory) {
+        Err(error) if error.kind() != ErrorKind::NotFound => Err(error.to_string()),
+        _ => Ok(()),
+    }
+}
+
 pub fn keep_aside(rom_path: &Path, slot: Slot) -> Result<PathBuf, String> {
     keep_aside_in(&states_directory()?, rom_path, slot)
 }

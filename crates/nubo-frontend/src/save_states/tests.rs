@@ -1,7 +1,9 @@
 //! Tests for save state files. They write real files in the temporary
 //! directory, so they need the `desktop` feature.
 
-use super::store::{delete_in, keep_aside_in, load_in, save_in, slot_info_in, thumbnail_in};
+use super::store::{
+    delete_all_in, delete_in, keep_aside_in, load_in, save_in, slot_info_in, thumbnail_in,
+};
 use super::*;
 use crate::time::Duration;
 use std::fs;
@@ -233,4 +235,33 @@ fn a_deleted_slot_is_empty_and_others_stay() {
             .unwrap()
             .is_some()
     );
+}
+
+#[test]
+fn deleting_every_state_empties_every_game() {
+    let directory = temporary_folder("delete-all");
+    let first = Path::new("First.gb");
+    let second = Path::new("Second.gbc");
+    save_in(&directory, first, Slot::Resume, &state(Model::Dmg, 0), None).unwrap();
+    save_in(
+        &directory,
+        second,
+        Slot::Numbered(3),
+        &state(Model::CgbE, 0),
+        None,
+    )
+    .unwrap();
+
+    delete_all_in(&directory).unwrap();
+
+    assert!(!any_saved_in(&directory, first));
+    assert!(!any_saved_in(&directory, second));
+    assert_eq!(delete_all_in(&directory), Ok(()));
+}
+
+/// Whether any slot of the game at `rom` in `directory` holds a state.
+fn any_saved_in(directory: &Path, rom: &Path) -> bool {
+    Slot::LOADABLE
+        .iter()
+        .any(|&slot| slot_info_in(directory, rom, slot).saved_at.is_some())
 }

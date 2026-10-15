@@ -127,13 +127,12 @@ fn every_library_folder_is_a_row() {
 }
 
 #[test]
-fn every_tab_has_rows_but_about_without_update_checks() {
+fn every_tab_has_rows() {
     let settings = Settings::default();
 
     for &tab in SettingsTab::all() {
         let tab_rows = rows(tab, &settings, &state(false, Device::Keyboard, false));
-        let expected_empty = tab == SettingsTab::About && !updates::AVAILABLE;
-        assert_eq!(tab_rows.is_empty(), expected_empty, "{tab:?}");
+        assert!(!tab_rows.is_empty(), "{tab:?}");
     }
 }
 

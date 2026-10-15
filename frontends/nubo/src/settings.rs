@@ -196,6 +196,18 @@ impl Default for OwnSettings {
 }
 
 impl Settings {
+    /// These settings put back to how they start, keeping only the window's
+    /// size and, unless `remove_folders`, the library folders (see
+    /// `nubo_frontend::settings::Settings::reset`).
+    #[must_use]
+    pub fn reset(&self, remove_folders: bool) -> Settings {
+        Settings {
+            shared: self.shared.reset(remove_folders),
+            window_size: self.window_size,
+            ..Settings::default()
+        }
+    }
+
     /// Reads the saved settings. Without saved settings this returns the
     /// defaults; if they can't be read it returns the defaults together with
     /// the reason.

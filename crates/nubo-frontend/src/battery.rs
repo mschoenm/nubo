@@ -70,6 +70,16 @@ impl<T> Pending<T> {
     }
 }
 
+/// Deletes the battery saves of every game in this build's storage (see
+/// [`storage::platform`]), for a player resetting the settings who wants
+/// their games to start from the beginning. A running game would write its
+/// save again, so apps only offer this while no game runs.
+pub fn delete_all() -> Result<(), String> {
+    storage::platform()
+        .delete_battery_saves()
+        .map_err(|error| format!("Couldn't delete the in-game saves: {error}"))
+}
+
 /// Where one ROM's saves are kept and the writes waiting to go there. It is
 /// shared between the emulator (which queues writes) and the session (which
 /// flushes them).
