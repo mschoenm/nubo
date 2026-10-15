@@ -59,6 +59,26 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.9.0" date="2026-10-15">
+      <description>
+        <p>Nubo is friendlier for players who just want to play: rewind, a library with real game names and menus, undo for loads and restarts, and an emulator that needs about a third less work for the same, exact result.</p>
+        <ul>
+          <li>Rewind: hold R, or the controller's left face button, to go back through the last 30 seconds</li>
+          <li>Game Boy Color games show softer colors, closer to its own screen (Color correction, on by default), and Smooth out flicker makes blinking sprites look see-through as on the real screen</li>
+          <li>Loading a state, restarting and saving over a slot can be undone from the message they show</li>
+          <li>Library games show their real names, have a menu (right click, the ⋯ button or Select) to play them on another model, show them in their folder or delete their save states, and can be sorted by name, last played or last added</li>
+          <li>Pick the model by console first, then its revision, each with a sentence saying what it is</li>
+          <li>Automatic starts Super Game Boy games on the Super Game Boy again, with their colors and border</li>
+          <li>The game pauses while another window is in front, the mouse pointer hides while you play, the window opens at its last size, and the game bar has a volume slider</li>
+          <li>Leaving a game goes back from fullscreen to a window, and the library has an Exit fullscreen button</li>
+          <li>The browser version offers to play your last game again, and the desktop app can tell you about new versions if you want</li>
+          <li>Box art is downloaded only after you say yes, and a narrow window shows the settings' tabs above the page</li>
+          <li>Nubo needs 20 to 40% fewer instructions per frame, with every frame, sound and save state exactly as before</li>
+          <li>The RetroArch core keeps saving states, rewinding and running ahead after a restart onto a Super Game Boy</li>
+          <li>Save states made by Nubo 0.4.0 to 0.8.1 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.8.1" date="2026-10-14">
       <description>
         <p>Nubo now brings its own fonts, so it looks the same on Windows, macOS, Linux and in the browser.</p>
