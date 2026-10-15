@@ -96,8 +96,9 @@ impl Toasts {
     }
 
     /// Shows a toast, or prints it. A message that is already on screen is
-    /// not repeated; its timer starts again and it counts the repeat
-    /// instead, so a problem reported every second shows up once.
+    /// not repeated; it moves to the newest place, its timer starts again
+    /// and it counts the repeat instead, so a problem reported every second
+    /// shows up once.
     fn push(&mut self, kind: ToastKind, message: String, undo: bool) {
         if self.printed {
             match kind {
@@ -109,22 +110,20 @@ impl Toasts {
 
         let now = Instant::now();
 
-        if let Some(existing) = self
+        let repeats = match self
             .toasts
-            .iter_mut()
-            .find(|toast| toast.kind == kind && toast.message == message)
+            .iter()
+            .position(|toast| toast.kind == kind && toast.message == message)
         {
-            existing.shown_at = now;
-            existing.repeats += 1;
-            existing.undo = undo;
-            return;
-        }
+            Some(index) => self.toasts.remove(index).repeats + 1,
+            None => 0,
+        };
 
         self.toasts.push(Toast {
             kind,
             message,
             shown_at: now,
-            repeats: 0,
+            repeats,
             undo,
         });
 

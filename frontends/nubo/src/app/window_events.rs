@@ -87,11 +87,13 @@ impl App {
 
     /// Keeps the window's size in the settings, so it opens at that size
     /// next time, unless it fills the screen, is minimized, shows only the
-    /// game (`--scale`) or the app keeps nothing (`--fresh`).
+    /// game (`--scale`), the app keeps nothing (`--fresh`) or the settings
+    /// couldn't be read (saving would write the defaults over them).
     fn remember_window_size(&mut self) {
         let size = (self.window_width, self.window_height);
         if cfg!(target_arch = "wasm32")
             || self.fresh
+            || !self.settings_read
             || self.screen_scale.is_some()
             || self.fullscreen
             || self.minimized

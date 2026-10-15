@@ -67,6 +67,10 @@ pub struct App {
     /// With `--fresh`: the app reads and writes nothing kept between runs,
     /// like a new install (see `command_line`).
     fresh: bool,
+    /// Whether the settings file was read (or there was none). When it
+    /// couldn't be, the app saves nothing on its own, such as the window's
+    /// size, so it doesn't write the defaults over the player's settings.
+    settings_read: bool,
     /// With `--speed`: games start fast forwarding at this speed.
     speed: Option<FastForwardSpeed>,
     library: Library,
@@ -187,6 +191,7 @@ impl App {
             model_override: options.model,
             screen_scale: options.scale,
             fresh: options.fresh,
+            settings_read: settings_error.is_none(),
             speed: options.speed,
             library,
             search: String::new(),
@@ -222,12 +227,10 @@ impl App {
             },
         };
 
-        // Saving over settings that couldn't be read would lose them.
-        let settings_read = settings_error.is_none();
         for error in [settings_error, library_error].into_iter().flatten() {
             app.toasts.error(error);
         }
-        if settings_read && app.settings.shared.controls_revision < controls::REVISION {
+        if app.settings_read && app.settings.shared.controls_revision < controls::REVISION {
             app.change_settings(|settings| {
                 controls::add_new_actions(&mut settings.shared.controls);
                 settings.shared.controls_revision = controls::REVISION;

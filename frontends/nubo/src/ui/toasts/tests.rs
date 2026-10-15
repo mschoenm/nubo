@@ -47,6 +47,18 @@ fn a_message_already_on_screen_is_not_repeated() {
 }
 
 #[test]
+fn a_repeated_message_becomes_the_newest_toast() {
+    let mut toasts = Toasts::default();
+
+    toasts.error("No sound");
+    toasts.info("Saved to Slot 1");
+    toasts.error("No sound");
+
+    assert_eq!(messages(&toasts), ["Saved to Slot 1", "No sound"]);
+    assert_eq!(toasts.toasts[1].repeats, 1);
+}
+
+#[test]
 fn the_oldest_toasts_make_way_for_new_ones() {
     let mut toasts = Toasts::default();
 

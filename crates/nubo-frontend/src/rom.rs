@@ -45,24 +45,34 @@ pub const REMEMBERS_LAST_GAME: bool = cfg!(all(feature = "web", not(feature = "d
 /// five megabytes for a site, and the battery saves need room too.
 const MAX_REMEMBERED_SIZE: usize = 2 * 1024 * 1024;
 
-/// Keeps `rom` as the last game played, if this build keeps one and the
-/// game isn't too big. The file name goes first, then a zero byte, then
-/// the file's contents.
+/// Keeps `rom` as the last game played, if this build keeps one. The file
+/// name goes first, then a zero byte, then the file's contents. A game too
+/// big to keep, or one that doesn't fit, forgets the game kept before, so
+/// the next start doesn't offer an older game than the last one played.
 pub fn remember(rom: &Rom) -> Result<(), String> {
-    if !REMEMBERS_LAST_GAME || rom.bytes.len() > MAX_REMEMBERED_SIZE {
+    if !REMEMBERS_LAST_GAME {
         return Ok(());
+    }
+    let storage = crate::storage::platform();
+    let forget = || storage.write(crate::storage::Entry::LastGame, &[]);
+    if rom.bytes.len() > MAX_REMEMBERED_SIZE {
+        return forget();
     }
     let name = rom.path.file_name().unwrap_or_default().to_string_lossy();
     let mut contents = Vec::with_capacity(name.len() + 1 + rom.bytes.len());
     contents.extend_from_slice(name.as_bytes());
     contents.push(0);
     contents.extend_from_slice(&rom.bytes);
-    crate::storage::platform()
+    storage
         .write(crate::storage::Entry::LastGame, &contents)
-        .map_err(|error| format!("Couldn't keep the game for next time: {error}"))
+        .map_err(|error| {
+            let _ = forget();
+            format!("Couldn't keep the game for next time: {error}")
+        })
 }
 
-/// The last game played, if this build keeps one and it was kept.
+/// The last game played, if this build keeps one and it was kept (an empty
+/// entry is a forgotten one).
 pub fn remembered() -> Option<Rom> {
     if !REMEMBERS_LAST_GAME {
         return None;
