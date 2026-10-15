@@ -51,3 +51,28 @@ fn a_reset_asks_first_puts_the_settings_back_and_can_be_undone() {
     let _ = app.update(GameMessage::Undo.into());
     assert_eq!(app.settings, changed);
 }
+
+#[test]
+fn a_reset_that_deletes_takes_away_an_earlier_resets_undo() {
+    let (mut app, _) = App::new(
+        None,
+        &Options {
+            fresh: true,
+            ..Options::default()
+        },
+    );
+    app.settings.appearance = Appearance::Dark;
+    let _ = app.update(SettingsMessage::Reset(ResetChoices::default()).into());
+    app.settings.appearance = Appearance::Light;
+
+    let _ = app.update(
+        SettingsMessage::Reset(ResetChoices {
+            delete_battery_saves: true,
+            ..ResetChoices::default()
+        })
+        .into(),
+    );
+    let _ = app.update(GameMessage::Undo.into());
+
+    assert_eq!(app.settings.appearance, Appearance::System);
+}

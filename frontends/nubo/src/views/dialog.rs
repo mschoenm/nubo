@@ -1,7 +1,8 @@
 //! A dialog over the current screen (see `crate::dialog`): its title, its
 //! text, and its choices, as buttons along the bottom for a question (under
 //! its checkboxes and notice, if it has them) or as rows for a menu, with
-//! the one the D-pad is on outlined.
+//! the one the D-pad is on outlined. A question that doesn't fit the window
+//! scrolls.
 
 use crate::app::Message;
 use crate::dialog::{Choice, ChoiceStyle, Dialog, DialogContent, Layout, Notice};
@@ -24,6 +25,7 @@ pub fn view<'a>(dialog: &Dialog, content: DialogContent) -> Element<'a, Message>
         panel = panel.push(text(body).size(14).style(theme::muted_text));
     }
 
+    let scrolls = layout == Layout::Buttons;
     let width = match layout {
         Layout::Buttons => {
             let (boxes, buttons): (Vec<_>, Vec<_>) = content
@@ -97,11 +99,15 @@ pub fn view<'a>(dialog: &Dialog, content: DialogContent) -> Element<'a, Message>
         }
     };
 
-    container(panel)
-        .padding(24)
-        .max_width(width)
-        .style(theme::panel)
-        .into()
+    // A question scrolls as a whole in a window too short for it, so its
+    // buttons stay reachable; a menu scrolls its rows instead.
+    let panel = container(panel).padding(24);
+    let panel: Element<'a, Message> = if scrolls {
+        scrollable(panel).into()
+    } else {
+        panel.into()
+    };
+    container(panel).max_width(width).style(theme::panel).into()
 }
 
 /// A question's checkboxes, `(index, choice)` by their place among its

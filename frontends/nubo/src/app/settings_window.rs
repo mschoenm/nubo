@@ -218,6 +218,10 @@ impl App {
         self.change_settings(|settings| *settings = reset);
 
         if choices.deletes() {
+            // An earlier reset's Undo would put back settings and games from
+            // before this reset, next to saves it can't put back.
+            self.undo = None;
+            self.toasts.forget_undo();
             if !deleted.is_empty() {
                 self.toasts.info(format!(
                     "Settings reset, and the {} deleted",
