@@ -59,6 +59,18 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.9.2" date="2026-10-15">
+      <description>
+        <p>Nubo can start over from its settings, its menus wrap around, and the controller's triggers no longer load or save by accident.</p>
+        <ul>
+          <li>Start over, on the settings' About tab, puts the settings back to how they started and can also delete the in-game saves and save states, remove the game folders and clear Continue playing; it asks first, and a reset that deletes nothing can be undone</li>
+          <li>Up on the first row of a menu goes to the last, and down on the last goes to the first, in the pause menu, the library, the settings and the dialogs</li>
+          <li>The controller's L2 and R2 are no longer quick load and quick save at first, since they are easy to press by accident; both are still in the pause menu, and controls you already set keep their buttons</li>
+          <li>Nubo.app, built with cargo xtask macos, shows its icon in Finder and the Dock straight away, instead of a blank one</li>
+          <li>Save states made by Nubo 0.4.0 to 0.9.1 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.9.1" date="2026-10-15">
       <description>
         <p>Nubo's command line is easier to use: on Linux it explains itself, and everywhere it takes any file name.</p>
