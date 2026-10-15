@@ -205,3 +205,22 @@ fn rewinding_steps_back_through_the_states_kept_while_playing() {
     assert_eq!(shown, kept);
     assert_eq!(machine.history.len(), 0);
 }
+
+#[test]
+fn loading_a_state_forgets_the_history_before_it() {
+    let (mut machine, _) = machine_with(Arc::new(Memory::default()));
+    let state = machine.emulator.save_state();
+    let mut frames = 0;
+    while frames < history::FRAMES_PER_STATE * 3 {
+        if machine.play_buffer().1 {
+            frames += 1;
+        }
+    }
+    assert!(machine.history.len() > 0);
+
+    let (reply, answer) = mpsc::channel();
+    machine.handle(Command::LoadState(state, reply));
+
+    assert!(answer.recv().unwrap().is_ok());
+    assert_eq!(machine.history.len(), 0);
+}

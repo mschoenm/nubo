@@ -693,14 +693,19 @@ fn merge_scan(
     mut scanned: Vec<LibraryEntry>,
     checked: &HashSet<PathBuf>,
 ) -> Vec<LibraryEntry> {
-    let last_played: HashMap<&Path, Option<u64>> = current
+    // The scan started from the entries as they were then; what the player
+    // did since (played a game, picked its model) is in `current`.
+    let known: HashMap<&Path, &LibraryEntry> = current
         .iter()
-        .map(|entry| (entry.path.as_path(), entry.last_played))
+        .map(|entry| (entry.path.as_path(), entry))
         .collect();
 
     for entry in &mut scanned {
-        if let Some(&played) = last_played.get(entry.path.as_path()) {
-            entry.last_played = played;
+        if let Some(known) = known.get(entry.path.as_path()) {
+            entry.last_played = known.last_played;
+            entry.model = known.model;
+            entry.added = known.added.or(entry.added);
+            entry.supports_sgb = entry.supports_sgb.or(known.supports_sgb);
         }
     }
 

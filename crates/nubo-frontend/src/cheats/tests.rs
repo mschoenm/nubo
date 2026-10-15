@@ -64,3 +64,18 @@ fn one_bad_code_rejects_the_cheat() {
     assert!(Cheat::new("", "01FF56D0 + XYZ").is_err());
     assert!(Cheat::new("", " + ").is_err());
 }
+
+#[test]
+fn cheats_that_share_a_code_keep_their_own_ids() {
+    let mut emulator = Emulator::new(nubo_core::Model::Dmg);
+    // Both make 0xD056 read 0x5A.
+    let both = Cheat::new("", "015A56D0 + 01FE57D0").unwrap();
+    let mut one = Cheat::new("", "015A56D0").unwrap();
+    both.apply_to(&mut emulator);
+    one.apply_to(&mut emulator);
+
+    one.enabled = false;
+    one.apply_to(&mut emulator);
+
+    assert_eq!(emulator.read_memory(0xD056), 0x5A);
+}

@@ -140,9 +140,15 @@ impl Session {
             self.last_tick = at.or(self.last_tick);
             self.make_frames_due(elapsed);
 
+            // Rewinding goes back at its own speed, fast forward or not.
+            let per_frame = if self.machine.playback.rewinding {
+                1
+            } else {
+                self.machine.playback.buffers_per_played()
+            };
             while self.frames_due >= 1.0 {
                 self.frames_due -= 1.0;
-                for _ in 1..self.machine.playback.buffers_per_played() {
+                for _ in 1..per_frame {
                     self.run_frame(false);
                 }
                 self.run_frame(true);

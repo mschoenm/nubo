@@ -361,3 +361,18 @@ fn a_scan_keeps_what_an_existing_library_file_knows_about_unchanged_games() {
     expected.sort_by(|first, second| first.path.cmp(&second.path));
     assert_eq!(result.entries, expected);
 }
+
+#[test]
+fn a_model_picked_during_a_scan_stays() {
+    let scanned = LibraryEntry::example("/games/Tetris.gb");
+    let mut picked = scanned.clone();
+    picked.model = Some(ModelPreference::Fixed(Model::Sgb2));
+
+    let merged = merge_scan(
+        std::slice::from_ref(&picked),
+        vec![scanned],
+        &std::collections::HashSet::new(),
+    );
+
+    assert_eq!(merged[0].model(), Some(Model::Sgb2));
+}

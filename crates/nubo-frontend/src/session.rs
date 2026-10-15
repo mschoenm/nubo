@@ -225,6 +225,12 @@ impl Machine {
                     .emulator
                     .load_state(&state)
                     .map_err(|error| error.to_string());
+                // The history leads up to the moment before the load, so
+                // rewinding through it would jump away from the loaded one.
+                if result.is_ok() {
+                    self.history.clear();
+                    self.rewind_time = Duration::ZERO;
+                }
                 let _ = reply.send(result);
             }
             Command::SetSgbPlayerPalette(palette) => {

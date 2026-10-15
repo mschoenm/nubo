@@ -71,14 +71,17 @@ impl Cheat {
 
     /// Turns the cheat on or off in `emulator`, as `enabled` says. The codes
     /// were checked when the cheat was made, so turning it on doesn't fail.
+    /// Each code is known to the emulator by the whole cheat's code and its
+    /// own, so two cheats that share a code don't turn each other off.
     pub fn apply_to(&self, emulator: &mut Emulator) {
         for code in self.codes() {
-            emulator.unregister_cheat(code);
+            let id = format!("{}/{code}", self.code);
+            emulator.unregister_cheat(&id);
 
             if self.enabled {
                 let _ = match kind_of(code).unwrap_or(CheatKind::GameShark) {
-                    CheatKind::GameShark => emulator.register_gameshark_cheat(code, code),
-                    CheatKind::GameGenie => emulator.register_gamegenie_cheat(code, code),
+                    CheatKind::GameShark => emulator.register_gameshark_cheat(&id, code),
+                    CheatKind::GameGenie => emulator.register_gamegenie_cheat(&id, code),
                 };
             }
         }
