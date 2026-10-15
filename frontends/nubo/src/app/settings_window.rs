@@ -2,15 +2,13 @@
 //! its pages, and moving through them with the D-pad.
 
 use super::playing::UndoPoint;
-use super::{App, GameMessage, LibraryMessage, Message, cycle};
+use super::{App, GameMessage, LibraryMessage, Message, cycle, scroll_in_proportion};
 use crate::dialog::ResetChoices;
 use crate::settings::{Appearance, Settings};
 use crate::views;
 use crate::views::settings::ModelOption;
 use crate::views::settings::{SettingsFocus, SettingsRow, SettingsTab};
 use iced::Task;
-use iced::widget;
-use iced::widget::scrollable::RelativeOffset;
 use nubo_frontend::background;
 use nubo_frontend::battery;
 use nubo_frontend::controls::{Action, Controls, Device};
@@ -165,7 +163,7 @@ impl App {
             }
             SettingsMessage::AskReset => {
                 self.capture = None;
-                self.ask_reset();
+                return self.ask_reset();
             }
             SettingsMessage::Reset(choices) => return self.reset_settings(choices),
         }
@@ -502,21 +500,8 @@ impl App {
     }
 }
 
-/// Scrolls the settings page so row `index` of `count` is roughly in view.
-/// Rows are spread fairly evenly over the page, so scrolling in proportion
-/// is close enough and needs no knowledge of their sizes.
+/// Scrolls the settings page so row `index` of `count` is roughly in view
+/// (see `scroll_in_proportion`).
 fn scroll_settings(index: usize, count: usize) -> Task<Message> {
-    let fraction = if count > 1 {
-        index as f32 / (count - 1) as f32
-    } else {
-        0.0
-    };
-
-    widget::operation::snap_to(
-        views::settings::scroll_id(),
-        RelativeOffset {
-            x: None,
-            y: Some(fraction),
-        },
-    )
+    scroll_in_proportion(views::settings::scroll_id(), index, count)
 }

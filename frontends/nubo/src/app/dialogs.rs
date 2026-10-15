@@ -2,13 +2,14 @@
 //! says and offers, picking a choice, and moving between the choices with
 //! the D-pad.
 
-use super::{App, GameMessage, LibraryMessage, Message, SettingsMessage};
+use super::{App, GameMessage, LibraryMessage, Message, SettingsMessage, scroll_in_proportion};
 use crate::dialog::{
     Choice, ChoiceStyle, Dialog, DialogAction, DialogContent, DialogKind, GameMenuPage, Layout,
     Notice, ResetChoices,
 };
 use crate::settings::{LibraryFilter, LibrarySort, Settings};
 use crate::ui::icons::Icon;
+use crate::views;
 use iced::Task;
 use nubo_frontend::controls::Action;
 use nubo_frontend::library::{self, LibraryEntry, box_art};
@@ -74,10 +75,11 @@ impl App {
     }
 
     /// Asks whether to reset every setting, with nothing else ticked and
-    /// the D-pad on Cancel, so a stray press of A deletes nothing.
-    pub(super) fn ask_reset(&mut self) {
+    /// the D-pad on Cancel, so a stray press of A deletes nothing, scrolled
+    /// to Cancel in a window too short for the whole question.
+    pub(super) fn ask_reset(&mut self) -> Task<Message> {
         if self.dialog.is_some() {
-            return;
+            return Task::none();
         }
         self.dialog = Some(Dialog::new(DialogKind::ResetSettings(
             ResetChoices::default(),
@@ -87,6 +89,22 @@ impl App {
             .and_then(|content| content.choices.iter().position(|choice| !choice.checkbox));
         if let (Some(dialog), Some(cancel)) = (&mut self.dialog, cancel) {
             dialog.selection = cancel;
+        }
+        self.scroll_to_selection()
+    }
+
+    /// Scrolls a question so the choice the D-pad is on is in view, in a
+    /// window too short for all of it. A menu scrolls its rows by itself.
+    fn scroll_to_selection(&self) -> Task<Message> {
+        match (&self.dialog, self.dialog_content()) {
+            (Some(dialog), Some(content)) if content.layout == Layout::Buttons => {
+                scroll_in_proportion(
+                    views::dialog::scroll_id(),
+                    dialog.selection,
+                    content.choices.len(),
+                )
+            }
+            _ => Task::none(),
         }
     }
 
@@ -303,8 +321,14 @@ impl App {
         let last = content.choices.len().saturating_sub(1);
 
         match action {
-            Action::Up | Action::Left => dialog.selection = dialog.selection.saturating_sub(1),
-            Action::Down | Action::Right => dialog.selection = (dialog.selection + 1).min(last),
+            Action::Up | Action::Left => {
+                dialog.selection = dialog.selection.saturating_sub(1);
+                return self.scroll_to_selection();
+            }
+            Action::Down | Action::Right => {
+                dialog.selection = (dialog.selection + 1).min(last);
+                return self.scroll_to_selection();
+            }
             Action::A | Action::Start => {
                 if let Some(choice) = content.choices.into_iter().nth(dialog.selection) {
                     return self.update(choice.action.into_message());

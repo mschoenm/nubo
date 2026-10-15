@@ -10,7 +10,7 @@ use crate::ui::icons::{Icon, icon};
 use crate::ui::theme;
 use crate::ui::widgets::menu_separator;
 use iced::widget::{Column, Row, button, column, container, row, scrollable, space, text};
-use iced::{Alignment, Element, Fill};
+use iced::{Alignment, Element, Fill, widget};
 
 const QUESTION_WIDTH: f32 = 440.0;
 const MENU_WIDTH: f32 = 420.0;
@@ -103,11 +103,17 @@ pub fn view<'a>(dialog: &Dialog, content: DialogContent) -> Element<'a, Message>
     // buttons stay reachable; a menu scrolls its rows instead.
     let panel = container(panel).padding(24);
     let panel: Element<'a, Message> = if scrolls {
-        scrollable(panel).into()
+        scrollable(panel).id(scroll_id()).into()
     } else {
         panel.into()
     };
     container(panel).max_width(width).style(theme::panel).into()
+}
+
+/// The scrolling area of a question, so the app can keep the choice the
+/// D-pad is on in view.
+pub fn scroll_id() -> widget::Id {
+    widget::Id::new("dialog-question")
 }
 
 /// A question's checkboxes, `(index, choice)` by their place among its

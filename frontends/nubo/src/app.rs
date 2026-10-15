@@ -617,6 +617,27 @@ fn cycle<T: Copy + PartialEq>(options: &[T], current: T, step: isize, wrap: bool
     options[next.cast_unsigned()]
 }
 
+/// Scrolls the scrollable with `id` so item `index` of `count` is roughly in
+/// view. The items of a settings page or a question are spread fairly evenly
+/// over it, from its start to its end, so scrolling in proportion is close
+/// enough and needs no knowledge of their sizes. A lone item counts as the
+/// last, at the end: the only row of the browser's About tab is.
+fn scroll_in_proportion(id: iced::widget::Id, index: usize, count: usize) -> Task<Message> {
+    let fraction = if count > 1 {
+        index as f32 / (count - 1) as f32
+    } else {
+        1.0
+    };
+
+    iced::widget::operation::snap_to(
+        id,
+        iced::widget::scrollable::RelativeOffset {
+            x: None,
+            y: Some(fraction),
+        },
+    )
+}
+
 mod dialogs;
 mod library_screen;
 mod player_input;
