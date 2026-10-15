@@ -7,7 +7,9 @@
 use chrono::Local;
 use clap::Parser;
 use image::RgbaImage;
-use nubo_core::{Emulator, Model, NoSaves, RtcClock, SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH};
+use nubo_core::{
+    Emulator, Model, NoSaves, RtcClock, SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH, SgbBorderTime,
+};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -41,6 +43,10 @@ struct Args {
     /// Hardware model: dmg-0, dmg, mgb, sgb, sgb2, cgb-0, cgb-a, cgb-b, cgb-c, cgb-d, cgb-e (or cgb), agb
     #[arg(long, value_name = "NAME")]
     model: Option<Model>,
+
+    /// On a Super Game Boy, draw Nubo's border by day instead of at night
+    #[arg(long)]
+    day: bool,
 }
 
 /// Reads the value of `--seconds`: a number of seconds, 0 or more.
@@ -119,6 +125,9 @@ fn run(args: &Args) -> Result<(), String> {
         .unwrap_or(if args.cgb { Model::CgbE } else { Model::Dmg });
     let mut emulator = Emulator::new(model);
     emulator.set_sample_rate(SAMPLE_RATE);
+    if args.day {
+        emulator.set_sgb_border_time(SgbBorderTime::Day);
+    }
 
     let header = emulator
         .load_rom(&rom_data, Box::new(NO_SAVES))

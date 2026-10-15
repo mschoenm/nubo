@@ -26,8 +26,9 @@
 //! - **The border.** The TV picture is 256×224 pixels with the Game Boy's
 //!   160×144 screen in the middle; a game can fill the rest with a border of
 //!   its own (`CHR_TRN`, `PCT_TRN`). Until it does, Nubo draws its own
-//!   (`border.rs`): the Super Game Boy's built-in border is Nintendo's
-//!   artwork and isn't included.
+//!   (`nubo_border.rs`), at night or by day as the player's clock says: the
+//!   Super Game Boy's built-in border is Nintendo's artwork and isn't
+//!   included.
 //! - **Masking.** A game can freeze the picture or blank it while it prepares
 //!   the next one (`MASK_EN`).
 //! - **Multiplayer.** A game can ask for up to four controllers (`MLT_REQ`),
@@ -69,7 +70,7 @@
 //! it every JOYP write.
 
 use crate::gpu::{DMG_SHADES, rgb555_to_rgba};
-use crate::sgb::border::{Border, BorderCache, BorderSource, NuboBorder};
+use crate::sgb::border::{Border, BorderCache, BorderSource};
 use crate::sgb::intro::Intro;
 use crate::sgb::packets::{MAX_COMMAND_SIZE, PacketReceiver, is_header_packet};
 use nubo_serializable_derive::Serializable;
@@ -152,6 +153,18 @@ pub enum SgbBorder {
     Game,
     /// Nubo's border, even when the game sent one of its own.
     Nubo,
+}
+
+/// Which look Nubo's own border has: its night or its day sky. Frontends
+/// pick it from the player's clock; the emulator never reads a clock, so the
+/// same run always draws the same pictures.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SgbBorderTime {
+    /// A dusk sky with faint stars over a dark purple panel.
+    #[default]
+    Night,
+    /// A blue sky with a sun over a periwinkle panel.
+    Day,
 }
 
 /// What `MASK_EN` does to the picture.
@@ -266,6 +279,10 @@ pub(crate) struct Sgb {
     /// The border the player picked from the menu.
     #[serializable(skip)]
     border_choice: SgbBorder,
+    /// Whether Nubo's border shows its night or its day look. Like
+    /// `border_choice`, save states leave it out.
+    #[serializable(skip)]
+    border_time: SgbBorderTime,
     /// How many frames since the intro the player has held no button. The
     /// attraction mode starts at `attraction::IDLE_FRAMES`.
     idle_frames: u32,
@@ -277,9 +294,6 @@ pub(crate) struct Sgb {
     /// Nubo's intro, drawn once.
     #[serializable(skip)]
     intro: Intro,
-    /// Nubo's own border, drawn once.
-    #[serializable(skip)]
-    nubo_border: NuboBorder,
     /// The border as last drawn, so it is only drawn again when it changes.
     #[serializable(skip)]
     border_cache: BorderCache,
@@ -339,10 +353,10 @@ impl Sgb {
             palette_picked_since: false,
             player_palette: None,
             border_choice: SgbBorder::Game,
+            border_time: SgbBorderTime::Night,
             idle_frames: 0,
             buttons_held: false,
             intro: Intro::new(),
-            nubo_border: NuboBorder::new(),
             border_cache: BorderCache::default(),
             frame_colorized: false,
             redrawable: false,
@@ -426,6 +440,16 @@ impl Sgb {
     /// Picks the border to show.
     pub(crate) fn set_border_choice(&mut self, border: SgbBorder) {
         self.border_choice = border;
+    }
+
+    /// Whether Nubo's border shows its night or its day look.
+    pub(crate) fn border_time(&self) -> SgbBorderTime {
+        self.border_time
+    }
+
+    /// Shows Nubo's border in its night or its day look.
+    pub(crate) fn set_border_time(&mut self, time: SgbBorderTime) {
+        self.border_time = time;
     }
 
     /// Tells whether the player holds any button now. A press ends the
@@ -902,11 +926,12 @@ impl Sgb {
                 && !self.attraction_disabled
                 && self.idle_frames >= attraction::IDLE_FRAMES;
             BorderSource::Nubo {
+                time: self.border_time,
                 attraction_frame: attraction.then(|| self.idle_frames - attraction::IDLE_FRAMES),
             }
         };
         let cache = &mut self.border_cache;
-        cache.update(source, &self.nubo_border);
+        cache.update(source);
 
         let screen_pixels = game_screen.as_chunks_mut::<4>().0;
         for &(index, color) in &cache.screen_cover {
@@ -985,6 +1010,7 @@ fn faded(color: u16, fade: u8) -> u16 {
 mod attraction;
 mod border;
 mod intro;
+mod nubo_border;
 mod packets;
 #[cfg(test)]
 mod tests;

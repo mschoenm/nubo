@@ -196,7 +196,8 @@ Largest phase, but each part stands alone:
      Nintendo emulator of its own.
    - **Nintendo's artwork and data**: the built-in borders, the 32 built-in palettes, the automatic
      colors for Nintendo's older games and the startup animation are never included. Nubo draws its
-     own border and animation.
+     own border, with a night and a day look that the apps pick by the player's clock
+     (`Emulator::set_sgb_border_time`), and its own animation.
    - **The first Super Game Boy's clock**, about 2.4% faster than a Game Boy's (the Super Nintendo's
      clock divided by 5), which makes games run and sound that much faster. Postponed: it changes how
      every app paces the game and how the cartridge clock counts, so it will be weighed and planned

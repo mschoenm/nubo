@@ -1,6 +1,7 @@
 //! Tests for the Super Game Boy menu's choices.
 
 use super::*;
+use nubo_core::Model;
 
 /// A menu whose player palette is `palette`.
 fn menu(palette: Option<[u16; 4]>) -> SgbMenu {
@@ -44,4 +45,32 @@ fn colors_convert_both_ways() {
     for color in DEFAULT_OWN_PALETTE {
         assert_eq!(rgb555(rgb(color)), color);
     }
+}
+
+#[test]
+fn nubos_border_shows_its_day_look_from_seven_to_seven() {
+    assert_eq!(border_time_at(0), SgbBorderTime::Night);
+    assert_eq!(border_time_at(6), SgbBorderTime::Night);
+    assert_eq!(border_time_at(7), SgbBorderTime::Day);
+    assert_eq!(border_time_at(12), SgbBorderTime::Day);
+    assert_eq!(border_time_at(18), SgbBorderTime::Day);
+    assert_eq!(border_time_at(19), SgbBorderTime::Night);
+    assert_eq!(border_time_at(23), SgbBorderTime::Night);
+}
+
+#[test]
+fn the_border_clock_follows_the_clock_on_a_super_game_boy_only() {
+    let mut emulator = Emulator::new(Model::Sgb);
+    let before = border_time_now();
+    BorderClock::start(&mut emulator);
+    let after = border_time_now();
+    // The hour may turn between the looks at the clock.
+    assert!([before, after].contains(&emulator.sgb_border_time()));
+
+    let mut emulator = Emulator::new(Model::Dmg);
+    let mut clock = BorderClock::start(&mut emulator);
+    for _ in 0..FRAMES_BETWEEN_CHECKS {
+        clock.frame_finished(&mut emulator);
+    }
+    assert_eq!(emulator.sgb_border_time(), SgbBorderTime::Night);
 }

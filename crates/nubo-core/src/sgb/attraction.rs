@@ -2,8 +2,9 @@
 //! built-in borders come alive once the controller has been left alone for
 //! about seven minutes, until a button is pressed again (Pan Docs). Those
 //! animations are Nintendo's, so Nubo's border has one of its own: little
-//! clouds, shaped like the one in Nubo's logo, drift across the frame,
-//! behind the panel and the logo. The game keeps running on the screen.
+//! clouds, shaped like the one in Nubo's logo, drift across the sky, behind
+//! the panel, the buddy peeking over it and the cloud bank. The game keeps
+//! running on the screen.
 //!
 //! A game can turn the attraction mode off (`ATRC_EN`). A real Super Game
 //! Boy also starts it when the player presses R, L, L, L, L, R on the Super
@@ -11,7 +12,8 @@
 //! the wait starts it.
 
 use crate::sgb::BORDERED_WIDTH;
-use crate::sgb::border::{BorderPicture, NuboBorder, nubo_colors, to_rgb555};
+use crate::sgb::border::BorderPicture;
+use crate::sgb::nubo_border::{NuboBorder, dithered_rgb555, mix};
 use nubo_logo::{Part, SHAPES};
 
 /// How many frames the controller has to be left alone before the
@@ -29,15 +31,16 @@ const SAMPLES: usize = 4;
 
 /// The clouds: their width in pixels, their top edge, how many frames each
 /// takes to move a pixel to the right, and how far along its way each
-/// starts. Their rows don't overlap: two are above the panel, two pass
-/// behind it and show only at its sides, and two are below it.
+/// starts. Their rows don't overlap: two are above the panel, passing behind
+/// the buddy, and four pass behind the panel and show only at its sides,
+/// above the cloud bank.
 const CLOUDS: [(usize, usize, u32, usize); 6] = [
     (16, 2, 6, 40),
     (12, 17, 9, 180),
     (20, 64, 4, 100),
+    (16, 100, 5, 0),
     (14, 132, 7, 230),
-    (16, 199, 5, 0),
-    (10, 214, 8, 150),
+    (10, 166, 8, 150),
 ];
 
 /// A cloud drifting across the border.
@@ -129,21 +132,16 @@ pub(super) fn draw(border: &NuboBorder, frame: u32) -> BorderPicture {
             else {
                 continue;
             };
-            let target = x + (cloud.top + index / cloud.width) * BORDERED_WIDTH;
+            let y = cloud.top + index / cloud.width;
+            let target = x + y * BORDERED_WIDTH;
+            // Only the open sky's share of the pixel shows the cloud.
             let amount = f32::from(pixel[3]) / 255.0 * visibility * border.open_frame[target];
             if amount == 0.0 {
                 continue;
             }
-            // Only the open frame's share of the pixel shows the cloud.
-            let under = border.colors[target];
-            let color = std::array::from_fn(|channel| {
-                let change =
-                    f32::from(pixel[channel]) - f32::from(nubo_colors::BACKGROUND[channel]);
-                (f32::from(under[channel]) + change * amount)
-                    .round()
-                    .clamp(0.0, 255.0) as u8
-            });
-            picture.pixels[target] = to_rgb555(color);
+            let color = [pixel[0], pixel[1], pixel[2]].map(f32::from);
+            let mixed = mix(border.colors[target], color, amount);
+            picture.pixels[target] = dithered_rgb555(mixed, x, y);
         }
     }
     picture
@@ -152,14 +150,14 @@ pub(super) fn draw(border: &NuboBorder, frame: u32) -> BorderPicture {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sgb::{BORDERED_HEIGHT, SCREEN_OFFSET};
+    use crate::sgb::{BORDERED_HEIGHT, SCREEN_OFFSET, SgbBorderTime};
 
     #[test]
     fn the_clouds_fade_in_over_the_open_frame_only() {
-        let border = NuboBorder::new();
-        assert_eq!(draw(&border, 0).pixels, border.picture.pixels);
+        let border = NuboBorder::get(SgbBorderTime::Day);
+        assert_eq!(draw(border, 0).pixels, border.picture.pixels);
 
-        let picture = draw(&border, 5_000);
+        let picture = draw(border, 5_000);
         let changed: Vec<_> = (0..BORDERED_WIDTH * BORDERED_HEIGHT)
             .filter(|&index| picture.pixels[index] != border.picture.pixels[index])
             .collect();
@@ -174,8 +172,8 @@ mod tests {
 
     #[test]
     fn the_clouds_keep_moving() {
-        let border = NuboBorder::new();
-        assert_ne!(draw(&border, 1_000).pixels, draw(&border, 1_100).pixels);
+        let border = NuboBorder::get(SgbBorderTime::Night);
+        assert_ne!(draw(border, 1_000).pixels, draw(border, 1_100).pixels);
     }
 
     #[test]

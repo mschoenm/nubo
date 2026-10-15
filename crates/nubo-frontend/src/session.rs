@@ -25,6 +25,7 @@ use crate::cheats::Cheat;
 use crate::notices::Notices;
 use crate::rom::Rom;
 use crate::settings::FastForwardSpeed;
+use crate::sgb_menu::BorderClock;
 use crate::time::Duration;
 use audio::AudioOutput;
 use history::History;
@@ -157,6 +158,9 @@ struct Machine {
     history: History,
     /// Playing time gone by while rewinding since the last step back.
     rewind_time: Duration,
+    /// Turns a Super Game Boy's border to its night or day look as the
+    /// player's clock says.
+    border_clock: BorderClock,
 }
 
 impl Machine {
@@ -195,6 +199,7 @@ impl Machine {
         emulator
             .load_rom(rom, saves.cartridge_effects())
             .map_err(|error| error.to_string())?;
+        let border_clock = BorderClock::start(&mut emulator);
 
         Ok(Machine {
             emulator,
@@ -203,6 +208,7 @@ impl Machine {
             playback,
             history: History::default(),
             rewind_time: Duration::ZERO,
+            border_clock,
         })
     }
 
@@ -278,11 +284,15 @@ impl Machine {
     }
 
     /// Whether the emulator finished a frame since this was last asked,
-    /// keeping a state for rewinding every few frames.
+    /// keeping a state for rewinding every few frames and keeping a Super
+    /// Game Boy's border in step with the clock.
     fn frame_finished(&mut self) -> bool {
         let finished = self.emulator.take_frame().is_some();
-        if finished && self.history.frame_finished() {
-            self.history.push(self.emulator.save_state());
+        if finished {
+            if self.history.frame_finished() {
+                self.history.push(self.emulator.save_state());
+            }
+            self.border_clock.frame_finished(&mut self.emulator);
         }
         finished
     }

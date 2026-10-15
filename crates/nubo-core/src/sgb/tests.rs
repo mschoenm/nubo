@@ -440,6 +440,38 @@ fn the_player_can_pick_nubos_border_over_the_games() {
     assert_ne!(console.sgb.bordered_frame(), nubo_border);
 }
 
+#[test]
+fn nubos_border_has_a_night_and_a_day_look() {
+    let mut console = Console::new();
+    console.frame_of_shade(3);
+    let night = console.sgb.bordered_frame().to_vec();
+    console.sgb.set_border_time(SgbBorderTime::Day);
+    console.frame_of_shade(3);
+    let day = console.sgb.bordered_frame().to_vec();
+    assert_ne!(day, night);
+
+    // Only the border changes: the game screen is the same.
+    let (left, top) = SCREEN_OFFSET;
+    for y in top..top + 144 {
+        let row = (left + y * BORDERED_WIDTH) * 4..(left + 160 + y * BORDERED_WIDTH) * 4;
+        assert_eq!(day[row.clone()], night[row]);
+    }
+
+    console.sgb.set_border_time(SgbBorderTime::Night);
+    console.frame_of_shade(3);
+    assert_eq!(console.sgb.bordered_frame(), night);
+}
+
+#[test]
+fn a_games_own_border_looks_the_same_by_day() {
+    let mut console = Console::new();
+    send_game_border(&mut console);
+    let night = console.sgb.bordered_frame().to_vec();
+    console.sgb.set_border_time(SgbBorderTime::Day);
+    console.frame_of_shade(0);
+    assert_eq!(console.sgb.bordered_frame(), night);
+}
+
 /// Runs frames until the attraction mode has been on for a while, and
 /// returns whether Nubo's border changed.
 fn border_comes_alive(console: &mut Console) -> bool {
@@ -455,6 +487,9 @@ fn border_comes_alive(console: &mut Console) -> bool {
 #[test]
 fn nubos_border_comes_alive_when_the_player_leaves_the_controller_alone() {
     let mut console = Console::new();
+    assert!(border_comes_alive(&mut console));
+    let mut console = Console::new();
+    console.sgb.set_border_time(SgbBorderTime::Day);
     assert!(border_comes_alive(&mut console));
 
     console.sgb.set_buttons_held(true);
@@ -497,6 +532,7 @@ fn save_states_keep_what_the_game_did_but_not_the_players_choices() {
     console.send(&[header(command::ATRC_EN, 1), 0x01]);
     console.sgb.set_player_palette(Some(PLAYER_PALETTE));
     console.sgb.set_border_choice(SgbBorder::Nubo);
+    console.sgb.set_border_time(SgbBorderTime::Day);
     console.frame_of_shade(0);
 
     let mut bytes = Vec::new();
@@ -506,6 +542,7 @@ fn save_states_keep_what_the_game_did_but_not_the_players_choices() {
     loaded.sgb.deserialize(&mut bytes.as_slice()).unwrap();
     assert_eq!(loaded.sgb.player_palette(), Some([1, 2, 3, 4]));
     assert_eq!(loaded.sgb.border_choice(), SgbBorder::Game);
+    assert_eq!(loaded.sgb.border_time(), SgbBorderTime::Night);
     assert!(loaded.sgb.game_palette_priority);
     assert!(loaded.sgb.attraction_disabled);
     assert_eq!(loaded.sgb.idle_frames, 1);
