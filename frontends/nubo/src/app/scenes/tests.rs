@@ -62,6 +62,14 @@ fn the_players_own_data_is_never_recorded() {
             ..OnScreen::default()
         },
         OnScreen {
+            library_busy: true,
+            ..OnScreen::default()
+        },
+        OnScreen {
+            searching: true,
+            ..OnScreen::default()
+        },
+        OnScreen {
             cheats_on: true,
             cheats_listed: true,
             ..OnScreen::default()

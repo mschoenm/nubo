@@ -16,7 +16,8 @@
 //!   preview, and nothing is recorded while a question is open. Nor do they
 //!   keep the player's own data, so nothing is recorded while it shows (see
 //!   [`unkept`]): box art, a cheat that is on, or a page of the pause menu
-//!   that lists saved states or cheats.
+//!   that lists saved states or cheats; nor while the library is still
+//!   finding its games or holds a search.
 //!
 //! A scene's game keeps no battery saves, with its cartridge clock on
 //! emulated time, so a clock doesn't make two pictures of a scene differ.
@@ -327,8 +328,8 @@ impl App {
                     .map(|library| library.played.clone())
                     .unwrap_or_default();
                 let folder = run.library_folder.clone().unwrap_or_default();
-                for game in played {
-                    if let Err(error) = record_played(&mut self.library, &folder, &game) {
+                for (order, game) in (0..).zip(&played) {
+                    if let Err(error) = record_played(&mut self.library, &folder, game, order) {
                         fail(&error);
                     }
                 }
@@ -414,10 +415,13 @@ impl App {
                         .slots()
                         .iter()
                         .any(|slot| slot.saved_at.is_some()),
+                    ..OnScreen::default()
                 }
             }
             None => OnScreen {
                 box_art: self.settings.shared.download_box_art && self.library.has_box_art(),
+                library_busy: self.library.is_busy(),
+                searching: !self.search.is_empty(),
                 ..OnScreen::default()
             },
         }
@@ -465,7 +469,7 @@ impl App {
                     .collect(),
                 played: self
                     .library
-                    .recently_played(crate::views::library::RECENT_LIMIT)
+                    .recently_played(crate::views::library::most_recent_shown())
                     .into_iter()
                     .filter_map(|entry| {
                         let played =
@@ -550,6 +554,12 @@ impl App {
 struct OnScreen {
     /// Whether the library shows box art, which captures never download.
     box_art: bool,
+    /// Whether the library is still finding its games or their title
+    /// screens, which a capture waits for.
+    library_busy: bool,
+    /// Whether the library's search field holds text, which scenes don't
+    /// keep.
+    searching: bool,
     /// Whether a cheat is on, which save states don't keep.
     cheats_on: bool,
     /// Whether the game has cheats for the cheats page to list.
@@ -566,6 +576,10 @@ struct OnScreen {
 fn unkept(on_screen: &OnScreen) -> Option<&'static str> {
     if on_screen.box_art {
         Some("scenes don't keep box art; turn it off in Settings › Library first")
+    } else if on_screen.library_busy {
+        Some("the library is still finding its games; wait until it is done")
+    } else if on_screen.searching {
+        Some("scenes don't keep the search; clear it first")
     } else if on_screen.cheats_on {
         Some("scenes don't keep cheats; turn them off first")
     } else if matches!(on_screen.page, Some(PauseMenu::Save | PauseMenu::Load))
@@ -580,16 +594,19 @@ fn unkept(on_screen: &OnScreen) -> Option<&'static str> {
 }
 
 /// Notes that a game of a scene's library was played as long ago as the
-/// scene says.
+/// scene says. It is the `order`th game the scene lists, newest first, and
+/// that many seconds older still, so games played in the same minute keep
+/// the order the scene recorded them in, without showing another "time ago".
 fn record_played(
     library: &mut nubo_frontend::library::Library,
     folder: &Path,
     game: &PlayedGame,
+    order: u64,
 ) -> Result<(), String> {
     let path = folder.join(&game.file);
     let rom = Rom::read(&path)?;
     let header = Emulator::read_rom_header(&rom.bytes).map_err(|error| error.to_string())?;
-    let time = SystemTime::now() - Duration::from_secs(game.minutes_ago * 60);
+    let time = SystemTime::now() - Duration::from_secs(game.minutes_ago * 60 + order);
     library.record_played_at(&path, &header, time)
 }
 
