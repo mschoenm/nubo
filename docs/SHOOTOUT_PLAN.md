@@ -11,10 +11,12 @@ The work has five parts:
 - Part 3 needs a Windows PC and is done by the maintainer. **Done** with 0.6.0: all 261 tests
   the harness judges pass (see "What Part 3 found"). Every nightly run, and so every release, now
   runs the harness again on a GitHub Windows machine (see "Part 3 in CI").
-- Part 4 is a pull request to another project's repository. It waits until Nubo would land at the top
-  of the published table (Part 5 shows where it stands), until the maintainer has reviewed Nubo
-  themselves and the app (its UI above all) is ready to go public, and then for the maintainer's go.
-  Don't open it, or prepare it in a fork, before then.
+- Part 4 is a pull request to another project's repository. It waited until Nubo would land at the top
+  of the published table (Part 5 shows where it stands), until the maintainer had reviewed Nubo
+  themselves and the app (its UI above all) was ready to go public, and then for the maintainer's go.
+  **Open** since 2026-10-15 as
+  [gbdev/GBEmulatorShootout#102](https://github.com/gbdev/GBEmulatorShootout/pull/102), tested with
+  0.9.2; it is done once Nubo appears in the published table (see Part 4).
 - Part 5 adds the Shootout's tests to `cargo test-roms`, so CI and the nightly run check them, and the
   nightly metrics on the wiki show where Nubo would rank. It doesn't depend on the other parts and goes
   first, right after steps 1 and 2 of [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md). **Done**: Nubo passes
