@@ -10,7 +10,7 @@ import os
 
 class Nubo(Emulator):
     def __init__(self):
-        super().__init__("Nubo", "https://github.com/mschoenm/nubo", startup_time=1.5, features=(PCM,))
+        super().__init__("Nubo", "https://github.com/mschoenm/nubo", startup_time=2.5, features=(PCM,))
         # While a game runs the title is "<game> — Nubo".
         self.title_check = lambda title: title.endswith("Nubo")
         self.speed = 4.0

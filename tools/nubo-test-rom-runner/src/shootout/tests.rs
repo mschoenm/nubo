@@ -64,7 +64,7 @@ fn a_test_runs_with_the_shootouts_defaults() {
     assert_eq!(case.suite(), "shootout");
     assert_eq!(case.rom, Path::new("blargg/halt_bug.gb"));
     assert!(matches!(case.source, Source::Shootout));
-    assert_eq!(case.deadline, Deadline::MillisecondsFromPowerOn(28_000));
+    assert_eq!(case.deadline, Deadline::MillisecondsFromPowerOn(32_000));
     let Check::Shootout { pass, fail } = case.check else {
         panic!("not judged like the Shootout");
     };

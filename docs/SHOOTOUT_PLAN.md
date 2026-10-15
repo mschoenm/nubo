@@ -304,7 +304,11 @@ Super Game Boy). Only Nubo was run, not the other emulators (step 5).
   - Started with the relative path `emu/nubo/Nubo/nubo.exe` and `cwd` set, the program wasn't found
     (`FileNotFoundError`), so every test failed to run. It now passes the absolute path.
 - **Startup time** (`--get-startuptime`): 1.41 s on DMG, 1.32 s on CGB and 1.35 s on SGB, so the class's
-  `startup_time` is 1.5. The test showed the window's inside is exactly 160×144.
+  `startup_time` was set to 1.5. It is 2.5 now, the slowest start measured (in CI, below), since the
+  Shootout's machine may be slower than this one. The value only lengthens each test's deadline
+  (counted from when the window opens) and passing tests stop at their first match, so a larger one
+  costs time only on tests with no reference image or that fail. The test showed the window's inside
+  is exactly 160×144.
 - **7-Zip isn't needed for Nubo**: `extract` unpacks a `.zip` with Python's `zipfile`. Only other
   emulators' downloads need it.
 - With nearly every test passing early, the whole run took about 7 minutes.
@@ -327,7 +331,8 @@ tests passed in about 4.5 minutes, `which.gb` ran to its deadline on both models
 now). GitHub's Windows machines have no graphics card and no sound device; the app draws and keeps
 time without them, and nothing covers its window. The
 startup time measured 2.5 s for the first start (DMG) and 0.8 s and 0.9 s after it (CGB, SGB); the
-class's 1.5 s only lengthens each test's deadline, and every test passed long before it.
+class's 1.5 s then only lengthened each test's deadline, and every test passed long before it. The
+class now uses 2.5 s, this first start.
 
 ## Part 4: the pull request to the Shootout
 
@@ -339,6 +344,14 @@ ahead, open a pull request to `gbdev/GBEmulatorShootout` from the
 maintainer's fork with `emulators/nubo.py`, the `EMULATOR_SPECS` entry and the README line. Mention the
 Nubo version it was tested with and the local results. The Shootout's maintainers rerun the suite and
 publish the table at gbdev.io/GBEmulatorShootout.
+
+**Prepared** on 2026-10-15, at the maintainer's go: the branch `add-nubo` of
+[mschoenm/GBEmulatorShootout](https://github.com/mschoenm/GBEmulatorShootout/tree/add-nubo), on the
+Shootout's `main` at `38b926b`. Besides the three changes above it adds `ci-nubo.yml` and a row in
+`ci-all.yml`, the per-emulator CI workflows the Shootout's GSE pull request added too. Its
+`emulators/nubo.py` is `.github/shootout/nubo.py` without the header comment; keep the two the same.
+The pull request waits for the release with the maintainer's last changes (0.9.2), a local run on
+Windows with it, and the maintainer's sign-off on its description.
 
 Afterwards, mark Phase 6 step 2 as done in ACCURACY_PLAN.md. CI runs the harness on every release
 (Part 3), so a release that would lose a row fails before it is published; when one gains rows, ask the
@@ -481,7 +494,7 @@ CPU time is the steadier number):
 - On their own (`cargo test-roms shootout`) they take 3.5 to 4.5 seconds, and 9 seconds with
   `--verify-boot`, which runs the boot ROM for each of them.
 - Every test passes long before its deadline, so the longer deadline below costs nothing unless tests
-  start failing; a failing test then runs for its `runtime` plus 26 emulated seconds.
+  start failing; a failing test then runs for its `runtime` plus 30 emulated seconds.
 
 **Done when:**
 - `cargo test-roms` runs the Shootout's tests in CI and at night, and prints the summary line.
@@ -507,7 +520,8 @@ differs from the steps above, and why:
   with more time: the CGB boot ROM alone takes 3.1 seconds and the DMG's 1.7, and some tests need up
   to 8.5 seconds more than their `runtime`. The runner uses the harness's own deadline instead,
   `runtime / speed + startup_time + 5` seconds of real time, which at speed 4 with the class's
-  `startup_time` of 1.5 seconds (1 in the first draft) is the `runtime` plus 26 emulated seconds.
+  `startup_time` of 2.5 seconds (1 in the first draft, then 1.5) is the `runtime` plus 30 emulated
+  seconds.
 - **Seven failing tests, all for the colors.** None of the plan's expected failures happen: the
   revision tests aren't in the list, and Nubo passes the Shootout's build of Bully on DMG. But the
   harness compares a screenshot of the app, so the runner compares the frame in the colors the app

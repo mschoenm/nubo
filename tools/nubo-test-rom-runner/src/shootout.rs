@@ -21,7 +21,7 @@
 //!   seen.
 //! - A test fails at the harness's own deadline ([`deadline_milliseconds`]):
 //!   its `runtime` at [`HARNESS_SPEED`], plus the startup time and 5 seconds of
-//!   real time, which at that speed is the `runtime` plus 26 emulated seconds,
+//!   real time, which at that speed is the `runtime` plus 30 emulated seconds,
 //!   counted from power-on. The `runtime` values are only rough: on Nubo a
 //!   test can need up to 8.5 seconds more, on the CGB the boot ROM alone takes
 //!   3.1 seconds, and passing tests stop as soon as they pass, so the full
@@ -67,7 +67,7 @@ pub(crate) const MATCH_HOLD_AUDIO_BUFFERS: u32 =
 /// The time the harness gives the emulator to start before its deadline
 /// starts counting, in milliseconds of real time: `startup_time` in the
 /// harness class (`.github/shootout/nubo.py`).
-const HARNESS_STARTUP_MILLISECONDS: u32 = 1500;
+const HARNESS_STARTUP_MILLISECONDS: u32 = 2500;
 /// The time the harness waits after a test's `runtime` and the startup time
 /// before the test fails, in milliseconds of real time (`Emulator.run` in the
 /// Shootout's `emulator.py`).
