@@ -245,7 +245,7 @@ impl App {
                         .min(ColorChannel::MAX);
                     if value != channel.of(color) {
                         self.set_sgb_own_color(shade, channel, value);
-                        self.change_settings(|_| {});
+                        self.sgb_colors_unsaved = true;
                     }
                 }
             }

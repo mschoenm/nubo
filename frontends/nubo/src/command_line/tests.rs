@@ -87,6 +87,16 @@ fn options_without_their_value() {
 }
 
 #[test]
+fn the_model_is_given_once() {
+    let error = Err(String::from(
+        "give the model once, with --cgb or --model, not both",
+    ));
+    assert_eq!(parse_args(&["--cgb", "--model", "dmg"]), error);
+    assert_eq!(parse_args(&["--model", "dmg", "--cgb"]), error);
+    assert_eq!(parse_args(&["--model", "dmg", "--model", "sgb"]), error);
+}
+
+#[test]
 fn an_unknown_model_or_option() {
     assert_eq!(
         parse_args(&["--model", "virtual boy"]),
