@@ -34,8 +34,8 @@ struct Rates {
     wakeups: f64,
     /// Audio buffers emulated per second.
     buffers: f64,
-    /// Frames handed to the window per second (identical frames are
-    /// skipped).
+    /// Frames handed to the window per second (repeats of a frame are
+    /// skipped, but for the first).
     frames: f64,
 }
 
@@ -103,6 +103,7 @@ pub fn measure(rom_path: &Path, model: Model) -> Result<String, String> {
         running: true,
         fast_forward: None,
         volume: 0.0,
+        rewinding: false,
     };
 
     let playing = measure_session(&rom, saves(), model, normal, |_| ())?;

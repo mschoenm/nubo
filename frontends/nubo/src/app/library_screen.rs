@@ -3,17 +3,22 @@
 
 use super::playing::read_rom;
 use super::{App, Message};
+use crate::dialog::{DialogKind, GameMenuPage};
 use crate::rom_picker;
+use crate::settings::{LibraryFilter, LibrarySort};
 use crate::views;
 use iced::Task;
 use iced::widget;
 use iced::widget::scrollable::AbsoluteOffset;
+use nubo_core::Model;
 use nubo_frontend::background;
 use nubo_frontend::controls::Action;
 use nubo_frontend::library::box_art::{self, GameList};
 use nubo_frontend::library::{
     self, DownloadedArt, FileCheck, LoadedPicture, ScanResult, WatchEvent,
 };
+use nubo_frontend::links;
+use nubo_frontend::save_states::{self, Slot};
 use nubo_frontend::settings::LibraryFolder;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -39,6 +44,24 @@ pub enum LibraryMessage {
     Rescan,
     /// The player took this game off "Continue playing".
     RemoveRecent(PathBuf),
+    /// Opens the menu of this game (a right click, the "⋯" button or
+    /// Select on its card).
+    OpenGameMenu(PathBuf),
+    /// Opens the menu of the library folder at this place in the list.
+    OpenFolderMenu(usize),
+    /// Opens the menu that sorts and filters the games.
+    OpenSortMenu,
+    SortPicked(LibrarySort),
+    FilterPicked(LibraryFilter),
+    /// Opens the folder this game is in.
+    ShowInFolder(PathBuf),
+    /// The player picked a model for this game in its menu, or `None` to
+    /// follow the settings again.
+    GameModelPicked(PathBuf, Option<Model>),
+    /// Asks whether to delete this game's save states.
+    AskDeleteSaveStates(PathBuf),
+    /// Deletes this game's save states, as the player confirmed.
+    DeleteSaveStates(PathBuf),
     Scanned(ScanResult),
     /// The quick startup look at whether the games' files still exist is
     /// done.
@@ -46,6 +69,10 @@ pub enum LibraryMessage {
     /// The folder watcher saw a change, or stopped working.
     Watch(WatchEvent),
     DownloadBoxArtToggled(bool),
+    /// The player answered the question whether to download box art.
+    BoxArtAnswered(bool),
+    /// The player asked to try downloading box art again after it failed.
+    RetryBoxArt,
     GameListLoaded(Result<Arc<GameList>, String>),
     /// A game's box art was looked up: a PNG, `None` if there is none, or
     /// why the download failed.
@@ -91,6 +118,7 @@ impl App {
                             include_subfolders: true,
                         });
                     });
+                    self.ask_about_box_art();
                     return self.rescan();
                 }
             }
@@ -123,8 +151,46 @@ impl App {
                 // before, so its file may be gone already.
                 return self.check_files();
             }
+            LibraryMessage::OpenGameMenu(path) => {
+                self.show_game_menu(path, GameMenuPage::Main);
+            }
+            LibraryMessage::OpenSortMenu => self.open_dialog(DialogKind::SortMenu),
+            LibraryMessage::OpenFolderMenu(index) => {
+                self.open_dialog(DialogKind::FolderMenu(index));
+            }
+            LibraryMessage::SortPicked(sort) => {
+                self.change_settings(|settings| settings.library_sort = sort);
+                self.library_selection = None;
+            }
+            LibraryMessage::FilterPicked(filter) => {
+                self.change_settings(|settings| settings.library_filter = filter);
+                self.library_selection = None;
+            }
+            LibraryMessage::ShowInFolder(path) => {
+                if let Err(error) = links::show_folder(&path) {
+                    self.toasts.error(error);
+                }
+            }
+            LibraryMessage::GameModelPicked(path, model) => {
+                if let Err(error) = self.library.set_model(&path, model) {
+                    self.toasts.error(error);
+                }
+                self.show_game_menu(path, GameMenuPage::Main);
+            }
+            LibraryMessage::AskDeleteSaveStates(path) => {
+                self.open_dialog(DialogKind::DeleteSaveStates(path));
+            }
+            LibraryMessage::DeleteSaveStates(path) => {
+                let deleted = Slot::LOADABLE
+                    .iter()
+                    .try_for_each(|&slot| save_states::delete(&path, slot));
+                match deleted {
+                    Ok(()) => self.toasts.info("Save states deleted"),
+                    Err(error) => self.toasts.error(error),
+                }
+            }
             LibraryMessage::Watch(WatchEvent::Failed(error)) => self.toasts.error(format!(
-                "New games won't show up by themselves ({error}). Use Rescan in the settings' Library tab instead."
+                "New games won't show up by themselves ({error}). Use \"Look for new games now\" in a folder's menu in Settings › Library instead."
             )),
             LibraryMessage::Scanned(result) => {
                 if let Err(error) = self.library.finish_scan(result) {
@@ -149,8 +215,18 @@ impl App {
                 self.library_selection = None;
             }
             LibraryMessage::DownloadBoxArtToggled(enabled) => {
-                self.change_settings(|settings| settings.shared.download_box_art = enabled);
+                self.change_settings(|settings| {
+                    settings.shared.download_box_art = enabled;
+                    settings.shared.box_art_asked = true;
+                });
                 return Task::batch([self.load_pictures(false), self.download_box_art()]);
+            }
+            LibraryMessage::BoxArtAnswered(download) => {
+                return self.update_library(LibraryMessage::DownloadBoxArtToggled(download));
+            }
+            LibraryMessage::RetryBoxArt => {
+                self.box_art_problem = None;
+                return self.download_box_art();
             }
             LibraryMessage::GameListLoaded(result) => {
                 self.loading_game_list = false;
@@ -159,14 +235,22 @@ impl App {
                         self.game_list = Some(list);
                         return self.download_box_art();
                     }
-                    Err(error) => self
-                        .toasts
-                        .error(format!("Box art couldn't be downloaded: {error}")),
+                    Err(error) => self.box_art_problem = Some(error),
                 }
             }
             LibraryMessage::BoxArtDownloaded(path, result) => {
-                if let Err(error) = self.library.finish_download(&path, result) {
-                    self.toasts.error(error);
+                // A download that failed stops the others until the player
+                // tries again; a picture that couldn't be saved is a problem
+                // on this computer, which the player should hear about.
+                let failed = result.as_ref().err().cloned();
+                let saved = self.library.finish_download(&path, result);
+                match failed {
+                    Some(error) => self.box_art_problem = Some(error),
+                    None => {
+                        if let Err(error) = saved {
+                            self.toasts.error(error);
+                        }
+                    }
                 }
                 return self.download_box_art();
             }
@@ -189,8 +273,8 @@ impl App {
     }
 
     /// Moves through the library's cards with a direction, scrolling the
-    /// selected card into view, and starts the selected game with A or
-    /// Start.
+    /// selected card into view, starts the selected game with A or Start,
+    /// and opens its menu with Select.
     pub(super) fn navigate_library(&mut self, action: Action) -> Task<Message> {
         let shelves = views::library::Shelves::new(&self.library, &self.settings, &self.search);
         let count = shelves.len();
@@ -204,6 +288,14 @@ impl App {
                 Some(entry) => read_rom(entry.path.clone()),
                 None => Task::none(),
             };
+        }
+
+        if action == Action::Select {
+            if let Some(entry) = current.and_then(|index| shelves.entry(index)) {
+                let path = entry.path.clone();
+                self.show_game_menu(path, GameMenuPage::Main);
+            }
+            return Task::none();
         }
 
         if !action.is_direction() {
@@ -256,7 +348,8 @@ impl App {
     }
 
     /// Looks up the box art of games that weren't looked up yet, a few at a
-    /// time on background threads, if the player turned box art on. The
+    /// time on background threads, if the player said yes to box art and
+    /// nothing failed this run (see `App::box_art_problem`). The
     /// game lists are read (or downloaded) first, and only when a game needs
     /// them, so a library whose box art is all looked up touches neither the
     /// network nor the lists.
@@ -264,6 +357,8 @@ impl App {
         if !box_art::AVAILABLE
             || self.fresh
             || !self.settings.shared.download_box_art
+            || !self.settings.shared.box_art_asked
+            || self.box_art_problem.is_some()
             || !self.library.needs_downloads()
         {
             return Task::none();

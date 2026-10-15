@@ -39,10 +39,20 @@ pub struct Settings {
     /// The folders the library shows the games of.
     pub library_folders: Vec<LibraryFolder>,
     /// Whether to download box art for the library and show it on the
-    /// cards. On until the player turns it off; the Settings page says
-    /// that it sends the games' names to the libretro servers. It is on the
-    /// Library tab of the settings.
+    /// cards. On until the player says no to the question about it (see
+    /// `box_art_asked`) or turns it off on the Library tab of the settings,
+    /// which say that it sends the games' names to the libretro servers.
     pub download_box_art: bool,
+    /// Whether the player has answered the question that asks whether to
+    /// download box art, which an app asks once the library has a folder.
+    /// Box art waits for the answer. Only saved once answered.
+    #[serde(skip_serializing_if = "is_false")]
+    pub box_art_asked: bool,
+    /// Whether to look for a newer Nubo when the app starts (see
+    /// `updates`), or `None` until the player answers the question about
+    /// it. Only saved once answered.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub check_for_updates: Option<bool>,
     /// Whether leaving a game saves its state, so it continues there the
     /// next time it starts. On until the player turns it off, on the
     /// settings' Playing tab.
@@ -55,6 +65,11 @@ pub struct Settings {
     pub muted: bool,
     /// Which keys and controller buttons do what.
     pub controls: Controls,
+    /// How many rounds of new actions the controls were given their keys
+    /// for (see `controls::add_new_actions`): 1 once rewind got one. Only
+    /// saved once it is more than 0.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub controls_revision: u32,
     /// The colors original Game Boy games are shown in.
     pub dmg_palette: DmgPalette,
     /// Whether a Super Game Boy's border shows around the screen. On until
@@ -74,6 +89,15 @@ pub struct Settings {
     /// apply to a game continued where the player left off.
     #[serde(skip_serializing_if = "is_game_colors")]
     pub sgb_colors: SgbColors,
+    /// Whether Game Boy Color games look as on the Game Boy Color's own
+    /// screen (see `lcd::correct_colors`). On until the player turns it off,
+    /// and only saved then.
+    #[serde(skip_serializing_if = "is_true")]
+    pub color_correction: bool,
+    /// Whether each frame is mixed with the one before, as the Game Boy's
+    /// slow screen did (see `lcd::blend`). Only saved when it is on.
+    #[serde(skip_serializing_if = "is_false")]
+    pub frame_blending: bool,
     /// Whether Super Game Boy games show Nubo's border even when they bring
     /// their own, as the player picks it on the same page. Only saved when
     /// it is on.
@@ -107,6 +131,15 @@ fn is_default_own_palette(palette: &[u16]) -> bool {
     palette == DEFAULT_OWN_PALETTE
 }
 
+/// Whether `value` is 0, for counts saved only once they go up.
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde's skip_serializing_if passes a reference"
+)]
+fn is_zero(value: &u32) -> bool {
+    *value == 0
+}
+
 /// Whether `value` is true, for settings saved only when they are off.
 #[expect(
     clippy::trivially_copy_pass_by_ref,
@@ -122,16 +155,21 @@ impl Default for Settings {
             model: ModelPreference::default(),
             library_folders: Vec::new(),
             download_box_art: true,
+            box_art_asked: false,
+            check_for_updates: None,
             resume_games: true,
             fast_forward_speed: FastForwardSpeed::default(),
             volume: 1.0,
             muted: false,
             controls: Controls::default(),
+            controls_revision: 0,
             dmg_palette: DmgPalette::default(),
             sgb_border: true,
             sgb_own_palette: DEFAULT_OWN_PALETTE,
             sgb_colors: SgbColors::Game,
             sgb_nubo_border: false,
+            color_correction: true,
+            frame_blending: false,
         }
     }
 }

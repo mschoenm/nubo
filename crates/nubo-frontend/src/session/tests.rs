@@ -48,6 +48,7 @@ const NORMAL_SPEED: Playback = Playback {
     running: true,
     fast_forward: None,
     volume: 1.0,
+    rewinding: false,
 };
 
 /// A machine running an empty cartridge, without a sound device, keeping its
@@ -176,4 +177,81 @@ fn fast_forward_emulates_its_speed_in_buffers_per_played_one() {
         fast.buffers_per_played(),
         FastForwardSpeed::default().multiplier()
     );
+}
+
+#[test]
+fn rewinding_steps_back_through_the_states_kept_while_playing() {
+    let (mut machine, _) = machine_with(Arc::new(Memory::default()));
+    let mut frames = 0;
+    while frames < history::FRAMES_PER_STATE * 10 {
+        if machine.play_buffer().1 {
+            frames += 1;
+        }
+    }
+    let kept = machine.history.len();
+    assert!(kept >= 9, "{kept}");
+
+    machine.handle(Command::SetPlayback(Playback {
+        rewinding: true,
+        ..NORMAL_SPEED
+    }));
+    let mut shown = 0;
+    for _ in 0..200 {
+        if machine.rewind_buffer().1 {
+            shown += 1;
+        }
+    }
+
+    assert_eq!(shown, kept);
+    assert_eq!(machine.history.len(), 0);
+}
+
+#[test]
+fn rewinding_keeps_its_speed_whatever_the_buffers_length() {
+    let (mut machine, _) = machine_with(Arc::new(Memory::default()));
+    let mut frames = 0;
+    while frames < history::FRAMES_PER_STATE * 20 {
+        if machine.play_buffer().1 {
+            frames += 1;
+        }
+    }
+
+    machine.handle(Command::SetPlayback(Playback {
+        rewinding: true,
+        ..NORMAL_SPEED
+    }));
+    let step = FRAME_DURATION.mul_f64(f64::from(history::FRAMES_PER_STATE) / REWIND_SPEED);
+    let (mut time, mut buffer, mut shown) = (Duration::ZERO, Duration::ZERO, 0);
+    while shown < 16 {
+        let (playing_time, new_frame) = machine.rewind_buffer();
+        time += playing_time;
+        buffer = playing_time;
+        if new_frame {
+            shown += 1;
+        }
+    }
+
+    assert!(
+        time < step * 16 + buffer,
+        "{time:?} for 16 steps of {step:?}"
+    );
+}
+
+#[test]
+fn loading_a_state_forgets_the_history_before_it() {
+    let (mut machine, _) = machine_with(Arc::new(Memory::default()));
+    let state = machine.emulator.save_state();
+    let mut frames = 0;
+    while frames < history::FRAMES_PER_STATE * 3 {
+        if machine.play_buffer().1 {
+            frames += 1;
+        }
+    }
+    assert!(machine.history.len() > 0);
+
+    let (reply, answer) = mpsc::channel();
+    machine.handle(Command::LoadState(state, reply));
+
+    assert!(answer.recv().unwrap().is_ok());
+    assert_eq!(machine.history.len(), 0);
 }

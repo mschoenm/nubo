@@ -2,7 +2,8 @@
 //! instead of files. Each entry is a key that starts with `nubo:`: the
 //! settings as TOML text under `nubo:settings.toml`, and battery saves as
 //! base64 under the ROM's name with the save's extension, such as
-//! `nubo:game.sav` for `game.gb`. The browser build keeps no cheats yet.
+//! `nubo:game.sav` for `game.gb`, and the last game played as base64 under
+//! `nubo:last-game`. The browser build keeps no cheats yet.
 //!
 //! The keys are worked out without the `web` feature too, so their tests run
 //! in every build; only reaching the browser's localStorage needs it.
@@ -37,6 +38,7 @@ impl LocalStorage {
                 rom_path.with_extension("rtc").display()
             )),
             Entry::Cheats(_) => Err(String::from("cheats aren't available in the browser")),
+            Entry::LastGame => Ok(format!("{KEY_PREFIX}last-game")),
         }
     }
 }

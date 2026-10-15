@@ -9,6 +9,7 @@
 //! buttons (`app/player_input.rs`).
 
 use crate::command_line::Options;
+use crate::dialog::Dialog;
 use crate::game::{Game, PauseMenu};
 use crate::input::{self, KeyInput};
 use crate::menu_presses::MenuPresses;
@@ -23,16 +24,18 @@ use iced::widget::Stack;
 use iced::{Element, Subscription, Task, Theme, event, keyboard, system, window};
 use nubo_core::{CartridgeHeader, ControllerState, Model};
 use nubo_frontend::background;
-use nubo_frontend::controls::{Action, Device};
+use nubo_frontend::controls::{self, Action, Device};
 use nubo_frontend::gamepads::{ControllerEvent, Controllers};
-use nubo_frontend::library::Library;
 use nubo_frontend::library::box_art::GameList;
+use nubo_frontend::library::{Library, LibraryEntry};
 use nubo_frontend::notices::Notices;
 use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states;
 use nubo_frontend::settings::FastForwardSpeed;
+use std::path::Path;
 use std::sync::Arc;
 
+pub use dialogs::DialogMessage;
 pub use library_screen::LibraryMessage;
 pub use nubo_frontend::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
 pub use playing::GameMessage;
@@ -64,6 +67,10 @@ pub struct App {
     /// With `--fresh`: the app reads and writes nothing kept between runs,
     /// like a new install (see `command_line`).
     fresh: bool,
+    /// Whether the settings file was read (or there was none). When it
+    /// couldn't be, the app saves nothing on its own, such as the window's
+    /// size, so it doesn't write the defaults over the player's settings.
+    settings_read: bool,
     /// With `--speed`: games start fast forwarding at this speed.
     speed: Option<FastForwardSpeed>,
     library: Library,
@@ -77,6 +84,9 @@ pub struct App {
     /// Whether the window fills the screen. The game's top bar then hides
     /// until the mouse moves.
     fullscreen: bool,
+    /// Whether the window is the one in front, which the game only runs in
+    /// if the settings say to pause in the background.
+    focused: bool,
     /// The window's size, as it last had one.
     window_width: f32,
     window_height: f32,
@@ -113,6 +123,19 @@ pub struct App {
     /// The No-Intro game lists that box art is looked up with, once read.
     game_list: Option<Arc<GameList>>,
     loading_game_list: bool,
+    /// Why box art couldn't be downloaded this run, shown in the settings'
+    /// Library tab. Nubo stops trying until the player asks it to or the
+    /// app starts again, and never shows a toast for it.
+    box_art_problem: Option<String>,
+    /// The dialog over the screen, if one is open.
+    dialog: Option<Dialog>,
+    /// What the newest toast's Undo button puts back, if it has one.
+    undo: Option<playing::UndoPoint>,
+    /// The last game played, which the browser's start screen offers to
+    /// play again (see `nubo_frontend::rom::remember`).
+    remembered: Option<Rom>,
+    /// A newer version than this one, once the app found one is out.
+    newer_version: Option<String>,
 }
 
 /// Everything the user or the window can ask the application to do.
@@ -122,10 +145,11 @@ pub enum Message {
     Library(LibraryMessage),
     Settings(SettingsMessage),
     Window(WindowMessage),
+    Dialog(DialogMessage),
     Key(KeyInput),
     Controller(ControllerEvent),
-    /// Steps back: closes the settings, goes up a page in the pause menu, or
-    /// pauses and resumes the game.
+    /// Steps back: dismisses a dialog, closes the settings, goes up a page
+    /// in the pause menu, or pauses and resumes the game.
     Escape,
     /// Time to show the newest frame and check what changes with time alone,
     /// such as toasts expiring: the emulator finished a new frame, a timer
@@ -134,6 +158,10 @@ pub enum Message {
     /// see `nubo_frontend::session`).
     Tick,
     DismissToast(usize),
+    /// Opens this web page in the player's browser.
+    OpenLink(&'static str),
+    /// The newest version was looked up: its number, or why not.
+    LatestVersion(Result<String, String>),
 }
 
 impl App {
@@ -163,6 +191,7 @@ impl App {
             model_override: options.model,
             screen_scale: options.scale,
             fresh: options.fresh,
+            settings_read: settings_error.is_none(),
             speed: options.speed,
             library,
             search: String::new(),
@@ -170,6 +199,7 @@ impl App {
             settings_tab: None,
             file_hovered: false,
             fullscreen: false,
+            focused: true,
             window_width: 0.0,
             window_height: 0.0,
             minimized: false,
@@ -186,16 +216,34 @@ impl App {
             settings_focus: None,
             game_list: None,
             loading_game_list: false,
+            box_art_problem: None,
+            dialog: None,
+            undo: None,
+            newer_version: None,
+            remembered: if options.fresh {
+                None
+            } else {
+                nubo_frontend::rom::remembered()
+            },
         };
 
         for error in [settings_error, library_error].into_iter().flatten() {
             app.toasts.error(error);
         }
+        if app.settings_read && app.settings.shared.controls_revision < controls::REVISION {
+            app.change_settings(|settings| {
+                controls::add_new_actions(&mut settings.shared.controls);
+                settings.shared.controls_revision = controls::REVISION;
+            });
+        }
 
         if let Some(rom) = rom {
             app.open(rom);
         }
+        app.ask_about_box_art();
+        app.ask_about_updates();
 
+        let updates = app.look_for_updates();
         let check = app.check_files();
         let scan = app.rescan();
         let pictures = app.load_pictures(false);
@@ -206,6 +254,7 @@ impl App {
                 check,
                 scan,
                 pictures,
+                updates,
             ]),
         )
     }
@@ -234,12 +283,10 @@ impl App {
             Message::Library(message) => self.update_library(message),
             Message::Settings(message) => self.update_settings(message),
             Message::Window(message) => self.update_window(message),
+            Message::Dialog(message) => self.update_dialog(message),
             Message::Key(input) => self.handle_key(&input),
             Message::Controller(event) => self.handle_controller(event),
-            Message::Escape => {
-                self.escape();
-                Task::none()
-            }
+            Message::Escape => self.escape(),
             Message::Tick => {
                 if let Some(game) = self.game.as_mut().filter(|_| !self.minimized) {
                     #[cfg(target_arch = "wasm32")]
@@ -247,6 +294,20 @@ impl App {
                     game.session.refresh_screen();
                 }
                 self.toasts.remove_expired(iced::time::Instant::now());
+                Task::none()
+            }
+            Message::LatestVersion(Ok(version)) => {
+                if nubo_frontend::updates::is_newer(&version, env!("CARGO_PKG_VERSION")) {
+                    self.newer_version = Some(version);
+                }
+                Task::none()
+            }
+            // Nothing the player can do about it; Nubo looks again next time.
+            Message::LatestVersion(Err(_)) => Task::none(),
+            Message::OpenLink(url) => {
+                if let Err(error) = nubo_frontend::links::open(url) {
+                    self.toasts.error(error);
+                }
                 Task::none()
             }
             Message::DismissToast(index) => {
@@ -292,6 +353,9 @@ impl App {
                 &self.settings,
                 &self.search,
                 self.library_selection,
+                &self.controllers,
+                self.remembered.as_ref(),
+                self.newer_version.as_deref(),
             ),
         }];
 
@@ -301,16 +365,18 @@ impl App {
                     tab,
                     &self.settings,
                     &self.library,
-                    self.restart_needed(),
-                    &views::settings::ControlsPage {
-                        device: self.controls_device,
-                        capture: self.capture,
-                        controllers: &self.controllers,
-                    },
+                    &self.settings_page_state(),
                     self.settings_focus,
                 ),
-                SettingsMessage::Close.into(),
+                Some(SettingsMessage::Close.into()),
             ));
+        }
+
+        if let Some((dialog, content)) = self.dialog.as_ref().zip(self.dialog_content()) {
+            let dismiss = content
+                .click_outside_dismisses
+                .then(|| content.dismiss.clone().into_message());
+            layers.push(views::modal(views::dialog::view(dialog, content), dismiss));
         }
 
         if self.file_hovered {
@@ -318,7 +384,12 @@ impl App {
         }
 
         if !self.toasts.is_empty() {
-            layers.push(self.toasts.view(Message::DismissToast));
+            let over_game = self.game.is_some() && self.settings_tab.is_none();
+            layers.push(self.toasts.view(
+                Message::DismissToast,
+                GameMessage::Undo.into(),
+                over_game,
+            ));
         }
 
         Stack::with_children(layers).into()
@@ -374,28 +445,48 @@ impl App {
         Subscription::batch(subscriptions)
     }
 
-    /// The model to start the game with this header on.
-    fn model_for(&self, header: &CartridgeHeader) -> Model {
+    /// The model to start the game at `path` with this header on: the one
+    /// picked on the command line, else the one picked for the game in its
+    /// menu, else the one the settings pick.
+    fn model_for(&self, path: &Path, header: &CartridgeHeader) -> Model {
         self.model_override
+            .or_else(|| self.library.entry(path).and_then(LibraryEntry::model))
             .unwrap_or_else(|| self.settings.shared.model.model_for(header))
     }
 
     /// Whether the running game uses another model than the settings pick,
     /// so the settings offer to restart it.
     fn restart_needed(&self) -> bool {
-        self.game
-            .as_ref()
-            .is_some_and(|game| game.session.model() != self.model_for(game.session.header()))
+        self.game.as_ref().is_some_and(|game| {
+            game.session.model() != self.model_for(&game.session.rom().path, game.session.header())
+        })
+    }
+
+    /// What the settings pages show besides the settings themselves.
+    fn settings_page_state(&self) -> views::settings::PageState<'_> {
+        views::settings::PageState {
+            restart_needed: self.restart_needed(),
+            device: self.controls_device,
+            capture: self.capture,
+            controllers: &self.controllers,
+            box_art_problem: self.box_art_problem.as_deref(),
+            newer_version: self.newer_version.as_deref(),
+        }
     }
 
     /// Whether the D-pad, A, B and Start move through menus instead of
     /// playing: in the library, the pause menu and the settings.
     fn in_menus(&self) -> bool {
-        self.settings_tab.is_some() || self.game.as_ref().is_none_or(Game::is_paused)
+        self.dialog.is_some()
+            || self.settings_tab.is_some()
+            || self.game.as_ref().is_none_or(Game::is_paused)
     }
 
     /// Steps back from whatever is on top.
-    fn escape(&mut self) {
+    fn escape(&mut self) -> Task<Message> {
+        if self.dialog.is_some() {
+            return self.dismiss_dialog();
+        }
         if self.settings_tab.is_some() {
             self.settings_tab = None;
         } else if let Some(game) = &mut self.game {
@@ -408,6 +499,7 @@ impl App {
             };
             game.show_menu(page);
         }
+        Task::none()
     }
 
     /// How often the desktop build needs a timer check (see `Message::Tick`),
@@ -425,11 +517,17 @@ impl App {
         }
     }
 
-    /// Whether a game is running: not paused, and not behind the settings.
+    /// Whether a game is running: not paused, not behind the settings or a
+    /// dialog, and not in a window in the background if the settings pause
+    /// it there.
     fn is_running(&self) -> bool {
-        self.game
-            .as_ref()
-            .is_some_and(|game| !game.is_paused() && self.settings_tab.is_none())
+        let in_background = !self.focused && self.settings.pause_in_background;
+        self.game.as_ref().is_some_and(|game| {
+            !game.is_paused()
+                && self.settings_tab.is_none()
+                && self.dialog.is_none()
+                && !in_background
+        })
     }
 
     /// Tells the emulator whether to run, how fast and how loud.
@@ -478,6 +576,7 @@ fn cycle<T: Copy + PartialEq>(options: &[T], current: T, step: isize, wrap: bool
     options[next.cast_unsigned()]
 }
 
+mod dialogs;
 mod library_screen;
 mod player_input;
 mod playing;

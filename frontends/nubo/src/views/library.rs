@@ -5,23 +5,29 @@
 use crate::app::{
     GameMessage, LibraryMessage, Message, SCREEN_HEIGHT, SCREEN_WIDTH, SettingsMessage,
 };
-use crate::settings::Settings;
+use crate::settings::{LibrarySort, Settings};
 use crate::ui::icons::{self, Icon, icon};
 use crate::ui::logo::logo;
 use crate::ui::pictures;
 use crate::ui::theme;
+use crate::ui::theme::Badge;
 use crate::ui::widgets::{
     bar_button, icon_button, keycap, primary_button, secondary_button, shortcut, top_bar,
     truncated_text, whole_step_screen, with_tooltip,
 };
 use crate::views::settings::SettingsTab;
 use iced::widget::{
-    Column, Row, button, center, column, container, grid, hover, image, responsive, row,
-    scrollable, space, text, text_input, tooltip,
+    Column, Row, button, center, column, container, grid, hover, image, mouse_area, responsive,
+    row, scrollable, space, text, text_input, tooltip,
 };
 use iced::{Alignment, ContentFit, Element, Fill, widget};
-use nubo_frontend::controls::Action;
+use nubo_frontend::controls::{Action, Device};
 use nubo_frontend::library::{self, Library, LibraryEntry};
+use nubo_frontend::rom::Rom;
+use nubo_frontend::save_states;
+use nubo_frontend::time::{Duration, SystemTime};
+use nubo_frontend::updates;
+use std::cmp::Reverse;
 
 /// The Game Boy controls the welcome screen explains, and the actions whose
 /// keys press them.
@@ -36,6 +42,9 @@ const CONTROLS: [(&[Action], &str); 5] = [
     (&[Action::Select], "Select"),
 ];
 
+/// Where the welcome screen sends players who have no games yet.
+const HOMEBREW_HUB: &str = "https://hh.gbdev.io";
+
 /// How many games "Continue playing" shows.
 pub const RECENT_LIMIT: usize = 4;
 /// Cards are at most this wide; the grid fits as many columns as it can.
@@ -48,6 +57,8 @@ const PAGE_PADDING: (f32, f32) = (20.0, 24.0);
 const SECTION_SPACING: f32 = 14.0;
 /// The search field in the top bar is at most this wide.
 const SEARCH_MAX_WIDTH: f32 = 260.0;
+/// The room kept next to the search field for its clear button.
+const CLEAR_WIDTH: f32 = 34.0;
 /// The height of the search field: its text, padding and border.
 const SEARCH_HEIGHT: f32 = 34.0;
 /// The space above "All games" when "Continue playing" comes first.
@@ -69,19 +80,29 @@ pub struct Shelves<'a> {
 }
 
 impl<'a> Shelves<'a> {
-    /// The cards shown for `search`. "Continue playing" hides while
-    /// searching.
+    /// The cards shown for `search`, with all games in the order and of the
+    /// kind the settings pick. "Continue playing" hides while searching.
     pub fn new(library: &'a Library, settings: &Settings, search: &'a str) -> Shelves<'a> {
         let recent = if search.is_empty() {
             library.recently_played(RECENT_LIMIT)
         } else {
             Vec::new()
         };
-        let games = if settings.shared.library_folders.is_empty() {
+        let mut games: Vec<&LibraryEntry> = if settings.shared.library_folders.is_empty() {
             Vec::new()
         } else {
-            library.games(search).collect()
+            library
+                .games(search)
+                .filter(|entry| settings.library_filter.allows(entry.supports_cgb))
+                .collect()
         };
+        // The library lists its games by name; sorting keeps that order
+        // among games played or added at the same time.
+        match settings.library_sort {
+            LibrarySort::Name => {}
+            LibrarySort::RecentlyPlayed => games.sort_by_key(|entry| Reverse(entry.last_played)),
+            LibrarySort::RecentlyAdded => games.sort_by_key(|entry| Reverse(entry.added())),
+        }
 
         Shelves { recent, games }
     }
@@ -197,12 +218,19 @@ pub fn view<'a>(
     settings: &'a Settings,
     search: &'a str,
     selection: Option<usize>,
+    controllers: &'a [String],
+    remembered: Option<&'a Rom>,
+    newer_version: Option<&'a str>,
 ) -> Element<'a, Message> {
     let shelves = Shelves::new(library, settings, search);
     let has_folders = !settings.shared.library_folders.is_empty();
 
     if !library::AVAILABLE || (!has_folders && library.recently_played(1).is_empty()) {
-        return column![bar(None), welcome(settings)].into();
+        return column![
+            bar(None, newer_version),
+            welcome(settings, controllers, remembered)
+        ]
+        .into();
     }
 
     let mut content = Column::new().spacing(SECTION_SPACING);
@@ -210,7 +238,7 @@ pub fn view<'a>(
 
     if !shelves.recent.is_empty() {
         content = content
-            .push(heading("Continue playing", None, false))
+            .push(heading("Continue playing", None, false, None))
             .push(card_grid(
                 library,
                 shelves.recent,
@@ -224,17 +252,18 @@ pub fn view<'a>(
 
     let games = shelves.games;
     content = content.push(heading(
-        "All games",
+        settings.library_filter.label(),
         Some(games.len()),
         library.is_scanning(),
+        Some(sort_button(settings)),
     ));
 
     content = if !has_folders {
         content.push(notice(
-            "Add a ROM folder to see all your games here.",
+            "Add the folder with your games to see them all here.",
             Some(secondary_button(
                 Icon::FolderPlus,
-                "Add ROM folder",
+                "Add games folder",
                 Message::Library(LibraryMessage::AddFolder),
             )),
         ))
@@ -253,7 +282,7 @@ pub fn view<'a>(
         content.push(notice("Looking for games…", None))
     } else {
         content.push(notice(
-            "No games found in your ROM folders.",
+            "No games found in your game folders.",
             Some(secondary_button(
                 Icon::FolderCog,
                 "Manage folders",
@@ -276,35 +305,45 @@ pub fn view<'a>(
         })
         .height(Fill);
 
-    column![bar(Some(search)), page].into()
+    column![bar(Some(search), newer_version), page].into()
 }
 
-/// The top bar, with a search field when there are games to search, and
-/// Open ROM and the settings on the right. Rescanning the folders is in the
-/// settings' Library tab.
-fn bar(search: Option<&str>) -> Element<'_, Message> {
-    let middle: Element<'_, Message> = match search {
-        Some(search) => search_field(search),
-        None => space::horizontal().into(),
-    };
-
-    top_bar(row![
-        brand(),
-        middle,
-        bar_button(
+/// The top bar: with games to search, a search field and Open game; on the
+/// welcome screen, whose own buttons open games, only the settings on the
+/// right. With a newer version out, a small note says so and opens its page.
+fn bar<'a>(search: Option<&'a str>, newer_version: Option<&'a str>) -> Element<'a, Message> {
+    let mut bar = row![brand()];
+    bar = match search {
+        Some(search) => bar.push(search_field(search)).push(bar_button(
             Icon::FolderOpen,
-            "Open ROM",
-            format!("Open ROM ({})", shortcut("O")),
+            "Open game",
+            format!("Open a game file ({})", shortcut("O")),
             false,
             Message::Game(GameMessage::OpenRom),
-        ),
-        space().width(6),
-        icon_button(
-            Icon::Settings,
-            format!("Settings ({})", shortcut(",")),
-            Some(Message::Settings(SettingsMessage::Open)),
-        ),
-    ])
+        )),
+        None => bar.push(space::horizontal()),
+    };
+    if let Some(version) = newer_version {
+        bar = bar.push(space().width(6)).push(
+            button(
+                row![
+                    icon(Icon::Sparkles).size(14),
+                    text(format!("Nubo {version} is out")).size(13),
+                ]
+                .spacing(6)
+                .align_y(Alignment::Center),
+            )
+            .padding([4, 10])
+            .style(theme::chip(true))
+            .on_press(Message::OpenLink(updates::RELEASES_PAGE)),
+        );
+    }
+
+    top_bar(bar.push(space().width(6)).push(icon_button(
+        Icon::Settings,
+        format!("Settings ({})", shortcut(",")),
+        Some(Message::Settings(SettingsMessage::Open)),
+    )))
 }
 
 /// The search field, filling the space between the app's name and the
@@ -312,7 +351,18 @@ fn bar(search: Option<&str>) -> Element<'_, Message> {
 /// narrow window instead of pushing the buttons out.
 fn search_field(search: &str) -> Element<'_, Message> {
     let field = responsive(move |bounds| {
-        text_input("Search games", search)
+        let clear: Element<'_, Message> = if search.is_empty() {
+            space().into()
+        } else {
+            icon_button(
+                Icon::X,
+                String::from("Clear search"),
+                Some(Message::Library(LibraryMessage::SearchChanged(
+                    String::new(),
+                ))),
+            )
+        };
+        let input = text_input("Search games", search)
             .on_input(|search| Message::Library(LibraryMessage::SearchChanged(search)))
             .icon(text_input::Icon {
                 font: icons::FONT,
@@ -322,8 +372,11 @@ fn search_field(search: &str) -> Element<'_, Message> {
                 side: text_input::Side::Left,
             })
             .padding([6, 10])
-            .width(bounds.width.min(SEARCH_MAX_WIDTH))
-            .style(theme::search_field)
+            .width((bounds.width - CLEAR_WIDTH).clamp(0.0, SEARCH_MAX_WIDTH))
+            .style(theme::search_field);
+        row![input, clear]
+            .spacing(4)
+            .align_y(Alignment::Center)
             .into()
     });
 
@@ -343,18 +396,40 @@ fn brand<'a>() -> Element<'a, Message> {
         .into()
 }
 
-/// The first screen a new user sees.
-fn welcome(settings: &Settings) -> Element<'_, Message> {
-    let actions: Element<'_, Message> = if library::AVAILABLE {
+/// The first screen a new user sees: what to do first, where to get free
+/// games, and which keys (or, with one connected, which controller buttons)
+/// press the Game Boy's buttons.
+fn welcome<'a>(
+    settings: &'a Settings,
+    controllers: &'a [String],
+    remembered: Option<&'a Rom>,
+) -> Element<'a, Message> {
+    let actions: Element<'_, Message> = if let Some(rom) = remembered {
+        column![
+            primary_button(
+                Icon::Play,
+                format!("Play {} again", rom.name()),
+                Message::Game(GameMessage::PlayRemembered),
+            ),
+            secondary_button(
+                Icon::FolderOpen,
+                "Open another game",
+                Message::Game(GameMessage::OpenRom)
+            ),
+        ]
+        .spacing(10)
+        .align_x(Alignment::Center)
+        .into()
+    } else if library::AVAILABLE {
         row![
             primary_button(
                 Icon::FolderPlus,
-                "Add ROM folder",
+                "Add games folder",
                 Message::Library(LibraryMessage::AddFolder)
             ),
             secondary_button(
                 Icon::FolderOpen,
-                "Open ROM",
+                "Open game",
                 Message::Game(GameMessage::OpenRom)
             ),
         ]
@@ -364,16 +439,25 @@ fn welcome(settings: &Settings) -> Element<'_, Message> {
     } else {
         primary_button(
             Icon::FolderOpen,
-            "Open ROM",
+            "Open game",
             Message::Game(GameMessage::OpenRom),
         )
     };
 
     let description = if library::AVAILABLE {
-        "Add the folder with your Game Boy games, or open a single ROM."
+        "Add the folder with your Game Boy games, or open a single game."
     } else {
-        "Open a Game Boy or Game Boy Color ROM to start."
+        "Open a Game Boy or Game Boy Color game to start."
     };
+
+    let free_games = button(
+        text("No games yet? Get free ones at Homebrew Hub")
+            .size(13)
+            .style(theme::accent_text),
+    )
+    .padding([2, 4])
+    .style(theme::text_button)
+    .on_press(Message::OpenLink(HOMEBREW_HUB));
 
     let welcome = column![
         logo(88.0),
@@ -382,8 +466,9 @@ fn welcome(settings: &Settings) -> Element<'_, Message> {
         space().height(8),
         actions,
         drop_hint(),
-        space().height(28),
-        controls_help(settings),
+        free_games,
+        space().height(20),
+        controls_help(settings, controllers),
     ]
     .spacing(10)
     .align_x(Alignment::Center);
@@ -404,20 +489,31 @@ fn drop_hint<'a>() -> Element<'a, Message> {
     }
 }
 
-/// Keycaps showing which keys press which Game Boy buttons. Buttons without
-/// a key are left out.
-fn controls_help(settings: &Settings) -> Element<'_, Message> {
+/// Keycaps showing which keys press which Game Boy buttons, or with a
+/// controller connected, its name and which of its buttons do. Buttons
+/// without a key are left out.
+fn controls_help<'a>(settings: &'a Settings, controllers: &'a [String]) -> Element<'a, Message> {
+    let device = if controllers.is_empty() {
+        Device::Keyboard
+    } else {
+        Device::Controller
+    };
+    let controls = &settings.shared.controls;
+
     let groups = CONTROLS.iter().filter_map(|(actions, button)| {
-        let keys: Vec<_> = actions
+        let mut keys: Vec<String> = actions
             .iter()
-            .filter_map(|&action| settings.shared.controls.keyboard.input(action))
+            .filter_map(|&action| controls.input_label(device, action))
             .collect();
         if keys.is_empty() {
             return None;
         }
+        // A controller's D-pad says "D-pad" once, not once per direction.
+        if device == Device::Controller && keys.iter().all(|key| key.starts_with("D-pad")) {
+            keys = vec![String::from("D-pad")];
+        }
 
-        let keycaps =
-            Row::with_children(keys.into_iter().map(|key| keycap(key.to_string()))).spacing(3);
+        let keycaps = Row::with_children(keys.into_iter().map(keycap)).spacing(3);
 
         Some(
             row![keycaps, text(*button).size(13).style(theme::muted_text)]
@@ -427,15 +523,35 @@ fn controls_help(settings: &Settings) -> Element<'_, Message> {
         )
     });
 
-    Row::with_children(groups)
+    let legend = Row::with_children(groups)
         .spacing(20)
         .align_y(Alignment::Center)
-        .wrap()
-        .into()
+        .wrap();
+
+    match controllers.first() {
+        Some(name) => column![
+            row![
+                icon(Icon::Gamepad2).size(16).style(theme::accent_text),
+                text(format!("{name} is ready")).size(13),
+            ]
+            .spacing(8)
+            .align_y(Alignment::Center),
+            legend,
+        ]
+        .spacing(10)
+        .align_x(Alignment::Center)
+        .into(),
+        None => legend.into(),
+    }
 }
 
 /// A section title, with the number of games and a scanning label if given.
-fn heading<'a>(title: &'a str, count: Option<usize>, scanning: bool) -> Element<'a, Message> {
+fn heading<'a>(
+    title: &'a str,
+    count: Option<usize>,
+    scanning: bool,
+    action: Option<Element<'a, Message>>,
+) -> Element<'a, Message> {
     let mut heading = row![text(title).size(17).font(theme::HEADING_FONT)]
         .spacing(10)
         .align_y(Alignment::Center);
@@ -444,8 +560,9 @@ fn heading<'a>(title: &'a str, count: Option<usize>, scanning: bool) -> Element<
         heading = heading.push(text(count.to_string()).size(14).style(theme::muted_text));
     }
 
+    heading = heading.push(space::horizontal());
     if scanning {
-        heading = heading.push(space::horizontal()).push(
+        heading = heading.push(
             row![
                 icons::icon(Icon::RefreshCw)
                     .size(13)
@@ -456,8 +573,28 @@ fn heading<'a>(title: &'a str, count: Option<usize>, scanning: bool) -> Element<
             .align_y(Alignment::Center),
         );
     }
+    if let Some(action) = action {
+        heading = heading.push(action);
+    }
 
-    heading.into()
+    heading.height(HEADING_HEIGHT).into()
+}
+
+/// The button next to the list of all games that opens the menu to sort
+/// and filter it, showing the order in use.
+fn sort_button<'a>(settings: &Settings) -> Element<'a, Message> {
+    button(
+        row![
+            icon(Icon::ArrowDownUp).size(14),
+            text(settings.library_sort.label()).size(13),
+        ]
+        .spacing(6)
+        .align_y(Alignment::Center),
+    )
+    .padding([3, 10])
+    .style(theme::secondary_button)
+    .on_press(Message::Library(LibraryMessage::OpenSortMenu))
+    .into()
 }
 
 /// A message in place of the game grid, with an optional button.
@@ -508,27 +645,27 @@ impl CardPicture {
 
 /// The games as a grid of cards that fits as many columns as the window
 /// allows. `first_index` is the first card's place across both shelves, to
-/// find the selected one. With `removable`, for "Continue playing", each
-/// card can be taken off it.
+/// find the selected one. With `recent`, for "Continue playing", each card
+/// says when the game was played.
 fn card_grid<'a>(
     library: &'a Library,
     games: Vec<&'a LibraryEntry>,
     show_box_art: bool,
     first_index: usize,
     selection: Option<usize>,
-    removable: bool,
+    recent: bool,
 ) -> Element<'a, Message> {
     grid(games.into_iter().enumerate().map(|(index, entry)| {
         let card = card(
             entry,
             CardPicture::of(library, entry, show_box_art),
             selection == Some(first_index + index),
+            recent,
         );
-        if removable {
-            hover(card, remove_button(entry))
-        } else {
-            card
-        }
+        let card = mouse_area(card).on_right_press(Message::Library(LibraryMessage::OpenGameMenu(
+            entry.path.clone(),
+        )));
+        hover(card, menu_button(entry))
     }))
     .fluid(CARD_MAX_WIDTH)
     .spacing(CARD_SPACING)
@@ -537,8 +674,14 @@ fn card_grid<'a>(
 }
 
 /// A game's card: a picture of the game (or a placeholder), its name and
-/// whether it's a Game Boy or Game Boy Color game. Clicking it starts the game.
-fn card(entry: &LibraryEntry, picture: CardPicture, selected: bool) -> Element<'_, Message> {
+/// badges for the consoles it's made for, and with `recent` when it was
+/// played. Clicking it starts the game; a right click opens its menu.
+fn card(
+    entry: &LibraryEntry,
+    picture: CardPicture,
+    selected: bool,
+    recent: bool,
+) -> Element<'_, Message> {
     let picture: Element<'_, Message> = match picture {
         CardPicture::BoxArt(handle) => image(handle)
             .content_fit(ContentFit::Contain)
@@ -552,15 +695,35 @@ fn card(entry: &LibraryEntry, picture: CardPicture, selected: bool) -> Element<'
             .into(),
     };
 
-    let badge = container(text(if entry.supports_cgb { "GBC" } else { "GB" }).size(10))
-        .padding([1, 6])
-        .style(theme::badge(entry.supports_cgb));
-
-    let caption = row![truncated_text(entry.name(), 14.0, theme::BODY_FONT), badge,]
-        .spacing(8)
+    let badge = |label, kind| {
+        container(text(label).size(10))
+            .padding([1, 6])
+            .style(theme::badge(kind))
+    };
+    let mut caption = row![truncated_text(entry.name(), 14.0, theme::BODY_FONT)]
+        .spacing(6)
         .align_y(Alignment::Center);
+    if entry.supports_sgb == Some(true) {
+        caption = caption.push(badge("SGB", Badge::SuperGameBoy));
+    }
+    caption = caption.push(if entry.supports_cgb {
+        badge("GBC", Badge::Color)
+    } else {
+        badge("GB", Badge::GameBoy)
+    });
 
-    button(column![picture, caption].spacing(8))
+    let mut content = column![picture, caption].spacing(8);
+    if recent && let Some(played) = entry.last_played {
+        content = content.push(
+            text(save_states::time_ago(
+                SystemTime::UNIX_EPOCH + Duration::from_secs(played),
+            ))
+            .size(12)
+            .style(theme::muted_text),
+        );
+    }
+
+    button(content.spacing(6))
         .padding(8)
         .width(Fill)
         .height(Fill)
@@ -569,19 +732,19 @@ fn card(entry: &LibraryEntry, picture: CardPicture, selected: bool) -> Element<'
         .into()
 }
 
-/// The button in the corner of a "Continue playing" card that takes the
-/// game off it, shown while the pointer is over the card.
-fn remove_button(entry: &LibraryEntry) -> Element<'_, Message> {
-    let button = button(icon(Icon::X).size(14))
+/// The button in the corner of a card that opens the game's menu, shown
+/// while the pointer is over the card.
+fn menu_button(entry: &LibraryEntry) -> Element<'_, Message> {
+    let button = button(icon(Icon::Ellipsis).size(14))
         .padding(4)
         .style(theme::card_corner_button)
-        .on_press(Message::Library(LibraryMessage::RemoveRecent(
+        .on_press(Message::Library(LibraryMessage::OpenGameMenu(
             entry.path.clone(),
         )));
 
     container(with_tooltip(
         button,
-        String::from("Remove from Continue playing"),
+        String::from("More (right click)"),
         tooltip::Position::Bottom,
     ))
     .padding(14)

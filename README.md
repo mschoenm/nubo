@@ -23,7 +23,7 @@
 
 Nubo plays your Game Boy and Game Boy Color games the way you remember them. It recreates the console one cycle at a time, so the picture, the sound and the tricks some games and demos play on the hardware come out just as they did on the real thing.
 
-Point it at your ROM folder and your games appear in a library with their title screens, the ones you played last up front. Save anywhere with a save state, pick up right where you left off, play with a keyboard or a controller, and see Super Game Boy games in their own colors and borders, as they looked on a TV.
+Point it at your games folder and your games appear in a library with their title screens, the ones you played last up front. Save anywhere with a save state, pick up right where you left off, play with a keyboard or a controller, and see Super Game Boy games in their own colors and borders, as they looked on a TV.
 
 <p align="center">
   <img src="images/screenshots/super-game-boy.png" width="700" alt="Tobu Tobu Girl Deluxe being played in Nubo: the girl jumps toward a crab over pink mountains, inside the game's own illustrated Super Game Boy border">
@@ -41,18 +41,19 @@ Point it at your ROM folder and your games appear in a library with their title 
 
 - **Windows:** the files aren't signed yet, so SmartScreen may warn you the first time. Choose More info, then Run anyway.
 - **Linux:** open the `.flatpak` file with your software center, or run `flatpak install --user Nubo-linux-x86_64.flatpak` (`Nubo-linux-aarch64.flatpak` on ARM). Flatpak fetches the runtime Nubo needs from Flathub the first time.
-- **Browser:** plays one game at a time and keeps its in-game saves in the browser. The library, save states, cheats and screenshots are in the desktop app.
+- **Browser:** plays one game at a time, keeps its in-game saves in the browser and remembers the last game (up to 2 MB), so it starts again without picking the file. The library, save states, cheats and screenshots are in the desktop app.
+- **New versions:** the desktop app can tell you when a new version is out. It asks first, since it looks on GitHub.
 - **Nightly build:** the [nightly build](https://github.com/mschoenm/nubo/releases/tag/nightly) has the newest changes that passed every check.
 
 ## Features
 
-- **Models:** the original Game Boy, the Game Boy Pocket, the Super Game Boy 1 and 2, every revision of the Game Boy Color, and the Game Boy Advance playing Game Boy games. Nubo picks a model for each game, and you can choose another in the settings.
+- **Models:** the original Game Boy, the Game Boy Pocket, the Super Game Boy 1 and 2, every revision of the Game Boy Color, and the Game Boy Advance playing Game Boy games. Nubo picks a model for each game, the Super Game Boy for games made for it. You can choose another in the settings, console first and then its revision, or for one game from its menu in the library.
 - **Super Game Boy:** games made for it show their own colors and border, and games for several players can be played by up to four, each on their own controller. The pause menu lets you pick other colors, your own included, and another border.
-- **Library:** built from your ROM folders, with each game's title screen or box art, search, and a Continue playing row with the games you played last.
-- **Saves:** save states with a picture, quick save and quick load, and continuing games where you left off. In-game saves are plain `.sav` files that move between the app and the [RetroArch core](#retroarch-core).
-- **Controls:** keyboard and controller, with buttons you can change and menus that work with a controller. Fast forward, fullscreen and screenshots.
-- **Colors:** gray, green or Pocket screens for Game Boy games, Super Game Boy palettes with an editor for your own, and light and dark themes that can follow your system.
-- **Cheats:** GameShark and Game Genie codes, kept for each game.
+- **Library:** built from your game folders, with each game's title screen or box art, search, sorting by name or by when you played or added a game, and a Continue playing row with the games you played last. Each game has a menu (right click it) to pick the model it starts on, open its folder or delete its save states.
+- **Saves:** save states with a picture, quick save and quick load, and continuing games where you left off. Loading a state, restarting a game or saving over a slot can be undone from the message that confirms it. In-game saves are plain `.sav` files that move between the app and the [RetroArch core](#retroarch-core).
+- **Controls:** keyboard and controller, with buttons you can change and menus that work with a controller. Rewind (hold R) to go back a few seconds, fast forward, fullscreen and screenshots.
+- **Colors:** gray, green or Pocket screens for Game Boy games, Game Boy Color colors as soft as its own screen showed them, smoothing out the flicker games use for see-through sprites, Super Game Boy palettes with an editor for your own, and light and dark themes that can follow your system.
+- **Cheats:** GameShark and Game Genie codes, kept for each game. A cheat that needs several codes takes them all at once.
 - **Cartridges:** the cartridge types almost all games use: cartridges without a mapper, MBC1, MBC2, MBC3 with its clock (as in Pokémon Gold, Silver and Crystal, including the larger MBC30 of the Japanese Crystal), MBC5 and HuC1. Games load from `.gb`, `.gbc` and `.zip` files.
 
 <table>
@@ -75,7 +76,7 @@ Point it at your ROM folder and your games appear in a library with their title 
 
 Nubo doesn't come with any games. Use games you own, or free homebrew games such as [Tobu Tobu Girl Deluxe](https://tangramgames.itch.io/tobu-tobu-girl-deluxe), [µCity](https://github.com/AntonioND/ucity) or the ones on [Homebrew Hub](https://hh.gbdev.io).
 
-Open a game with Open ROM in the library (Ctrl+O) or by dropping a `.gb`, `.gbc` or `.zip` file onto the window. To fill the library, add your ROM folders under Settings > Library:
+Open a game with Open game in the library (Ctrl+O) or by dropping a `.gb`, `.gbc` or `.zip` file onto the window. To fill the library, add your game folders with Add games folder on the first screen or under Settings > Library:
 
 <p align="center">
   <img src="images/screenshots/library.png" width="760" alt="Nubo's game library in the light theme: a Continue playing row with Moki the Monster Kid, Big2Small, Froggy Kong and Dawn Will Come, above all the games, each shown with its title screen">
@@ -128,7 +129,7 @@ Screenshots go to your Pictures folder, in `Pictures/Nubo`.
 <summary><strong>Installing, updating and removing</strong></summary>
 
 - **Windows:** the installer installs Nubo for your user, without administrator rights, with a Start menu entry; it can also offer Nubo for opening `.gb` and `.gbc` files and add a desktop shortcut. Running a newer installer updates Nubo and keeps those choices. Uninstall Nubo from Settings > Apps, like any app. To install without questions from a script, run `msiexec /i Nubo-windows-x64.msi /qn`, adding `ASSOCIATE_FILES=0` (don't offer Nubo for ROMs) or `DESKTOP_SHORTCUT=1` (add a desktop shortcut); `/passive` shows only a progress bar.
-- **Linux:** the Flatpak adds Nubo to your app grid; it can read ROM folders in your home folder and on external drives. Start it from a terminal with `flatpak run io.github.mschoenm.nubo`. To update, install the newer file over the old one with `flatpak install --user --reinstall Nubo-linux-x86_64.flatpak` (`Nubo-linux-aarch64.flatpak` on ARM); your saves and settings stay. Remove Nubo with `flatpak uninstall --user io.github.mschoenm.nubo` or your software center.
+- **Linux:** the Flatpak adds Nubo to your app grid; it can read game folders in your home folder and on external drives. Start it from a terminal with `flatpak run io.github.mschoenm.nubo`. To update, install the newer file over the old one with `flatpak install --user --reinstall Nubo-linux-x86_64.flatpak` (`Nubo-linux-aarch64.flatpak` on ARM); your saves and settings stay. Remove Nubo with `flatpak uninstall --user io.github.mschoenm.nubo` or your software center.
 
 </details>
 

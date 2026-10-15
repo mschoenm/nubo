@@ -1,8 +1,9 @@
 //! Finds the ROMs in the library folders and reads their headers with
 //! `Emulator::read_rom_header`.
 
-use super::LibraryEntry;
+use super::{LibraryEntry, seconds_since_epoch};
 use crate::settings::LibraryFolder;
+use crate::time::SystemTime;
 use nubo_core::{CartridgeHeader, Emulator};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
@@ -104,11 +105,15 @@ pub fn scan(generation: u64, folders: &[LibraryFolder], known: Vec<LibraryEntry>
         .into_iter()
         .filter_map(|(path, in_folder)| {
             let (size, modified) = file_stamp(&path)?;
+            let unchanged = |entry: &LibraryEntry| entry.size == size && entry.modified == modified;
             let mut entry = match known.remove(&path) {
-                Some(entry) if entry.size == size && entry.modified == modified => entry,
+                Some(entry) if unchanged(&entry) => entry,
                 previous => {
                     let mut entry = read_entry(&path, size)?;
-                    entry.last_played = previous.and_then(|previous| previous.last_played);
+                    match previous {
+                        Some(previous) => entry.keep_from(&previous, unchanged(&previous)),
+                        None => entry.added = Some(seconds_since_epoch(SystemTime::now())),
+                    }
                     entry
                 }
             };
@@ -180,6 +185,9 @@ pub fn entry_for(path: &Path, header: &CartridgeHeader) -> LibraryEntry {
         last_played: None,
         title_screen_checked: false,
         box_art_checked: false,
+        supports_sgb: Some(header.supports_sgb),
+        model: None,
+        added: None,
         size,
         modified,
     }

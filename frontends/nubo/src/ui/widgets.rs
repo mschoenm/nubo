@@ -118,7 +118,7 @@ pub fn menu_separator<'a, Message: 'a>() -> Element<'a, Message> {
 /// The filled accent-colored button for the main action on a screen.
 pub fn primary_button<'a, Message: Clone + 'a>(
     icon: Icon,
-    label: &'a str,
+    label: impl text::IntoFragment<'a>,
     on_press: Message,
 ) -> Element<'a, Message> {
     labelled_button(icon, label)
@@ -131,7 +131,7 @@ pub fn primary_button<'a, Message: Clone + 'a>(
 /// An outlined button for less important actions.
 pub fn secondary_button<'a, Message: Clone + 'a>(
     icon: Icon,
-    label: &'a str,
+    label: impl text::IntoFragment<'a>,
     on_press: Message,
 ) -> Element<'a, Message> {
     labelled_button(icon, label)
@@ -141,7 +141,10 @@ pub fn secondary_button<'a, Message: Clone + 'a>(
         .into()
 }
 
-fn labelled_button<'a, Message: 'a>(icon: Icon, label: &'a str) -> button::Button<'a, Message> {
+fn labelled_button<'a, Message: 'a>(
+    icon: Icon,
+    label: impl text::IntoFragment<'a>,
+) -> button::Button<'a, Message> {
     button(
         row![icons::icon(icon), text(label)]
             .spacing(8)
@@ -199,6 +202,29 @@ where
         .padding(3)
         .style(theme::segmented_control)
         .into()
+}
+
+/// Buttons of which exactly one is picked, in rows that wrap when the
+/// space runs out, for choices too many or too long for [`segmented`].
+pub fn chips<'a, T, Message>(
+    options: &[T],
+    selected: T,
+    label: impl Fn(T) -> String,
+    on_select: impl Fn(T) -> Message,
+) -> Element<'a, Message>
+where
+    T: Copy + PartialEq,
+    Message: Clone + 'a,
+{
+    let buttons = options.iter().map(|&option| {
+        button(text(label(option)).size(13))
+            .padding([6, 12])
+            .style(theme::chip(option == selected))
+            .on_press(on_select(option))
+            .into()
+    });
+
+    row(buttons).spacing(6).wrap().into()
 }
 
 /// The bar along the top of a screen, with a thin line under it.

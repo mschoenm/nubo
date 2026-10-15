@@ -2,7 +2,7 @@
 //! and the pause menu with its save state, cheats and Super Game Boy
 //! (`sgb.rs`) pages. The bar keeps only what a player reaches for while
 //! playing: the way back to the library on the left, and fast forward,
-//! sound, fullscreen and Pause on the right. Pause opens the pause menu,
+//! sound with its volume, fullscreen and Pause on the right. Pause opens the pause menu,
 //! which holds everything else. In a window the bar sits
 //! above the picture. In fullscreen the picture fills the screen and the bar
 //! appears over its top when the mouse moves. Double-clicking the picture
@@ -24,9 +24,9 @@ use crate::ui::widgets::{
 };
 use iced::widget::{
     self, Column, Stack, button, center, column, container, image, mouse_area, opaque, row,
-    scrollable, space, text, text_input, toggler,
+    scrollable, slider, space, text, text_input, toggler,
 };
-use iced::{Alignment, ContentFit, Element, Fill};
+use iced::{Alignment, ContentFit, Element, Fill, mouse};
 use nubo_frontend::cheats;
 use nubo_frontend::controls::Action;
 use nubo_frontend::library;
@@ -34,6 +34,8 @@ use nubo_frontend::save_states::{self, Slot, SlotInfo};
 use nubo_frontend::screenshots;
 
 const MENU_WIDTH: f32 = 400.0;
+/// The width of the volume slider in the bar.
+const VOLUME_SLIDER_WIDTH: f32 = 80.0;
 const MENU_MAX_HEIGHT: f32 = 560.0;
 const SLOT_THUMBNAIL_WIDTH: f32 = 80.0;
 const SLOT_THUMBNAIL_HEIGHT: f32 = 72.0;
@@ -63,10 +65,17 @@ pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Ele
         )
         .on_double_click(Message::Window(WindowMessage::ToggleFullscreen))
         .on_right_press(Message::Game(GameMessage::OpenPauseMenu))
+        .interaction(if game.pointer_hidden() {
+            mouse::Interaction::Hidden
+        } else {
+            mouse::Interaction::None
+        })
         .into(),
     ];
 
-    if game.session.is_fast_forwarding() {
+    if game.session.is_rewinding() && !game.is_paused() {
+        layers.push(corner_badge(Icon::Rewind, String::from("Rewinding")));
+    } else if game.session.is_fast_forwarding() {
         layers.push(fast_forward_badge(game, settings));
     }
 
@@ -171,6 +180,15 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
             String::from(volume_label),
             Some(Message::Settings(SettingsMessage::ToggleMute)),
         ),
+        slider(
+            0.0..=1.0_f32,
+            settings.shared.effective_volume(),
+            |volume| Message::Settings(SettingsMessage::VolumeChanged(volume)),
+        )
+        .step(0.01_f32)
+        .on_release(Message::Settings(SettingsMessage::VolumeReleased))
+        .width(VOLUME_SLIDER_WIDTH),
+        space().width(4),
         icon_button(
             fullscreen_icon,
             String::from(fullscreen_label),
@@ -183,18 +201,21 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
 
 /// The label in the top-right corner while fast forwarding.
 fn fast_forward_badge<'a>(game: &Game, settings: &Settings) -> Element<'a, Message> {
+    corner_badge(
+        Icon::FastForward,
+        game.session
+            .fast_forward_speed(&settings.shared)
+            .to_string(),
+    )
+}
+
+/// A small label in the top-right corner of the picture, such as while
+/// fast forwarding or rewinding.
+fn corner_badge<'a>(symbol: Icon, label: String) -> Element<'a, Message> {
     let badge = container(
-        row![
-            icon(Icon::FastForward).size(14),
-            text(
-                game.session
-                    .fast_forward_speed(&settings.shared)
-                    .to_string()
-            )
-            .size(13),
-        ]
-        .spacing(6)
-        .align_y(Alignment::Center),
+        row![icon(symbol).size(14), text(label).size(13)]
+            .spacing(6)
+            .align_y(Alignment::Center),
     )
     .padding([4, 10])
     .style(theme::floating_card);
@@ -481,10 +502,20 @@ fn slots_page<'a>(
         .into_iter()
         .enumerate()
         .map(|(index, info)| slot_row(info, saving, index == selection));
+    let explanation = if saving {
+        "Keeps this exact moment, to come back to later. The game's own saves are kept \
+         separately."
+    } else {
+        "Goes back to a moment you kept. You can undo it right after."
+    };
 
-    column![page_header(title), Column::with_children(rows).spacing(6)]
-        .spacing(12)
-        .into()
+    column![
+        page_header(title),
+        text(explanation).size(12).style(theme::muted_text),
+        Column::with_children(rows).spacing(6)
+    ]
+    .spacing(12)
+    .into()
 }
 
 fn slot_row(info: &SlotInfo, saving: bool, selected: bool) -> Element<'_, Message> {
@@ -568,13 +599,20 @@ fn cheats_page(game: &Game, selection: usize) -> Element<'_, Message> {
 
     let form = &game.cheat_form;
     let mut add = column![
-        text_input("Name (optional)", &form.name)
-            .on_input(|name| Message::Game(GameMessage::CheatNameChanged(name)))
+        text_input("Code", &form.code)
+            .on_input(|code| Message::Game(GameMessage::CheatCodeChanged(code)))
+            .on_submit(Message::Game(GameMessage::AddCheat))
             .padding([7, 10])
             .style(theme::search_field),
+        text(
+            "Such as 01FF56D0 (GameShark) or 00A-17B-C49 (Game Genie). For a cheat with \
+             several codes, put a space or + between them."
+        )
+        .size(12)
+        .style(theme::muted_text),
         row![
-            text_input("Code, such as 01FF56D0 or 00A-17B-C49", &form.code)
-                .on_input(|code| Message::Game(GameMessage::CheatCodeChanged(code)))
+            text_input("Name (optional)", &form.name)
+                .on_input(|name| Message::Game(GameMessage::CheatNameChanged(name)))
                 .on_submit(Message::Game(GameMessage::AddCheat))
                 .padding([7, 10])
                 .style(theme::search_field),

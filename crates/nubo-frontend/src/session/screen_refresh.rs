@@ -140,9 +140,15 @@ impl Session {
             self.last_tick = at.or(self.last_tick);
             self.make_frames_due(elapsed);
 
+            // Rewinding goes back at its own speed, fast forward or not.
+            let per_frame = if self.machine.playback.rewinding {
+                1
+            } else {
+                self.machine.playback.buffers_per_played()
+            };
             while self.frames_due >= 1.0 {
                 self.frames_due -= 1.0;
-                for _ in 1..self.machine.playback.buffers_per_played() {
+                for _ in 1..per_frame {
                     self.run_frame(false);
                 }
                 self.run_frame(true);
@@ -213,7 +219,9 @@ impl Session {
     fn run_frame(&mut self, play: bool) {
         self.screen_off_credit += FRAME_DURATION.as_secs_f64();
         loop {
-            let (playing_time, new_frame) = if play {
+            let (playing_time, new_frame) = if self.machine.playback.rewinding {
+                self.machine.rewind_buffer()
+            } else if play {
                 self.machine.play_buffer()
             } else {
                 self.machine.skip_buffer()

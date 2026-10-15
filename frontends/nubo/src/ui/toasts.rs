@@ -1,5 +1,7 @@
 //! Short notifications ("toasts") that pop up in the bottom-right corner,
-//! such as an error loading a ROM, and disappear by themselves.
+//! such as an error loading a ROM, and disappear by themselves. Over a game
+//! only the newest one shows, as a small card at the top, so the game stays
+//! in view. A toast can offer to undo what it reports.
 
 use crate::ui::icons::{self, Icon};
 use crate::ui::theme;
@@ -11,9 +13,15 @@ use iced::{Alignment, Element, Fill, Theme};
 const INFO_DURATION: Duration = Duration::from_secs(3);
 /// Errors stay longer, so there is time to read them.
 const ERROR_DURATION: Duration = Duration::from_secs(8);
+/// A toast with an Undo button stays long enough to reach for it.
+const UNDO_DURATION: Duration = Duration::from_secs(6);
 /// Older toasts make way when there are more than this many.
 const MAX_VISIBLE: usize = 4;
 const WIDTH: f32 = 340.0;
+/// How wide a toast over a game gets at most.
+const COMPACT_WIDTH: f32 = 380.0;
+/// The room above a toast over a game, which keeps it under the game's bar.
+const COMPACT_TOP: f32 = 60.0;
 
 /// Whether a toast confirms something or reports a problem, which sets its
 /// icon, color and how long it stays.
@@ -28,11 +36,16 @@ struct Toast {
     kind: ToastKind,
     message: String,
     shown_at: Instant,
+    /// How many more times the same message came while it showed.
+    repeats: u32,
+    /// Whether the toast has an Undo button.
+    undo: bool,
 }
 
 impl Toast {
     fn duration(&self) -> Duration {
         match self.kind {
+            ToastKind::Info if self.undo => UNDO_DURATION,
             ToastKind::Info => INFO_DURATION,
             ToastKind::Error => ERROR_DURATION,
         }
@@ -59,17 +72,34 @@ impl Toasts {
     }
 
     pub fn info(&mut self, message: impl Into<String>) {
-        self.push(ToastKind::Info, message.into());
+        self.push(ToastKind::Info, message.into(), false);
+    }
+
+    /// A confirmation with an Undo button, such as "Loaded Quick save".
+    /// Only the newest toast keeps its button, since only the last thing
+    /// done can be undone.
+    pub fn info_with_undo(&mut self, message: impl Into<String>) {
+        for toast in &mut self.toasts {
+            toast.undo = false;
+        }
+        self.push(ToastKind::Info, message.into(), true);
     }
 
     pub fn error(&mut self, message: impl Into<String>) {
-        self.push(ToastKind::Error, message.into());
+        self.push(ToastKind::Error, message.into(), false);
+    }
+
+    /// Takes the Undo button off the toast that has it, once the undo is
+    /// done or no longer possible.
+    pub fn forget_undo(&mut self) {
+        self.toasts.retain(|toast| !toast.undo);
     }
 
     /// Shows a toast, or prints it. A message that is already on screen is
-    /// not repeated; its timer starts again instead, so a problem reported
-    /// every second shows up once.
-    fn push(&mut self, kind: ToastKind, message: String) {
+    /// not repeated; it moves to the newest place, its timer starts again
+    /// and it counts the repeat instead, so a problem reported every second
+    /// shows up once.
+    fn push(&mut self, kind: ToastKind, message: String, undo: bool) {
         if self.printed {
             match kind {
                 ToastKind::Info => eprintln!("{message}"),
@@ -80,19 +110,21 @@ impl Toasts {
 
         let now = Instant::now();
 
-        if let Some(existing) = self
+        let repeats = match self
             .toasts
-            .iter_mut()
-            .find(|toast| toast.kind == kind && toast.message == message)
+            .iter()
+            .position(|toast| toast.kind == kind && toast.message == message)
         {
-            existing.shown_at = now;
-            return;
-        }
+            Some(index) => self.toasts.remove(index).repeats + 1,
+            None => 0,
+        };
 
         self.toasts.push(Toast {
             kind,
             message,
             shown_at: now,
+            repeats,
+            undo,
         });
 
         if self.toasts.len() > MAX_VISIBLE {
@@ -117,18 +149,34 @@ impl Toasts {
         self.toasts.is_empty()
     }
 
-    /// The toasts stacked in the bottom-right corner of a full-window layer.
+    /// The toasts stacked in the bottom-right corner of a full-window layer,
+    /// or with `over_game` only the newest one, at the top in the middle.
     /// `on_dismiss` makes the message sent when a toast's close button is
-    /// pressed.
+    /// pressed, and `on_undo` is sent by an Undo button.
     pub fn view<'a, Message: Clone + 'a>(
         &'a self,
         on_dismiss: impl Fn(usize) -> Message,
+        on_undo: Message,
+        over_game: bool,
     ) -> Element<'a, Message> {
+        if over_game {
+            let newest = self.toasts.len().saturating_sub(1);
+            let card = self
+                .toasts
+                .last()
+                .map(|toast| toast_card(toast, on_dismiss(newest), on_undo.clone(), true));
+            return container(column(card).max_width(COMPACT_WIDTH))
+                .align_top(Fill)
+                .center_x(Fill)
+                .padding(iced::Padding::from([COMPACT_TOP, 16.0]))
+                .into();
+        }
+
         let cards = self
             .toasts
             .iter()
             .enumerate()
-            .map(|(index, toast)| toast_card(toast, on_dismiss(index)));
+            .map(|(index, toast)| toast_card(toast, on_dismiss(index), on_undo.clone(), false));
 
         container(column(cards).spacing(8).width(WIDTH))
             .align_right(Fill)
@@ -138,9 +186,14 @@ impl Toasts {
     }
 }
 
+/// A toast's card: its icon, its message (with how often it came, if more
+/// than once), an Undo button if it has one, and a close button. A compact
+/// card, over a game, uses smaller text.
 fn toast_card<'a, Message: Clone + 'a>(
     toast: &'a Toast,
     on_dismiss: Message,
+    on_undo: Message,
+    compact: bool,
 ) -> Element<'a, Message> {
     let kind = toast.kind;
     let symbol = icons::icon(match kind {
@@ -159,15 +212,36 @@ fn toast_card<'a, Message: Clone + 'a>(
         .style(theme::icon_button)
         .on_press(on_dismiss);
 
-    container(
-        row![symbol, text(&toast.message).size(14).width(Fill), close]
-            .spacing(10)
-            .align_y(Alignment::Center),
-    )
-    .padding([10, 12])
-    .width(Fill)
-    .style(theme::floating_card)
-    .into()
+    let message = if toast.repeats > 0 {
+        format!("{} (×{})", toast.message, toast.repeats + 1)
+    } else {
+        toast.message.clone()
+    };
+    let message = text(message).size(if compact { 13 } else { 14 });
+    let mut content = row![
+        symbol,
+        if compact {
+            message
+        } else {
+            message.width(Fill)
+        }
+    ]
+    .spacing(10)
+    .align_y(Alignment::Center);
+    if toast.undo {
+        content = content.push(
+            button(text("Undo").size(13))
+                .padding([3, 10])
+                .style(theme::secondary_button)
+                .on_press(on_undo),
+        );
+    }
+
+    container(content.push(close))
+        .padding(if compact { [6, 10] } else { [10, 12] })
+        .width(if compact { iced::Length::Shrink } else { Fill })
+        .style(theme::floating_card)
+        .into()
 }
 
 #[cfg(test)]

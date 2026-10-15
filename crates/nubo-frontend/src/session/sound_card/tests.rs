@@ -54,21 +54,25 @@ fn the_listener_is_told_about_new_frames_only() {
 
     publish_pixels(&frame, &[1, 2, 3]);
     publish_pixels(&frame, &[1, 2, 3]);
+    publish_pixels(&frame, &[1, 2, 3]);
     publish_pixels(&frame, &[1, 2, 4]);
 
-    assert_eq!(calls.load(Ordering::Relaxed), 3);
+    assert_eq!(calls.load(Ordering::Relaxed), 4);
 }
 
 #[test]
-fn a_frame_like_the_one_before_is_not_published_again() {
+fn only_the_first_frame_like_the_one_before_is_published() {
     let frame = shared_frame();
 
     publish_pixels(&frame, &[1, 2, 3]);
     publish_pixels(&frame, &[1, 2, 3]);
-    assert_eq!(frame.lock().unwrap().sequence, 1);
+    assert_eq!(frame.lock().unwrap().sequence, 2);
+    publish_pixels(&frame, &[1, 2, 3]);
+    publish_pixels(&frame, &[1, 2, 3]);
+    assert_eq!(frame.lock().unwrap().sequence, 2);
 
     publish_pixels(&frame, &[1, 2, 4]);
-    assert_eq!(frame.lock().unwrap().sequence, 2);
+    assert_eq!(frame.lock().unwrap().sequence, 3);
 }
 
 #[test]
@@ -98,6 +102,17 @@ fn fast_forward_spreads_its_buffers_over_the_played_one() {
     for _ in 0..3 {
         assert!(fast_forward.take_buffer());
     }
+    assert!(!fast_forward.take_buffer());
+    assert_eq!(fast_forward.time_until_next_buffer(), None);
+}
+
+#[test]
+fn clearing_fast_forward_drops_the_buffers_still_due() {
+    let mut fast_forward = FastForward::new();
+    fast_forward.spread(3, Duration::from_millis(20));
+
+    fast_forward.clear();
+
     assert!(!fast_forward.take_buffer());
     assert_eq!(fast_forward.time_until_next_buffer(), None);
 }

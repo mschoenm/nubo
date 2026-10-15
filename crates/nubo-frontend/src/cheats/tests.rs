@@ -37,3 +37,45 @@ fn invalid_codes_are_rejected() {
     assert!(Cheat::new("Nothing", "00A-17").is_err());
     assert!(Cheat::new("Nothing", "01FF0080").is_err());
 }
+
+#[test]
+fn a_cheat_can_have_several_codes() {
+    let cheat = Cheat::new("Max money", "01ff56d0 + 01fe57d0, 00A17BC49").unwrap();
+
+    assert_eq!(cheat.code, "01FF56D0+01FE57D0+00A-17B-C49");
+    assert_eq!(
+        cheat.codes().collect::<Vec<_>>(),
+        ["01FF56D0", "01FE57D0", "00A-17B-C49"]
+    );
+    assert_eq!(cheat.kind(), CheatKind::GameShark);
+}
+
+#[test]
+fn codes_can_be_apart_with_spaces() {
+    assert_eq!(
+        Cheat::new("", "01FF56D0 01FE57D0").unwrap().code,
+        "01FF56D0+01FE57D0"
+    );
+    assert_eq!(Cheat::new("", "CED 56A").unwrap().code, "CED-56A");
+}
+
+#[test]
+fn one_bad_code_rejects_the_cheat() {
+    assert!(Cheat::new("", "01FF56D0 + XYZ").is_err());
+    assert!(Cheat::new("", " + ").is_err());
+}
+
+#[test]
+fn cheats_that_share_a_code_keep_their_own_ids() {
+    let mut emulator = Emulator::new(nubo_core::Model::Dmg);
+    // Both make 0xD056 read 0x5A.
+    let both = Cheat::new("", "015A56D0 + 01FE57D0").unwrap();
+    let mut one = Cheat::new("", "015A56D0").unwrap();
+    both.apply_to(&mut emulator);
+    one.apply_to(&mut emulator);
+
+    one.enabled = false;
+    one.apply_to(&mut emulator);
+
+    assert_eq!(emulator.read_memory(0xD056), 0x5A);
+}

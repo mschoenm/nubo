@@ -1,7 +1,7 @@
 //! Tests for save state files. They write real files in the temporary
 //! directory, so they need the `desktop` feature.
 
-use super::store::{keep_aside_in, load_in, save_in, slot_info_in, thumbnail_in};
+use super::store::{delete_in, keep_aside_in, load_in, save_in, slot_info_in, thumbnail_in};
 use super::*;
 use crate::time::Duration;
 use std::fs;
@@ -198,5 +198,39 @@ fn time_ago_reads_naturally() {
     assert_eq!(
         time_ago(now - Duration::from_secs(2 * 86_400)),
         "2 days ago"
+    );
+}
+
+#[test]
+fn a_deleted_slot_is_empty_and_others_stay() {
+    let directory = temporary_folder("delete");
+    let rom = Path::new("Example.gb");
+    let pixels = vec![0xFF; 160 * 144 * 4];
+    save_in(
+        &directory,
+        rom,
+        Slot::Quick,
+        &state(Model::Dmg, 0),
+        Some(&pixels),
+    )
+    .unwrap();
+    save_in(
+        &directory,
+        rom,
+        Slot::Numbered(1),
+        &state(Model::Dmg, 1),
+        None,
+    )
+    .unwrap();
+
+    delete_in(&directory, rom, Slot::Quick).unwrap();
+    delete_in(&directory, rom, Slot::Numbered(2)).unwrap();
+
+    assert!(load_in(&directory, rom, Slot::Quick).unwrap().is_none());
+    assert!(thumbnail_in(&directory, rom, Slot::Quick).is_none());
+    assert!(
+        load_in(&directory, rom, Slot::Numbered(1))
+            .unwrap()
+            .is_some()
     );
 }

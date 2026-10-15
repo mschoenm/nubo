@@ -12,16 +12,20 @@ const MODAL_MARGIN: f32 = 24.0;
 /// Shows `content` as a dialog over a dimmed screen, at least
 /// [`MODAL_MARGIN`] from the window's edges, so a dialog that fills the
 /// height it gets still shows the screen around it. Clicking outside the
-/// dialog sends `on_dismiss`.
-pub fn modal<'a>(content: Element<'a, Message>, on_dismiss: Message) -> Element<'a, Message> {
-    opaque(
-        mouse_area(
-            center(opaque(content))
-                .padding(MODAL_MARGIN)
-                .style(theme::backdrop),
-        )
-        .on_press(on_dismiss),
-    )
+/// dialog sends `on_dismiss`, if there is one.
+pub fn modal<'a>(
+    content: Element<'a, Message>,
+    on_dismiss: Option<Message>,
+) -> Element<'a, Message> {
+    let mut area = mouse_area(
+        center(opaque(content))
+            .padding(MODAL_MARGIN)
+            .style(theme::backdrop),
+    );
+    if let Some(on_dismiss) = on_dismiss {
+        area = area.on_press(on_dismiss);
+    }
+    opaque(area)
 }
 
 /// The layer shown while a file is dragged over the window.
@@ -42,6 +46,7 @@ pub fn drop_target<'a>() -> Element<'a, Message> {
     .into()
 }
 
+pub mod dialog;
 pub mod game;
 pub mod library;
 pub mod settings;

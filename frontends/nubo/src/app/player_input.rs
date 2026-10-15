@@ -194,11 +194,14 @@ impl App {
         }
     }
 
-    /// Moves through the menu on screen (the settings window, the pause menu
-    /// or the library) with a direction, picks with A or Start, and steps
+    /// Moves through the menu on screen (a dialog, the settings window, the
+    /// pause menu or the library) with a direction, picks with A or Start, and steps
     /// back with B. These are the keys and controller buttons the player
     /// bound to the Game Boy's D-pad, A, B, Start and Select.
     fn navigate(&mut self, action: Action) -> Task<Message> {
+        if self.dialog.is_some() {
+            return self.navigate_dialog(action);
+        }
         if self.settings_tab.is_some() {
             return self.navigate_settings(action);
         }
@@ -213,7 +216,7 @@ impl App {
     /// Does what a key or controller button is bound to, as it goes down
     /// (`pressed`) or up. Game Boy buttons only go down while the game runs.
     /// A window that shows only the game (`--scale`) only plays it and fast
-    /// forwards, so nothing can come up over the game.
+    /// forwards (no rewinding either), so nothing can come up over the game.
     fn perform(&mut self, action: Action, pressed: bool) -> Task<Message> {
         if let Some(key) = action.game_boy_key() {
             let running = self.is_running();
@@ -230,6 +233,15 @@ impl App {
         if action == Action::FastForward {
             if let Some(game) = &mut self.game {
                 game.session.hold_fast_forward(pressed);
+            }
+            return Task::none();
+        }
+
+        if action == Action::Rewind {
+            if self.screen_scale.is_none()
+                && let Some(game) = &mut self.game
+            {
+                game.session.hold_rewind(pressed);
             }
             return Task::none();
         }

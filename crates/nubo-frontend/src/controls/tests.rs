@@ -88,3 +88,15 @@ fn every_controller_button_has_a_name_that_loads_back() {
         assert_eq!(PadButton::try_from(String::from(button)), Ok(button));
     }
 }
+
+#[test]
+fn rewind_gets_a_key_once_where_the_player_left_it_free() {
+    let mut controls: Controls =
+        toml::from_str("[keyboard]\nup = \"ArrowUp\"\n[controller]\nb = \"west\"\n").unwrap();
+
+    assert!(add_new_actions(&mut controls));
+    assert_eq!(controls.keyboard.input(Action::Rewind), Some(KeyCode::KeyR));
+    // The controller's left button already presses B.
+    assert_eq!(controls.controller.input(Action::Rewind), None);
+    assert!(!add_new_actions(&mut controls));
+}

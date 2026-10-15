@@ -4,14 +4,17 @@
 use super::{App, GameMessage, LibraryMessage, Message, cycle};
 use crate::settings::Appearance;
 use crate::views;
+use crate::views::settings::ModelOption;
 use crate::views::settings::{SettingsFocus, SettingsRow, SettingsTab};
 use iced::Task;
 use iced::widget;
 use iced::widget::scrollable::RelativeOffset;
+use nubo_frontend::background;
 use nubo_frontend::controls::{Action, Controls, Device};
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::palettes::DmgPalette;
 use nubo_frontend::settings::FastForwardSpeed;
+use nubo_frontend::updates;
 
 /// How much the D-pad changes the volume per press.
 const VOLUME_STEP: f32 = 0.05;
@@ -26,9 +29,14 @@ pub enum SettingsMessage {
     AppearanceSelected(Appearance),
     PaletteSelected(DmgPalette),
     IntegerScalingToggled(bool),
+    ColorCorrectionToggled(bool),
+    /// The player turned looking for newer versions on or off.
+    CheckForUpdatesToggled(bool),
+    FrameBlendingToggled(bool),
     SgbBorderToggled(bool),
     ModelSelected(ModelPreference),
     ResumeGamesToggled(bool),
+    PauseInBackgroundToggled(bool),
     FastForwardSpeedSelected(FastForwardSpeed),
     /// The volume slider moved; the setting is saved once it's released.
     VolumeChanged(f32),
@@ -81,6 +89,18 @@ impl App {
                 }
                 return self.load_pictures(false);
             }
+            SettingsMessage::CheckForUpdatesToggled(check) => {
+                self.change_settings(|settings| settings.shared.check_for_updates = Some(check));
+                return self.look_for_updates();
+            }
+            SettingsMessage::ColorCorrectionToggled(enabled) => {
+                self.change_settings(|settings| settings.shared.color_correction = enabled);
+                self.apply_screen_effects();
+            }
+            SettingsMessage::FrameBlendingToggled(enabled) => {
+                self.change_settings(|settings| settings.shared.frame_blending = enabled);
+                self.apply_screen_effects();
+            }
             SettingsMessage::IntegerScalingToggled(enabled) => {
                 self.change_settings(|settings| settings.integer_scaling = enabled);
             }
@@ -93,6 +113,9 @@ impl App {
             SettingsMessage::ModelSelected(model) => {
                 self.model_override = None;
                 self.change_settings(|settings| settings.shared.model = model);
+            }
+            SettingsMessage::PauseInBackgroundToggled(pause) => {
+                self.change_settings(|settings| settings.pause_in_background = pause);
             }
             SettingsMessage::ResumeGamesToggled(resume) => {
                 self.change_settings(|settings| settings.shared.resume_games = resume);
@@ -137,6 +160,30 @@ impl App {
     }
 
     /// Changes the controls, saves them and hands them to the running game.
+    /// Looks for a newer version in the background, if the player wants
+    /// that and this run hasn't yet.
+    pub(super) fn look_for_updates(&mut self) -> Task<Message> {
+        if !updates::AVAILABLE
+            || self.fresh
+            || self.settings.shared.check_for_updates != Some(true)
+            || self.newer_version.is_some()
+        {
+            return Task::none();
+        }
+        Task::perform(background::run(updates::latest_version), |version| {
+            Message::LatestVersion(version.flatten())
+        })
+    }
+
+    /// Shows the running game with the screen effects the settings pick.
+    fn apply_screen_effects(&mut self) {
+        let shared = &self.settings.shared;
+        if let Some(game) = &mut self.game {
+            game.session
+                .set_screen_effects(shared.color_correction, shared.frame_blending);
+        }
+    }
+
     pub(super) fn change_controls(&mut self, change: impl FnOnce(&mut Controls)) {
         self.change_settings(|settings| change(&mut settings.shared.controls));
         if let Some(game) = &mut self.game {
@@ -158,12 +205,7 @@ impl App {
             self.settings_focus = Some(SettingsFocus::Sidebar);
             return Task::none();
         };
-        let rows = views::settings::rows(
-            tab,
-            &self.settings,
-            self.restart_needed(),
-            self.controls_device,
-        );
+        let rows = views::settings::rows(tab, &self.settings, &self.settings_page_state());
 
         match focus {
             SettingsFocus::Sidebar => match action {
@@ -247,12 +289,26 @@ impl App {
                 step,
                 wrap,
             )),
-            SettingsRow::Model => SettingsMessage::ModelSelected(cycle(
-                &views::settings::model_choices(),
-                settings.shared.model,
-                step,
-                wrap,
-            )),
+            SettingsRow::Model => SettingsMessage::ModelSelected(
+                cycle(
+                    &ModelOption::ALL,
+                    ModelOption::of(settings.shared.model),
+                    step,
+                    wrap,
+                )
+                .preference(settings.shared.model),
+            ),
+            SettingsRow::ModelRevision => {
+                let ModelPreference::Fixed(current) = settings.shared.model else {
+                    return None;
+                };
+                SettingsMessage::ModelSelected(ModelPreference::Fixed(cycle(
+                    views::settings::revisions(settings.shared.model),
+                    current,
+                    step,
+                    wrap,
+                )))
+            }
             SettingsRow::FastForwardSpeed => SettingsMessage::FastForwardSpeedSelected(cycle(
                 &FastForwardSpeed::ALL,
                 settings.shared.fast_forward_speed,
@@ -279,6 +335,12 @@ impl App {
             SettingsRow::SharpPixels => {
                 SettingsMessage::IntegerScalingToggled(!settings.integer_scaling).into()
             }
+            SettingsRow::ColorCorrection => {
+                SettingsMessage::ColorCorrectionToggled(!settings.shared.color_correction).into()
+            }
+            SettingsRow::FrameBlending => {
+                SettingsMessage::FrameBlendingToggled(!settings.shared.frame_blending).into()
+            }
             SettingsRow::SgbBorder => {
                 SettingsMessage::SgbBorderToggled(!settings.shared.sgb_border).into()
             }
@@ -286,23 +348,22 @@ impl App {
             SettingsRow::ResumeGames => {
                 SettingsMessage::ResumeGamesToggled(!settings.shared.resume_games).into()
             }
+            SettingsRow::PauseInBackground => {
+                SettingsMessage::PauseInBackgroundToggled(!settings.pause_in_background).into()
+            }
             SettingsRow::Volume => SettingsMessage::ToggleMute.into(),
             SettingsRow::ResetControls => SettingsMessage::ResetControls(device).into(),
             SettingsRow::Binding(action) => SettingsMessage::CaptureBinding(device, action).into(),
-            SettingsRow::Folder(index) => LibraryMessage::IncludeSubfolders(
-                index,
-                !settings
-                    .shared
-                    .library_folders
-                    .get(index)?
-                    .include_subfolders,
-            )
-            .into(),
+            SettingsRow::Folder(index) => LibraryMessage::OpenFolderMenu(index).into(),
             SettingsRow::AddFolder => LibraryMessage::AddFolder.into(),
-            SettingsRow::Rescan => LibraryMessage::Rescan.into(),
             SettingsRow::BoxArt => {
                 LibraryMessage::DownloadBoxArtToggled(!settings.shared.download_box_art).into()
             }
+            SettingsRow::RetryBoxArt => LibraryMessage::RetryBoxArt.into(),
+            SettingsRow::CheckForUpdates => SettingsMessage::CheckForUpdatesToggled(
+                settings.shared.check_for_updates != Some(true),
+            )
+            .into(),
             _ => return self.adjust_setting(row, 1, true),
         })
     }

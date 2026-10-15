@@ -25,10 +25,13 @@ const LONGEST_SLEEP: Duration = Duration::from_secs(1);
 /// The latest finished frame, shared between the two threads.
 #[derive(Default)]
 struct SharedFrame {
-    /// Goes up by one for every new frame that differs from the one before,
-    /// so readers can tell whether the pixels changed since they last looked.
+    /// Goes up by one for every new frame that differs from the one before
+    /// (and for the first frame like it, see [`publish`]), so readers can
+    /// tell whether there is a frame they haven't shown.
     sequence: u64,
     frame: Frame,
+    /// Whether the frame published last was the same as the one before it.
+    repeated: bool,
     /// Called for every new frame while the app listens (see
     /// [`FrameListener::listen`]).
     on_frame: Option<Box<dyn FnMut() + Send>>,
@@ -106,7 +109,7 @@ pub struct ActivityCount {
     /// Audio buffers emulated, played or skipped.
     pub buffers: u64,
     /// Frames handed to the app. Frames exactly like the one before are
-    /// skipped.
+    /// skipped, but for the first.
     pub frames: u64,
 }
 
@@ -279,7 +282,9 @@ impl EmulatorThread {
     /// plays (see [`super::Playback::buffers_per_played`]): the played one
     /// when the queue needs it, and the others spread over the time that one
     /// takes to play (see [`FastForward`]). The sound card still paces the
-    /// loop, and the sound stays at its normal pitch.
+    /// loop, and the sound stays at its normal pitch. While rewinding it
+    /// plays silence instead, stepping back through the game's recent past
+    /// (see `Machine::rewind_buffer`).
     fn step(&mut self) {
         self.machine.saves.flush_when_settled();
 
@@ -289,6 +294,22 @@ impl EmulatorThread {
         if !self.machine.playback.running {
             self.count_wakeup();
             thread::park();
+            return;
+        }
+
+        if self.machine.playback.rewinding {
+            // Fast forward's buffers still due belong to the time being
+            // rewound; running them after the rewind would undo part of it.
+            self.fast_forward.clear();
+            if self.machine.audio.needs_samples() {
+                self.activity.buffers.fetch_add(1, Ordering::Relaxed);
+                if self.machine.rewind_buffer().1 {
+                    publish_frame(&self.frame, &self.machine.emulator);
+                }
+            } else {
+                self.count_wakeup();
+                self.machine.audio.wait_until_samples_needed(LONGEST_SLEEP);
+            }
             return;
         }
 
@@ -371,6 +392,11 @@ impl FastForward {
         (self.remaining > 0).then(|| self.next_at.saturating_duration_since(Instant::now()))
     }
 
+    /// Drops the unplayed buffers still due.
+    fn clear(&mut self) {
+        self.remaining = 0;
+    }
+
     /// Counts one unplayed buffer as emulated, returning `false` if there
     /// were none left.
     fn take_buffer(&mut self) -> bool {
@@ -385,9 +411,11 @@ impl FastForward {
 
 /// Copies the emulator's finished frame into the shared buffer for the app, and calls
 /// the app's callback if it listens. A call the app hasn't handled yet
-/// already covers this frame, since the app always takes the newest one. A frame
-/// exactly like the one before is skipped, so still screens such as menus
-/// and text boxes don't redraw the window at all.
+/// already covers this frame, since the app always takes the newest one. Once
+/// the picture stops changing, the first frame like the one before is still
+/// handed on, so a picture mixed with the frame before it (frame blending)
+/// settles; the ones after it are skipped, so still screens such as menus
+/// and text boxes don't redraw the window.
 fn publish_frame(frame: &Mutex<SharedFrame>, emulator: &Emulator) {
     publish(frame, |latest| latest.update(emulator));
 }
@@ -396,9 +424,11 @@ fn publish_frame(frame: &Mutex<SharedFrame>, emulator: &Emulator) {
 /// frame and calls the app's callback.
 fn publish(frame: &Mutex<SharedFrame>, update: impl FnOnce(&mut Frame) -> bool) {
     if let Ok(mut shared) = frame.lock() {
-        if !update(&mut shared.frame) {
+        let changed = update(&mut shared.frame);
+        if !changed && shared.repeated {
             return;
         }
+        shared.repeated = !changed;
         shared.sequence += 1;
         if let Some(on_frame) = &mut shared.on_frame {
             on_frame();

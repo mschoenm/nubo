@@ -20,6 +20,7 @@ fn earlier_settings() -> Settings {
         appearance: Appearance::Dark,
         shared: toml::from_str(WRITTEN_BY_EARLIER_VERSION).unwrap(),
         integer_scaling: true,
+        ..Settings::default()
     }
 }
 
@@ -59,7 +60,9 @@ fn missing_fields_get_their_defaults() {
     let settings = Settings::from_toml("appearance = \"dark\"").unwrap();
 
     assert_eq!(settings.appearance, Appearance::Dark);
-    assert!(!settings.integer_scaling);
+    assert!(settings.integer_scaling);
+    assert!(settings.pause_in_background);
+    assert_eq!(settings.window_size, None);
     assert_eq!(
         settings.shared,
         nubo_frontend::settings::Settings::default()
@@ -92,4 +95,21 @@ fn a_mistake_in_the_shared_settings_is_reported_where_it_is() {
     let error = Settings::from_toml("appearance = \"dark\"\nfast_forward_speed = 5").unwrap_err();
 
     assert!(error.to_string().contains("line 2, column 22"), "{error}");
+}
+
+#[test]
+fn the_window_size_and_pausing_are_kept() {
+    let settings = Settings {
+        pause_in_background: false,
+        window_size: Some((1000.0, 700.0)),
+        ..Settings::default()
+    };
+
+    let contents = toml::to_string(&settings).unwrap();
+
+    assert!(
+        contents.contains("pause_in_background = false"),
+        "{contents}"
+    );
+    assert_eq!(Settings::from_toml(&contents).unwrap(), settings);
 }

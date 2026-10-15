@@ -12,16 +12,21 @@ fn settings_survive_a_round_trip() {
             include_subfolders: true,
         }],
         download_box_art: false,
+        box_art_asked: true,
+        check_for_updates: Some(true),
         resume_games: true,
         fast_forward_speed: FastForwardSpeed(8),
         volume: 0.5,
         muted: true,
         controls: Controls::default(),
+        controls_revision: 1,
         dmg_palette: DmgPalette::Pocket,
         sgb_border: false,
         sgb_own_palette: [0x001F, 0x03E0, 0x7C00, 0x0000],
         sgb_colors: SgbColors::Preset(DmgPalette::Green),
         sgb_nubo_border: true,
+        color_correction: false,
+        frame_blending: true,
     };
 
     let contents = toml::to_string(&settings).unwrap();
@@ -158,6 +163,8 @@ fn earlier_settings() -> Settings {
     keyboard.bind(Action::QuickLoad, Some(KeyCode::Quote));
     keyboard.bind(Action::Fullscreen, Some(KeyCode::Backslash));
     keyboard.bind(Action::Screenshot, None);
+    // The file was written before rewind had a key.
+    keyboard.bind(Action::Rewind, None);
     let controller = &mut controls.controller;
     controller.bind(Action::A, Some(PadButton(ControllerButton::South)));
     controller.bind(Action::B, Some(PadButton(ControllerButton::West)));
@@ -189,16 +196,21 @@ fn earlier_settings() -> Settings {
             },
         ],
         download_box_art: false,
+        box_art_asked: false,
+        check_for_updates: None,
         resume_games: true,
         fast_forward_speed: FastForwardSpeed(3),
         volume: 0.65,
         muted: true,
         controls,
+        controls_revision: 0,
         dmg_palette: DmgPalette::Pocket,
         sgb_border: true,
         sgb_own_palette: DEFAULT_OWN_PALETTE,
         sgb_colors: SgbColors::Game,
         sgb_nubo_border: false,
+        color_correction: true,
+        frame_blending: false,
     }
 }
 

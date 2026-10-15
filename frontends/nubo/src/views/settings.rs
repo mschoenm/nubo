@@ -10,22 +10,28 @@ use crate::settings::{Appearance, Settings};
 use crate::ui::icons::{Icon, icon};
 use crate::ui::logo::logo;
 use crate::ui::theme;
-use crate::ui::widgets::{icon_button, segmented};
+use crate::ui::widgets::{chips, icon_button, segmented};
 use iced::widget::text::Wrapping;
 use iced::widget::{
-    Column, button, column, container, pick_list, row, scrollable, slider, space, text, toggler,
+    Column, button, column, container, row, scrollable, slider, space, text, toggler,
 };
 use iced::{Alignment, Color, Element, Fill, Padding, Theme, widget};
 use nubo_core::Model;
 use nubo_frontend::controls::{Action, Device};
 use nubo_frontend::library::{self, Library, box_art};
-use nubo_frontend::model::ModelPreference;
+use nubo_frontend::model::{self, Console, ModelPreference};
 use nubo_frontend::palettes::DmgPalette;
 use nubo_frontend::save_states;
 use nubo_frontend::settings::{FastForwardSpeed, LibraryFolder};
-use std::fmt;
+use nubo_frontend::updates;
 
 const WIDTH: f32 = 700.0;
+/// The page of this version's release notes.
+const RELEASE_NOTES: &str = concat!(
+    env!("CARGO_PKG_REPOSITORY"),
+    "/releases/tag/v",
+    env!("CARGO_PKG_VERSION")
+);
 /// The tallest the window gets. Below that it fills the app's window, less
 /// the margin `views::modal` leaves around it.
 const MAX_HEIGHT: f32 = 640.0;
@@ -49,9 +55,6 @@ const BINDING_ROW_PADDING: Padding = Padding {
 const HEADING_HEIGHT: f32 = 28.0;
 /// The width of the chips that show the key or button of an action.
 const CHIP_WIDTH: f32 = 140.0;
-/// The width of the clear button next to a chip, kept free when there is
-/// nothing to clear so the chips line up.
-const CLEAR_WIDTH: f32 = 34.0;
 
 /// A page of the settings window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -108,17 +111,62 @@ impl SettingsTab {
     }
 }
 
-/// A model preference as the model picker lists it. Automatic is explained
-/// by the row's description, so the picker keeps it short.
+/// A choice on the model row: Automatic, or one of the consoles, whose
+/// revision the row under it picks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ModelChoice(ModelPreference);
+pub enum ModelOption {
+    Automatic,
+    Console(Console),
+}
 
-impl fmt::Display for ModelChoice {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0 {
-            ModelPreference::Automatic => formatter.write_str("Automatic"),
-            ModelPreference::Fixed(model) => formatter.write_str(model.description()),
+impl ModelOption {
+    /// Every choice, in the order the row shows them.
+    pub const ALL: [ModelOption; 6] = [
+        ModelOption::Automatic,
+        ModelOption::Console(Console::GameBoy),
+        ModelOption::Console(Console::Pocket),
+        ModelOption::Console(Console::SuperGameBoy),
+        ModelOption::Console(Console::Color),
+        ModelOption::Console(Console::Advance),
+    ];
+
+    /// The choice `preference` falls under.
+    pub fn of(preference: ModelPreference) -> ModelOption {
+        match preference {
+            ModelPreference::Automatic => ModelOption::Automatic,
+            ModelPreference::Fixed(model) => ModelOption::Console(Console::of(model)),
         }
+    }
+
+    fn label(self) -> String {
+        String::from(match self {
+            ModelOption::Automatic => "Automatic",
+            ModelOption::Console(console) => console.short_label(),
+        })
+    }
+
+    /// The preference picking this choice gives: the revision `current`
+    /// uses if it is of the same console, else the console's recommended
+    /// one.
+    pub fn preference(self, current: ModelPreference) -> ModelPreference {
+        match self {
+            ModelOption::Automatic => ModelPreference::Automatic,
+            ModelOption::Console(console) => match current {
+                ModelPreference::Fixed(model) if Console::of(model) == console => current,
+                _ => ModelPreference::Fixed(console.recommended()),
+            },
+        }
+    }
+}
+
+/// The revisions the revision row offers for `preference`: none for
+/// Automatic or a console with only one.
+pub fn revisions(preference: ModelPreference) -> &'static [Model] {
+    match preference {
+        ModelPreference::Fixed(model) if Console::of(model).revisions().len() > 1 => {
+            Console::of(model).revisions()
+        }
+        _ => &[],
     }
 }
 
@@ -135,78 +183,90 @@ pub enum SettingsFocus {
 pub enum SettingsRow {
     Appearance,
     Palette,
+    ColorCorrection,
+    FrameBlending,
     SharpPixels,
     SgbBorder,
     Model,
+    /// The revision of the console picked on the model row.
+    ModelRevision,
     RestartNow,
     ResumeGames,
+    PauseInBackground,
     FastForwardSpeed,
     Volume,
     /// The keyboard or controller switch on the Controls tab.
     Device,
     ResetControls,
     Binding(Action),
-    Rescan,
     /// A library folder, by its place in the list.
     Folder(usize),
     AddFolder,
     BoxArt,
+    /// Tries to download box art again after it failed.
+    RetryBoxArt,
+    /// The switch that looks for newer versions.
+    CheckForUpdates,
 }
 
 /// The rows of `tab` in the order the D-pad moves through them, which is
 /// the order the page shows them in (a test checks that the pages draw them
-/// in this order). `restart_needed` and `device` are as in [`view`] and
-/// [`ControlsPage`]. The About tab has none.
-pub fn rows(
-    tab: SettingsTab,
-    settings: &Settings,
-    restart_needed: bool,
-    device: Device,
-) -> Vec<SettingsRow> {
+/// in this order). The About tab has none.
+pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec<SettingsRow> {
     let mut rows = Vec::new();
 
     match tab {
         SettingsTab::Display => rows.extend([
             SettingsRow::Appearance,
             SettingsRow::Palette,
+            SettingsRow::ColorCorrection,
+            SettingsRow::FrameBlending,
             SettingsRow::SharpPixels,
             SettingsRow::SgbBorder,
         ]),
         SettingsTab::Playing => {
             rows.push(SettingsRow::Model);
-            if restart_needed {
+            if !revisions(settings.shared.model).is_empty() {
+                rows.push(SettingsRow::ModelRevision);
+            }
+            if state.restart_needed {
                 rows.push(SettingsRow::RestartNow);
             }
             if save_states::AVAILABLE {
                 rows.push(SettingsRow::ResumeGames);
             }
+            rows.push(SettingsRow::PauseInBackground);
             rows.extend([SettingsRow::FastForwardSpeed, SettingsRow::Volume]);
         }
         SettingsTab::Controls => {
             rows.push(SettingsRow::Device);
             rows.extend(Action::GAME_BOY.map(SettingsRow::Binding));
-            rows.extend(shortcuts(device).iter().copied().map(SettingsRow::Binding));
+            rows.extend(
+                shortcuts(state.device)
+                    .iter()
+                    .copied()
+                    .map(SettingsRow::Binding),
+            );
             rows.push(SettingsRow::ResetControls);
         }
         SettingsTab::Library => {
-            rows.push(SettingsRow::Rescan);
             rows.extend((0..settings.shared.library_folders.len()).map(SettingsRow::Folder));
             rows.push(SettingsRow::AddFolder);
             if box_art::AVAILABLE {
                 rows.push(SettingsRow::BoxArt);
+                if state.box_art_problem.is_some() {
+                    rows.push(SettingsRow::RetryBoxArt);
+                }
             }
         }
-        SettingsTab::About => {}
+        SettingsTab::About => {
+            if updates::AVAILABLE {
+                rows.push(SettingsRow::CheckForUpdates);
+            }
+        }
     }
 
     rows
-}
-
-/// The model choices in the order the picker lists them.
-pub fn model_choices() -> Vec<ModelPreference> {
-    std::iter::once(ModelPreference::Automatic)
-        .chain(Model::ALL.map(ModelPreference::Fixed))
-        .collect()
 }
 
 /// The shortcuts listed for `device`.
@@ -223,25 +283,29 @@ pub fn scroll_id() -> widget::Id {
     widget::Id::new("settings-page")
 }
 
-/// What the Controls tab shows besides the settings.
-pub struct ControlsPage<'a> {
-    /// Whether it shows the keyboard or the controller.
+/// What the pages show besides the settings themselves.
+pub struct PageState<'a> {
+    /// Whether the running game uses another model than the one picked, so
+    /// the Playing tab offers to restart it.
+    pub restart_needed: bool,
+    /// Whether the Controls tab shows the keyboard or the controller.
     pub device: Device,
     /// The action waiting for a key or button, if any.
     pub capture: Option<(Device, Action)>,
     /// The names of the connected controllers.
     pub controllers: &'a [String],
+    /// Why box art couldn't be downloaded this run, if it couldn't.
+    pub box_art_problem: Option<&'a str>,
+    /// A newer version than this one, if the app found one is out.
+    pub newer_version: Option<&'a str>,
 }
 
-/// The settings window showing `tab`. `restart_needed` says whether the
-/// running game uses another model than the selected one, so it should offer
-/// a restart.
+/// The settings window showing `tab`.
 pub fn view<'a>(
     tab: SettingsTab,
     settings: &'a Settings,
     library: &'a Library,
-    restart_needed: bool,
-    controls_page: &ControlsPage<'a>,
+    state: &PageState<'a>,
     focus: Option<SettingsFocus>,
 ) -> Element<'a, Message> {
     let header = row![
@@ -256,21 +320,10 @@ pub fn view<'a>(
     .align_y(Alignment::Center);
 
     let focused = match focus {
-        Some(SettingsFocus::Row(index)) => {
-            rows(tab, settings, restart_needed, controls_page.device)
-                .get(index)
-                .copied()
-        }
+        Some(SettingsFocus::Row(index)) => rows(tab, settings, state).get(index).copied(),
         _ => None,
     };
-    let page = page(
-        tab,
-        settings,
-        library,
-        restart_needed,
-        controls_page,
-        &Rings::new(focused),
-    );
+    let page = page(tab, settings, library, state, &Rings::new(focused));
 
     let body = row![
         sidebar(tab, focus == Some(SettingsFocus::Sidebar)),
@@ -331,16 +384,15 @@ fn page<'a>(
     tab: SettingsTab,
     settings: &'a Settings,
     library: &'a Library,
-    restart_needed: bool,
-    controls_page: &ControlsPage<'a>,
+    state: &PageState<'a>,
     rings: &Rings,
 ) -> Element<'a, Message> {
     match tab {
         SettingsTab::Display => display(settings, rings),
-        SettingsTab::Playing => playing(settings, restart_needed, rings),
-        SettingsTab::Controls => controls(settings, controls_page, rings),
-        SettingsTab::Library => library_page(settings, library, rings),
-        SettingsTab::About => about(),
+        SettingsTab::Playing => playing(settings, state.restart_needed, rings),
+        SettingsTab::Controls => controls(settings, state, rings),
+        SettingsTab::Library => library_page(settings, library, state.box_art_problem, rings),
+        SettingsTab::About => about(settings, state.newer_version, rings),
     }
 }
 
@@ -562,10 +614,37 @@ fn display<'a>(settings: &'a Settings, rings: &Rings) -> Element<'a, Message> {
                 ),
                 rings.row(
                     setting(
+                        "Game Boy Color colors as on its screen",
+                        Some(String::from(
+                            "Softer colors, as the Game Boy Color's own screen showed them. \
+                             Off, they are as bright as the game sets them."
+                        )),
+                        switch(settings.shared.color_correction, |enabled| {
+                            Message::Settings(SettingsMessage::ColorCorrectionToggled(enabled))
+                        }),
+                    ),
+                    SettingsRow::ColorCorrection,
+                ),
+                rings.row(
+                    setting(
+                        "Smooth out flicker",
+                        Some(String::from(
+                            "Mixes each frame with the one before, as the Game Boy's slow \
+                             screen did, so sprites games blink on and off look see-through."
+                        )),
+                        switch(settings.shared.frame_blending, |enabled| {
+                            Message::Settings(SettingsMessage::FrameBlendingToggled(enabled))
+                        }),
+                    ),
+                    SettingsRow::FrameBlending,
+                ),
+                rings.row(
+                    setting(
                         "Sharp pixels",
                         Some(String::from(
                             "Grow the screen only in whole steps (2×, 3×, …), so every pixel \
-                             is the same size."
+                             is the same size. Off, the picture fills the window, and some \
+                             pixels come out a little bigger than others."
                         )),
                         switch(settings.integer_scaling, |enabled| {
                             Message::Settings(SettingsMessage::IntegerScalingToggled(enabled))
@@ -608,28 +687,60 @@ fn playing<'a>(
     restart_needed: bool,
     rings: &Rings,
 ) -> Element<'a, Message> {
-    let choices: Vec<ModelChoice> = model_choices().into_iter().map(ModelChoice).collect();
-    let model_description = match settings.shared.model {
-        ModelPreference::Automatic => "Each game starts on the Game Boy it was made for.",
-        ModelPreference::Fixed(_) => "Every game starts on this model.",
+    let preference = settings.shared.model;
+    let model_description = match preference {
+        ModelPreference::Automatic => String::from(
+            "Each game starts on the Game Boy it was made for, Super Game Boy games with \
+             their colors and border. A game's menu in the library can pick another for \
+             that game.",
+        ),
+        ModelPreference::Fixed(model) if revisions(preference).is_empty() => {
+            format!("Every game starts on this model. {}", model::about(model))
+        }
+        ModelPreference::Fixed(model) => format!(
+            "Every game starts on the {}, in the revision below.",
+            Console::of(model).label()
+        ),
     };
 
     let mut console = vec![
         rings.row(
             column![
-                label("Game Boy model", Some(String::from(model_description))),
-                pick_list(
-                    choices,
-                    Some(ModelChoice(settings.shared.model)),
-                    |choice| Message::Settings(SettingsMessage::ModelSelected(choice.0)),
-                )
-                .text_size(13)
-                .width(Fill),
+                label("Game Boy model", Some(model_description)),
+                chips(
+                    &ModelOption::ALL,
+                    ModelOption::of(preference),
+                    ModelOption::label,
+                    move |option| Message::Settings(SettingsMessage::ModelSelected(
+                        option.preference(preference)
+                    )),
+                ),
             ]
             .spacing(10),
             SettingsRow::Model,
         ),
     ];
+    if let ModelPreference::Fixed(current) = preference
+        && !revisions(preference).is_empty()
+    {
+        console.push(
+            rings.row(
+                column![
+                    label("Revision", Some(String::from(model::about(current)))),
+                    chips(
+                        revisions(preference),
+                        current,
+                        |model| String::from(model.name()),
+                        |model| Message::Settings(SettingsMessage::ModelSelected(
+                            ModelPreference::Fixed(model)
+                        )),
+                    ),
+                ]
+                .spacing(10),
+                SettingsRow::ModelRevision,
+            ),
+        );
+    }
     if restart_needed {
         console.push(restart_notice(rings.is_focused(SettingsRow::RestartNow)));
     }
@@ -649,6 +760,19 @@ fn playing<'a>(
             SettingsRow::ResumeGames,
         ));
     }
+    games.push(rings.row(
+        setting(
+            "Pause in the background",
+            Some(String::from(
+                "The game waits while another window is in front, and goes on when you \
+                 come back.",
+            )),
+            switch(settings.pause_in_background, |pause| {
+                Message::Settings(SettingsMessage::PauseInBackgroundToggled(pause))
+            }),
+        ),
+        SettingsRow::PauseInBackground,
+    ));
 
     let fast_forward_key = settings
         .shared
@@ -741,7 +865,11 @@ fn volume<'a>(settings: &Settings) -> Element<'a, Message> {
 
 /// The version, the copyright, the license, where to read it and where to get
 /// the source code, which the GPL asks every copy to show.
-fn about<'a>() -> Element<'a, Message> {
+fn about<'a>(
+    settings: &'a Settings,
+    newer_version: Option<&'a str>,
+    rings: &Rings,
+) -> Element<'a, Message> {
     let title = row![
         logo(48.0),
         column![
@@ -755,12 +883,60 @@ fn about<'a>() -> Element<'a, Message> {
     .spacing(16)
     .align_y(Alignment::Center);
 
+    let mut versions = Vec::new();
+    if updates::AVAILABLE {
+        versions.push(rings.row(
+            setting(
+                "Tell me when a new Nubo is out",
+                Some(String::from(
+                    "When Nubo starts, it asks GitHub for the newest version.",
+                )),
+                switch(settings.shared.check_for_updates == Some(true), |check| {
+                    Message::Settings(SettingsMessage::CheckForUpdatesToggled(check))
+                }),
+            ),
+            SettingsRow::CheckForUpdates,
+        ));
+        if let Some(version) = newer_version {
+            versions.push(group_row(
+                setting(
+                    "A new version is out",
+                    Some(format!("Nubo {version} is ready to download.")),
+                    small_button(
+                        Icon::ExternalLink,
+                        "Open",
+                        Message::OpenLink(updates::RELEASES_PAGE),
+                    ),
+                ),
+                ROW_PADDING,
+                false,
+            ));
+        }
+    }
+
     let rows = vec![
         group_row(
             setting(
+                "What's new",
+                Some(String::from(concat!(
+                    "The changes in Nubo ",
+                    env!("CARGO_PKG_VERSION"),
+                    ", on GitHub."
+                ))),
+                small_button(Icon::ExternalLink, "Open", Message::OpenLink(RELEASE_NOTES)),
+            ),
+            ROW_PADDING,
+            false,
+        ),
+        group_row(
+            setting(
                 "Source code",
-                None,
-                text(env!("CARGO_PKG_REPOSITORY")).size(13),
+                Some(String::from(env!("CARGO_PKG_REPOSITORY"))),
+                small_button(
+                    Icon::ExternalLink,
+                    "Open",
+                    Message::OpenLink(env!("CARGO_PKG_REPOSITORY")),
+                ),
             ),
             ROW_PADDING,
             false,
@@ -788,21 +964,21 @@ fn about<'a>() -> Element<'a, Message> {
         ),
     ];
 
-    column![
-        container(title).padding([4, 2]),
-        group(
-            "Source and license",
-            None,
-            rows,
-            Some(
-                "Copyright 2026 Michel Schoenmakers. Based on RetroBoy, copyright 2023-2026 \
+    let mut page = column![container(title).padding([4, 2])].spacing(20);
+    if !versions.is_empty() {
+        page = page.push(group("New versions", None, versions, None));
+    }
+    page.push(group(
+        "Source and license",
+        None,
+        rows,
+        Some(
+            "Copyright 2026 Michel Schoenmakers. Based on RetroBoy, copyright 2023-2026 \
                  Samuel Parsons. Nubo is free software: you can share and change it under \
                  the GNU General Public License, version 3 or later. It comes with no \
-                 warranty."
-            ),
+                 warranty.",
         ),
-    ]
-    .spacing(20)
+    ))
     .into()
 }
 
@@ -837,7 +1013,7 @@ fn palette_button<'a>(palette: DmgPalette, selected: bool) -> Element<'a, Messag
 /// buttons and the shortcuts, and a button that resets them.
 fn controls<'a>(
     settings: &'a Settings,
-    page: &ControlsPage<'a>,
+    page: &PageState<'a>,
     rings: &Rings,
 ) -> Element<'a, Message> {
     let device = page.device;
@@ -863,11 +1039,12 @@ fn controls<'a>(
         }
         Device::Controller if page.controllers.is_empty() => String::from(
             "No controller connected. Click a button, then press the new one on your \
-             controller. The left stick always works as the D-pad.",
+             controller; Backspace leaves it unset. The left stick always works as the \
+             D-pad.",
         ),
         Device::Controller => format!(
-            "Connected: {}. Click a button, then press the new one. The left stick always \
-             works as the D-pad.",
+            "Connected: {}. Click a button, then press the new one; Backspace leaves it \
+             unset. The left stick always works as the D-pad.",
             page.controllers.join(", ")
         ),
     };
@@ -928,7 +1105,6 @@ fn pause_menu_key<'a>() -> Element<'a, Message> {
             .padding([5, 12])
             .width(CHIP_WIDTH)
             .style(theme::binding_chip(false, false)),
-        space().width(CLEAR_WIDTH),
     ]
     .spacing(8)
     .align_y(Alignment::Center)
@@ -936,7 +1112,7 @@ fn pause_menu_key<'a>() -> Element<'a, Message> {
 }
 
 /// An action with the key or button that does it. Clicking the key waits
-/// for a new one.
+/// for a new one, or for Backspace, which leaves the action unset.
 fn binding_row(
     settings: &Settings,
     device: Device,
@@ -960,40 +1136,20 @@ fn binding_row(
             device, action,
         )));
 
-    let clear: Element<'_, Message> = if bound.is_some() && !capturing {
-        icon_button(
-            Icon::X,
-            String::from("Clear"),
-            Some(Message::Settings(SettingsMessage::ClearBinding(
-                device, action,
-            ))),
-        )
-    } else {
-        space().width(CLEAR_WIDTH).into()
-    };
-
-    row![text(action.label()).size(14).width(Fill), chip, clear]
+    row![text(action.label()).size(14).width(Fill), chip]
         .spacing(8)
         .align_y(Alignment::Center)
         .into()
 }
 
-/// The library's folders with a rescan button and a row that adds one, and
+/// The library's folders, each with a menu, and a row that adds one, and
 /// the box art switch.
 fn library_page<'a>(
     settings: &'a Settings,
     library: &'a Library,
+    box_art_problem: Option<&'a str>,
     rings: &Rings,
 ) -> Element<'a, Message> {
-    let rescan = rings.around(
-        small_button(
-            Icon::RefreshCw,
-            "Rescan",
-            Message::Library(LibraryMessage::Rescan),
-        ),
-        SettingsRow::Rescan,
-    );
-
     let mut folders: Vec<Element<'a, Message>> = settings
         .shared
         .library_folders
@@ -1008,7 +1164,7 @@ fn library_page<'a>(
         .collect();
     if folders.is_empty() {
         folders.push(group_row(
-            text("No folders yet. Add the folders that hold your ROMs.")
+            text("No folders yet. Add the folders that hold your games.")
                 .size(14)
                 .style(theme::muted_text),
             ROW_PADDING,
@@ -1030,29 +1186,39 @@ fn library_page<'a>(
     );
 
     let mut page = column![group(
-        "ROM folders",
-        Some(rescan),
+        "Game folders",
+        None,
         folders,
-        Some("Nubo looks for .gb, .gbc and .zip files in these folders."),
+        Some(
+            "Nubo looks for .gb, .gbc and .zip files in these folders, and sees new ones \
+             by itself. A folder's ⋯ menu has more."
+        ),
     )]
     .spacing(20);
 
     if box_art::AVAILABLE {
+        let mut rows = vec![rings.row(
+            setting(
+                "Download box art",
+                Some(String::from(
+                    "Games without box art show their title screen.",
+                )),
+                switch(settings.shared.download_box_art, |enabled| {
+                    Message::Library(LibraryMessage::DownloadBoxArtToggled(enabled))
+                }),
+            ),
+            SettingsRow::BoxArt,
+        )];
+        if let Some(problem) = box_art_problem {
+            rows.push(box_art_problem_row(
+                problem,
+                rings.is_focused(SettingsRow::RetryBoxArt),
+            ));
+        }
         page = page.push(group(
             "Box art",
             None,
-            vec![rings.row(
-                setting(
-                    "Download box art",
-                    Some(String::from(
-                        "Games without box art show their title screen.",
-                    )),
-                    switch(settings.shared.download_box_art, |enabled| {
-                        Message::Library(LibraryMessage::DownloadBoxArtToggled(enabled))
-                    }),
-                ),
-                SettingsRow::BoxArt,
-            )],
+            rows,
             Some(
                 "Pictures come from the libretro thumbnail collection. While this is on, the \
                  names of your games are sent to thumbnails.libretro.com, and the game lists \
@@ -1064,7 +1230,36 @@ fn library_page<'a>(
     page.into()
 }
 
-/// A library folder with its name, path, subfolder switch and remove button.
+/// The row that says box art couldn't be downloaded, with why in small
+/// print, and a button that tries again.
+fn box_art_problem_row(problem: &str, focused: bool) -> Element<'_, Message> {
+    let content = row![
+        icon(Icon::CloudOff).style(theme::warning_text),
+        column![
+            text("Couldn't reach the box art server, so cards show title screens for now.")
+                .size(13),
+            note_text(problem),
+        ]
+        .spacing(2)
+        .width(Fill),
+        small_button(
+            Icon::RefreshCw,
+            "Try again",
+            Message::Library(LibraryMessage::RetryBoxArt)
+        ),
+    ]
+    .spacing(12)
+    .align_y(Alignment::Center);
+
+    container(content)
+        .padding(ROW_PADDING)
+        .width(Fill)
+        .style(theme::notice_row(focused))
+        .into()
+}
+
+/// A library folder with its name and path, and a button that opens its
+/// menu (subfolders, showing it, scanning it again and removing it).
 fn folder_row(index: usize, folder: &LibraryFolder, missing: bool) -> Element<'_, Message> {
     let name = folder
         .path
@@ -1074,18 +1269,19 @@ fn folder_row(index: usize, folder: &LibraryFolder, missing: bool) -> Element<'_
         .into_owned();
 
     let symbol = if missing {
-        icon(Icon::TriangleAlert).style(|theme: &Theme| text::Style {
-            color: Some(theme.palette().danger),
-        })
+        icon(Icon::TriangleAlert).style(theme::danger_text)
     } else {
         icon(Icon::Folder).style(theme::accent_text)
     };
 
-    let detail = if missing {
+    let mut detail = if missing {
         format!("Not found: {}", folder.path.display())
     } else {
         folder.path.display().to_string()
     };
+    if !folder.include_subfolders {
+        detail.push_str(" · without subfolders");
+    }
 
     row![
         symbol,
@@ -1095,14 +1291,10 @@ fn folder_row(index: usize, folder: &LibraryFolder, missing: bool) -> Element<'_
         ]
         .spacing(3)
         .width(Fill),
-        text("Subfolders").size(12).style(theme::muted_text),
-        switch(folder.include_subfolders, move |include| {
-            Message::Library(LibraryMessage::IncludeSubfolders(index, include))
-        }),
         icon_button(
-            Icon::Trash2,
-            String::from("Remove folder"),
-            Some(Message::Library(LibraryMessage::RemoveFolder(index))),
+            Icon::Ellipsis,
+            String::from("More"),
+            Some(Message::Library(LibraryMessage::OpenFolderMenu(index))),
         ),
     ]
     .spacing(12)

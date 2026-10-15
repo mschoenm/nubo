@@ -65,6 +65,9 @@ pub struct Game {
     menu_selection: usize,
     /// What the player is typing on the cheats page.
     pub cheat_form: CheatForm,
+    /// Whether the Super Game Boy page shows the editor for the player's
+    /// own colors.
+    pub sgb_editor_open: bool,
     /// In fullscreen the bar shows until this moment, after the mouse last
     /// moved.
     controls_shown_until: Instant,
@@ -86,6 +89,7 @@ impl Game {
             menu: None,
             menu_selection: 0,
             cheat_form: CheatForm::default(),
+            sgb_editor_open: false,
             controls_shown_until: Instant::now() + CONTROLS_TIMEOUT,
             cursor_near_bar: false,
             keeps_data,
@@ -145,6 +149,13 @@ impl Game {
     /// is near the top, and for a moment after it moved.
     pub fn controls_visible(&self) -> bool {
         self.is_paused() || self.cursor_near_bar || Instant::now() < self.controls_shown_until
+    }
+
+    /// Whether to hide the mouse pointer over the picture: while the game
+    /// runs and the mouse hasn't moved for a moment, as for the fullscreen
+    /// bar.
+    pub fn pointer_hidden(&self) -> bool {
+        !self.is_paused() && !self.cursor_near_bar && Instant::now() >= self.controls_shown_until
     }
 
     /// Whether the fullscreen bar is shown only until a moment still to
