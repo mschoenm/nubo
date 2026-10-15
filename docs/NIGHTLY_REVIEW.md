@@ -24,10 +24,10 @@ Commands taking longer than a minute or two (builds, `cargo test-roms`, benchmar
 4. The day's changes are `git log --reverse <changes_since>..origin/main`; without `changes_since`, the commits of the last 26 hours. Read their diffs, all files including docs. Beyond about 3,000 changed lines, review the files with the most changes and list the rest as not reviewed.
 5. Read last night's CI: `gh api 'repos/mschoenm/nubo/actions/workflows/nightly.yml/runs?event=schedule&per_page=1'` gives the newest scheduled run (runs started by hand don't count), with its `run_started_at` (UTC), `status`, `conclusion`, `head_sha` and `html_url`. GitHub holds scheduled runs back, sometimes for hours, when Actions is busy, and under heavy load can drop one, so it is one of three cases:
    - **Tonight's run, finished** (started after tonight's 01:17 Amsterdam time, `status` `completed`): read its `conclusion` and the Regressions section of `/tmp/wiki/Nightly-metrics.md`. When it passed, `nightly-build.yml` should have published it as the `nightly` pre-release: the `nightly` tag points to its `head_sha` (`gh api repos/mschoenm/nubo/git/ref/tags/nightly --jq .object.sha`) and the release has 8 downloads, two Flatpaks, the Windows installer and zip and four RetroArch cores (`gh api repos/mschoenm/nubo/releases/tags/nightly --jq '.assets | length'`). If not, the newest `nightly-build.yml` run (read like the nightly run) says why, or that it is still running.
-   - **Tonight's run, still going** (`status` `queued` or `in_progress`): review with the metrics and part the wiki has (step 3 if `tonight.json` is not today's). A night takes about 20 minutes, so judge it by how long ago `run_started_at` was, whenever it started: under an hour, report under Metrics that the nightly CI started late and is still running; over an hour, it is stuck: open the issue `Nightly: the CI run is stuck` with its link, the way section 6 opens one for a failed nightly job.
+   - **Tonight's run, still going** (`status` `queued` or `in_progress`): review with the metrics and part the wiki has (step 3 if `tonight.json` is not today's). A night takes about 20 minutes, so judge it by how long ago `run_started_at` was, whenever it started: under an hour, report under Metrics that the nightly CI started late and is still running; over an hour, it is stuck: report `The nightly CI run is stuck` with its link under Problems (section 6).
    - **No run since tonight's 01:17:** report under Metrics that the nightly CI is late and hasn't started yet, and review as in the case before.
 
-   A late night gets no issue, unless the night before had no scheduled run either (the newest one started before yesterday's 01:17): then open the issue `Nightly: the scheduled CI run didn't start`, the way section 6 opens one for a failed nightly job.
+   A late night is no problem, unless the night before had no scheduled run either (the newest one started before yesterday's 01:17): then report `The scheduled nightly CI run didn't start` under Problems (section 6).
 6. Look for an open pull request of an earlier night: `gh api 'repos/mschoenm/nubo/pulls?state=open&per_page=100' --jq '.[] | select(.head.ref | startswith("claude/nightly-")) | .number'`.
 
 ## 3. Review
@@ -72,18 +72,19 @@ The last one proves every frame, audio sample and end state is unchanged. A chan
 
 ## 6. Report
 
-GitHub's GraphQL API is blocked in routines, so `gh pr create` and `gh issue` don't work: use the REST API with `gh api`, and write long text to a file and pass it with `-F body=@file`.
+GitHub's GraphQL API is blocked in routines, so `gh pr create` doesn't work: use the REST API with `gh api`, and write long text to a file and pass it with `-F body=@file`. Issues are turned off on this repository, so everything goes into the night's pull request: problems (a regressed metric, a failed or stuck nightly CI job, a nightly build that couldn't be published, a run of this review that couldn't finish) go into its **Problems** section, first, so they are seen.
 
 - **When you changed something and no earlier nightly PR is open:** push the branch `claude/nightly-<date>` (based on `origin/main`) and open a pull request with `gh api repos/mschoenm/nubo/pulls -f title="Nightly review <date>" -f head=claude/nightly-<date> -f base=main -F body=@/tmp/pr.md`. Its description has these sections:
-  1. **Summary:** what changed and why, in a few lines.
-  2. **Changes:** a table of file, what changed and why.
-  3. **Verification:** the commands above and their results, including that the fingerprints matched.
-  4. **Metrics:** last night against the 14-night medians from the wiki page, with anything flagged.
-  5. **Suggestions:** what you didn't change and why, most important first.
-  6. **Reviewed:** the commit range of the day's changes and tonight's part, with its files.
-- **When an earlier nightly PR is still open:** make no new changes; add tonight's findings to it as a comment: `gh api repos/mschoenm/nubo/issues/<number>/comments -F body=@/tmp/comment.md`.
-- **When a metric regressed, a nightly CI job failed or the nightly build couldn't be published:** open an issue titled `Nightly: <what>` with the numbers, the CI run's link and the commits since the last good night, unless an open issue with that title exists; then add a comment to it. Look with `gh api 'repos/mschoenm/nubo/issues?state=open&per_page=100'`.
-- **When the run can't finish** (setup fails, a tool is missing): open an issue `Nightly review failed: <date>` saying where and why.
-- **When there is nothing to fix and nothing regressed:** no pull request and no issue.
+  1. **Problems:** each problem with its numbers, the CI run's link and the commits since the last good night; leave the section out when there are none.
+  2. **Summary:** what changed and why, in a few lines.
+  3. **Changes:** a table of file, what changed and why.
+  4. **Verification:** the commands above and their results, including that the fingerprints matched.
+  5. **Metrics:** last night against the 14-night medians from the wiki page, with anything flagged.
+  6. **Suggestions:** what you didn't change and why, most important first.
+  7. **Reviewed:** the commit range of the day's changes and tonight's part, with its files.
+- **When an earlier nightly PR is still open:** make no new changes; add tonight's findings to it as a comment, problems first: `gh api repos/mschoenm/nubo/issues/<number>/comments -F body=@/tmp/comment.md`.
+- **When there are problems but nothing to change:** push `claude/nightly-<date>` with one empty commit (`git commit --allow-empty -m "Nightly review <date>"`) and open the pull request as above, as the night's report, with its Problems and whatever else you found. The maintainer closes it once it's read; it has nothing to merge.
+- **When the run can't finish** (setup fails, a tool is missing): report it the same way, as the problem `The nightly review couldn't finish`, saying where and why.
+- **When there is nothing to fix and no problem:** no pull request.
 
 Never merge, push to `main`, force-push, delete branches or write to the wiki. End with a short summary of what you reviewed, what you changed and what you reported.
