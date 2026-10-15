@@ -350,8 +350,13 @@ publish the table at gbdev.io/GBEmulatorShootout.
 Shootout's `main` at `38b926b`. Besides the three changes above it adds `ci-nubo.yml` and a row in
 `ci-all.yml`, the per-emulator CI workflows the Shootout's GSE pull request added too. Its
 `emulators/nubo.py` is `.github/shootout/nubo.py` without the header comment; keep the two the same.
-The pull request waits for the release with the maintainer's last changes (0.9.2), a local run on
-Windows with it, and the maintainer's sign-off on its description.
+**Opened** on 2026-10-15 as
+[gbdev/GBEmulatorShootout#102](https://github.com/gbdev/GBEmulatorShootout/pull/102), after 0.9.2 and
+a local run on Windows with it: 261 passed, none failed, and `which.gb` (DMG and CGB) and
+`daid/rom_and_ram.gb` only report information. `--get-startuptime` measured 1.44 s (DMG), 1.38 s
+(CGB) and 1.34 s (SGB). The Shootout had four other pull requests adding emulators open since before
+July, so it may wait a while; they touch the same lines of `main.py` and the README, so it may need
+a rebase.
 
 Afterwards, mark Phase 6 step 2 as done in ACCURACY_PLAN.md. CI runs the harness on every release
 (Part 3), so a release that would lose a row fails before it is published; when one gains rows, ask the
