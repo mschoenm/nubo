@@ -8,7 +8,33 @@ and with real GNOME window borders where a listing wants them.
 
 ## Status
 
-Signed off by the maintainer; being built. Update this section as the steps get done.
+Steps 1 to 7 are built (see Order of work); step 8, the full nightly run after merging, is left, and then
+the new screenshots. Checked in a cloud session: every kind of picture (`none`, `gnome`, `fullscreen`,
+`game`, variants side by side, a scene of the library) comes out the same pixel for pixel when made again,
+a scene recorded with Ctrl+F12 renders exactly like its preview, and a scene from `explore` renders exactly
+like its preview at 1×. No screenshot in the README or the Flathub listing is replaced yet:
+`images/screenshots.toml` lists none, and `images/scenes/` holds only `games.toml`.
+
+Where the build differs from the plan below:
+
+- **A fourth frame, `game`:** the game's picture alone at a whole scale, as the app's `--scale` shows it, for
+  pictures such as the palettes side by side.
+- **Screenshots can open another page:** `pause_menu` and `settings_tab` in `images/screenshots.toml` (and the
+  `capture` command's `--pause-menu` and `--settings-tab`) open another page of the pause menu or another
+  settings tab than the scene has open, or close it with `none`.
+- **`cargo save-states` doesn't load the scenes' states.** It would need the scenes' games downloaded in the
+  nightly run, which keeps the screenshots out of CI. The save state rule covers them all the same: a scene's
+  state is stored in a layout `cargo save-states` keeps, and `cargo xtask screenshots` loads every state it
+  renders.
+- **GNOME 46's border:** GNOME draws the border of an XWayland window with GTK 4, so on GNOME 46 (Ubuntu
+  24.04, which cloud sessions and GitHub's runners have) it has the shadow and rounded top corners, square
+  bottom corners and plain window buttons, not libadwaita's round ones. A newer GNOME would draw a newer
+  border, and GNOME's version decides the pixels of those pictures.
+- **The recorder's preview** leaves out the toasts and isn't taken while a question is open, since scenes keep
+  neither, and the scene keeps the light or dark look on screen rather than "System". `--record-scenes`
+  refuses `--fresh` too, which hides the save state rows a capture shows.
+- **Explore's previews** show the game's picture alone, as the app shows it with the default settings, not
+  the whole window.
 
 ## Scenes: recorded moments
 
@@ -21,8 +47,7 @@ A scene is a folder with:
 - `preview.png`: what was on screen, to check the renders against.
 
 The scenes that published screenshots use are kept in `images/scenes/` (about 30 KB each in git). They
-fall under the rule that players never lose a save state to an update, and `cargo save-states` loads
-them too (well under a second).
+fall under the rule that players never lose a save state to an update.
 
 Scenes are made two ways:
 
