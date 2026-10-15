@@ -104,9 +104,12 @@ impl Gpu {
         let bg_window_enabled = self.bg_window_enabled();
         let mut ran = 0;
         while ran < dots {
-            if let Some((position, fractional_scrolling)) = (dots - ran >= FIFO_LENGTH as u32 - 1)
-                .then(|| self.line_start_end())
-                .flatten()
+            // The line's start comes once a line, so most dots skip `line_start_end` at once.
+            let maybe_line_start = dots - ran >= FIFO_LENGTH as u32 - 1
+                && self.pipeline.fetcher_state == FetcherState::GetTileT2
+                && self.pipeline.position_in_line >= POSITION_LINE_START;
+            if let Some((position, fractional_scrolling)) =
+                maybe_line_start.then(|| self.line_start_end()).flatten()
             {
                 self.skip_line_start(position, fractional_scrolling);
                 ran += FIFO_LENGTH as u32 - 1;
@@ -233,28 +236,34 @@ impl Gpu {
                         .any(|&dot| position + dot + WX_OFFSET == wx))
         };
 
-        let mut row = self.pipeline.bg_fifo;
         let mut position = start_position;
+        let mut next_pixel =
+            usize::from(self.ly) * GB_SCREEN_WIDTH as usize + usize::from(self.pipeline.lcd_x);
+        let mut window_tile_x = self.pipeline.window_tile_x;
+        let mut fetched_row = self.pipeline.fetched_row();
+        // The first tile's row is the background FIFO's; the next ones are the rows fetched.
+        let first_row = self.pipeline.bg_fifo;
+        let (mut lower, mut upper, mut palette) =
+            (first_row.lower, first_row.upper, first_row.palette);
         // The pixels of the first tile that are before the screen.
         let hidden_pixels = if self.pipeline.is_on_screen() {
             0
         } else {
             0u8.wrapping_sub(start_position)
         };
-        let mut next_pixel =
-            usize::from(self.ly) * GB_SCREEN_WIDTH as usize + usize::from(self.pipeline.lcd_x);
+        let mut shown = FIFO_LENGTH - usize::from(hidden_pixels);
         let mut tiles = 0;
-        let mut window_tile_x = self.pipeline.window_tile_x;
-        let mut fetched_row = self.pipeline.fetched_row();
         loop {
-            if tiles == 0 && hidden_pixels > 0 {
-                let shown = FIFO_LENGTH - usize::from(hidden_pixels);
-                self.draw_tile_row_end(colors, bg_enabled, row, next_pixel, shown);
-                next_pixel += shown;
-            } else {
-                self.draw_tile_row(colors, bg_enabled, row, next_pixel);
-                next_pixel += FIFO_LENGTH;
-            }
+            self.draw_tile_row(
+                colors,
+                bg_enabled,
+                [lower, upper],
+                palette,
+                next_pixel,
+                shown,
+            );
+            next_pixel += shown;
+            shown = FIFO_LENGTH;
             fetched_row = self.fetch_row(
                 fetcher,
                 position.wrapping_add(1),
@@ -264,7 +273,8 @@ impl Gpu {
             if fetcher.wx_triggered {
                 window_tile_x = (window_tile_x + 1) % TILE_MAP_WIDTH;
             }
-            row = fetched_row.as_fifo();
+            [lower, upper] = fetched_row.pixel_order_bytes();
+            palette = fetched_row.attributes & PALETTE_BITS;
             position = position.wrapping_add(FIFO_LENGTH as u8);
             tiles += 1;
             if tiles == max_tiles || !next_tile_is_plain(position) {
@@ -464,21 +474,23 @@ impl Gpu {
             attributes
         };
 
-        let mut tile_address = if fetcher.unsigned_tile_data {
-            u16::from(tile) * TILE_BYTES
+        // The signed ($8800) method's tile -128 to 127 is, from 0x0800, tile 0 to 255 with the top
+        // bit flipped, so both methods are a start plus a tile number (see `tile_data_address`).
+        let (data_start, tile_number_flip) = if fetcher.unsigned_tile_data {
+            (0, 0)
         } else {
-            SIGNED_TILE_DATA_CENTER
-                .wrapping_add_signed(i16::from(tile.cast_signed()) * TILE_BYTES.cast_signed())
+            (SIGNED_TILE_DATA_CENTER - 128 * TILE_BYTES, 0x80)
         };
-        if is_bit_set(attributes, VRAM_BANK_BIT) {
-            tile_address += VRAM_BANK_SIZE;
-        }
+        let bank_start = u16::from(attributes & (1 << VRAM_BANK_BIT)) << 10;
         let y_flip = if is_bit_set(attributes, Y_FLIP_BIT) {
             7
         } else {
             0
         };
-        let low_address = tile_address + u16::from(fetcher.y_in_tile ^ y_flip) * 2;
+        let low_address = data_start
+            + bank_start
+            + u16::from(tile ^ tile_number_flip) * TILE_BYTES
+            + u16::from(fetcher.y_in_tile ^ y_flip) * 2;
         let high_address = low_address + 1;
         FetchedRow {
             tile_index_address,
@@ -534,7 +546,15 @@ impl Gpu {
     fn draw_background_tile(&mut self, colors: PixelColors, bg_enabled: bool) {
         let first_pixel =
             usize::from(self.ly) * GB_SCREEN_WIDTH as usize + usize::from(self.pipeline.lcd_x);
-        self.draw_tile_row(colors, bg_enabled, self.pipeline.bg_fifo, first_pixel);
+        let row = self.pipeline.bg_fifo;
+        self.draw_tile_row(
+            colors,
+            bg_enabled,
+            [row.lower, row.upper],
+            row.palette,
+            first_pixel,
+            FIFO_LENGTH,
+        );
 
         self.line_dot += FIFO_LENGTH as u16;
         let pipeline = &mut self.pipeline;
@@ -546,58 +566,47 @@ impl Gpu {
         self.take_tile_steps(|gpu, pixels| gpu.move_on_in_tile(position, pixels));
     }
 
-    /// Draws the eight pixels of the background row `row` into the frame buffer from
-    /// `first_pixel` on, with the colors from `colors` (only color 0 unless `bg_enabled`).
+    /// Draws the last `shown` of the eight pixels of a background tile row into the frame buffer
+    /// from `first_pixel` on (all eight but for a row whose first pixels are before the screen):
+    /// `bytes` are its low and high bitplanes in the order the pixels come out, `palette` its CGB
+    /// palette, and the colors come from `colors` (only color 0 unless `bg_enabled`).
     /// Always inlined so that `colors` is a constant in it (see `PixelColors`).
     #[inline(always)]
     fn draw_tile_row(
         &mut self,
         colors: PixelColors,
         bg_enabled: bool,
-        row: BackgroundFifo,
-        first_pixel: usize,
-    ) {
-        let row_color = |color_id: u8| {
-            self.background_color_in(colors, row.palette, if bg_enabled { color_id } else { 0 })
-        };
-        let row_colors = [row_color(0), row_color(1), row_color(2), row_color(3)];
-        let color_ids =
-            SPREAD_BITS[usize::from(row.lower)] | (SPREAD_BITS[usize::from(row.upper)] << 1);
-        let targets = self
-            .frame_buffer
-            .get_mut(first_pixel..first_pixel + FIFO_LENGTH);
-        debug_assert!(targets.is_some(), "{FRAME_BUFFER_BOUNDS}");
-        if let Some(targets) = targets {
-            for (pixel, target) in targets.iter_mut().enumerate() {
-                *target = row_colors[usize::from((color_ids >> (14 - 2 * pixel)) & 3)];
-            }
-        }
-    }
-
-    /// Draws the last `shown` pixels of the background row `row` into the frame buffer from
-    /// `first_pixel` on, like `draw_tile_row`, for a row whose first pixels are before the screen.
-    /// Always inlined so that `colors` is a constant in it (see `PixelColors`).
-    #[inline(always)]
-    fn draw_tile_row_end(
-        &mut self,
-        colors: PixelColors,
-        bg_enabled: bool,
-        row: BackgroundFifo,
+        bytes: [u8; 2],
+        palette: u8,
         first_pixel: usize,
         shown: usize,
     ) {
         let row_color = |color_id: u8| {
-            self.background_color_in(colors, row.palette, if bg_enabled { color_id } else { 0 })
+            self.background_color_in(colors, palette, if bg_enabled { color_id } else { 0 })
         };
         let row_colors = [row_color(0), row_color(1), row_color(2), row_color(3)];
         let color_ids =
-            SPREAD_BITS[usize::from(row.lower)] | (SPREAD_BITS[usize::from(row.upper)] << 1);
-        let hidden = FIFO_LENGTH - shown;
-        let targets = self.frame_buffer.get_mut(first_pixel..first_pixel + shown);
-        debug_assert!(targets.is_some(), "{FRAME_BUFFER_BOUNDS}");
-        if let Some(targets) = targets {
-            for (pixel, target) in (hidden..).zip(targets.iter_mut()) {
-                *target = row_colors[usize::from((color_ids >> (14 - 2 * pixel)) & 3)];
+            SPREAD_BITS[usize::from(bytes[0])] | (SPREAD_BITS[usize::from(bytes[1])] << 1);
+        let color = |pixel: usize| row_colors[usize::from((color_ids >> (14 - 2 * pixel)) & 3)];
+        if shown == FIFO_LENGTH {
+            // A whole row, which the compiler unrolls.
+            let targets = self
+                .frame_buffer
+                .get_mut(first_pixel..first_pixel + FIFO_LENGTH);
+            debug_assert!(targets.is_some(), "{FRAME_BUFFER_BOUNDS}");
+            if let Some(targets) = targets {
+                for (pixel, target) in targets.iter_mut().enumerate() {
+                    *target = color(pixel);
+                }
+            }
+        } else {
+            let hidden = FIFO_LENGTH - shown;
+            let targets = self.frame_buffer.get_mut(first_pixel..first_pixel + shown);
+            debug_assert!(targets.is_some(), "{FRAME_BUFFER_BOUNDS}");
+            if let Some(targets) = targets {
+                for (pixel, target) in (hidden..).zip(targets.iter_mut()) {
+                    *target = color(pixel);
+                }
             }
         }
     }
@@ -791,6 +800,16 @@ struct FetchedRow {
 }
 
 impl FetchedRow {
+    /// The row's low and high bitplanes in the order its pixels come out of the FIFO: reversed
+    /// for a tile flipped horizontally (see `BackgroundFifo::push_row`).
+    fn pixel_order_bytes(self) -> [u8; 2] {
+        if is_bit_set(self.attributes, X_FLIP_BIT) {
+            [self.bytes[0].reverse_bits(), self.bytes[1].reverse_bits()]
+        } else {
+            self.bytes
+        }
+    }
+
     /// The background FIFO full of this row, as the fetcher pushes it.
     fn as_fifo(self) -> BackgroundFifo {
         let mut fifo = BackgroundFifo::default();
