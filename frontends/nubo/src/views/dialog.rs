@@ -52,7 +52,7 @@ pub fn view<'a>(dialog: &Dialog, content: DialogContent) -> Element<'a, Message>
                 )
                 .padding([8, 16])
                 .style(style)
-                .on_press(choice.action.into_message());
+                .on_press_maybe(choice.enabled.then(|| choice.action.into_message()));
                 container(button)
                     .padding(3)
                     .style(theme::focus_ring(index == selection))

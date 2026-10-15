@@ -21,14 +21,26 @@ fn labels(content: &DialogContent) -> (Vec<&str>, Vec<&str>) {
     )
 }
 
+/// The button that does the reset, the last choice.
+fn reset_button(content: &DialogContent) -> &Choice {
+    content.choices.last().unwrap()
+}
+
 #[test]
-fn the_reset_starts_with_nothing_ticked_and_its_boxes_above_its_buttons() {
+fn starting_over_ticks_only_the_settings_and_puts_the_boxes_above_the_buttons() {
     let content = reset_question(ResetChoices::default(), EVERYTHING);
 
     let first_button = content.choices.iter().position(|choice| !choice.checkbox);
-    assert_eq!(first_button, Some(4));
-    assert!(content.choices.iter().all(|choice| !choice.checked));
+    assert_eq!(first_button, Some(5));
+    assert_eq!(labels(&content).0[0], "Reset settings");
+    let ticked: Vec<bool> = content
+        .choices
+        .iter()
+        .map(|choice| choice.checked)
+        .collect();
+    assert_eq!(ticked, [true, false, false, false, false, false, false]);
     assert_eq!(labels(&content).1, ["Cancel", "Reset"]);
+    assert!(reset_button(&content).enabled);
     assert!(!content.notice.unwrap().warning);
 }
 
@@ -43,7 +55,14 @@ fn only_what_is_offered_gets_a_box() {
 
     let content = reset_question(ResetChoices::default(), offers);
 
-    assert_eq!(labels(&content).0.len(), 2);
+    assert_eq!(
+        labels(&content).0,
+        [
+            "Reset settings",
+            "Remove game folders",
+            "Clear Continue playing"
+        ]
+    );
     assert!(
         content
             .text
@@ -57,7 +76,7 @@ fn ticking_a_box_changes_only_its_choice() {
     let content = reset_question(ResetChoices::default(), EVERYTHING);
 
     let DialogAction::Stay(Message::Dialog(DialogMessage::ResetChoicesChanged(changed))) =
-        &content.choices[2].action
+        &content.choices[3].action
     else {
         panic!("a box should keep the dialog open and change the choices");
     };
@@ -79,11 +98,47 @@ fn deleting_saves_warns_and_names_the_button_after_it() {
 
     let content = reset_question(choices, EVERYTHING);
 
-    assert!(content.choices[0].checked);
+    assert!(content.choices[1].checked);
     assert_eq!(labels(&content).1, ["Cancel", "Reset and delete"]);
     let notice = content.notice.unwrap();
     assert!(notice.warning);
     assert_eq!(notice.text, "Deleted saves can't be brought back.");
+}
+
+#[test]
+fn the_button_says_what_it_does_without_the_settings() {
+    let only_saves = ResetChoices {
+        reset_settings: false,
+        delete_save_states: true,
+        ..ResetChoices::default()
+    };
+    let only_recent = ResetChoices {
+        reset_settings: false,
+        clear_recently_played: true,
+        ..ResetChoices::default()
+    };
+
+    assert_eq!(
+        reset_button(&reset_question(only_saves, EVERYTHING)).label,
+        "Delete"
+    );
+    assert_eq!(
+        reset_button(&reset_question(only_recent, EVERYTHING)).label,
+        "Clear"
+    );
+}
+
+#[test]
+fn nothing_ticked_greys_the_button_out() {
+    let nothing = ResetChoices {
+        reset_settings: false,
+        ..ResetChoices::default()
+    };
+
+    let content = reset_question(nothing, EVERYTHING);
+
+    assert!(!reset_button(&content).enabled);
+    assert!(content.choices[..6].iter().all(|choice| choice.enabled));
 }
 
 #[test]
