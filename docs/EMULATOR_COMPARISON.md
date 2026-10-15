@@ -59,28 +59,28 @@ The other emulators are only built and run on the machine that runs the comparis
 
 ## Results
 
-On a shared cloud machine (4 cores of an Intel Xeon at 2.1 GHz) on 2026-10-13, with the commits pinned in `compare_emulators.rs`:
+On a shared cloud machine (4 cores of an Intel Xeon at 2.1 GHz) on 2026-10-15, Nubo at commit `6b06267` and the others at the commits pinned in `compare_emulators.rs`:
 
 | Best of 3 rounds of 30 s | Nubo | Nubo eager | SameBoy | Gambatte | mGBA | binjgb | Gearboy |
 |---|---|---|---|---|---|---|---|
-| Geometrix DMG | 47.7x | 10.8x | 17.3x | 206.7x | 81.1x | 93.3x | 67.8x |
-| Geometrix CGB | 56.4x | 12.9x | 20.6x | 190.3x | 72.2x | 84.0x | 61.4x |
-| Tobu Tobu Girl DMG | 80.3x | 10.8x | 18.1x | 309.2x | 108.9x | 82.3x | 58.2x |
-| Tobu Tobu Girl CGB | 69.5x | 13.3x | 22.7x | 242.9x | 90.9x | 76.7x | 61.1x |
-| µCity DMG | 126.0x | 12.2x | 20.4x | 408.1x | 123.9x | 95.3x | 78.8x |
-| µCity CGB | 75.7x | 8.7x | 13.9x | 228.1x | 108.3x | 75.3x | 43.6x |
+| Geometrix DMG | 49.7x | 8.9x | 15.5x | 191.2x | 74.4x | 72.3x | 54.6x |
+| Geometrix CGB | 61.3x | 10.4x | 19.0x | 161.5x | 72.1x | 69.1x | 49.7x |
+| Tobu Tobu Girl DMG | 93.6x | 8.7x | 16.2x | 275.2x | 90.4x | 66.2x | 46.8x |
+| Tobu Tobu Girl CGB | 82.8x | 10.5x | 19.9x | 214.8x | 83.4x | 68.0x | 47.9x |
+| µCity DMG | 155.2x | 9.5x | 19.8x | 348.9x | 122.7x | 66.7x | 62.0x |
+| µCity CGB | 92.8x | 6.7x | 12.7x | 212.0x | 86.2x | 57.1x | 39.0x |
 
-Nubo ran 2.7 to 6.2 times as fast as SameBoy, all of it from its lazy shortcuts: running every M-cycle on its own (Nubo eager), it is about 0.6 times as fast. Gambatte was 3 to 4.3 times as fast as Nubo, mGBA 1 to 1.7 times, binjgb 0.8 to 2 times and Gearboy 0.6 to 1.4 times.
+Nubo ran 3.2 to 7.8 times as fast as SameBoy, all of it from its lazy shortcuts: running every M-cycle on its own (Nubo eager), it is about 0.5 times as fast. Gambatte was 2.2 to 3.9 times as fast as Nubo, mGBA 0.8 to 1.5 times, binjgb 0.4 to 1.5 times and Gearboy 0.4 to 1.1 times.
 
 With `--instructions`, in millions of instructions per emulated second over 10 s:
 
 | Instructions | Nubo | Nubo eager | SameBoy | Gambatte | mGBA | binjgb | Gearboy |
 |---|---|---|---|---|---|---|---|
-| Geometrix DMG | 194 | 1,192 | 734 | 70 | 121 | 158 | 203 |
-| Geometrix CGB | 239 | 1,016 | 618 | 92 | 126 | 164 | 205 |
-| Tobu Tobu Girl DMG | 138 | 1,185 | 690 | 58 | 109 | 174 | 241 |
-| Tobu Tobu Girl CGB | 206 | 985 | 550 | 82 | 115 | 177 | 227 |
-| µCity DMG | 125 | 1,178 | 644 | 54 | 92 | 155 | 202 |
-| µCity CGB | 213 | 1,492 | 905 | 84 | 126 | 215 | 288 |
+| Geometrix DMG | 157 | 1,189 | 735 | 70 | 121 | 158 | 203 |
+| Geometrix CGB | 179 | 1,011 | 618 | 92 | 126 | 164 | 205 |
+| Tobu Tobu Girl DMG | 100 | 1,187 | 690 | 58 | 109 | 174 | 241 |
+| Tobu Tobu Girl CGB | 147 | 981 | 550 | 82 | 115 | 177 | 227 |
+| µCity DMG | 86 | 1,180 | 644 | 54 | 92 | 155 | 202 |
+| µCity CGB | 154 | 1,491 | 905 | 84 | 126 | 215 | 288 |
 
-Nubo ran 2.6 to 5.2 times fewer instructions than SameBoy, about as much as its lead in time, though its skip-ahead code costs more time per instruction.
+Nubo ran 3.4 to 7.5 times fewer instructions than SameBoy, about as much as its lead in time, though its skip-ahead code costs more time per instruction. On 2026-10-13, before the work in [SPEED_PLAN.md](SPEED_PLAN.md), Nubo ran 125 to 239 M instructions per emulated second on the same games and 47.7x to 126.0x in time (the machine of that day ran the other emulators about 10% faster).
