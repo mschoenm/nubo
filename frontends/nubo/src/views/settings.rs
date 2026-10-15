@@ -25,6 +25,12 @@ use nubo_frontend::save_states;
 use nubo_frontend::settings::{FastForwardSpeed, LibraryFolder};
 
 const WIDTH: f32 = 700.0;
+/// The page of this version's release notes.
+const RELEASE_NOTES: &str = concat!(
+    env!("CARGO_PKG_REPOSITORY"),
+    "/releases/tag/v",
+    env!("CARGO_PKG_VERSION")
+);
 /// The tallest the window gets. Below that it fills the app's window, less
 /// the margin `views::modal` leaves around it.
 const MAX_HEIGHT: f32 = 640.0;
@@ -48,9 +54,6 @@ const BINDING_ROW_PADDING: Padding = Padding {
 const HEADING_HEIGHT: f32 = 28.0;
 /// The width of the chips that show the key or button of an action.
 const CHIP_WIDTH: f32 = 140.0;
-/// The width of the clear button next to a chip, kept free when there is
-/// nothing to clear so the chips line up.
-const CLEAR_WIDTH: f32 = 34.0;
 
 /// A page of the settings window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -193,7 +196,6 @@ pub enum SettingsRow {
     Device,
     ResetControls,
     Binding(Action),
-    Rescan,
     /// A library folder, by its place in the list.
     Folder(usize),
     AddFolder,
@@ -241,7 +243,6 @@ pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec
             rows.push(SettingsRow::ResetControls);
         }
         SettingsTab::Library => {
-            rows.push(SettingsRow::Rescan);
             rows.extend((0..settings.shared.library_folders.len()).map(SettingsRow::Folder));
             rows.push(SettingsRow::AddFolder);
             if box_art::AVAILABLE {
@@ -841,9 +842,26 @@ fn about<'a>() -> Element<'a, Message> {
     let rows = vec![
         group_row(
             setting(
+                "What's new",
+                Some(String::from(concat!(
+                    "The changes in Nubo ",
+                    env!("CARGO_PKG_VERSION"),
+                    ", on GitHub."
+                ))),
+                small_button(Icon::ExternalLink, "Open", Message::OpenLink(RELEASE_NOTES)),
+            ),
+            ROW_PADDING,
+            false,
+        ),
+        group_row(
+            setting(
                 "Source code",
-                None,
-                text(env!("CARGO_PKG_REPOSITORY")).size(13),
+                Some(String::from(env!("CARGO_PKG_REPOSITORY"))),
+                small_button(
+                    Icon::ExternalLink,
+                    "Open",
+                    Message::OpenLink(env!("CARGO_PKG_REPOSITORY")),
+                ),
             ),
             ROW_PADDING,
             false,
@@ -946,11 +964,12 @@ fn controls<'a>(
         }
         Device::Controller if page.controllers.is_empty() => String::from(
             "No controller connected. Click a button, then press the new one on your \
-             controller. The left stick always works as the D-pad.",
+             controller; Backspace leaves it unset. The left stick always works as the \
+             D-pad.",
         ),
         Device::Controller => format!(
-            "Connected: {}. Click a button, then press the new one. The left stick always \
-             works as the D-pad.",
+            "Connected: {}. Click a button, then press the new one; Backspace leaves it \
+             unset. The left stick always works as the D-pad.",
             page.controllers.join(", ")
         ),
     };
@@ -1011,7 +1030,6 @@ fn pause_menu_key<'a>() -> Element<'a, Message> {
             .padding([5, 12])
             .width(CHIP_WIDTH)
             .style(theme::binding_chip(false, false)),
-        space().width(CLEAR_WIDTH),
     ]
     .spacing(8)
     .align_y(Alignment::Center)
@@ -1019,7 +1037,7 @@ fn pause_menu_key<'a>() -> Element<'a, Message> {
 }
 
 /// An action with the key or button that does it. Clicking the key waits
-/// for a new one.
+/// for a new one, or for Backspace, which leaves the action unset.
 fn binding_row(
     settings: &Settings,
     device: Device,
@@ -1043,25 +1061,13 @@ fn binding_row(
             device, action,
         )));
 
-    let clear: Element<'_, Message> = if bound.is_some() && !capturing {
-        icon_button(
-            Icon::X,
-            String::from("Clear"),
-            Some(Message::Settings(SettingsMessage::ClearBinding(
-                device, action,
-            ))),
-        )
-    } else {
-        space().width(CLEAR_WIDTH).into()
-    };
-
-    row![text(action.label()).size(14).width(Fill), chip, clear]
+    row![text(action.label()).size(14).width(Fill), chip]
         .spacing(8)
         .align_y(Alignment::Center)
         .into()
 }
 
-/// The library's folders with a rescan button and a row that adds one, and
+/// The library's folders, each with a menu, and a row that adds one, and
 /// the box art switch.
 fn library_page<'a>(
     settings: &'a Settings,
@@ -1069,15 +1075,6 @@ fn library_page<'a>(
     box_art_problem: Option<&'a str>,
     rings: &Rings,
 ) -> Element<'a, Message> {
-    let rescan = rings.around(
-        small_button(
-            Icon::RefreshCw,
-            "Rescan",
-            Message::Library(LibraryMessage::Rescan),
-        ),
-        SettingsRow::Rescan,
-    );
-
     let mut folders: Vec<Element<'a, Message>> = settings
         .shared
         .library_folders
@@ -1092,7 +1089,7 @@ fn library_page<'a>(
         .collect();
     if folders.is_empty() {
         folders.push(group_row(
-            text("No folders yet. Add the folders that hold your ROMs.")
+            text("No folders yet. Add the folders that hold your games.")
                 .size(14)
                 .style(theme::muted_text),
             ROW_PADDING,
@@ -1114,10 +1111,13 @@ fn library_page<'a>(
     );
 
     let mut page = column![group(
-        "ROM folders",
-        Some(rescan),
+        "Game folders",
+        None,
         folders,
-        Some("Nubo looks for .gb, .gbc and .zip files in these folders."),
+        Some(
+            "Nubo looks for .gb, .gbc and .zip files in these folders, and sees new ones \
+             by itself. A folder's ⋯ menu has more."
+        ),
     )]
     .spacing(20);
 
@@ -1183,7 +1183,8 @@ fn box_art_problem_row(problem: &str, focused: bool) -> Element<'_, Message> {
         .into()
 }
 
-/// A library folder with its name, path, subfolder switch and remove button.
+/// A library folder with its name and path, and a button that opens its
+/// menu (subfolders, showing it, scanning it again and removing it).
 fn folder_row(index: usize, folder: &LibraryFolder, missing: bool) -> Element<'_, Message> {
     let name = folder
         .path
@@ -1193,18 +1194,19 @@ fn folder_row(index: usize, folder: &LibraryFolder, missing: bool) -> Element<'_
         .into_owned();
 
     let symbol = if missing {
-        icon(Icon::TriangleAlert).style(|theme: &Theme| text::Style {
-            color: Some(theme.palette().danger),
-        })
+        icon(Icon::TriangleAlert).style(theme::danger_text)
     } else {
         icon(Icon::Folder).style(theme::accent_text)
     };
 
-    let detail = if missing {
+    let mut detail = if missing {
         format!("Not found: {}", folder.path.display())
     } else {
         folder.path.display().to_string()
     };
+    if !folder.include_subfolders {
+        detail.push_str(" · without subfolders");
+    }
 
     row![
         symbol,
@@ -1214,14 +1216,10 @@ fn folder_row(index: usize, folder: &LibraryFolder, missing: bool) -> Element<'_
         ]
         .spacing(3)
         .width(Fill),
-        text("Subfolders").size(12).style(theme::muted_text),
-        switch(folder.include_subfolders, move |include| {
-            Message::Library(LibraryMessage::IncludeSubfolders(index, include))
-        }),
         icon_button(
-            Icon::Trash2,
-            String::from("Remove folder"),
-            Some(Message::Library(LibraryMessage::RemoveFolder(index))),
+            Icon::Ellipsis,
+            String::from("More"),
+            Some(Message::Library(LibraryMessage::OpenFolderMenu(index))),
         ),
     ]
     .spacing(12)

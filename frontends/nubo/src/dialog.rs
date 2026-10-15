@@ -21,6 +21,8 @@ pub enum DialogKind {
     SortMenu,
     /// The menu of the library game at the path, on one of its pages.
     GameMenu(PathBuf, GameMenuPage),
+    /// The menu of the library folder at this place in the settings' list.
+    FolderMenu(usize),
     /// Asks whether to delete the save states of the game at the path.
     DeleteSaveStates(PathBuf),
 }

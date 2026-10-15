@@ -21,7 +21,7 @@ use iced::widget::{
     row, scrollable, space, text, text_input, tooltip,
 };
 use iced::{Alignment, ContentFit, Element, Fill, widget};
-use nubo_frontend::controls::Action;
+use nubo_frontend::controls::{Action, Device};
 use nubo_frontend::library::{self, Library, LibraryEntry};
 use nubo_frontend::save_states;
 use nubo_frontend::time::{Duration, SystemTime};
@@ -39,6 +39,9 @@ const CONTROLS: [(&[Action], &str); 5] = [
     (&[Action::Start], "Start"),
     (&[Action::Select], "Select"),
 ];
+
+/// Where the welcome screen sends players who have no games yet.
+const HOMEBREW_HUB: &str = "https://hh.gbdev.io";
 
 /// How many games "Continue playing" shows.
 pub const RECENT_LIMIT: usize = 4;
@@ -213,12 +216,13 @@ pub fn view<'a>(
     settings: &'a Settings,
     search: &'a str,
     selection: Option<usize>,
+    controllers: &'a [String],
 ) -> Element<'a, Message> {
     let shelves = Shelves::new(library, settings, search);
     let has_folders = !settings.shared.library_folders.is_empty();
 
     if !library::AVAILABLE || (!has_folders && library.recently_played(1).is_empty()) {
-        return column![bar(None), welcome(settings)].into();
+        return column![bar(None), welcome(settings, controllers)].into();
     }
 
     let mut content = Column::new().spacing(SECTION_SPACING);
@@ -248,10 +252,10 @@ pub fn view<'a>(
 
     content = if !has_folders {
         content.push(notice(
-            "Add a ROM folder to see all your games here.",
+            "Add the folder with your games to see them all here.",
             Some(secondary_button(
                 Icon::FolderPlus,
-                "Add ROM folder",
+                "Add games folder",
                 Message::Library(LibraryMessage::AddFolder),
             )),
         ))
@@ -270,7 +274,7 @@ pub fn view<'a>(
         content.push(notice("Looking for games…", None))
     } else {
         content.push(notice(
-            "No games found in your ROM folders.",
+            "No games found in your game folders.",
             Some(secondary_button(
                 Icon::FolderCog,
                 "Manage folders",
@@ -296,32 +300,27 @@ pub fn view<'a>(
     column![bar(Some(search)), page].into()
 }
 
-/// The top bar, with a search field when there are games to search, and
-/// Open ROM and the settings on the right. Rescanning the folders is in the
-/// settings' Library tab.
+/// The top bar: with games to search, a search field and Open game; on the
+/// welcome screen, whose own buttons open games, only the settings on the
+/// right.
 fn bar(search: Option<&str>) -> Element<'_, Message> {
-    let middle: Element<'_, Message> = match search {
-        Some(search) => search_field(search),
-        None => space::horizontal().into(),
-    };
-
-    top_bar(row![
-        brand(),
-        middle,
-        bar_button(
+    let mut bar = row![brand()];
+    bar = match search {
+        Some(search) => bar.push(search_field(search)).push(bar_button(
             Icon::FolderOpen,
-            "Open ROM",
-            format!("Open ROM ({})", shortcut("O")),
+            "Open game",
+            format!("Open a game file ({})", shortcut("O")),
             false,
             Message::Game(GameMessage::OpenRom),
-        ),
-        space().width(6),
-        icon_button(
-            Icon::Settings,
-            format!("Settings ({})", shortcut(",")),
-            Some(Message::Settings(SettingsMessage::Open)),
-        ),
-    ])
+        )),
+        None => bar.push(space::horizontal()),
+    };
+
+    top_bar(bar.push(space().width(6)).push(icon_button(
+        Icon::Settings,
+        format!("Settings ({})", shortcut(",")),
+        Some(Message::Settings(SettingsMessage::Open)),
+    )))
 }
 
 /// The search field, filling the space between the app's name and the
@@ -374,18 +373,20 @@ fn brand<'a>() -> Element<'a, Message> {
         .into()
 }
 
-/// The first screen a new user sees.
-fn welcome(settings: &Settings) -> Element<'_, Message> {
+/// The first screen a new user sees: what to do first, where to get free
+/// games, and which keys (or, with one connected, which controller buttons)
+/// press the Game Boy's buttons.
+fn welcome<'a>(settings: &'a Settings, controllers: &'a [String]) -> Element<'a, Message> {
     let actions: Element<'_, Message> = if library::AVAILABLE {
         row![
             primary_button(
                 Icon::FolderPlus,
-                "Add ROM folder",
+                "Add games folder",
                 Message::Library(LibraryMessage::AddFolder)
             ),
             secondary_button(
                 Icon::FolderOpen,
-                "Open ROM",
+                "Open game",
                 Message::Game(GameMessage::OpenRom)
             ),
         ]
@@ -395,16 +396,25 @@ fn welcome(settings: &Settings) -> Element<'_, Message> {
     } else {
         primary_button(
             Icon::FolderOpen,
-            "Open ROM",
+            "Open game",
             Message::Game(GameMessage::OpenRom),
         )
     };
 
     let description = if library::AVAILABLE {
-        "Add the folder with your Game Boy games, or open a single ROM."
+        "Add the folder with your Game Boy games, or open a single game."
     } else {
-        "Open a Game Boy or Game Boy Color ROM to start."
+        "Open a Game Boy or Game Boy Color game to start."
     };
+
+    let free_games = button(
+        text("No games yet? Get free ones at Homebrew Hub")
+            .size(13)
+            .style(theme::accent_text),
+    )
+    .padding([2, 4])
+    .style(theme::text_button)
+    .on_press(Message::OpenLink(HOMEBREW_HUB));
 
     let welcome = column![
         logo(88.0),
@@ -413,8 +423,9 @@ fn welcome(settings: &Settings) -> Element<'_, Message> {
         space().height(8),
         actions,
         drop_hint(),
-        space().height(28),
-        controls_help(settings),
+        free_games,
+        space().height(20),
+        controls_help(settings, controllers),
     ]
     .spacing(10)
     .align_x(Alignment::Center);
@@ -435,20 +446,31 @@ fn drop_hint<'a>() -> Element<'a, Message> {
     }
 }
 
-/// Keycaps showing which keys press which Game Boy buttons. Buttons without
-/// a key are left out.
-fn controls_help(settings: &Settings) -> Element<'_, Message> {
+/// Keycaps showing which keys press which Game Boy buttons, or with a
+/// controller connected, its name and which of its buttons do. Buttons
+/// without a key are left out.
+fn controls_help<'a>(settings: &'a Settings, controllers: &'a [String]) -> Element<'a, Message> {
+    let device = if controllers.is_empty() {
+        Device::Keyboard
+    } else {
+        Device::Controller
+    };
+    let controls = &settings.shared.controls;
+
     let groups = CONTROLS.iter().filter_map(|(actions, button)| {
-        let keys: Vec<_> = actions
+        let mut keys: Vec<String> = actions
             .iter()
-            .filter_map(|&action| settings.shared.controls.keyboard.input(action))
+            .filter_map(|&action| controls.input_label(device, action))
             .collect();
         if keys.is_empty() {
             return None;
         }
+        // A controller's D-pad says "D-pad" once, not once per direction.
+        if device == Device::Controller && keys.iter().all(|key| key.starts_with("D-pad")) {
+            keys = vec![String::from("D-pad")];
+        }
 
-        let keycaps =
-            Row::with_children(keys.into_iter().map(|key| keycap(key.to_string()))).spacing(3);
+        let keycaps = Row::with_children(keys.into_iter().map(keycap)).spacing(3);
 
         Some(
             row![keycaps, text(*button).size(13).style(theme::muted_text)]
@@ -458,11 +480,26 @@ fn controls_help(settings: &Settings) -> Element<'_, Message> {
         )
     });
 
-    Row::with_children(groups)
+    let legend = Row::with_children(groups)
         .spacing(20)
         .align_y(Alignment::Center)
-        .wrap()
-        .into()
+        .wrap();
+
+    match controllers.first() {
+        Some(name) => column![
+            row![
+                icon(Icon::Gamepad2).size(16).style(theme::accent_text),
+                text(format!("{name} is ready")).size(13),
+            ]
+            .spacing(8)
+            .align_y(Alignment::Center),
+            legend,
+        ]
+        .spacing(10)
+        .align_x(Alignment::Center)
+        .into(),
+        None => legend.into(),
+    }
 }
 
 /// A section title, with the number of games and a scanning label if given.

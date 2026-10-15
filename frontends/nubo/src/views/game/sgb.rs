@@ -1,6 +1,6 @@
 //! The pause menu's Super Game Boy page: the colors the game shows (its own,
-//! one of Nubo's palettes, or the player's own, with an editor for those)
-//! and the border around the screen. It stands in for the menu a real Super
+//! one of Nubo's palettes, or the player's own, with an editor for those
+//! that opens when asked) and the border around the screen. It stands in for the menu a real Super
 //! Game Boy opens with the Super Nintendo's L and R buttons (see
 //! `nubo_frontend::sgb_menu`).
 
@@ -24,6 +24,9 @@ const SHADES: [&str; 4] = ["Lightest", "Light", "Dark", "Darkest"];
 pub enum SgbRow {
     /// A choice of colors, which A picks.
     Colors(SgbColors),
+    /// The button that shows or hides the editor for the player's own
+    /// colors.
+    EditOwnColors,
     /// A channel of one of the player's own colors (shade 0 to 3, lightest
     /// first), which left and right change.
     OwnColor(usize, ColorChannel),
@@ -31,13 +34,17 @@ pub enum SgbRow {
     Border(SgbBorderChoice),
 }
 
-/// The page's rows, in order: the colors and the editor for the player's
-/// own (left out while the game doesn't let the player change its colors),
-/// then the borders. The view and the app's D-pad handling both use it.
+/// The page's rows, in order: the colors, the button for the editor of the
+/// player's own and, while it is open, the editor (all left out while the
+/// game doesn't let the player change its colors), then the borders. The
+/// view and the app's D-pad handling both use it.
 pub fn rows(game: &Game) -> Vec<SgbRow> {
     let mut rows = Vec::new();
     if palettes_allowed(game) {
         rows.extend(SgbColors::ALL.map(SgbRow::Colors));
+        rows.push(SgbRow::EditOwnColors);
+    }
+    if palettes_allowed(game) && game.sgb_editor_open {
         for shade in 0..SHADES.len() {
             rows.extend(
                 ColorChannel::ALL
@@ -55,6 +62,7 @@ pub fn pick(row: SgbRow) -> Option<Message> {
     match row {
         SgbRow::Colors(colors) => Some(GameMessage::SgbColorsPicked(colors).into()),
         SgbRow::Border(border) => Some(GameMessage::SgbBorderPicked(border).into()),
+        SgbRow::EditOwnColors => Some(GameMessage::ToggleSgbEditor.into()),
         SgbRow::OwnColor(..) => None,
     }
 }
@@ -65,7 +73,7 @@ pub fn adjust(row: SgbRow, step: i8) -> Option<Message> {
         SgbRow::OwnColor(shade, channel) => {
             Some(GameMessage::SgbOwnColorStepped(shade, channel, step).into())
         }
-        SgbRow::Colors(_) | SgbRow::Border(_) => None,
+        SgbRow::Colors(_) | SgbRow::EditOwnColors | SgbRow::Border(_) => None,
     }
 }
 
@@ -108,16 +116,44 @@ pub fn page<'a>(game: &'a Game, settings: &'a Settings, selection: usize) -> Ele
                 GameMessage::SgbColorsPicked(colors).into(),
             )
         });
-        let editor = (0..SHADES.len()).map(|shade| own_color(own[shade], shade, &selected));
-        column![
-            Column::with_children(choices).spacing(2),
-            text("Your own colors, lightest first: changing one shows them.")
-                .size(12)
-                .style(theme::muted_text),
-            Column::with_children(editor).spacing(8),
-        ]
-        .spacing(10)
-        .into()
+        let open = game.sgb_editor_open;
+        let toggle = container(
+            button(
+                row![
+                    icon(if open {
+                        Icon::ChevronUp
+                    } else {
+                        Icon::SlidersHorizontal
+                    })
+                    .size(15),
+                    text(if open {
+                        "Hide the editor"
+                    } else {
+                        "Edit your own colors…"
+                    })
+                    .size(13),
+                ]
+                .spacing(8)
+                .align_y(Alignment::Center),
+            )
+            .padding([4, 8])
+            .style(theme::text_button)
+            .on_press(GameMessage::ToggleSgbEditor.into()),
+        )
+        .style(theme::focus_ring(selected(SgbRow::EditOwnColors)));
+
+        let mut colors = column![Column::with_children(choices).spacing(2), toggle].spacing(10);
+        if open {
+            let editor = (0..SHADES.len()).map(|shade| own_color(own[shade], shade, &selected));
+            colors = colors
+                .push(
+                    text("Your own colors, lightest first: changing one shows them.")
+                        .size(12)
+                        .style(theme::muted_text),
+                )
+                .push(Column::with_children(editor).spacing(8));
+        }
+        colors.into()
     } else {
         text("This game keeps its own colors.")
             .size(13)

@@ -149,6 +149,8 @@ pub enum Message {
     /// see `nubo_frontend::session`).
     Tick,
     DismissToast(usize),
+    /// Opens this web page in the player's browser.
+    OpenLink(&'static str),
 }
 
 impl App {
@@ -267,6 +269,12 @@ impl App {
                 self.toasts.remove_expired(iced::time::Instant::now());
                 Task::none()
             }
+            Message::OpenLink(url) => {
+                if let Err(error) = nubo_frontend::links::open(url) {
+                    self.toasts.error(error);
+                }
+                Task::none()
+            }
             Message::DismissToast(index) => {
                 self.toasts.dismiss(index);
                 Task::none()
@@ -310,6 +318,7 @@ impl App {
                 &self.settings,
                 &self.search,
                 self.library_selection,
+                &self.controllers,
             ),
         }];
 

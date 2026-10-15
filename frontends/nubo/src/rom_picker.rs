@@ -15,8 +15,8 @@ const EXTENSIONS: [&str; 3] = ["gb", "gbc", "zip"];
 /// hands over the file's bytes, since a web page can't open files by path.
 pub async fn pick() -> Option<Rom> {
     let file = rfd::AsyncFileDialog::new()
-        .add_filter("Game Boy ROMs", &EXTENSIONS)
-        .set_title("Open a Game Boy ROM")
+        .add_filter("Game Boy games", &EXTENSIONS)
+        .set_title("Open a Game Boy game")
         .pick_file()
         .await?;
 
@@ -31,7 +31,7 @@ pub async fn pick() -> Option<Rom> {
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn pick_folder() -> Option<PathBuf> {
     let folder = rfd::AsyncFileDialog::new()
-        .set_title("Add a ROM folder")
+        .set_title("Add a folder of games")
         .pick_folder()
         .await?;
     Some(folder.path().to_path_buf())

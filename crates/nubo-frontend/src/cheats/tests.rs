@@ -37,3 +37,30 @@ fn invalid_codes_are_rejected() {
     assert!(Cheat::new("Nothing", "00A-17").is_err());
     assert!(Cheat::new("Nothing", "01FF0080").is_err());
 }
+
+#[test]
+fn a_cheat_can_have_several_codes() {
+    let cheat = Cheat::new("Max money", "01ff56d0 + 01fe57d0, 00A17BC49").unwrap();
+
+    assert_eq!(cheat.code, "01FF56D0+01FE57D0+00A-17B-C49");
+    assert_eq!(
+        cheat.codes().collect::<Vec<_>>(),
+        ["01FF56D0", "01FE57D0", "00A-17B-C49"]
+    );
+    assert_eq!(cheat.kind(), CheatKind::GameShark);
+}
+
+#[test]
+fn codes_can_be_apart_with_spaces() {
+    assert_eq!(
+        Cheat::new("", "01FF56D0 01FE57D0").unwrap().code,
+        "01FF56D0+01FE57D0"
+    );
+    assert_eq!(Cheat::new("", "CED 56A").unwrap().code, "CED-56A");
+}
+
+#[test]
+fn one_bad_code_rejects_the_cheat() {
+    assert!(Cheat::new("", "01FF56D0 + XYZ").is_err());
+    assert!(Cheat::new("", " + ").is_err());
+}

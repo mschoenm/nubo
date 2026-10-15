@@ -497,10 +497,20 @@ fn slots_page<'a>(
         .into_iter()
         .enumerate()
         .map(|(index, info)| slot_row(info, saving, index == selection));
+    let explanation = if saving {
+        "Keeps this exact moment, to come back to later. The game's own saves are kept \
+         separately."
+    } else {
+        "Goes back to a moment you kept. You can undo it right after."
+    };
 
-    column![page_header(title), Column::with_children(rows).spacing(6)]
-        .spacing(12)
-        .into()
+    column![
+        page_header(title),
+        text(explanation).size(12).style(theme::muted_text),
+        Column::with_children(rows).spacing(6)
+    ]
+    .spacing(12)
+    .into()
 }
 
 fn slot_row(info: &SlotInfo, saving: bool, selected: bool) -> Element<'_, Message> {
@@ -584,13 +594,20 @@ fn cheats_page(game: &Game, selection: usize) -> Element<'_, Message> {
 
     let form = &game.cheat_form;
     let mut add = column![
-        text_input("Name (optional)", &form.name)
-            .on_input(|name| Message::Game(GameMessage::CheatNameChanged(name)))
+        text_input("Code", &form.code)
+            .on_input(|code| Message::Game(GameMessage::CheatCodeChanged(code)))
+            .on_submit(Message::Game(GameMessage::AddCheat))
             .padding([7, 10])
             .style(theme::search_field),
+        text(
+            "Such as 01FF56D0 (GameShark) or 00A-17B-C49 (Game Genie). For a cheat with \
+             several codes, put a space or + between them."
+        )
+        .size(12)
+        .style(theme::muted_text),
         row![
-            text_input("Code, such as 01FF56D0 or 00A-17B-C49", &form.code)
-                .on_input(|code| Message::Game(GameMessage::CheatCodeChanged(code)))
+            text_input("Name (optional)", &form.name)
+                .on_input(|name| Message::Game(GameMessage::CheatNameChanged(name)))
                 .on_submit(Message::Game(GameMessage::AddCheat))
                 .padding([7, 10])
                 .style(theme::search_field),

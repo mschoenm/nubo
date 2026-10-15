@@ -26,20 +26,22 @@ pub enum CheatKind {
 pub struct Cheat {
     /// What the player called it, or the code if they gave no name.
     pub name: String,
-    /// The code, in capitals, such as `01FF56D0` or `00A-17B-C49`. It also
-    /// identifies the cheat to the emulator.
+    /// The code, in capitals, such as `01FF56D0` or `00A-17B-C49`, or
+    /// several codes joined by `+` for a cheat that needs them all, such as
+    /// `01FF56D0+01FE57D0`. Each code also identifies itself to the
+    /// emulator.
     pub code: String,
     /// Whether the cheat is on.
     pub enabled: bool,
 }
 
 impl Cheat {
-    /// Checks a code the player typed and makes a cheat of it, named `name`
-    /// (or after the code if the name is empty), or says what is wrong with
-    /// the code.
+    /// Checks the code (or codes) the player typed and makes a cheat of
+    /// it, named `name` (or after the code if the name is empty), or says
+    /// what is wrong with a code. Several codes can be typed with `+`, a
+    /// comma, a new line or a space between them.
     pub fn new(name: &str, code: &str) -> Result<Cheat, String> {
-        let code = normalize(code);
-        kind_of(&code)?;
+        let code = split_codes(code)?.join("+");
 
         let name = name.trim();
         Ok(Cheat {
@@ -53,23 +55,65 @@ impl Cheat {
         })
     }
 
-    /// The kind of code, which was checked when the cheat was made.
+    /// The kind of the cheat's (first) code, which was checked when the
+    /// cheat was made.
     pub fn kind(&self) -> CheatKind {
-        kind_of(&self.code).unwrap_or(CheatKind::GameShark)
+        self.codes()
+            .next()
+            .and_then(|code| kind_of(code).ok())
+            .unwrap_or(CheatKind::GameShark)
     }
 
-    /// Turns the cheat on or off in `emulator`, as `enabled` says. The code
-    /// was checked when the cheat was made, so turning it on doesn't fail.
-    pub fn apply_to(&self, emulator: &mut Emulator) {
-        emulator.unregister_cheat(&self.code);
+    /// The cheat's codes, one or more.
+    pub fn codes(&self) -> impl Iterator<Item = &str> {
+        self.code.split('+')
+    }
 
-        if self.enabled {
-            let _ = match self.kind() {
-                CheatKind::GameShark => emulator.register_gameshark_cheat(&self.code, &self.code),
-                CheatKind::GameGenie => emulator.register_gamegenie_cheat(&self.code, &self.code),
-            };
+    /// Turns the cheat on or off in `emulator`, as `enabled` says. The codes
+    /// were checked when the cheat was made, so turning it on doesn't fail.
+    pub fn apply_to(&self, emulator: &mut Emulator) {
+        for code in self.codes() {
+            emulator.unregister_cheat(code);
+
+            if self.enabled {
+                let _ = match kind_of(code).unwrap_or(CheatKind::GameShark) {
+                    CheatKind::GameShark => emulator.register_gameshark_cheat(code, code),
+                    CheatKind::GameGenie => emulator.register_gamegenie_cheat(code, code),
+                };
+            }
         }
     }
+}
+
+/// The codes in what the player typed, each in the form the emulator
+/// expects, or why one isn't a code. Codes are apart where there is a `+`,
+/// a comma or a new line, and where there is a space unless the space is
+/// inside one code (`CED 56A`).
+fn split_codes(input: &str) -> Result<Vec<String>, String> {
+    let pieces: Vec<&str> = input
+        .split(['+', ',', ';', '\n'])
+        .map(str::trim)
+        .filter(|piece| !piece.is_empty())
+        .collect();
+    if pieces.is_empty() {
+        return Err(String::from("Type a GameShark or Game Genie code"));
+    }
+
+    let mut codes = Vec::new();
+    for piece in pieces {
+        let whole = normalize(piece);
+        if kind_of(&whole).is_ok() {
+            codes.push(whole);
+            continue;
+        }
+        let words: Vec<String> = piece.split_whitespace().map(normalize).collect();
+        if words.len() > 1 && words.iter().all(|word| kind_of(word).is_ok()) {
+            codes.extend(words);
+        } else {
+            kind_of(&whole)?;
+        }
+    }
+    Ok(codes)
 }
 
 /// Puts a code in the form the emulator expects: capitals without spaces,

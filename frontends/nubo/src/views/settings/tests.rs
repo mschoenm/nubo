@@ -110,10 +110,10 @@ fn every_library_folder_is_a_row() {
     assert_eq!(
         rows[..4],
         [
-            SettingsRow::Rescan,
             SettingsRow::Folder(0),
             SettingsRow::Folder(1),
-            SettingsRow::AddFolder
+            SettingsRow::AddFolder,
+            SettingsRow::BoxArt
         ]
     );
 }

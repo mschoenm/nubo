@@ -47,6 +47,8 @@ pub enum LibraryMessage {
     /// Opens the menu of this game (a right click, the "⋯" button or
     /// Select on its card).
     OpenGameMenu(PathBuf),
+    /// Opens the menu of the library folder at this place in the list.
+    OpenFolderMenu(usize),
     /// Opens the menu that sorts and filters the games.
     OpenSortMenu,
     SortPicked(LibrarySort),
@@ -153,6 +155,9 @@ impl App {
                 self.show_game_menu(path, GameMenuPage::Main);
             }
             LibraryMessage::OpenSortMenu => self.open_dialog(DialogKind::SortMenu),
+            LibraryMessage::OpenFolderMenu(index) => {
+                self.open_dialog(DialogKind::FolderMenu(index));
+            }
             LibraryMessage::SortPicked(sort) => {
                 self.change_settings(|settings| settings.library_sort = sort);
                 self.library_selection = None;
@@ -185,7 +190,7 @@ impl App {
                 }
             }
             LibraryMessage::Watch(WatchEvent::Failed(error)) => self.toasts.error(format!(
-                "New games won't show up by themselves ({error}). Use Rescan in the settings' Library tab instead."
+                "New games won't show up by themselves ({error}). Use \"Look for new games now\" in a folder's menu in Settings › Library instead."
             )),
             LibraryMessage::Scanned(result) => {
                 if let Err(error) = self.library.finish_scan(result) {

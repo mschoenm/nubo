@@ -60,6 +60,9 @@ pub enum GameMessage {
     /// A channel of one of the player's own colors went down or up by this
     /// much with the D-pad.
     SgbOwnColorStepped(usize, ColorChannel, i8),
+    /// Shows or hides the editor for the player's own Super Game Boy
+    /// colors.
+    ToggleSgbEditor,
     /// Shows this border around a Super Game Boy game.
     SgbBorderPicked(SgbBorderChoice),
     /// The pictures of the save state slots a pause menu page lists were
@@ -205,6 +208,14 @@ impl App {
                 let own = self.settings.shared.sgb_own_palette;
                 if let Some(game) = &mut self.game {
                     game.session.set_sgb_player_palette(colors.palette(own));
+                    if colors == SgbColors::Own {
+                        game.sgb_editor_open = true;
+                    }
+                }
+            }
+            GameMessage::ToggleSgbEditor => {
+                if let Some(game) = &mut self.game {
+                    game.sgb_editor_open = !game.sgb_editor_open;
                 }
             }
             GameMessage::SgbOwnColorChanged(shade, channel, value) => {

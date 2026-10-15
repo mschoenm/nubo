@@ -306,17 +306,8 @@ impl App {
             SettingsRow::Volume => SettingsMessage::ToggleMute.into(),
             SettingsRow::ResetControls => SettingsMessage::ResetControls(device).into(),
             SettingsRow::Binding(action) => SettingsMessage::CaptureBinding(device, action).into(),
-            SettingsRow::Folder(index) => LibraryMessage::IncludeSubfolders(
-                index,
-                !settings
-                    .shared
-                    .library_folders
-                    .get(index)?
-                    .include_subfolders,
-            )
-            .into(),
+            SettingsRow::Folder(index) => LibraryMessage::OpenFolderMenu(index).into(),
             SettingsRow::AddFolder => LibraryMessage::AddFolder.into(),
-            SettingsRow::Rescan => LibraryMessage::Rescan.into(),
             SettingsRow::BoxArt => {
                 LibraryMessage::DownloadBoxArtToggled(!settings.shared.download_box_art).into()
             }

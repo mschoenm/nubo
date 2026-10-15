@@ -14,6 +14,7 @@ use nubo_frontend::library::{LibraryEntry, box_art};
 use nubo_frontend::links;
 use nubo_frontend::model::{self, Console, ModelPreference};
 use nubo_frontend::save_states;
+use nubo_frontend::settings::LibraryFolder;
 use std::path::{Path, PathBuf};
 
 /// What happens to the open dialog.
@@ -86,6 +87,10 @@ impl App {
         match &dialog.kind {
             DialogKind::BoxArt => Some(box_art_question()),
             DialogKind::SortMenu => Some(sort_menu(&self.settings)),
+            DialogKind::FolderMenu(index) => {
+                let folder = self.settings.shared.library_folders.get(*index)?;
+                Some(folder_menu(*index, folder))
+            }
             DialogKind::GameMenu(path, page) => {
                 let entry = self.library.entry(path)?;
                 Some(match *page {
@@ -329,6 +334,60 @@ fn sort_menu(settings: &Settings) -> DialogContent {
         text: None,
         layout: Layout::List,
         choices: sorts.into_iter().chain(filters).collect(),
+        dismiss: DialogAction::Close,
+        click_outside_dismisses: true,
+    }
+}
+
+/// The menu of the library folder at `index` in the settings' list.
+fn folder_menu(index: usize, folder: &LibraryFolder) -> DialogContent {
+    let mut choices = vec![
+        Choice::new(
+            Icon::FolderTree,
+            "Look in subfolders too",
+            ChoiceStyle::Secondary,
+            DialogAction::Stay(
+                LibraryMessage::IncludeSubfolders(index, !folder.include_subfolders).into(),
+            ),
+        )
+        .checked(folder.include_subfolders),
+    ];
+    if links::CAN_SHOW_FOLDERS {
+        choices.push(Choice::new(
+            Icon::FolderOpen,
+            "Show in file manager",
+            ChoiceStyle::Secondary,
+            DialogAction::CloseThen(LibraryMessage::ShowInFolder(folder.path.clone()).into()),
+        ));
+    }
+    choices.extend([
+        Choice::new(
+            Icon::RefreshCw,
+            "Look for new games now",
+            ChoiceStyle::Secondary,
+            DialogAction::CloseThen(LibraryMessage::Rescan.into()),
+        ),
+        Choice::new(
+            Icon::Trash2,
+            "Remove from the library",
+            ChoiceStyle::Danger,
+            DialogAction::CloseThen(LibraryMessage::RemoveFolder(index).into()),
+        )
+        .starts_group(),
+    ]);
+
+    DialogContent {
+        title: folder
+            .path
+            .file_name()
+            .unwrap_or(folder.path.as_os_str())
+            .to_string_lossy()
+            .into_owned(),
+        text: Some(String::from(
+            "Removing the folder only takes its games out of the library. The files stay.",
+        )),
+        layout: Layout::List,
+        choices,
         dismiss: DialogAction::Close,
         click_outside_dismisses: true,
     }
