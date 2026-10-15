@@ -89,15 +89,12 @@ pub struct Settings {
     /// apply to a game continued where the player left off.
     #[serde(skip_serializing_if = "is_game_colors")]
     pub sgb_colors: SgbColors,
-    /// Whether Game Boy Color games look as on the Game Boy Color's own
-    /// screen (see `lcd::correct_colors`). On until the player turns it off,
-    /// and only saved then.
+    /// Whether games look as on their console's own screen: softer colors
+    /// on a Game Boy Color, and the slow screen's blur on an original Game
+    /// Boy or Pocket (see `lcd`). On until the player turns it off, and only
+    /// saved then.
     #[serde(skip_serializing_if = "is_true")]
-    pub color_correction: bool,
-    /// Whether each frame is mixed with the one before, as the Game Boy's
-    /// slow screen did (see `lcd::blend`). Only saved when it is on.
-    #[serde(skip_serializing_if = "is_false")]
-    pub frame_blending: bool,
+    pub original_screen: bool,
     /// Whether Super Game Boy games show Nubo's border even when they bring
     /// their own, as the player picks it on the same page. Only saved when
     /// it is on.
@@ -168,8 +165,7 @@ impl Default for Settings {
             sgb_own_palette: DEFAULT_OWN_PALETTE,
             sgb_colors: SgbColors::Game,
             sgb_nubo_border: false,
-            color_correction: true,
-            frame_blending: false,
+            original_screen: true,
         }
     }
 }
@@ -203,8 +199,7 @@ impl Settings {
     pub fn screen_look(&self) -> ScreenLook {
         ScreenLook {
             dmg_palette: self.dmg_palette,
-            color_correction: self.color_correction,
-            frame_blending: self.frame_blending,
+            original_screen: self.original_screen,
         }
     }
 }
@@ -218,10 +213,8 @@ impl Settings {
 pub struct ScreenLook {
     /// The colors original Game Boy games are shown in.
     pub dmg_palette: DmgPalette,
-    /// Whether Game Boy Color games look as on its own screen.
-    pub color_correction: bool,
-    /// Whether each frame is mixed with the one before.
-    pub frame_blending: bool,
+    /// Whether games look as on their console's own screen.
+    pub original_screen: bool,
 }
 
 impl ScreenLook {
@@ -231,8 +224,7 @@ impl ScreenLook {
     /// judged on too.
     pub const RAW: ScreenLook = ScreenLook {
         dmg_palette: DmgPalette::Gray,
-        color_correction: false,
-        frame_blending: false,
+        original_screen: false,
     };
 }
 

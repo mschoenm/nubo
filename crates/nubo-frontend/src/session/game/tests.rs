@@ -1,5 +1,5 @@
-//! Tests for telling the emulator how to play only when that changes, and
-//! for showing frames in the chosen palette.
+//! Tests for telling the emulator how to play only when that changes, for
+//! showing frames in the chosen palette, and for each model's screen effects.
 
 use super::*;
 use crate::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
@@ -115,6 +115,18 @@ fn the_palette_repaints_only_the_screen_inside_a_border() {
         screen.screen_pixels().unwrap(),
         pixels_in(DmgPalette::Green)
     );
+}
+
+#[test]
+fn the_original_screen_look_follows_each_models_screen() {
+    for model in Model::ALL {
+        let effects = ScreenEffects::of(model, true);
+        let color_screen = model.is_cgb() && model != Model::Agb;
+        let slow_screen = !model.is_cgb() && !model.is_sgb();
+        assert_eq!(effects.correct_colors, color_screen, "{model}");
+        assert_eq!(effects.blend_frames, slow_screen, "{model}");
+        assert_eq!(ScreenEffects::of(model, false), ScreenEffects::default());
+    }
 }
 
 #[test]

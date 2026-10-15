@@ -237,13 +237,11 @@ impl GameSession {
     }
 
     /// Shows the game as `look` says from now on, repainting the frame on
-    /// screen. Colors are corrected on a Game Boy Color only: the Game Boy
-    /// Advance's screen and a Super Game Boy's TV showed them differently.
+    /// screen.
     pub fn set_screen_look(&mut self, look: ScreenLook) {
-        let color_screen = self.model.is_cgb() && self.model != Model::Agb;
+        let effects = ScreenEffects::of(self.model, look.original_screen);
         self.screen.set_palette(look.dmg_palette);
-        self.screen
-            .set_effects(look.color_correction && color_screen, look.frame_blending);
+        self.screen.set_effects(effects);
     }
 
     /// Shows a Super Game Boy's border around the screen from now on, or
@@ -415,6 +413,32 @@ impl GameSession {
     }
 }
 
+/// What the picture goes through to look like the model's own screen (see
+/// `lcd`), when the player wants the original screen look.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct ScreenEffects {
+    /// Whether the colors are shown as on a Game Boy Color's screen (see
+    /// `lcd::correct_colors`).
+    correct_colors: bool,
+    /// Whether each frame is mixed with the one before, as a slow screen
+    /// showed it (see `lcd::blend`).
+    blend_frames: bool,
+}
+
+impl ScreenEffects {
+    /// The effects of `model`'s own screen, or none without the
+    /// `original_screen` look. A Game Boy Color's colors are corrected, and
+    /// an original Game Boy's or Pocket's slow screen blends frames. The Game
+    /// Boy Color's screen was fast enough not to, the Game Boy Advance's
+    /// showed colors differently, and a Super Game Boy's TV did neither.
+    fn of(model: Model, original_screen: bool) -> Self {
+        ScreenEffects {
+            correct_colors: original_screen && model.is_cgb() && model != Model::Agb,
+            blend_frames: original_screen && matches!(model, Model::Dmg0 | Model::Dmg | Model::Mgb),
+        }
+    }
+}
+
 /// The game's picture as an app shows it: the newest frame, in the
 /// chosen palette, with or without a Super Game Boy's border.
 #[derive(Debug)]
@@ -428,11 +452,8 @@ struct Screen {
     palette: DmgPalette,
     /// Whether a Super Game Boy's border shows around the screen.
     border: bool,
-    /// Whether the colors are shown as on a Game Boy Color's screen (see
-    /// `lcd::correct_colors`).
-    correct_colors: bool,
-    /// Whether each frame is mixed with the one before (see `lcd::blend`).
-    blend_frames: bool,
+    /// What the picture goes through to look like the model's own screen.
+    effects: ScreenEffects,
     /// The pixels of the frame before the newest, as the emulator drew
     /// them, to blend the newest with.
     previous: Option<Vec<u8>>,
@@ -447,8 +468,7 @@ impl Screen {
             raw: None,
             palette: DmgPalette::default(),
             border: true,
-            correct_colors: false,
-            blend_frames: false,
+            effects: ScreenEffects::default(),
             previous: None,
             sequence: 0,
         }
@@ -468,7 +488,7 @@ impl Screen {
     /// with the one before and with its colors corrected if the player wants.
     fn show(&mut self, frame: Frame) {
         let mut shown = frame.clone();
-        if self.blend_frames
+        if self.effects.blend_frames
             && let Some(previous) = &self.previous
         {
             lcd::blend(&mut shown.pixels, previous);
@@ -483,17 +503,16 @@ impl Screen {
     /// Frames in the Game Boy's grays and Super Game Boy frames, which a TV
     /// showed, stay as they are.
     fn correct(&self, frame: &mut Frame) {
-        if self.correct_colors && !frame.in_dmg_shades && frame.sgb_menu.is_none() {
+        if self.effects.correct_colors && !frame.in_dmg_shades && frame.sgb_menu.is_none() {
             lcd::correct_colors(&mut frame.pixels);
         }
     }
 
-    /// Shows Game Boy Color colors as on its screen, and mixes frames, from
-    /// now on as these say, repainting the frame on screen.
-    fn set_effects(&mut self, correct_colors: bool, blend_frames: bool) {
-        if (correct_colors, blend_frames) != (self.correct_colors, self.blend_frames) {
-            self.correct_colors = correct_colors;
-            self.blend_frames = blend_frames;
+    /// Shows the picture through `effects` from now on, repainting the frame
+    /// on screen.
+    fn set_effects(&mut self, effects: ScreenEffects) {
+        if effects != self.effects {
+            self.effects = effects;
             self.show_again();
         }
     }

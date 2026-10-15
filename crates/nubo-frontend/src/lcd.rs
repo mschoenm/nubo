@@ -15,7 +15,9 @@
 //!   of flickering. [`blend`] mixes each frame with the one before it.
 //!
 //! Both work on the picture after the emulator made it, so the emulation
-//! itself never changes.
+//! itself never changes. The settings' one switch for both, the original
+//! screen look, turns on only the one each model's screen had (see
+//! `GameSession::set_screen_look`).
 
 use std::sync::OnceLock;
 
