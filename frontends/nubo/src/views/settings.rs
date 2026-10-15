@@ -227,7 +227,7 @@ pub enum SettingsRow {
     RetryBoxArt,
     /// The switch that looks for newer versions.
     CheckForUpdates,
-    /// The button that asks whether to reset every setting.
+    /// The button that asks what to start over with.
     ResetSettings,
 }
 
@@ -1023,7 +1023,7 @@ fn volume<'a>(settings: &Settings) -> Element<'a, Message> {
 
 /// The version, the copyright, the license, where to read it and where to get
 /// the source code, which the GPL asks every copy to show, and the button
-/// that resets the settings.
+/// that starts over, between the new versions and the license.
 fn about<'a>(
     settings: &'a Settings,
     newer_version: Option<&'a str>,
@@ -1128,6 +1128,26 @@ fn about<'a>(
         page = page.push(group("New versions", None, versions, None));
     }
     page.push(group(
+        "Start over",
+        None,
+        vec![rings.row(
+            setting(
+                "Reset settings and data",
+                Some(String::from(
+                    "Put the settings back to how they started, clear Continue playing or \
+                     delete your saves. You pick what goes.",
+                )),
+                small_button(
+                    Icon::RotateCcw,
+                    "Start over…",
+                    Message::Settings(SettingsMessage::AskReset),
+                ),
+            ),
+            SettingsRow::ResetSettings,
+        )],
+        Some("Only the keys or buttons: Controls › Reset to defaults."),
+    ))
+    .push(group(
         "Source and license",
         None,
         rows,
@@ -1137,26 +1157,6 @@ fn about<'a>(
                  the GNU General Public License, version 3 or later. It comes with no \
                  warranty.",
         ),
-    ))
-    .push(group(
-        "Start over",
-        None,
-        vec![rings.row(
-            setting(
-                "Reset all settings",
-                Some(String::from(
-                    "Puts every setting back to how it was when you installed Nubo. You pick \
-                     whether your saves and the library go too.",
-                )),
-                small_button(
-                    Icon::RotateCcw,
-                    "Reset…",
-                    Message::Settings(SettingsMessage::AskReset),
-                ),
-            ),
-            SettingsRow::ResetSettings,
-        )],
-        Some("Only the keys or buttons: Controls › Reset to defaults."),
     ))
     .into()
 }

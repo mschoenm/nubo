@@ -330,7 +330,12 @@ impl App {
                 return self.scroll_to_selection();
             }
             Action::A | Action::Start => {
-                if let Some(choice) = content.choices.into_iter().nth(dialog.selection) {
+                if let Some(choice) = content
+                    .choices
+                    .into_iter()
+                    .nth(dialog.selection)
+                    .filter(|choice| choice.enabled)
+                {
                     return self.update(choice.action.into_message());
                 }
             }
@@ -564,8 +569,8 @@ fn revisions_page(entry: &LibraryEntry, console: Console) -> DialogContent {
     }
 }
 
-/// What the question whether to reset the settings offers to do besides
-/// (see `App::reset_offers`).
+/// What the question that starts over offers besides the settings, which
+/// it always offers (see `App::reset_offers`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResetOffers {
     pub delete_battery_saves: bool,
@@ -576,9 +581,31 @@ pub struct ResetOffers {
     pub close_game_first: bool,
 }
 
-/// The question whether to reset every setting, with a box for each other
-/// thing `offers` lets it reset, ticked as in `choices`. A box ticks or
-/// unticks itself with `DialogMessage::ResetChoicesChanged`.
+impl ResetChoices {
+    /// These choices as far as `offers` allows them: a box that isn't on
+    /// show resets nothing, such as a deleting one a game that opened
+    /// meanwhile took away.
+    pub fn within(self, offers: ResetOffers) -> ResetChoices {
+        ResetChoices {
+            reset_settings: self.reset_settings,
+            delete_battery_saves: self.delete_battery_saves && offers.delete_battery_saves,
+            delete_save_states: self.delete_save_states && offers.delete_save_states,
+            remove_folders: self.remove_folders && offers.remove_folders,
+            clear_recently_played: self.clear_recently_played && offers.clear_recently_played,
+        }
+    }
+
+    /// Whether the reset deletes saves, which can't be put back.
+    pub fn deletes(self) -> bool {
+        self.delete_battery_saves || self.delete_save_states
+    }
+}
+
+/// The question what to start over with: a box for the settings, ticked at
+/// first, and one for each other thing `offers` lets it reset, ticked as in
+/// `choices`. A box ticks or unticks itself with
+/// `DialogMessage::ResetChoicesChanged`. The button says what it does, and
+/// is greyed out while nothing is ticked.
 fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
     let toggle = |change: fn(&mut ResetChoices)| {
         let mut changed = choices;
@@ -586,7 +613,14 @@ fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
         DialogAction::Stay(DialogMessage::ResetChoicesChanged(changed).into())
     };
 
-    let mut boxes = Vec::new();
+    let mut boxes = vec![Choice::checkbox(
+        "Reset settings",
+        "The theme, colors, model, controls, sound and every other setting, and the console \
+         picked for each game. Nubo asks again about box art and new versions.",
+        choices.reset_settings,
+        ChoiceStyle::Secondary,
+        toggle(|choices| choices.reset_settings = !choices.reset_settings),
+    )];
     if offers.delete_battery_saves {
         boxes.push(Choice::checkbox(
             "Delete in-game saves",
@@ -635,18 +669,13 @@ fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
         ));
     }
 
-    let mut text = String::from(
-        "The theme, colors, model, controls, sound and every other setting go back to how \
-         they started, and Nubo asks again about box art and new versions.",
-    );
+    let mut text = String::from("Tick what to put back or remove.");
     if offers.close_game_first {
         text.push_str(" To delete saves too, close the game first.");
     }
-    // Only a box on show counts: a game that opened meanwhile takes the
-    // deleting ones away.
-    let deletes = (choices.delete_battery_saves && offers.delete_battery_saves)
-        || (choices.delete_save_states && offers.delete_save_states);
-    let notice = if deletes {
+
+    let effective = choices.within(offers);
+    let notice = if effective.deletes() {
         Notice {
             text: String::from("Deleted saves can't be brought back."),
             warning: true,
@@ -657,6 +686,16 @@ fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
             warning: false,
         }
     };
+    let (icon, label) = match (effective.reset_settings, effective.deletes()) {
+        (true, true) => (Icon::RotateCcw, "Reset and delete"),
+        (true, false) => (Icon::RotateCcw, "Reset"),
+        (false, true) => (Icon::Trash2, "Delete"),
+        (false, false) => (Icon::Eraser, "Clear"),
+    };
+    let anything = effective.reset_settings
+        || effective.deletes()
+        || effective.remove_folders
+        || effective.clear_recently_played;
 
     boxes.extend([
         Choice::new(
@@ -666,15 +705,16 @@ fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
             DialogAction::Close,
         ),
         Choice::new(
-            Icon::RotateCcw,
-            if deletes { "Reset and delete" } else { "Reset" },
+            icon,
+            label,
             ChoiceStyle::Danger,
             DialogAction::CloseThen(SettingsMessage::Reset(choices).into()),
-        ),
+        )
+        .enabled(anything),
     ]);
 
     DialogContent {
-        title: String::from("Reset all settings?"),
+        title: String::from("Start over?"),
         text: Some(text),
         notice: Some(notice),
         layout: Layout::Buttons,

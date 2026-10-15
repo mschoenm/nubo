@@ -1,6 +1,7 @@
 //! Tests for the app's small helpers, and for resetting the settings in a
 //! `--fresh` app, which keeps nothing.
 
+use super::settings_window::reset_summary;
 use super::{App, GameMessage, SettingsMessage, cycle};
 use crate::command_line::Options;
 use crate::dialog::{DialogKind, ResetChoices};
@@ -96,7 +97,8 @@ fn a_game_waits_for_every_reset_deleting_saves() {
     let _ = app.update(GameMessage::PlayRemembered.into());
     let _ = app.update(
         SettingsMessage::SavesDeleted {
-            deleted: vec!["save states"],
+            done: Vec::new(),
+            deleted: vec!["save states deleted"],
             errors: Vec::new(),
         }
         .into(),
@@ -127,4 +129,44 @@ fn starting_a_game_takes_away_a_resets_undo() {
     let _ = app.update(GameMessage::Undo.into());
 
     assert_eq!(app.settings.appearance, Appearance::System);
+}
+
+#[test]
+fn starting_over_without_the_settings_box_keeps_the_settings() {
+    let (mut app, _) = App::new(
+        None,
+        &Options {
+            fresh: true,
+            ..Options::default()
+        },
+    );
+    app.settings.appearance = Appearance::Dark;
+
+    let _ = app.update(
+        SettingsMessage::Reset(ResetChoices {
+            reset_settings: false,
+            ..ResetChoices::default()
+        })
+        .into(),
+    );
+
+    assert_eq!(app.settings.appearance, Appearance::Dark);
+    assert!(app.undo.is_none());
+}
+
+#[test]
+fn the_reset_toast_names_what_was_done() {
+    assert_eq!(reset_summary(&["settings reset"]), "Settings reset");
+    assert_eq!(
+        reset_summary(&["Continue playing cleared", "save states deleted"]),
+        "Continue playing cleared and save states deleted"
+    );
+    assert_eq!(
+        reset_summary(&[
+            "settings reset",
+            "game folders removed",
+            "in-game saves deleted"
+        ]),
+        "Settings reset, game folders removed and in-game saves deleted"
+    );
 }

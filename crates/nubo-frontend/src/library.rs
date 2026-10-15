@@ -659,13 +659,16 @@ impl Library {
         self.save()
     }
 
-    /// Forgets the model the player picked for each game and, with
-    /// `forget_played`, which games they played, for a player resetting the
-    /// settings. Games opened from elsewhere than the library folders then
-    /// leave at the next scan, as after [`Library::forget_played`].
-    pub fn reset_games(&mut self, forget_played: bool) -> Result<(), String> {
+    /// Forgets, with `forget_models`, the model the player picked for each
+    /// game and, with `forget_played`, which games they played, for a
+    /// player starting over. Games opened from elsewhere than the library
+    /// folders then leave at the next scan, as after
+    /// [`Library::forget_played`].
+    pub fn reset_games(&mut self, forget_models: bool, forget_played: bool) -> Result<(), String> {
         for entry in &mut self.entries {
-            entry.model = None;
+            if forget_models {
+                entry.model = None;
+            }
             if forget_played {
                 entry.last_played = None;
             }
