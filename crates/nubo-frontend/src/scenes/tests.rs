@@ -61,14 +61,14 @@ fn settings_change_by_key_with_values_read_as_toml_or_text() {
     let changes = [
         parse_change("appearance=dark").unwrap(),
         parse_change("volume = 0.5").unwrap(),
-        parse_change("frame_blending=true").unwrap(),
+        parse_change("original_screen=true").unwrap(),
         parse_change("controls.keyboard.a=\"KeyK\"").unwrap(),
     ];
     change_settings(&mut settings, &changes).unwrap();
 
     assert_eq!(settings["appearance"].as_str(), Some("dark"));
     assert_eq!(settings["volume"].as_float(), Some(0.5));
-    assert_eq!(settings["frame_blending"].as_bool(), Some(true));
+    assert_eq!(settings["original_screen"].as_bool(), Some(true));
     assert_eq!(settings["controls"]["keyboard"]["a"].as_str(), Some("KeyK"));
 }
 

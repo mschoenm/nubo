@@ -37,7 +37,7 @@ fn a_screenshot_with_variants_takes_one_picture_each() {
         scene = "saloon"
         frame = "game"
         scale = 4
-        settings = { frame_blending = true }
+        settings = { original_screen = true }
         layout = "grid"
         columns = 2
         gap = 16
@@ -45,7 +45,7 @@ fn a_screenshot_with_variants_takes_one_picture_each() {
         settings = { dmg_palette = "green" }
         [[screenshot.variant]]
         scene = "town"
-        settings = { dmg_palette = "pocket", frame_blending = false }
+        settings = { dmg_palette = "pocket", original_screen = false }
         pause_menu = "main"
         "#,
     )
@@ -58,10 +58,10 @@ fn a_screenshot_with_variants_takes_one_picture_each() {
     assert_eq!(tiles.len(), 2);
     assert_eq!(tiles[0].scene, "saloon");
     assert_eq!(tiles[0].settings["dmg_palette"].as_str(), Some("green"));
-    assert_eq!(tiles[0].settings["frame_blending"].as_bool(), Some(true));
+    assert_eq!(tiles[0].settings["original_screen"].as_bool(), Some(true));
     assert_eq!(tiles[0].pause_menu, None);
     assert_eq!(tiles[1].scene, "town");
-    assert_eq!(tiles[1].settings["frame_blending"].as_bool(), Some(false));
+    assert_eq!(tiles[1].settings["original_screen"].as_bool(), Some(false));
     assert_eq!(tiles[1].pause_menu.as_deref(), Some("main"));
 }
 

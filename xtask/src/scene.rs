@@ -19,7 +19,7 @@ use crate::screenshots::lists::GameList;
 use crate::screenshots::{GAMES_FILE, SCENES_FOLDER};
 use crate::{Result, target_dir, workspace_root};
 use nubo_core::{Emulator, Key, Model, NoSaves, RtcClock};
-use nubo_frontend::lcd;
+use nubo_frontend::lcd::ScreenEffects;
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::palettes::DmgPalette;
 use nubo_frontend::picture::Frame;
@@ -278,19 +278,27 @@ fn new_emulator(rom: &[u8], model: Model, state: Option<&[u8]>) -> Result<Emulat
 }
 
 /// The game's picture `frames` frames after `state`, as the app shows it
-/// with the default settings: colors corrected on a Game Boy Color, in
-/// plain grays on the original Game Boy, and with a Super Game Boy's
-/// border.
+/// with the default settings: with the original screen look (see
+/// `lcd::ScreenEffects`), in plain grays on the original Game Boy, and with
+/// a Super Game Boy's border. The last frame is blended with the one before
+/// it as the app's `capture` command blends them, from the frames it runs
+/// alone.
 fn preview(rom: &[u8], model: Model, state: &[u8], frames: u32) -> Result<image::RgbaImage> {
     let mut emulator = new_emulator(rom, model, Some(state))?;
     let (mut left, mut right) = (Vec::new(), Vec::new());
+    let mut finished: Vec<Frame> = Vec::new();
     for _ in 0..frames {
         emulator.run_frame(&mut left, &mut right);
+        if emulator.take_frame().is_some() {
+            finished.push(Frame::latest(&emulator));
+        }
     }
-    let mut frame = Frame::latest(&emulator);
-    if model.is_cgb() && model != Model::Agb && !frame.in_dmg_shades && frame.sgb_menu.is_none() {
-        lcd::correct_colors(&mut frame.pixels);
-    }
+    let mut frame = finished.pop().unwrap_or_else(|| Frame::latest(&emulator));
+    let previous = finished.pop();
+    ScreenEffects::of(model, true).apply(
+        &mut frame,
+        previous.as_ref().map(|frame| frame.pixels.as_slice()),
+    );
     let picture = frame.shown(DmgPalette::default(), true);
     image::RgbaImage::from_raw(picture.width(), picture.height(), picture.pixels().to_vec())
         .ok_or_else(|| String::from("the game's picture has the wrong size"))
