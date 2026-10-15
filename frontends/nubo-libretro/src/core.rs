@@ -31,6 +31,7 @@ use nubo_core::{
 use nubo_frontend::picture::Frame;
 use nubo_frontend::sgb_menu::DEFAULT_OWN_PALETTE;
 use std::collections::BTreeMap;
+use std::ffi::CStr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -53,8 +54,9 @@ const DOTS_PER_SECOND: f64 = 4_194_304.0;
 /// Frames per second: 4,194,304 / 70,224, about 59.73.
 pub const FRAMES_PER_SECOND: f64 = DOTS_PER_SECOND / DOTS_PER_FRAME as f64;
 
-/// The bytes a save state may grow by after the first one of a game, so
-/// [`Core::serialize_size`] never has to change. Only a few values change
+/// The bytes a save state may grow by after the first one of a game on its
+/// longest model (see [`largest_state`]), so [`Core::serialize_size`] never
+/// has to change. Only a few values change
 /// the length of a state, and by little: enum variants are stored by name
 /// (`Halted` is longer than `Running`), `Option`s with their value only when
 /// there is one, and the PPU's pixel queues with the pixels they hold, which
@@ -65,16 +67,18 @@ const STATE_LENGTH_BYTES: usize = 4;
 
 /// The Game Boy's buttons as libretro numbers them (`RETRO_DEVICE_ID_JOYPAD_*`),
 /// with the button each one presses. Libretro's B and A are the bottom and
-/// right face buttons, where the Game Boy has its B and A.
-pub const BUTTONS: [(u32, Key, &str); 8] = [
-    (0, Key::B, "B"),
-    (2, Key::Select, "Select"),
-    (3, Key::Start, "Start"),
-    (4, Key::Up, "D-Pad Up"),
-    (5, Key::Down, "D-Pad Down"),
-    (6, Key::Left, "D-Pad Left"),
-    (7, Key::Right, "D-Pad Right"),
-    (8, Key::A, "A"),
+/// right face buttons, where the Game Boy has its B and A. The names are C
+/// strings that live as long as the core, since RetroArch keeps pointing at
+/// them for its controls menus.
+pub const BUTTONS: [(u32, Key, &CStr); 8] = [
+    (0, Key::B, c"B"),
+    (2, Key::Select, c"Select"),
+    (3, Key::Start, c"Start"),
+    (4, Key::Up, c"D-Pad Up"),
+    (5, Key::Down, c"D-Pad Down"),
+    (6, Key::Left, c"D-Pad Left"),
+    (7, Key::Right, c"D-Pad Right"),
+    (8, Key::A, c"A"),
 ];
 
 /// How a frame is handed to RetroArch.
@@ -274,7 +278,8 @@ impl Core {
         }
         core.save_ram_copy.clone_from(&core.save_ram);
         core.rtc_copy.clone_from(&core.rtc_memory);
-        core.state_size = STATE_LENGTH_BYTES + core.emulator.save_state().len() + STATE_SIZE_MARGIN;
+        let longest = largest_state(&core.rom, options).max(core.emulator.save_state().len());
+        core.state_size = STATE_LENGTH_BYTES + longest + STATE_SIZE_MARGIN;
         core.draw_frame();
         core.memory.update(&mut core.emulator);
         Ok(core)
@@ -723,6 +728,28 @@ fn start(
     Ok(emulator)
 }
 
+/// The length of the longest save state `rom` makes just after it starts,
+/// on any model. A restart takes on the model the options pick then (see
+/// [`Core::reset`]), and a Super Game Boy's state is tens of kilobytes
+/// longer than a Game Boy's, so [`Core::serialize_size`] must hold every
+/// model's from the start.
+fn largest_state(rom: &[u8], options: Options) -> usize {
+    Model::ALL
+        .iter()
+        .filter_map(|&model| {
+            let mut emulator = Emulator::new(model);
+            emulator.set_sample_rate(SAMPLE_RATE);
+            let effects = CoreEffects {
+                rtc_clock: options.rtc_clock,
+                requests: Arc::new(SaveRequests::default()),
+            };
+            emulator.load_rom(rom, Box::new(effects)).ok()?;
+            Some(emulator.save_state().len())
+        })
+        .max()
+        .unwrap_or(0)
+}
+
 /// Gives a Super Game Boy the colors `options` pick, as its menu would.
 /// Other models ignore them. Save states don't keep them (they are the
 /// player's), so they stay through loads, rewind and run-ahead.
@@ -860,6 +887,23 @@ fn cartridge_ram_index(index: usize, length: usize) -> Option<usize> {
     }
 }
 
+/// Copies cartridge RAM `ram` into `target` as [`cartridge_ram_index`] lays
+/// it out, a slice at a time rather than byte by byte, since it runs every
+/// frame.
+fn copy_cartridge_ram(target: &mut [u8], ram: &[u8]) {
+    let filled = if !ram.is_empty() && ram.len() < 0x2000 {
+        for chunk in target[..0x2000].chunks_mut(ram.len()) {
+            chunk.copy_from_slice(&ram[..chunk.len()]);
+        }
+        0x2000
+    } else {
+        let length = ram.len().min(target.len());
+        target[..length].copy_from_slice(&ram[..length]);
+        length
+    };
+    target[filled..].fill(0);
+}
+
 /// Writes the bytes of `buffer` that differ from `written` into `target`,
 /// the emulator's own memory, at the index `target_index` gives (none skips
 /// the byte), except past `target`'s end. Returns whether it wrote any.
@@ -959,11 +1003,7 @@ impl MemorySnapshot {
         copy_into(self.work_ram.as_mut_slice(), emulator.work_ram());
         copy_into(&mut self.high_ram[..0x7F], emulator.high_ram());
         self.high_ram[0x7F] = emulator.read_memory(0xFFFF);
-        let cartridge_ram = emulator.cartridge_ram();
-        for (index, byte) in self.cartridge_ram.iter_mut().enumerate() {
-            *byte = cartridge_ram_index(index, cartridge_ram.len())
-                .map_or(0, |index| cartridge_ram[index]);
-        }
+        copy_cartridge_ram(self.cartridge_ram.as_mut_slice(), emulator.cartridge_ram());
         for (offset, byte) in self.io.iter_mut().enumerate() {
             *byte = emulator.read_memory(0xFF00 + offset as u16);
         }
