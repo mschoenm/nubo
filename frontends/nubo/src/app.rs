@@ -67,8 +67,9 @@ pub struct App {
     /// With `--fresh`: the app reads and writes nothing kept between runs,
     /// like a new install (see `command_line`).
     fresh: bool,
-    /// With `--raw-screen`: games show the emulator's own picture, whatever
-    /// the settings say (see `command_line`).
+    /// With `--raw-screen`: games show the Game Boy screen as the emulator
+    /// draws it, whatever palette and screen effects the settings pick (see
+    /// `command_line`).
     raw_screen: bool,
     /// Whether the settings file was read (or there was none). When it
     /// couldn't be, the app saves nothing on its own, such as the window's

@@ -192,8 +192,9 @@ impl Settings {
 
 /// How a game's picture is shown on top of what the emulator draws: the
 /// colors of original Game Boy games and the screen effects (see `lcd`).
-/// Every choice that changes the picture belongs here, so that
-/// [`ScreenLook::RAW`] has to name it too.
+/// Every choice that changes the Game Boy screen's pixels belongs here, so
+/// that [`ScreenLook::RAW`] has to name it too. What frames the screen, such
+/// as the Super Game Boy's border, is not part of it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScreenLook {
     /// The colors original Game Boy games are shown in.

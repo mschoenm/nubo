@@ -17,9 +17,12 @@
 //!   problems printed on stderr.
 //! - `--speed <n>` starts the game fast forwarding at `n` times real time,
 //!   one of the fast forward speeds the settings offer.
-//! - `--raw-screen` shows the emulator's own picture, whatever the settings
-//!   say: plain grays and no color correction or other screen effect
-//!   (`nubo_frontend::settings::ScreenLook::RAW`).
+//! - `--raw-screen` shows the Game Boy screen as the emulator draws it,
+//!   whatever palette and screen effects the settings pick: plain grays and
+//!   no color correction or other screen effect
+//!   (`nubo_frontend::settings::ScreenLook::RAW`). A Super Game Boy's
+//!   border still shows or not as the settings say; it frames the screen
+//!   without changing it, and the Shootout's harness crops it off.
 //!
 //! The GB Emulator Shootout's harness runs the app with `--model` and all
 //! but `--cgb` (`docs/SHOOTOUT_PLAN.md`). `--raw-screen` makes its
@@ -52,8 +55,8 @@ pub struct Options {
     pub fresh: bool,
     /// With `--speed`: start the game fast forwarding at this speed.
     pub speed: Option<FastForwardSpeed>,
-    /// With `--raw-screen`: show the emulator's own picture, without the
-    /// settings' palette and screen effects.
+    /// With `--raw-screen`: show the Game Boy screen as the emulator draws
+    /// it, without the settings' palette and screen effects.
     pub raw_screen: bool,
 }
 
