@@ -50,13 +50,6 @@ pub struct ResetChoices {
     pub clear_recently_played: bool,
 }
 
-impl ResetChoices {
-    /// Whether the reset deletes something that can't be put back.
-    pub fn deletes(self) -> bool {
-        self.delete_battery_saves || self.delete_save_states
-    }
-}
-
 /// A page of a library game's menu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameMenuPage {

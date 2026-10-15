@@ -245,15 +245,12 @@ impl App {
         } else {
             Task::none()
         };
-        if choices.deletes() {
+        if delete_battery_saves || delete_save_states {
             // An earlier reset's Undo would put back settings and games from
             // before this reset, next to saves it can't put back. The toast
             // comes once the saves are deleted.
             self.undo = None;
             self.toasts.forget_undo();
-            if !(delete_battery_saves || delete_save_states) {
-                self.toasts.info("Settings are back to how they started");
-            }
         } else {
             self.undo = Some(before);
             self.toasts

@@ -399,6 +399,21 @@ fn a_reset_forgets_the_picked_models_and_keeps_the_play_times_unless_asked() {
     library.reset_games(true).unwrap();
 
     assert!(library.recently_played(4).is_empty());
+    assert!(!library.any_played());
+}
+
+#[cfg(feature = "desktop")]
+#[test]
+fn a_game_on_a_drive_that_is_gone_still_counts_as_played() {
+    let mut library = library_with_two_played_games("played-unavailable");
+    library.unavailable = library
+        .entries
+        .iter()
+        .map(|entry| entry.path.clone())
+        .collect();
+
+    assert!(library.recently_played(4).is_empty());
+    assert!(library.any_played());
 }
 
 #[cfg(feature = "desktop")]

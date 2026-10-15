@@ -123,7 +123,7 @@ impl App {
                 && !self.settings.shared.library_folders.is_empty(),
             clear_recently_played: keeps_data
                 && if library::AVAILABLE {
-                    !self.library.recently_played(1).is_empty()
+                    self.library.any_played()
                 } else {
                     rom::REMEMBERS_LAST_GAME && self.remembered.is_some()
                 },
@@ -642,7 +642,11 @@ fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
     if offers.close_game_first {
         text.push_str(" To delete saves too, close the game first.");
     }
-    let notice = if choices.deletes() {
+    // Only a box on show counts: a game that opened meanwhile takes the
+    // deleting ones away.
+    let deletes = (choices.delete_battery_saves && offers.delete_battery_saves)
+        || (choices.delete_save_states && offers.delete_save_states);
+    let notice = if deletes {
         Notice {
             text: String::from("Deleted saves can't be brought back."),
             warning: true,
@@ -663,11 +667,7 @@ fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
         ),
         Choice::new(
             Icon::RotateCcw,
-            if choices.deletes() {
-                "Reset and delete"
-            } else {
-                "Reset"
-            },
+            if deletes { "Reset and delete" } else { "Reset" },
             ChoiceStyle::Danger,
             DialogAction::CloseThen(SettingsMessage::Reset(choices).into()),
         ),

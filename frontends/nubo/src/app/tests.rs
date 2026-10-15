@@ -56,7 +56,7 @@ fn a_reset_asks_first_puts_the_settings_back_and_can_be_undone() {
 }
 
 #[test]
-fn a_reset_that_deletes_takes_away_an_earlier_resets_undo() {
+fn a_reset_whose_deletions_are_not_offered_can_still_be_undone() {
     let (mut app, _) = App::new(
         None,
         &Options {
@@ -65,8 +65,6 @@ fn a_reset_that_deletes_takes_away_an_earlier_resets_undo() {
         },
     );
     app.settings.appearance = Appearance::Dark;
-    let _ = app.update(SettingsMessage::Reset(ResetChoices::default()).into());
-    app.settings.appearance = Appearance::Light;
 
     let _ = app.update(
         SettingsMessage::Reset(ResetChoices {
@@ -77,7 +75,7 @@ fn a_reset_that_deletes_takes_away_an_earlier_resets_undo() {
     );
     let _ = app.update(GameMessage::Undo.into());
 
-    assert_eq!(app.settings.appearance, Appearance::System);
+    assert_eq!(app.settings.appearance, Appearance::Dark);
 }
 
 #[test]

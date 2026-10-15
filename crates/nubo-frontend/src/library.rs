@@ -604,6 +604,12 @@ impl Library {
         self.save()
     }
 
+    /// Whether any game counts as played, those on a drive that is gone too,
+    /// which "Continue playing" leaves out until it is back.
+    pub fn any_played(&self) -> bool {
+        self.entries.iter().any(|entry| entry.last_played.is_some())
+    }
+
     /// Notes that the game at `path` just started, adding it to the library
     /// if it wasn't known yet.
     pub fn record_played(&mut self, path: &Path, header: &CartridgeHeader) -> Result<(), String> {

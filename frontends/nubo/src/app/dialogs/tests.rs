@@ -85,3 +85,22 @@ fn deleting_saves_warns_and_names_the_button_after_it() {
     assert!(notice.warning);
     assert_eq!(notice.text, "Deleted saves can't be brought back.");
 }
+
+#[test]
+fn a_ticked_box_no_longer_offered_deletes_nothing() {
+    let choices = ResetChoices {
+        delete_battery_saves: true,
+        ..ResetChoices::default()
+    };
+    let offers = ResetOffers {
+        delete_battery_saves: false,
+        delete_save_states: false,
+        close_game_first: true,
+        ..EVERYTHING
+    };
+
+    let content = reset_question(choices, offers);
+
+    assert_eq!(labels(&content).1, ["Cancel", "Reset"]);
+    assert!(!content.notice.unwrap().warning);
+}
