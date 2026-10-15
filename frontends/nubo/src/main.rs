@@ -176,6 +176,7 @@ mod game;
 mod input;
 mod menu_presses;
 mod rom_picker;
+mod selection;
 mod settings;
 mod subscriptions;
 #[cfg(not(target_arch = "wasm32"))]

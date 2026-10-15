@@ -4,6 +4,7 @@
 //! window draws over it: the auto-hiding bar, the pause menu and the cheat
 //! the player is typing.
 
+use crate::selection;
 use nubo_frontend::cheats::Cheat;
 use nubo_frontend::save_states::Slot;
 use nubo_frontend::session::GameSession;
@@ -124,11 +125,11 @@ impl Game {
         self.menu_selection
     }
 
-    /// Moves the highlighted menu row by `step`, staying within the
-    /// `rows` rows of the current page.
-    pub fn move_menu_selection(&mut self, step: isize, rows: usize) {
-        let last = rows.saturating_sub(1);
-        self.menu_selection = self.menu_selection.saturating_add_signed(step).min(last);
+    /// Moves the highlighted menu row by `step` on a page of `rows` rows.
+    /// With `wrap`, going up from the first row lands on the last and down
+    /// from the last on the first; without it, the selection stops there.
+    pub fn move_menu_selection(&mut self, step: isize, rows: usize, wrap: bool) {
+        self.menu_selection = selection::moved(self.menu_selection, step, rows, wrap);
     }
 
     /// Adds the cheat the player typed, or keeps the form's error.

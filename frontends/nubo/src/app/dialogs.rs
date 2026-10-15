@@ -7,6 +7,7 @@ use crate::dialog::{
     Choice, ChoiceStyle, Dialog, DialogAction, DialogContent, DialogKind, GameMenuPage, Layout,
     Notice, ResetChoices,
 };
+use crate::selection;
 use crate::settings::{LibraryFilter, LibrarySort, Settings};
 use crate::ui::icons::Icon;
 use crate::views;
@@ -309,24 +310,26 @@ impl App {
         }
     }
 
-    /// Moves between the open dialog's choices with a direction, picks one
+    /// Moves between the open dialog's choices with a direction, around the
+    /// ends unless the key is `held` (see `crate::selection`), picks one
     /// with A or Start, and dismisses the dialog with B.
-    pub(super) fn navigate_dialog(&mut self, action: Action) -> Task<Message> {
+    pub(super) fn navigate_dialog(&mut self, action: Action, held: bool) -> Task<Message> {
         let Some(content) = self.dialog_content() else {
             return Task::none();
         };
         let Some(dialog) = &mut self.dialog else {
             return Task::none();
         };
-        let last = content.choices.len().saturating_sub(1);
+        let choices = content.choices.len();
 
         match action {
-            Action::Up | Action::Left => {
-                dialog.selection = dialog.selection.saturating_sub(1);
-                return self.scroll_to_selection();
-            }
-            Action::Down | Action::Right => {
-                dialog.selection = (dialog.selection + 1).min(last);
+            Action::Up | Action::Left | Action::Down | Action::Right => {
+                let step = if matches!(action, Action::Up | Action::Left) {
+                    -1
+                } else {
+                    1
+                };
+                dialog.selection = selection::moved(dialog.selection, step, choices, !held);
                 return self.scroll_to_selection();
             }
             Action::A | Action::Start => {

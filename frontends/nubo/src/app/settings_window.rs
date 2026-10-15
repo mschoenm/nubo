@@ -4,6 +4,7 @@
 use super::playing::UndoPoint;
 use super::{App, GameMessage, LibraryMessage, Message, cycle, scroll_in_proportion};
 use crate::dialog::ResetChoices;
+use crate::selection;
 use crate::settings::{Appearance, Settings};
 use crate::views;
 use crate::views::settings::ModelOption;
@@ -371,8 +372,9 @@ impl App {
     /// from the first goes back to a row of tabs above it), left and right
     /// change the row's value, A picks it, Select clears a key or removes a
     /// folder, and B goes back to the tabs (and from there closes the
-    /// window).
-    pub(super) fn navigate_settings(&mut self, action: Action) -> Task<Message> {
+    /// window). Moving through the tabs or the rows wraps around their ends
+    /// unless the key is `held` (see `crate::selection`).
+    pub(super) fn navigate_settings(&mut self, action: Action, held: bool) -> Task<Message> {
         let Some(tab) = self.settings_tab else {
             return Task::none();
         };
@@ -390,7 +392,7 @@ impl App {
                 if let Some(step) = layout.tab_step(action) {
                     let tabs = SettingsTab::all();
                     let current = tabs.iter().position(|&known| known == tab).unwrap_or(0);
-                    let next = current.saturating_add_signed(step).min(tabs.len() - 1);
+                    let next = selection::moved(current, step, tabs.len(), !held);
                     self.settings_tab = Some(tabs[next]);
                     self.capture = None;
                 } else if layout.enters_page(action) && !rows.is_empty() {
@@ -415,7 +417,7 @@ impl App {
                     }
                     Action::Up | Action::Down => {
                         let step = if action == Action::Up { -1 } else { 1 };
-                        let next = index.saturating_add_signed(step).min(rows.len() - 1);
+                        let next = selection::moved(index, step, rows.len(), !held);
                         self.settings_focus = Some(SettingsFocus::Row(next));
                         return scroll_settings(next, rows.len());
                     }
