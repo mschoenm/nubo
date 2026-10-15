@@ -478,6 +478,7 @@ impl App {
             controllers: &self.controllers,
             box_art_problem: self.box_art_problem.as_deref(),
             newer_version: self.newer_version.as_deref(),
+            layout: views::settings::SettingsLayout::new(self.window_width),
         }
     }
 
