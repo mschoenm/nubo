@@ -334,7 +334,12 @@ pub fn main_entries(game: &Game, settings: &Settings, fullscreen: bool) -> Vec<M
         ),
         entry(
             Icon::ArrowLeft,
-            "Back to library",
+            // The browser has no library, as in the bar.
+            if library::AVAILABLE {
+                "Back to library"
+            } else {
+                "Back to the start screen"
+            },
             None,
             Message::Game(GameMessage::CloseGame),
         ),

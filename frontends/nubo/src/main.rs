@@ -87,7 +87,7 @@ fn run(rom: Option<Result<Rom, String>>, options: Options) -> iced::Result {
         None => default_window(settings::Settings::load().0.window_size),
     };
 
-    iced::application(
+    let application = iced::application(
         move || App::new(rom.clone(), &options),
         App::update,
         App::view,
@@ -95,12 +95,13 @@ fn run(rom: Option<Result<Rom, String>>, options: Options) -> iced::Result {
     .title(App::title)
     .subscription(App::subscription)
     .theme(App::theme)
-    .font(ui::icons::FONT_BYTES)
-    .font(ui::theme::FONT_BYTES[0])
-    .font(ui::theme::FONT_BYTES[1])
-    .default_font(ui::theme::BODY_FONT)
-    .window(window)
-    .run()
+    .font(ui::icons::FONT_BYTES);
+    ui::theme::FONT_BYTES
+        .into_iter()
+        .fold(application, iced::Application::font)
+        .default_font(ui::theme::BODY_FONT)
+        .window(window)
+        .run()
 }
 
 /// The window the app usually opens: at `saved_size`, the size it had when

@@ -235,6 +235,8 @@ mod tests {
             root.join("gone").join("Kirby.gb"),
         ];
 
-        assert_eq!(game_folders(&folders, &games), [elsewhere]);
+        let watched = game_folders(&folders, &games);
+        std::fs::remove_dir_all(&root).unwrap();
+        assert_eq!(watched, [elsewhere]);
     }
 }
