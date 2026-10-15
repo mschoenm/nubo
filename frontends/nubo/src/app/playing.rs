@@ -220,9 +220,9 @@ impl App {
             }
             GameMessage::SgbColorsPicked(colors) => {
                 self.change_settings(|settings| settings.shared.sgb_colors = colors);
-                let own = self.settings.shared.sgb_own_palette;
+                let palette = self.sgb_player_palette();
                 if let Some(game) = &mut self.game {
-                    game.session.set_sgb_player_palette(colors.palette(own));
+                    game.session.set_sgb_player_palette(palette);
                     if colors == SgbColors::Own {
                         game.sgb_editor_open = true;
                     }
@@ -412,7 +412,7 @@ impl App {
             // The Super Game Boy menu's choices are the player's, which save
             // states don't keep, so they come from the settings.
             let shared = &self.settings.shared;
-            session.set_sgb_player_palette(shared.sgb_colors.palette(shared.sgb_own_palette));
+            session.set_sgb_player_palette(self.sgb_player_palette());
             session.choose_sgb_border(if shared.sgb_nubo_border {
                 SgbBorder::Nubo
             } else {
@@ -632,9 +632,21 @@ impl App {
         };
         *color = channel.with(*color, value);
         self.settings.shared.sgb_colors = SgbColors::Own;
-        let own = self.settings.shared.sgb_own_palette;
+        let palette = self.sgb_player_palette();
         if let Some(game) = &mut self.game {
-            game.session.set_sgb_player_palette(Some(own));
+            game.session.set_sgb_player_palette(palette);
+        }
+    }
+
+    /// The colors the player picked in the Super Game Boy menu, or none for
+    /// the game's own: always the game's with `--raw-screen`, which shows
+    /// the Game Boy screen as the emulator draws it.
+    fn sgb_player_palette(&self) -> Option<[u16; 4]> {
+        let shared = &self.settings.shared;
+        if self.raw_screen {
+            None
+        } else {
+            shared.sgb_colors.palette(shared.sgb_own_palette)
         }
     }
 

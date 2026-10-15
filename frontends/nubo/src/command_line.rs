@@ -18,9 +18,10 @@
 //! - `--speed <n>` starts the game fast forwarding at `n` times real time,
 //!   one of the fast forward speeds the settings offer.
 //! - `--raw-screen` shows the Game Boy screen as the emulator draws it,
-//!   whatever palette and screen effects the settings pick: plain grays and
+//!   whatever palette and screen effects the settings pick: plain grays,
 //!   no color correction or other screen effect
-//!   (`nubo_frontend::settings::ScreenLook::RAW`). A Super Game Boy's
+//!   (`nubo_frontend::settings::ScreenLook::RAW`) and a Super Game Boy
+//!   game's own colors rather than ones the player picked. A Super Game Boy's
 //!   border still shows or not as the settings say; it frames the screen
 //!   without changing it, and the Shootout's harness crops it off.
 //!
