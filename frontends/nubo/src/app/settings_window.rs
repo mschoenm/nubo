@@ -84,9 +84,7 @@ impl App {
             }
             SettingsMessage::PaletteSelected(palette) => {
                 self.change_settings(|settings| settings.shared.dmg_palette = palette);
-                if let Some(game) = &mut self.game {
-                    game.session.set_palette(palette);
-                }
+                self.apply_screen_look();
                 return self.load_pictures(false);
             }
             SettingsMessage::CheckForUpdatesToggled(check) => {
@@ -95,11 +93,11 @@ impl App {
             }
             SettingsMessage::ColorCorrectionToggled(enabled) => {
                 self.change_settings(|settings| settings.shared.color_correction = enabled);
-                self.apply_screen_effects();
+                self.apply_screen_look();
             }
             SettingsMessage::FrameBlendingToggled(enabled) => {
                 self.change_settings(|settings| settings.shared.frame_blending = enabled);
-                self.apply_screen_effects();
+                self.apply_screen_look();
             }
             SettingsMessage::IntegerScalingToggled(enabled) => {
                 self.change_settings(|settings| settings.integer_scaling = enabled);
@@ -175,12 +173,12 @@ impl App {
         })
     }
 
-    /// Shows the running game with the screen effects the settings pick.
-    fn apply_screen_effects(&mut self) {
-        let shared = &self.settings.shared;
+    /// Shows the running game with the palette and screen effects the
+    /// settings pick (see `App::screen_look`).
+    fn apply_screen_look(&mut self) {
+        let look = self.screen_look();
         if let Some(game) = &mut self.game {
-            game.session
-                .set_screen_effects(shared.color_correction, shared.frame_blending);
+            game.session.set_screen_look(look);
         }
     }
 

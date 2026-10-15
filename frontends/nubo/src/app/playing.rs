@@ -406,11 +406,7 @@ impl App {
             &self.settings.shared,
         )?;
         session.set_controls(&self.settings.shared.controls);
-        session.set_palette(self.settings.shared.dmg_palette);
-        session.set_screen_effects(
-            self.settings.shared.color_correction,
-            self.settings.shared.frame_blending,
-        );
+        session.set_screen_look(self.screen_look());
         session.set_sgb_border(self.settings.shared.sgb_border);
         if model.is_sgb() {
             // The Super Game Boy menu's choices are the player's, which save

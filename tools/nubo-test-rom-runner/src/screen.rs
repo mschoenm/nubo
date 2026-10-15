@@ -44,10 +44,10 @@ pub(crate) fn normalize(frame: &[u8], model: Model) -> RgbImage {
     RgbImage::from_raw(WIDTH, HEIGHT, pixels).expect("the frame buffer is 160x144 RGBA")
 }
 
-/// An RGBA frame from the emulator in the colors the app shows it in, as
-/// the GB Emulator Shootout's harness sees it: the original Game Boy's
-/// grays (`DMG_SHADES`, which the app's default palette keeps) and the Game
-/// Boy Color's colors as the core draws them.
+/// An RGBA frame from the emulator in the colors the app shows it in with
+/// `--raw-screen`, as the GB Emulator Shootout's harness sees it: the
+/// original Game Boy's grays (`DMG_SHADES`, the gray palette) and the Game
+/// Boy Color's colors as the core draws them, without color correction.
 pub(crate) fn as_shown(frame: &[u8]) -> RgbImage {
     let pixels = frame
         .as_chunks::<4>()
@@ -73,7 +73,7 @@ impl GrayscaleReference {
     }
 
     /// Whether every pixel of the emulator's RGBA `frame`, in the colors
-    /// the app shows it in (unlike [`normalize`], which rounds Game Boy
+    /// the app shows it in with `--raw-screen` (unlike [`normalize`], which rounds Game Boy
     /// Color colors as the screenshots store them), is within `GRAYSCALE_TOLERANCE`
     /// of the reference's brightness, as the Shootout's harness compares a
     /// screenshot of the app. Stops at the first pixel that isn't.

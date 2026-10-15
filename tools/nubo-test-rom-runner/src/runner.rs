@@ -525,7 +525,8 @@ enum Verdict {
 /// it passes once the screen has matched one of the `pass` screenshots for
 /// `MATCH_HOLD_AUDIO_BUFFERS`, fails once it has matched one of the `fail`
 /// screenshots that long, and fails at the deadline. Screens are compared in
-/// grayscale, as the Shootout does, in the colors the app shows: unlike the
+/// grayscale, as the Shootout does, in the colors the app shows with
+/// `--raw-screen` (see `screen::as_shown`): unlike the
 /// other screenshot checks, the original Game Boy's grays aren't mapped to
 /// the screenshots' own, since the harness takes screenshots of the app.
 fn run_shootout_test(

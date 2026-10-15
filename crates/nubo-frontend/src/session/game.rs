@@ -14,7 +14,7 @@ use crate::palettes::DmgPalette;
 use crate::picture::{Frame, Picture};
 use crate::rom::Rom;
 use crate::save_states::{self, SaveState, Slot, SlotInfo};
-use crate::settings::{FastForwardSpeed, Settings};
+use crate::settings::{FastForwardSpeed, ScreenLook, Settings};
 use crate::sgb_menu::SgbMenu;
 use nubo_core::{CartridgeHeader, ControllerState, Key, Model, SgbBorder};
 use std::path::PathBuf;
@@ -236,20 +236,14 @@ impl GameSession {
         cheats::save(&self.rom.path, &self.cheats)
     }
 
-    /// Shows Game Boy Color games as on its own screen (on a Game Boy Color
-    /// only: the Game Boy Advance's screen and a Super Game Boy's TV showed
-    /// them differently), and mixes each frame with the one before, as
-    /// these say (see `lcd`).
-    pub fn set_screen_effects(&mut self, color_correction: bool, frame_blending: bool) {
+    /// Shows the game as `look` says from now on, repainting the frame on
+    /// screen. Colors are corrected on a Game Boy Color only: the Game Boy
+    /// Advance's screen and a Super Game Boy's TV showed them differently.
+    pub fn set_screen_look(&mut self, look: ScreenLook) {
         let color_screen = self.model.is_cgb() && self.model != Model::Agb;
+        self.screen.set_palette(look.dmg_palette);
         self.screen
-            .set_effects(color_correction && color_screen, frame_blending);
-    }
-
-    /// Shows original Game Boy games in `palette` from now on, repainting
-    /// the frame on screen.
-    pub fn set_palette(&mut self, palette: DmgPalette) {
-        self.screen.set_palette(palette);
+            .set_effects(look.color_correction && color_screen, look.frame_blending);
     }
 
     /// Shows a Super Game Boy's border around the screen from now on, or
