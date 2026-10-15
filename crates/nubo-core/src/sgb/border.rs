@@ -1,3 +1,9 @@
+/*
+    How a game's border is decoded (the tiles, the map entries with their palette and flip bits)
+    is ported from SameBoy's sgb.c (https://github.com/LIJI32/SameBoy, Expat License,
+    Copyright (c) 2015-2026 Lior Halphon; see the notice in apu.rs).
+*/
+
 //! The border around the Game Boy screen on a Super Game Boy: a game's own,
 //! sent as Super Nintendo tiles, or Nubo's.
 //!
