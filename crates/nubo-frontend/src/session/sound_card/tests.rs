@@ -54,21 +54,25 @@ fn the_listener_is_told_about_new_frames_only() {
 
     publish_pixels(&frame, &[1, 2, 3]);
     publish_pixels(&frame, &[1, 2, 3]);
+    publish_pixels(&frame, &[1, 2, 3]);
     publish_pixels(&frame, &[1, 2, 4]);
 
-    assert_eq!(calls.load(Ordering::Relaxed), 3);
+    assert_eq!(calls.load(Ordering::Relaxed), 4);
 }
 
 #[test]
-fn a_frame_like_the_one_before_is_not_published_again() {
+fn only_the_first_frame_like_the_one_before_is_published() {
     let frame = shared_frame();
 
     publish_pixels(&frame, &[1, 2, 3]);
     publish_pixels(&frame, &[1, 2, 3]);
-    assert_eq!(frame.lock().unwrap().sequence, 1);
+    assert_eq!(frame.lock().unwrap().sequence, 2);
+    publish_pixels(&frame, &[1, 2, 3]);
+    publish_pixels(&frame, &[1, 2, 3]);
+    assert_eq!(frame.lock().unwrap().sequence, 2);
 
     publish_pixels(&frame, &[1, 2, 4]);
-    assert_eq!(frame.lock().unwrap().sequence, 2);
+    assert_eq!(frame.lock().unwrap().sequence, 3);
 }
 
 #[test]

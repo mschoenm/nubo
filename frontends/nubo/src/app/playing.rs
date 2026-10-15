@@ -10,6 +10,8 @@ use iced::widget::{self, scrollable::RelativeOffset};
 use nubo_core::{CartridgeHeader, Emulator, Model, SgbBorder};
 use nubo_frontend::cheats;
 use nubo_frontend::controls::Action;
+use nubo_frontend::library::LibraryEntry;
+use nubo_frontend::model::Console;
 use nubo_frontend::picture::Picture;
 use nubo_frontend::rom::{self, Rom};
 use nubo_frontend::save_states::{self, SaveState, Slot};
@@ -275,7 +277,9 @@ impl App {
 
     /// Starts `rom` on the model the settings pick for it. With `resume` and
     /// the "resume games" setting on, it continues from where the player
-    /// left it, on the model it ran on then (never with `--fresh`).
+    /// left it, on the model it ran on then (never with `--fresh`), unless
+    /// the player has since picked another model for the game: then it
+    /// starts on that one, and Undo goes back to where they left off.
     ///
     /// Restarting the same ROM stops it first, so its battery save and
     /// where the player left off are written before it loads again and
@@ -306,6 +310,12 @@ impl App {
             })
         } else {
             None
+        };
+
+        let picked = self.library.entry(&rom.path).and_then(LibraryEntry::model);
+        let (resume_state, set_aside) = match resume_state {
+            Some(state) if picked.is_some_and(|model| model != state.model) => (None, Some(state)),
+            state => (state, None),
         };
 
         let model = resume_state
@@ -345,6 +355,17 @@ impl App {
                 self.settings_tab = None;
                 self.search.clear();
                 self.library_selection = None;
+
+                if let Some(state) = set_aside {
+                    self.undo = Some(UndoPoint::Game {
+                        rom_path: path,
+                        state,
+                    });
+                    self.toasts.info_with_undo(format!(
+                        "Started on the {}, not where you left off",
+                        Console::of(model).label()
+                    ));
+                }
             }
             Err(error) => self.toasts.error(format!(
                 "Couldn't start {}: {error}",
