@@ -4,8 +4,10 @@
 use crate::ui::icons::{self, Icon};
 use crate::ui::theme;
 use iced::widget::text::Wrapping;
-use iced::widget::{button, center, column, container, image, responsive, row, text, tooltip};
-use iced::{Alignment, Element, Fill, Font, Size};
+use iced::widget::{
+    button, center, column, container, image, responsive, row, stack, text, tooltip,
+};
+use iced::{Alignment, Color, Element, Fill, Font, Size};
 
 /// The average width of a character as a fraction of the font size, used to
 /// guess how much text fits. Game titles measure about 0.46; a bit more
@@ -84,14 +86,53 @@ pub fn bar_button<'a, Message: Clone + 'a>(
 ) -> Element<'a, Message> {
     let button = labelled_button(icon, label)
         .padding([6, 12])
-        .style(if primary {
-            theme::primary_button
-        } else {
-            theme::secondary_button
-        })
+        .style(bar_button_style(primary))
         .on_press(on_press);
 
     with_tooltip(button, tip, tooltip::Position::Bottom)
+}
+
+/// A [`bar_button`] whose label changes, such as Pause and Resume, that is
+/// always as wide as it is with `widest`, its widest label, so it keeps its
+/// size and nothing beside it in the bar moves. An invisible copy of the
+/// button with `widest` takes the room, and the label shown sits in the
+/// middle of it.
+pub fn steady_bar_button<'a, Message: Clone + 'a>(
+    icon: Icon,
+    (label, widest): (&'a str, &'a str),
+    tip: String,
+    primary: bool,
+    on_press: Message,
+) -> Element<'a, Message> {
+    let room = row![
+        icons::icon(icon).color(Color::TRANSPARENT),
+        text(widest).color(Color::TRANSPARENT)
+    ]
+    .spacing(8)
+    .align_y(Alignment::Center);
+    let shown = container(
+        row![icons::icon(icon), text(label)]
+            .spacing(8)
+            .align_y(Alignment::Center),
+    )
+    .center_x(Fill);
+
+    let button = button(stack![room, shown])
+        .padding([6, 12])
+        .style(bar_button_style(primary))
+        .on_press(on_press);
+
+    with_tooltip(button, tip, tooltip::Position::Bottom)
+}
+
+/// The style of a top bar button: filled with the accent color when
+/// `primary`.
+fn bar_button_style(primary: bool) -> fn(&iced::Theme, button::Status) -> button::Style {
+    if primary {
+        theme::primary_button
+    } else {
+        theme::secondary_button
+    }
 }
 
 /// A short upright line between groups of buttons in the top bar.
@@ -268,6 +309,51 @@ pub fn whole_step_screen<'a, Message: 'a>(
         .into()
     })
     .into()
+}
+
+/// A picture of the Game Boy screen, `size` pixels, in a frame `border`
+/// wide drawn with `style` that hugs it, in the middle of the space it
+/// gets, such as a library card's. The screen grows in whole steps like
+/// [`whole_step_screen`]; where even its own size doesn't fit, it shrinks
+/// to fit instead of being cut off.
+pub fn framed_screen<'a, Message: 'a>(
+    handle: image::Handle,
+    (width, height): (u32, u32),
+    border: f32,
+    style: fn(&iced::Theme) -> container::Style,
+) -> Element<'a, Message> {
+    responsive(move |available| {
+        let inside = Size::new(
+            (available.width - 2.0 * border).max(0.0),
+            (available.height - 2.0 * border).max(0.0),
+        );
+        let factor = whole_step_or_fitting_factor(inside, width, height);
+
+        center(
+            container(
+                image(handle.clone())
+                    .filter_method(image::FilterMethod::Nearest)
+                    .width(width as f32 * factor)
+                    .height(height as f32 * factor),
+            )
+            .padding(border)
+            .style(style),
+        )
+        .into()
+    })
+    .into()
+}
+
+/// The largest whole factor a picture `width` by `height` pixels can grow by
+/// in `available`, or, where even its own size doesn't fit, the factor
+/// below 1 that shrinks it to fit.
+fn whole_step_or_fitting_factor(available: Size, width: u32, height: u32) -> f32 {
+    let fitting = (available.width / width as f32).min(available.height / height as f32);
+    if fitting >= 1.0 {
+        fitting.floor()
+    } else {
+        fitting
+    }
 }
 
 /// The largest whole factor a picture `width` by `height` pixels can grow by

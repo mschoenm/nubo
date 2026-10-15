@@ -13,8 +13,8 @@ use crate::ui::pictures;
 use crate::ui::theme;
 use crate::ui::theme::Badge;
 use crate::ui::widgets::{
-    bar_button, icon_button, keycap, primary_button, secondary_button, shortcut, top_bar,
-    truncated_text, whole_step_screen, with_tooltip,
+    bar_button, framed_screen, icon_button, keycap, primary_button, secondary_button, shortcut,
+    top_bar, truncated_text, with_tooltip,
 };
 use crate::views::settings::SettingsTab;
 use iced::widget::{
@@ -46,13 +46,15 @@ const CONTROLS: [(&[Action], &str); 5] = [
 /// Where the welcome screen sends players who have no games yet.
 const HOMEBREW_HUB: &str = "https://hh.gbdev.io";
 
-/// How many games "Continue playing" shows.
-pub const RECENT_LIMIT: usize = 4;
+/// How many full-size cards fit side by side in the window Nubo starts with.
+const STARTING_COLUMNS: usize = 4;
 /// Cards are at most this wide; the grid fits as many columns as it can.
 const CARD_MAX_WIDTH: f32 = 210.0;
 const CARD_SPACING: f32 = 16.0;
 /// A card's width to its height.
 const CARD_ASPECT: (f32, f32) = (160.0, 196.0);
+/// The width of the dark frame around a title screen on a card.
+const SCREEN_FRAME: f32 = 6.0;
 const CONTENT_MAX_WIDTH: f32 = 1100.0;
 const PAGE_PADDING: (f32, f32) = (20.0, 24.0);
 const SECTION_SPACING: f32 = 14.0;
@@ -67,10 +69,10 @@ const SHELF_GAP: f32 = 12.0;
 /// The height of a section heading, at 17 points.
 const HEADING_HEIGHT: f32 = 22.0;
 
-/// The width of a window that fits a whole "Continue playing" row of
-/// full-size cards side by side, used as the window's starting width.
-pub const FULL_ROW_WINDOW_WIDTH: f32 = RECENT_LIMIT as f32 * CARD_MAX_WIDTH
-    + (RECENT_LIMIT - 1) as f32 * CARD_SPACING
+/// The width of a window that fits a row of [`STARTING_COLUMNS`] full-size
+/// cards side by side, used as the window's starting width.
+pub const FULL_ROW_WINDOW_WIDTH: f32 = STARTING_COLUMNS as f32 * CARD_MAX_WIDTH
+    + (STARTING_COLUMNS - 1) as f32 * CARD_SPACING
     + 2.0 * PAGE_PADDING.1;
 
 /// The cards the library shows, in the order the D-pad moves through them:
@@ -81,11 +83,17 @@ pub struct Shelves<'a> {
 }
 
 impl<'a> Shelves<'a> {
-    /// The cards shown for `search`, with all games in the order and of the
-    /// kind the settings pick. "Continue playing" hides while searching.
-    pub fn new(library: &'a Library, settings: &Settings, search: &'a str) -> Shelves<'a> {
+    /// The cards shown for `search` in a window `window_width` wide, with
+    /// all games in the order and of the kind the settings pick. "Continue
+    /// playing" fills one row, and hides while searching.
+    pub fn new(
+        library: &'a Library,
+        settings: &Settings,
+        search: &'a str,
+        window_width: f32,
+    ) -> Shelves<'a> {
         let recent = if search.is_empty() {
-            library.recently_played(RECENT_LIMIT)
+            library.recently_played(columns(window_width))
         } else {
             Vec::new()
         };
@@ -118,6 +126,26 @@ impl<'a> Shelves<'a> {
             .get(index)
             .or_else(|| self.games.get(index.checked_sub(self.recent.len())?))
             .copied()
+    }
+
+    /// Where the card at `index` of `before` is on these shelves, such as
+    /// after the window was resized and "Continue playing" holds a
+    /// different number of games: the same game on the same shelf while
+    /// it's still there, or else on All games.
+    pub fn same_card(&self, before: &Shelves, index: usize) -> Option<usize> {
+        let entry = before.entry(index)?;
+        let on_recent = || self.recent.iter().position(|game| game.path == entry.path);
+        let on_games = || {
+            self.games
+                .iter()
+                .position(|game| game.path == entry.path)
+                .map(|position| self.recent.len() + position)
+        };
+        if index < before.recent.len() {
+            on_recent().or_else(on_games)
+        } else {
+            on_games()
+        }
     }
 
     /// The card the D-pad moves to from `index` in `direction`, in a
@@ -249,6 +277,11 @@ fn content_width(window_width: f32) -> f32 {
     (window_width - PAGE_PADDING.1 * 2.0).clamp(CARD_MAX_WIDTH, CONTENT_MAX_WIDTH)
 }
 
+/// The most games "Continue playing" shows: a row in the widest window.
+pub fn most_recent_shown() -> usize {
+    columns(f32::INFINITY)
+}
+
 /// How many cards fit side by side, the way Iced's grid works it out.
 fn columns(window_width: f32) -> usize {
     (((content_width(window_width) + CARD_SPACING) / (CARD_MAX_WIDTH + CARD_SPACING)).ceil()
@@ -268,17 +301,23 @@ pub fn scroll_id() -> widget::Id {
 }
 
 /// The library screen. `selection` is the card the D-pad is on, if the
-/// player has used it.
+/// player has used it. `window_width` decides how many games "Continue
+/// playing" shows.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "each is a separate part of the app's state, borrowed only for this view"
+)]
 pub fn view<'a>(
     library: &'a Library,
     settings: &'a Settings,
     search: &'a str,
+    window_width: f32,
     selection: Option<usize>,
     controllers: &'a [String],
     remembered: Option<&'a Rom>,
     top: TopBar<'a>,
 ) -> Element<'a, Message> {
-    let shelves = Shelves::new(library, settings, search);
+    let shelves = Shelves::new(library, settings, search, window_width);
     let has_folders = !settings.shared.library_folders.is_empty();
 
     if !library::AVAILABLE || (!has_folders && library.recently_played(1).is_empty()) {
@@ -823,16 +862,17 @@ fn menu_button(entry: &LibraryEntry) -> Element<'_, Message> {
     .into()
 }
 
-/// A picture of the Game Boy screen on a dark frame, grown by the largest
-/// whole factor that fits so every pixel is the same size, like the game
-/// screen with sharp pixels on.
+/// A picture of the Game Boy screen in a thin dark frame that hugs it,
+/// grown by the largest whole factor that fits so every pixel is the same
+/// size, like the game screen with sharp pixels on, or shrunk to fit a card
+/// too narrow for the screen's own size.
 fn screen_picture<'a>(handle: image::Handle) -> Element<'a, Message> {
-    container(whole_step_screen(handle, (SCREEN_WIDTH, SCREEN_HEIGHT)))
-        .width(Fill)
-        .height(Fill)
-        .clip(true)
-        .style(theme::card_screen)
-        .into()
+    framed_screen(
+        handle,
+        (SCREEN_WIDTH, SCREEN_HEIGHT),
+        SCREEN_FRAME,
+        theme::card_screen,
+    )
 }
 
 #[cfg(test)]

@@ -277,7 +277,12 @@ impl App {
     /// selected card into view, starts the selected game with A or Start,
     /// and opens its menu with Select.
     pub(super) fn navigate_library(&mut self, action: Action, held: bool) -> Task<Message> {
-        let shelves = views::library::Shelves::new(&self.library, &self.settings, &self.search);
+        let shelves = views::library::Shelves::new(
+            &self.library,
+            &self.settings,
+            &self.search,
+            self.window_width,
+        );
         let count = shelves.len();
         if count == 0 {
             return Task::none();
@@ -420,6 +425,24 @@ impl App {
         )
     }
 
+    /// Keeps the D-pad on the same game when the window's width changed
+    /// from `old_width`, which can change how many games "Continue
+    /// playing" holds and so where every card after them is.
+    pub(super) fn keep_library_selection(&mut self, old_width: f32) {
+        let Some(index) = self.library_selection else {
+            return;
+        };
+        let before =
+            views::library::Shelves::new(&self.library, &self.settings, &self.search, old_width);
+        let after = views::library::Shelves::new(
+            &self.library,
+            &self.settings,
+            &self.search,
+            self.window_width,
+        );
+        self.library_selection = after.same_card(&before, index);
+    }
+
     /// The games "Continue playing" shows that aren't in a library folder,
     /// whose files the folder watcher watches too, so a deleted one leaves
     /// the list right away.
@@ -429,7 +452,7 @@ impl App {
         }
 
         self.library
-            .recently_played(views::library::RECENT_LIMIT)
+            .recently_played(views::library::most_recent_shown())
             .into_iter()
             .filter(|entry| !entry.in_folder)
             .map(|entry| entry.path.clone())

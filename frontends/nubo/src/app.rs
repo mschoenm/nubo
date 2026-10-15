@@ -377,6 +377,7 @@ impl App {
                 &self.library,
                 &self.settings,
                 &self.search,
+                self.window_width,
                 self.library_selection,
                 &self.controllers,
                 self.remembered.as_ref(),
