@@ -144,7 +144,13 @@ impl RtcState {
     /// brought up to date. The fraction of a millisecond left over stays in
     /// `base_timestamp`, so a game that latches the clock very often doesn't
     /// lose it. A halted clock doesn't count. Returns whether the clock moved.
+    /// A `base_timestamp` that isn't a number, as a damaged `.rtc` file or
+    /// save state can hold, starts counting from `current_time` instead.
     fn catch_up(&mut self, current_time: f64) -> bool {
+        if !self.base_timestamp.is_finite() {
+            self.base_timestamp = current_time;
+            return false;
+        }
         let elapsed_ms = (current_time - self.base_timestamp).floor();
         if self.halted || elapsed_ms < 1.0 {
             return false;
@@ -622,6 +628,23 @@ mod tests {
         state.rebase(3_500.5, 20.0);
         assert_eq!((state.seconds, state.milliseconds), (12, 500));
         assert_eq!(state.base_timestamp, 20.0 - 0.25);
+    }
+
+    #[test]
+    fn a_damaged_timestamp_starts_the_clock_again_from_now() {
+        for damaged in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut state = RtcState {
+                seconds: 10,
+                base_timestamp: damaged,
+                ..RtcState::default()
+            };
+            assert!(!state.catch_up(5_000.0));
+            assert_eq!(state.seconds, 10);
+            assert_eq!(state.base_timestamp, 5_000.0);
+
+            assert!(state.catch_up(7_000.0));
+            assert_eq!(state.seconds, 12);
+        }
     }
 
     #[test]
