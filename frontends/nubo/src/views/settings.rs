@@ -151,18 +151,14 @@ pub enum SettingsRow {
     Folder(usize),
     AddFolder,
     BoxArt,
+    /// Tries to download box art again after it failed.
+    RetryBoxArt,
 }
 
 /// The rows of `tab` in the order the D-pad moves through them, which is
 /// the order the page shows them in (a test checks that the pages draw them
-/// in this order). `restart_needed` and `device` are as in [`view`] and
-/// [`ControlsPage`]. The About tab has none.
-pub fn rows(
-    tab: SettingsTab,
-    settings: &Settings,
-    restart_needed: bool,
-    device: Device,
-) -> Vec<SettingsRow> {
+/// in this order). The About tab has none.
+pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec<SettingsRow> {
     let mut rows = Vec::new();
 
     match tab {
@@ -174,7 +170,7 @@ pub fn rows(
         ]),
         SettingsTab::Playing => {
             rows.push(SettingsRow::Model);
-            if restart_needed {
+            if state.restart_needed {
                 rows.push(SettingsRow::RestartNow);
             }
             if save_states::AVAILABLE {
@@ -185,7 +181,12 @@ pub fn rows(
         SettingsTab::Controls => {
             rows.push(SettingsRow::Device);
             rows.extend(Action::GAME_BOY.map(SettingsRow::Binding));
-            rows.extend(shortcuts(device).iter().copied().map(SettingsRow::Binding));
+            rows.extend(
+                shortcuts(state.device)
+                    .iter()
+                    .copied()
+                    .map(SettingsRow::Binding),
+            );
             rows.push(SettingsRow::ResetControls);
         }
         SettingsTab::Library => {
@@ -194,6 +195,9 @@ pub fn rows(
             rows.push(SettingsRow::AddFolder);
             if box_art::AVAILABLE {
                 rows.push(SettingsRow::BoxArt);
+                if state.box_art_problem.is_some() {
+                    rows.push(SettingsRow::RetryBoxArt);
+                }
             }
         }
         SettingsTab::About => {}
@@ -223,25 +227,27 @@ pub fn scroll_id() -> widget::Id {
     widget::Id::new("settings-page")
 }
 
-/// What the Controls tab shows besides the settings.
-pub struct ControlsPage<'a> {
-    /// Whether it shows the keyboard or the controller.
+/// What the pages show besides the settings themselves.
+pub struct PageState<'a> {
+    /// Whether the running game uses another model than the one picked, so
+    /// the Playing tab offers to restart it.
+    pub restart_needed: bool,
+    /// Whether the Controls tab shows the keyboard or the controller.
     pub device: Device,
     /// The action waiting for a key or button, if any.
     pub capture: Option<(Device, Action)>,
     /// The names of the connected controllers.
     pub controllers: &'a [String],
+    /// Why box art couldn't be downloaded this run, if it couldn't.
+    pub box_art_problem: Option<&'a str>,
 }
 
-/// The settings window showing `tab`. `restart_needed` says whether the
-/// running game uses another model than the selected one, so it should offer
-/// a restart.
+/// The settings window showing `tab`.
 pub fn view<'a>(
     tab: SettingsTab,
     settings: &'a Settings,
     library: &'a Library,
-    restart_needed: bool,
-    controls_page: &ControlsPage<'a>,
+    state: &PageState<'a>,
     focus: Option<SettingsFocus>,
 ) -> Element<'a, Message> {
     let header = row![
@@ -256,21 +262,10 @@ pub fn view<'a>(
     .align_y(Alignment::Center);
 
     let focused = match focus {
-        Some(SettingsFocus::Row(index)) => {
-            rows(tab, settings, restart_needed, controls_page.device)
-                .get(index)
-                .copied()
-        }
+        Some(SettingsFocus::Row(index)) => rows(tab, settings, state).get(index).copied(),
         _ => None,
     };
-    let page = page(
-        tab,
-        settings,
-        library,
-        restart_needed,
-        controls_page,
-        &Rings::new(focused),
-    );
+    let page = page(tab, settings, library, state, &Rings::new(focused));
 
     let body = row![
         sidebar(tab, focus == Some(SettingsFocus::Sidebar)),
@@ -331,15 +326,14 @@ fn page<'a>(
     tab: SettingsTab,
     settings: &'a Settings,
     library: &'a Library,
-    restart_needed: bool,
-    controls_page: &ControlsPage<'a>,
+    state: &PageState<'a>,
     rings: &Rings,
 ) -> Element<'a, Message> {
     match tab {
         SettingsTab::Display => display(settings, rings),
-        SettingsTab::Playing => playing(settings, restart_needed, rings),
-        SettingsTab::Controls => controls(settings, controls_page, rings),
-        SettingsTab::Library => library_page(settings, library, rings),
+        SettingsTab::Playing => playing(settings, state.restart_needed, rings),
+        SettingsTab::Controls => controls(settings, state, rings),
+        SettingsTab::Library => library_page(settings, library, state.box_art_problem, rings),
         SettingsTab::About => about(),
     }
 }
@@ -837,7 +831,7 @@ fn palette_button<'a>(palette: DmgPalette, selected: bool) -> Element<'a, Messag
 /// buttons and the shortcuts, and a button that resets them.
 fn controls<'a>(
     settings: &'a Settings,
-    page: &ControlsPage<'a>,
+    page: &PageState<'a>,
     rings: &Rings,
 ) -> Element<'a, Message> {
     let device = page.device;
@@ -983,6 +977,7 @@ fn binding_row(
 fn library_page<'a>(
     settings: &'a Settings,
     library: &'a Library,
+    box_art_problem: Option<&'a str>,
     rings: &Rings,
 ) -> Element<'a, Message> {
     let rescan = rings.around(
@@ -1038,21 +1033,28 @@ fn library_page<'a>(
     .spacing(20);
 
     if box_art::AVAILABLE {
+        let mut rows = vec![rings.row(
+            setting(
+                "Download box art",
+                Some(String::from(
+                    "Games without box art show their title screen.",
+                )),
+                switch(settings.shared.download_box_art, |enabled| {
+                    Message::Library(LibraryMessage::DownloadBoxArtToggled(enabled))
+                }),
+            ),
+            SettingsRow::BoxArt,
+        )];
+        if let Some(problem) = box_art_problem {
+            rows.push(box_art_problem_row(
+                problem,
+                rings.is_focused(SettingsRow::RetryBoxArt),
+            ));
+        }
         page = page.push(group(
             "Box art",
             None,
-            vec![rings.row(
-                setting(
-                    "Download box art",
-                    Some(String::from(
-                        "Games without box art show their title screen.",
-                    )),
-                    switch(settings.shared.download_box_art, |enabled| {
-                        Message::Library(LibraryMessage::DownloadBoxArtToggled(enabled))
-                    }),
-                ),
-                SettingsRow::BoxArt,
-            )],
+            rows,
             Some(
                 "Pictures come from the libretro thumbnail collection. While this is on, the \
                  names of your games are sent to thumbnails.libretro.com, and the game lists \
@@ -1062,6 +1064,34 @@ fn library_page<'a>(
     }
 
     page.into()
+}
+
+/// The row that says box art couldn't be downloaded, with why in small
+/// print, and a button that tries again.
+fn box_art_problem_row(problem: &str, focused: bool) -> Element<'_, Message> {
+    let content = row![
+        icon(Icon::CloudOff).style(theme::warning_text),
+        column![
+            text("Couldn't reach the box art server, so cards show title screens for now.")
+                .size(13),
+            note_text(problem),
+        ]
+        .spacing(2)
+        .width(Fill),
+        small_button(
+            Icon::RefreshCw,
+            "Try again",
+            Message::Library(LibraryMessage::RetryBoxArt)
+        ),
+    ]
+    .spacing(12)
+    .align_y(Alignment::Center);
+
+    container(content)
+        .padding(ROW_PADDING)
+        .width(Fill)
+        .style(theme::notice_row(focused))
+        .into()
 }
 
 /// A library folder with its name, path, subfolder switch and remove button.

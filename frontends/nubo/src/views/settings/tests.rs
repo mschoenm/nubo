@@ -2,29 +2,23 @@
 
 use super::*;
 
-/// The rows the page of `tab` draws, in the order it draws them.
-fn drawn_rows(
-    tab: SettingsTab,
-    settings: &Settings,
-    restart_needed: bool,
-    device: Device,
-) -> Vec<SettingsRow> {
-    let library = Library::default();
-    let controls_page = ControlsPage {
+/// The page state with `restart_needed`, `device` and `box_art_problem`.
+fn state(restart_needed: bool, device: Device, box_art_problem: bool) -> PageState<'static> {
+    PageState {
+        restart_needed,
         device,
         capture: None,
         controllers: &[],
-    };
+        box_art_problem: box_art_problem.then_some("offline"),
+    }
+}
+
+/// The rows the page of `tab` draws, in the order it draws them.
+fn drawn_rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec<SettingsRow> {
+    let library = Library::default();
     let rings = Rings::new(None);
 
-    let _ = page(
-        tab,
-        settings,
-        &library,
-        restart_needed,
-        &controls_page,
-        &rings,
-    );
+    let _ = page(tab, settings, &library, state, &rings);
     rings.drawn.into_inner()
 }
 
@@ -41,11 +35,15 @@ fn every_page_draws_its_rows_in_the_order_the_d_pad_moves_through_them() {
     for &tab in SettingsTab::all() {
         for restart_needed in [false, true] {
             for device in Device::ALL {
-                assert_eq!(
-                    drawn_rows(tab, &settings, restart_needed, device),
-                    rows(tab, &settings, restart_needed, device),
-                    "{tab:?} with restart_needed {restart_needed} and {device:?}"
-                );
+                for box_art_problem in [false, true] {
+                    let state = state(restart_needed, device, box_art_problem);
+                    assert_eq!(
+                        drawn_rows(tab, &settings, &state),
+                        rows(tab, &settings, &state),
+                        "{tab:?} with restart_needed {restart_needed}, {device:?} and \
+                         box_art_problem {box_art_problem}"
+                    );
+                }
             }
         }
     }
@@ -55,8 +53,16 @@ fn every_page_draws_its_rows_in_the_order_the_d_pad_moves_through_them() {
 fn restart_now_is_only_a_row_when_it_shows() {
     let settings = Settings::default();
 
-    let without = rows(SettingsTab::Playing, &settings, false, Device::Keyboard);
-    let with = rows(SettingsTab::Playing, &settings, true, Device::Keyboard);
+    let without = rows(
+        SettingsTab::Playing,
+        &settings,
+        &state(false, Device::Keyboard, false),
+    );
+    let with = rows(
+        SettingsTab::Playing,
+        &settings,
+        &state(true, Device::Keyboard, false),
+    );
 
     assert!(!without.contains(&SettingsRow::RestartNow));
     assert_eq!(with.len(), without.len() + 1);
@@ -66,8 +72,16 @@ fn restart_now_is_only_a_row_when_it_shows() {
 fn the_controls_rows_follow_the_device() {
     let settings = Settings::default();
 
-    let keyboard = rows(SettingsTab::Controls, &settings, false, Device::Keyboard);
-    let controller = rows(SettingsTab::Controls, &settings, false, Device::Controller);
+    let keyboard = rows(
+        SettingsTab::Controls,
+        &settings,
+        &state(false, Device::Keyboard, false),
+    );
+    let controller = rows(
+        SettingsTab::Controls,
+        &settings,
+        &state(false, Device::Controller, false),
+    );
 
     assert_eq!(
         keyboard.len(),
@@ -87,7 +101,11 @@ fn every_library_folder_is_a_row() {
         });
     }
 
-    let rows = rows(SettingsTab::Library, &settings, false, Device::Keyboard);
+    let rows = rows(
+        SettingsTab::Library,
+        &settings,
+        &state(false, Device::Keyboard, false),
+    );
 
     assert_eq!(
         rows[..4],
@@ -105,7 +123,7 @@ fn every_tab_but_about_has_rows() {
     let settings = Settings::default();
 
     for &tab in SettingsTab::all() {
-        let tab_rows = rows(tab, &settings, false, Device::Keyboard);
+        let tab_rows = rows(tab, &settings, &state(false, Device::Keyboard, false));
         assert_eq!(tab_rows.is_empty(), tab == SettingsTab::About, "{tab:?}");
     }
 }

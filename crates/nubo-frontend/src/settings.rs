@@ -39,10 +39,15 @@ pub struct Settings {
     /// The folders the library shows the games of.
     pub library_folders: Vec<LibraryFolder>,
     /// Whether to download box art for the library and show it on the
-    /// cards. On until the player turns it off; the Settings page says
-    /// that it sends the games' names to the libretro servers. It is on the
-    /// Library tab of the settings.
+    /// cards. On until the player says no to the question about it (see
+    /// `box_art_asked`) or turns it off on the Library tab of the settings,
+    /// which say that it sends the games' names to the libretro servers.
     pub download_box_art: bool,
+    /// Whether the player has answered the question that asks whether to
+    /// download box art, which an app asks once the library has a folder.
+    /// Box art waits for the answer. Only saved once answered.
+    #[serde(skip_serializing_if = "is_false")]
+    pub box_art_asked: bool,
     /// Whether leaving a game saves its state, so it continues there the
     /// next time it starts. On until the player turns it off, on the
     /// settings' Playing tab.
@@ -122,6 +127,7 @@ impl Default for Settings {
             model: ModelPreference::default(),
             library_folders: Vec::new(),
             download_box_art: true,
+            box_art_asked: false,
             resume_games: true,
             fast_forward_speed: FastForwardSpeed::default(),
             volume: 1.0,

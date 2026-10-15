@@ -158,12 +158,7 @@ impl App {
             self.settings_focus = Some(SettingsFocus::Sidebar);
             return Task::none();
         };
-        let rows = views::settings::rows(
-            tab,
-            &self.settings,
-            self.restart_needed(),
-            self.controls_device,
-        );
+        let rows = views::settings::rows(tab, &self.settings, &self.settings_page_state());
 
         match focus {
             SettingsFocus::Sidebar => match action {
@@ -303,6 +298,7 @@ impl App {
             SettingsRow::BoxArt => {
                 LibraryMessage::DownloadBoxArtToggled(!settings.shared.download_box_art).into()
             }
+            SettingsRow::RetryBoxArt => LibraryMessage::RetryBoxArt.into(),
             _ => return self.adjust_setting(row, 1, true),
         })
     }

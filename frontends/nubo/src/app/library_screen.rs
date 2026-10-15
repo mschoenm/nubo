@@ -46,6 +46,10 @@ pub enum LibraryMessage {
     /// The folder watcher saw a change, or stopped working.
     Watch(WatchEvent),
     DownloadBoxArtToggled(bool),
+    /// The player answered the question whether to download box art.
+    BoxArtAnswered(bool),
+    /// The player asked to try downloading box art again after it failed.
+    RetryBoxArt,
     GameListLoaded(Result<Arc<GameList>, String>),
     /// A game's box art was looked up: a PNG, `None` if there is none, or
     /// why the download failed.
@@ -91,6 +95,7 @@ impl App {
                             include_subfolders: true,
                         });
                     });
+                    self.ask_about_box_art();
                     return self.rescan();
                 }
             }
@@ -149,8 +154,18 @@ impl App {
                 self.library_selection = None;
             }
             LibraryMessage::DownloadBoxArtToggled(enabled) => {
-                self.change_settings(|settings| settings.shared.download_box_art = enabled);
+                self.change_settings(|settings| {
+                    settings.shared.download_box_art = enabled;
+                    settings.shared.box_art_asked = true;
+                });
                 return Task::batch([self.load_pictures(false), self.download_box_art()]);
+            }
+            LibraryMessage::BoxArtAnswered(download) => {
+                return self.update_library(LibraryMessage::DownloadBoxArtToggled(download));
+            }
+            LibraryMessage::RetryBoxArt => {
+                self.box_art_problem = None;
+                return self.download_box_art();
             }
             LibraryMessage::GameListLoaded(result) => {
                 self.loading_game_list = false;
@@ -159,14 +174,22 @@ impl App {
                         self.game_list = Some(list);
                         return self.download_box_art();
                     }
-                    Err(error) => self
-                        .toasts
-                        .error(format!("Box art couldn't be downloaded: {error}")),
+                    Err(error) => self.box_art_problem = Some(error),
                 }
             }
             LibraryMessage::BoxArtDownloaded(path, result) => {
-                if let Err(error) = self.library.finish_download(&path, result) {
-                    self.toasts.error(error);
+                // A download that failed stops the others until the player
+                // tries again; a picture that couldn't be saved is a problem
+                // on this computer, which the player should hear about.
+                let failed = result.as_ref().err().cloned();
+                let saved = self.library.finish_download(&path, result);
+                match failed {
+                    Some(error) => self.box_art_problem = Some(error),
+                    None => {
+                        if let Err(error) = saved {
+                            self.toasts.error(error);
+                        }
+                    }
                 }
                 return self.download_box_art();
             }
@@ -256,7 +279,8 @@ impl App {
     }
 
     /// Looks up the box art of games that weren't looked up yet, a few at a
-    /// time on background threads, if the player turned box art on. The
+    /// time on background threads, if the player said yes to box art and
+    /// nothing failed this run (see `App::box_art_problem`). The
     /// game lists are read (or downloaded) first, and only when a game needs
     /// them, so a library whose box art is all looked up touches neither the
     /// network nor the lists.
@@ -264,6 +288,8 @@ impl App {
         if !box_art::AVAILABLE
             || self.fresh
             || !self.settings.shared.download_box_art
+            || !self.settings.shared.box_art_asked
+            || self.box_art_problem.is_some()
             || !self.library.needs_downloads()
         {
             return Task::none();

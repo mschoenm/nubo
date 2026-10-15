@@ -9,6 +9,7 @@
 //! buttons (`app/player_input.rs`).
 
 use crate::command_line::Options;
+use crate::dialog::Dialog;
 use crate::game::{Game, PauseMenu};
 use crate::input::{self, KeyInput};
 use crate::menu_presses::MenuPresses;
@@ -33,6 +34,7 @@ use nubo_frontend::save_states;
 use nubo_frontend::settings::FastForwardSpeed;
 use std::sync::Arc;
 
+pub use dialogs::DialogMessage;
 pub use library_screen::LibraryMessage;
 pub use nubo_frontend::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
 pub use playing::GameMessage;
@@ -113,6 +115,12 @@ pub struct App {
     /// The No-Intro game lists that box art is looked up with, once read.
     game_list: Option<Arc<GameList>>,
     loading_game_list: bool,
+    /// Why box art couldn't be downloaded this run, shown in the settings'
+    /// Library tab. Nubo stops trying until the player asks it to or the
+    /// app starts again, and never shows a toast for it.
+    box_art_problem: Option<String>,
+    /// The dialog over the screen, if one is open.
+    dialog: Option<Dialog>,
 }
 
 /// Everything the user or the window can ask the application to do.
@@ -122,10 +130,11 @@ pub enum Message {
     Library(LibraryMessage),
     Settings(SettingsMessage),
     Window(WindowMessage),
+    Dialog(DialogMessage),
     Key(KeyInput),
     Controller(ControllerEvent),
-    /// Steps back: closes the settings, goes up a page in the pause menu, or
-    /// pauses and resumes the game.
+    /// Steps back: dismisses a dialog, closes the settings, goes up a page
+    /// in the pause menu, or pauses and resumes the game.
     Escape,
     /// Time to show the newest frame and check what changes with time alone,
     /// such as toasts expiring: the emulator finished a new frame, a timer
@@ -186,6 +195,8 @@ impl App {
             settings_focus: None,
             game_list: None,
             loading_game_list: false,
+            box_art_problem: None,
+            dialog: None,
         };
 
         for error in [settings_error, library_error].into_iter().flatten() {
@@ -195,6 +206,7 @@ impl App {
         if let Some(rom) = rom {
             app.open(rom);
         }
+        app.ask_about_box_art();
 
         let check = app.check_files();
         let scan = app.rescan();
@@ -234,12 +246,10 @@ impl App {
             Message::Library(message) => self.update_library(message),
             Message::Settings(message) => self.update_settings(message),
             Message::Window(message) => self.update_window(message),
+            Message::Dialog(message) => self.update_dialog(message),
             Message::Key(input) => self.handle_key(&input),
             Message::Controller(event) => self.handle_controller(event),
-            Message::Escape => {
-                self.escape();
-                Task::none()
-            }
+            Message::Escape => self.escape(),
             Message::Tick => {
                 if let Some(game) = self.game.as_mut().filter(|_| !self.minimized) {
                     #[cfg(target_arch = "wasm32")]
@@ -301,16 +311,18 @@ impl App {
                     tab,
                     &self.settings,
                     &self.library,
-                    self.restart_needed(),
-                    &views::settings::ControlsPage {
-                        device: self.controls_device,
-                        capture: self.capture,
-                        controllers: &self.controllers,
-                    },
+                    &self.settings_page_state(),
                     self.settings_focus,
                 ),
-                SettingsMessage::Close.into(),
+                Some(SettingsMessage::Close.into()),
             ));
+        }
+
+        if let Some((dialog, content)) = self.dialog.as_ref().zip(self.dialog_content()) {
+            let dismiss = content
+                .click_outside_dismisses
+                .then(|| DialogMessage::Closed(Box::new(content.dismiss.clone())).into());
+            layers.push(views::modal(views::dialog::view(dialog, content), dismiss));
         }
 
         if self.file_hovered {
@@ -388,14 +400,30 @@ impl App {
             .is_some_and(|game| game.session.model() != self.model_for(game.session.header()))
     }
 
+    /// What the settings pages show besides the settings themselves.
+    fn settings_page_state(&self) -> views::settings::PageState<'_> {
+        views::settings::PageState {
+            restart_needed: self.restart_needed(),
+            device: self.controls_device,
+            capture: self.capture,
+            controllers: &self.controllers,
+            box_art_problem: self.box_art_problem.as_deref(),
+        }
+    }
+
     /// Whether the D-pad, A, B and Start move through menus instead of
     /// playing: in the library, the pause menu and the settings.
     fn in_menus(&self) -> bool {
-        self.settings_tab.is_some() || self.game.as_ref().is_none_or(Game::is_paused)
+        self.dialog.is_some()
+            || self.settings_tab.is_some()
+            || self.game.as_ref().is_none_or(Game::is_paused)
     }
 
     /// Steps back from whatever is on top.
-    fn escape(&mut self) {
+    fn escape(&mut self) -> Task<Message> {
+        if self.dialog.is_some() {
+            return self.dismiss_dialog();
+        }
         if self.settings_tab.is_some() {
             self.settings_tab = None;
         } else if let Some(game) = &mut self.game {
@@ -408,6 +436,7 @@ impl App {
             };
             game.show_menu(page);
         }
+        Task::none()
     }
 
     /// How often the desktop build needs a timer check (see `Message::Tick`),
@@ -425,11 +454,12 @@ impl App {
         }
     }
 
-    /// Whether a game is running: not paused, and not behind the settings.
+    /// Whether a game is running: not paused, and not behind the settings
+    /// or a dialog.
     fn is_running(&self) -> bool {
-        self.game
-            .as_ref()
-            .is_some_and(|game| !game.is_paused() && self.settings_tab.is_none())
+        self.game.as_ref().is_some_and(|game| {
+            !game.is_paused() && self.settings_tab.is_none() && self.dialog.is_none()
+        })
     }
 
     /// Tells the emulator whether to run, how fast and how loud.
@@ -478,6 +508,7 @@ fn cycle<T: Copy + PartialEq>(options: &[T], current: T, step: isize, wrap: bool
     options[next.cast_unsigned()]
 }
 
+mod dialogs;
 mod library_screen;
 mod player_input;
 mod playing;

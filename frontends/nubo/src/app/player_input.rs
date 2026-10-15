@@ -194,11 +194,14 @@ impl App {
         }
     }
 
-    /// Moves through the menu on screen (the settings window, the pause menu
-    /// or the library) with a direction, picks with A or Start, and steps
+    /// Moves through the menu on screen (a dialog, the settings window, the
+    /// pause menu or the library) with a direction, picks with A or Start, and steps
     /// back with B. These are the keys and controller buttons the player
     /// bound to the Game Boy's D-pad, A, B, Start and Select.
     fn navigate(&mut self, action: Action) -> Task<Message> {
+        if self.dialog.is_some() {
+            return self.navigate_dialog(action);
+        }
         if self.settings_tab.is_some() {
             return self.navigate_settings(action);
         }

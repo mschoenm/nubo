@@ -528,7 +528,7 @@ impl App {
                     return self.update(message);
                 }
             }
-            Action::B => self.escape(),
+            Action::B => return self.escape(),
             Action::A | Action::Start => {
                 let selection = game.menu_selection();
                 let message = match page {

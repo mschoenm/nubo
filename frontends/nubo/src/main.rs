@@ -161,6 +161,7 @@ fn window_settings() -> iced::window::Settings {
 
 mod app;
 mod command_line;
+mod dialog;
 #[cfg(not(target_arch = "wasm32"))]
 mod efficiency;
 mod game;
