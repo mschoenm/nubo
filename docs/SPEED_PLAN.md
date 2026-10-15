@@ -1,10 +1,12 @@
 # Speed plan
 
-Nubo runs the benchmark games with 13 to 31% fewer instructions than at the start of this work, with
+Nubo runs the benchmark games with 16 to 33% fewer instructions than at the start of this work, with
 results that are bit for bit the same. Gambatte, the fastest emulator in
 [the comparison](EMULATOR_COMPARISON.md), is still ahead: 54 to 92 M instructions per emulated second
-against Nubo's 85 to 200 M. This file says what was done, what was learned from other emulators, and the
-work left, in the order it should happen. Update it as parts get done.
+against Nubo's 83 to 193 M, and 2.2 to 3.9 times Nubo's speed, down from 3 to 4.3 times. The small, safe
+steps are used up; what is left are two larger changes, to be tried as separate prototypes. This file
+says what was done, what was learned from other emulators, what was tried without gain, and the work
+left. Update it as parts get done.
 
 ## The research
 
@@ -29,18 +31,21 @@ commit `3f6e3c7`, before the work below, so their Nubo numbers are the starting 
 
 Each change is a shortcut that must give exactly what running every dot one at a time gives.
 
-| Commit | Change | Instructions saved |
+| Pull request | Change | Instructions saved |
 |---|---|---|
-| `3c50dcd` | A plain background tile takes the fetcher's eight steps in one go and decodes its pixels through a bit-spreading table. A read of IF no longer makes the PPU catch up while its quiet dots hold no interrupt request at all (`AddressBus::ppu_read_can_wait`), which Nubo's CGB boot ROM does about 500,000 times while it waits for frames | 8 to 18% |
-| `cb08bc3` | Runs of plain tiles in one loop, with the tile map row, tile data area and row in the tile kept at hand, and the fetcher's registers written back once at the end | 6 to 14% more |
-| `4070596` | The seven dots that shift out a line's dummy pixels at once, and a run of plain tiles that may begin just before the screen (fine scrolling) | 1 to 2% more |
+| #95 | A plain background tile takes the fetcher's eight steps in one go and decodes its pixels through a bit-spreading table. A read of IF no longer makes the PPU catch up while its quiet dots hold no interrupt request at all (`AddressBus::ppu_read_can_wait`), which Nubo's CGB boot ROM does about 500,000 times while it waits for frames | 8 to 18% |
+| #95 | Runs of plain tiles in one loop, with the tile map row, tile data area and row in the tile kept at hand, and the fetcher's registers written back once at the end | 6 to 14% more |
+| #95 | The seven dots that shift out a line's dummy pixels at once, and a run of plain tiles that may begin just before the screen (fine scrolling) | 1 to 2% more |
+| #98 | Plain CPU reads of ROM, work RAM and HRAM take a short inlined path (`AddressBus::cpu_read_plain_byte`), everything else out of line | 2 to 3% more |
+| #98 | The bulk OAM scan stops at ten objects, checks the y range with one comparison and sets its bus latches once | about 1.5% more |
 
 How it was checked, for each commit:
 
 - The fingerprints of every frame, sample and end state, recorded before the work, still match on the
   benchmark games and on all of the roughly 9,000 test ROM runs (`cargo benchmark --compare`).
 - 2,000 random scenes of `gpu/tests/random_scenes.rs` matched running dot by dot (a local run; the test
-  in CI runs 18). That run caught one bug before it was committed.
+  in CI runs 18). That run caught one bug before it was committed. The nightly run now tries 10,000
+  scenes with a new seed each night (`NUBO_RANDOM_SCENES`, `NUBO_RANDOM_SEED`).
 - `cargo test-roms` still passes 6,793 of 6,824 runs, 261 of 264 on the Shootout's table.
 - The `eager` build takes none of the shortcuts, so matching the old build also means matching it.
 
@@ -50,35 +55,51 @@ Callgrind, millions of instructions per emulated second, 20 emulated seconds per
 
 | Game | Model | Before | After | Change |
 |---|---|---|---|---|
-| µCity | DMG | 123 | 85 | −31% |
-| µCity | CGB | 181 | 134 | −26% |
-| Tobu Tobu Girl | CGB | 185 | 139 | −25% |
-| Tobu Tobu Girl | DMG | 148 | 114 | −23% |
-| Geometrix | CGB | 232 | 186 | −20% |
-| Geometrix | DMG | 231 | 200 | −13% |
+| µCity | DMG | 123 | 83 | −33% |
+| µCity | CGB | 181 | 129 | −29% |
+| Tobu Tobu Girl | CGB | 185 | 134 | −28% |
+| Tobu Tobu Girl | DMG | 148 | 110 | −26% |
+| Geometrix | CGB | 232 | 179 | −23% |
+| Geometrix | DMG | 231 | 193 | −16% |
 
-These count instructions, which stay the same from run to run. Real speed hasn't been timed yet.
+In time, best of 3 rounds of 30 s with `cargo xtask compare-emulators` (the tables are in
+[EMULATOR_COMPARISON.md](EMULATOR_COMPARISON.md)), the gap to Gambatte shrank from 3 to 4.3 times
+(2026-10-13) to 2.2 to 3.9 times (2026-10-15). Nubo now runs as fast as mGBA or faster on four of the six
+runs. Times vary by up to 50% on shared machines, so the gap to the other emulators, measured in the
+same run, is what to compare.
+
+## Tried, without gain
+
+Each of these kept every result the same but saved nothing measurable (under 1%, or cost more), so
+none was kept:
+
+- **A page table for plain CPU reads** (one entry per 4 KiB page: ROM or work RAM at an offset, or the
+  long way), rebuilt on bank, SVBK and boot ROM changes. Once the read path is inlined, working out
+  where an address goes costs only a few instructions, and the table's own checks cost as much.
+- **One CPU run loop** with `Cpu::step` inlined into it and a stop condition from data, to pay the
+  call into `step` once per call instead of once per instruction.
+- **Inlining the check for M-cycles waiting to run** before accesses that aren't plain.
+- **Asking whether the PPU's shape is steady less often**, running the dots that can't be steady (the
+  start of a line, HBlank's delays, the countdowns) one by one without asking before each.
+- **Skipping idle countdowns** in `Gpu::tick_dot`.
 
 ## The work left
 
-In order: the safe, smaller steps first, the large one last.
+Both are large and carry risk, so each is to be tried as a separate prototype first.
 
-1. **Measure real speed.** Run `cargo xtask compare-emulators` and update the tables in
-   [EMULATOR_COMPARISON.md](EMULATOR_COMPARISON.md).
-2. **Cache each line's objects.** OAM scan runs for every line (3 to 5%). Keep the list of objects per
-   line until OAM or the object size changes, and fall back to the scan for anything unusual (OAM DMA,
-   the OAM corruption bug, a scan that a write lands in). Low to medium risk.
-3. **Fewer slow dots around HBlank and the line start.** About 10 dots per visible line, plus about 260
-   per frame in VBlank around OAM DMA and VRAM writes, still go through `Gpu::tick_dot` (2 to 5%).
-4. **A leaner CPU read path.** A page table for plain memory (ROM, work RAM, HRAM), with rare checks
-   (processor test mode, boot ROM exit, HDMA) moved out of the instruction loop (5 to 15%). Medium risk:
-   bank switches, cheats and OAM DMA must turn a page slow whenever they need to.
-5. **Answer LY and STAT reads from the predicted timeline** instead of catching the PPU up, and let the
-   quiet dots reach the next real STAT edge (5 to 15% on games that poll; more on games with raster
-   effects). Medium to high risk; needs the timing model of step 6 for mode 3.
-6. **A whole-line renderer** with a model of mode 3's length derived from Nubo's own pipeline, which
+1. **A whole-line renderer** with a model of mode 3's length derived from Nubo's own pipeline, which
    stays the reference and the fallback. The estimates range from 1.3 to 2 times the speed. High risk:
-   before it starts, the random scene test should run more cases, for example in the nightly run.
+   the model must give mode 3's exact length for every arrangement of objects, the window and fine
+   scrolling, and every PPU quirk must either be handled in both renderers or send the line to the
+   reference one.
+2. **Answer LY and STAT reads from the predicted timeline** instead of catching the PPU up, and let the
+   quiet dots reach the next real STAT edge (5 to 15% on games that poll; more on games with raster
+   effects). Medium to high risk; needs the timing model of the line renderer for mode 3.
+
+A smaller one, if those wait: **sort the objects into the lines they cover once per OAM change**
+instead of scanning OAM on every line (about 3%). Most games rewrite OAM by DMA every frame, so this
+only pays as one pass per frame instead of one per line, and it must stay exact when OAM changes in the
+middle of a frame.
 
 ## Not taken, on purpose
 

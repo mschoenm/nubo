@@ -258,13 +258,21 @@ impl AddressBus {
     /// and catches the PPU and the APU up where the address reaches them.
     #[inline]
     pub(crate) fn cpu_read_byte(&mut self, address: u16) -> u8 {
+        match self.cpu_read_plain_byte(address) {
+            Some(byte) => byte,
+            None => self.cpu_read_byte_elsewhere(address),
+        }
+    }
+
+    /// `cpu_read_byte` for a read of plain memory (see `reads_plain_memory`)
+    /// while no OAM DMA runs, outside processor test mode, which needs nothing
+    /// else to happen first; `None` for any other read.
+    #[inline]
+    pub(crate) fn cpu_read_plain_byte(&self, address: u16) -> Option<u8> {
         // The read's M-cycle has already run, so only a transfer in progress can collide with it;
         // writes have to check for a requested one too (see `cpu_write_cycle`).
-        if reads_plain_memory(address) && !self.dma.in_progress && !self.processor_test_mode() {
-            self.read_plain_memory(address)
-        } else {
-            self.cpu_read_byte_elsewhere(address)
-        }
+        (reads_plain_memory(address) && !self.dma.in_progress && !self.processor_test_mode())
+            .then(|| self.read_plain_memory(address))
     }
 
     /// `cpu_read_byte` for everything but plain memory read while no OAM DMA

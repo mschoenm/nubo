@@ -649,19 +649,23 @@ impl Gpu {
         } else {
             8
         };
-        let line = i16::from(self.ly);
-        for index in entries {
+        // The object covers the line when the line is 0 to `height - 1` rows below its top
+        // (OAM y - 16), which one unsigned comparison checks.
+        let line_plus_16 = u16::from(self.ly) + 16;
+        for index in entries.clone() {
+            if usize::from(self.pipeline.visible_object_count) == MAX_VISIBLE_OBJECTS {
+                break;
+            }
             let oam_y = self.object_attribute_memory[usize::from(index) * 4];
-            let oam_x = self.object_attribute_memory[usize::from(index) * 4 + 1];
-            self.oam_scan_y_bus = oam_y;
-            self.oam_scan_x_bus = oam_x;
-            let y = i16::from(oam_y) - 16;
-            if usize::from(self.pipeline.visible_object_count) < MAX_VISIBLE_OBJECTS
-                && y <= line
-                && y + height > line
-            {
+            if line_plus_16.wrapping_sub(u16::from(oam_y)) < height {
+                let oam_x = self.object_attribute_memory[usize::from(index) * 4 + 1];
                 self.add_visible_object(index, oam_x, oam_y);
             }
+        }
+        // The scan reads every entry's Y and X over the same latches, so they hold the last.
+        if let Some(last) = entries.last() {
+            self.oam_scan_y_bus = self.object_attribute_memory[usize::from(last) * 4];
+            self.oam_scan_x_bus = self.object_attribute_memory[usize::from(last) * 4 + 1];
         }
     }
 

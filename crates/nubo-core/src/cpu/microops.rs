@@ -70,19 +70,31 @@ impl Cpu {
     }
 
     /// The read at the end of an M-cycle the rest of the hardware has already
-    /// run through.
+    /// run through. Most reads are of plain memory (ROM, work RAM, HRAM) and
+    /// take the short path, inlined into the instructions; the rest go
+    /// through `read_byte_elsewhere`.
+    #[inline]
     pub(super) fn read_byte_in_synced_cycle(&mut self, address: u16) -> u8 {
         // A read puts its address on the bus after its M-cycle ran, like SameBoy's `cycle_read`,
         // and a write before (see `store_byte_in_memory`). The APU's stopped wave channel reads
         // the bus in some states. No test ROM result depends on either order: putting a read's
         // address on the bus before its M-cycle only changes four Gambatte ch3 runs' end states.
         self.address_bus.set_cpu_bus_address(address);
-        let byte = self.address_bus.cpu_read_byte(address);
+        match self.address_bus.cpu_read_plain_byte(address) {
+            Some(byte) => byte,
+            None => self.read_byte_elsewhere(address),
+        }
+    }
 
+    /// `read_byte_in_synced_cycle` for what isn't a plain read: anything but
+    /// plain memory, a read during OAM DMA, and every read in processor test
+    /// mode, which records it.
+    #[inline(never)]
+    fn read_byte_elsewhere(&mut self, address: u16) -> u8 {
+        let byte = self.address_bus.cpu_read_byte(address);
         if self.address_bus.processor_test_mode() {
             self.record_bus_read(address, byte);
         }
-
         byte
     }
 
