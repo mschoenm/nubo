@@ -4,6 +4,10 @@
 //! They check that the bulk runs (`Gpu::run_dots` with its steady stretches and plain pixels) give
 //! exactly what running dot by dot does, and that a save state taken at any dot carries on
 //! exactly like the PPU it came from and can't make the PPU panic when corrupted.
+//!
+//! `NUBO_RANDOM_SCENES` sets how many scenes the comparison of bulk runs with running dot by dot
+//! tries (18 by default, a few seconds in a debug build), and `NUBO_RANDOM_SEED` the seed it starts
+//! from, which a failure reports. The nightly run tries thousands with a new seed each night.
 
 use crate::address_bus::MemoryMapped;
 use crate::address_bus::hdma::HdmaState;
@@ -39,6 +43,24 @@ impl TestRandom {
     fn chance(&mut self, percent: u32) -> bool {
         self.below(100) < percent
     }
+}
+
+/// How many scenes `bulk_runs_match_running_dot_by_dot` tries, and the seed it starts from: from
+/// `NUBO_RANDOM_SCENES` and `NUBO_RANDOM_SEED` when they are set (see the module docs).
+fn scene_count_and_seed() -> (usize, u64) {
+    let read = |name: &str| {
+        std::env::var(name)
+            .ok()
+            .map(|value| value.parse::<u64>().expect("a whole number"))
+    };
+    let count = read("NUBO_RANDOM_SCENES").map_or(18, |count| {
+        usize::try_from(count).expect("a scene count that fits")
+    });
+    // xorshift64 never leaves 0, so a seed of 0 becomes 1.
+    let seed = read("NUBO_RANDOM_SEED")
+        .unwrap_or(0x2545_F491_4F6C_DD1D)
+        .max(1);
+    (count, seed)
 }
 
 /// The three timing variants (DMG, CGB, CGB in double speed), as a model and a speed.
@@ -130,8 +152,9 @@ fn load(state: &[u8], model: Model) -> std::io::Result<Gpu> {
 
 #[test]
 fn bulk_runs_match_running_dot_by_dot() {
-    let mut random = TestRandom(0x2545_F491_4F6C_DD1D);
-    for case in 0..18 {
+    let (count, seed) = scene_count_and_seed();
+    let mut random = TestRandom(seed);
+    for case in 0..count {
         let (model, double_speed) = TIMINGS[case % TIMINGS.len()];
         let scene = random_scene(&mut random, model, double_speed);
         let (mut by_dot, mut in_bulk) = (scene.clone(), scene);
@@ -162,7 +185,7 @@ fn bulk_runs_match_running_dot_by_dot() {
                 assert_eq!(
                     requests(&by_dot),
                     requests(&in_bulk),
-                    "case {case}, frame {frame}"
+                    "seed {seed}, case {case}, frame {frame}"
                 );
                 for gpu in [&mut by_dot, &mut in_bulk] {
                     gpu.stat_interrupt = false;
@@ -178,12 +201,12 @@ fn bulk_runs_match_running_dot_by_dot() {
             assert_eq!(
                 format!("{by_dot:?}"),
                 format!("{in_bulk:?}"),
-                "case {case}, frame {frame}"
+                "seed {seed}, case {case}, frame {frame}"
             );
             assert_eq!(
                 format!("{by_dot_hdma:?}"),
                 format!("{in_bulk_hdma:?}"),
-                "case {case}"
+                "seed {seed}, case {case}"
             );
         }
     }

@@ -227,6 +227,30 @@ jobs:
           --seconds 4 --jobs "$(nproc)" --compare "$RUNNER_TEMP/lazy.txt"
           --shard ${{ matrix.shard }}/${{ strategy.job-total }}
 
+  # The randomized PPU scenes compare the bulk runs with running dot by dot.
+  # CI tries 18; this tries thousands, with a new seed each night (the run's
+  # id), which a failure reports so it can be run again with that seed.
+  random-scenes:
+    name: Random PPU scenes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: release
+          save-if: false
+
+      - name: Compare 10,000 random scenes with running dot by dot
+        env:
+          NUBO_RANDOM_SCENES: 10000
+          NUBO_RANDOM_SEED: ${{ github.run_id }}
+        run: cargo test --release --locked -p nubo-core bulk_runs_match_running_dot_by_dot
+
   flatpak:
     name: Flatpak
     uses: ./.github/workflows/flatpak.yml
@@ -266,7 +290,7 @@ jobs:
   metrics:
     name: Metrics
     if: always() && github.workflow == 'Nightly'
-    needs: [ci, advisories, tests, verify-boot, save-states, eager, flatpak, windows, libretro, shootout]
+    needs: [ci, advisories, tests, verify-boot, save-states, eager, random-scenes, flatpak, windows, libretro, shootout]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     # Two runs at once would both push to the wiki.
@@ -332,6 +356,7 @@ jobs:
           VERIFY_BOOT: ${{ needs.verify-boot.result }}
           SAVE_STATES: ${{ needs.save-states.result }}
           EAGER: ${{ needs.eager.result }}
+          RANDOM_SCENES: ${{ needs.random-scenes.result }}
           PASSED: ${{ needs.verify-boot.outputs.passed }}
           TOTAL: ${{ needs.verify-boot.outputs.total }}
           SHOOTOUT_PASSED: ${{ needs.verify-boot.outputs.shootout_passed }}
@@ -353,7 +378,7 @@ jobs:
             --arg date "$(TZ=Europe/Amsterdam date +%F)" \
             --arg commit "$(git rev-parse --short HEAD)" \
             --arg ci "$CI" --arg advisories "$ADVISORIES" --arg tests "$TESTS" --arg verify_boot "$VERIFY_BOOT" \
-            --arg save_states "$SAVE_STATES" --arg eager "$EAGER" \
+            --arg save_states "$SAVE_STATES" --arg eager "$EAGER" --arg random_scenes "$RANDOM_SCENES" \
             --arg passed "$PASSED" --arg total "$TOTAL" \
             --arg shootout_passed "$SHOOTOUT_PASSED" --arg shootout_total "$SHOOTOUT_TOTAL" \
             --arg shootout_rank "$SHOOTOUT_RANK" --arg shootout_leader "$SHOOTOUT_LEADER" \
@@ -366,7 +391,7 @@ jobs:
             --argjson wasm "$(stat -c %s target/web/nubo_bg.wasm)" \
             '{date: $date, commit: $commit,
               tests: {ci: $ci, advisories: $advisories, unit_tests: $tests, verify_boot: $verify_boot,
-                      save_states: $save_states, eager: $eager},
+                      save_states: $save_states, eager: $eager, random_scenes: $random_scenes},
               test_roms_passed: ($passed | tonumber? // null),
               test_roms_total: ($total | tonumber? // null),
               shootout: (if $shootout_passed == "" then null else
