@@ -216,7 +216,7 @@ impl App {
     /// Does what a key or controller button is bound to, as it goes down
     /// (`pressed`) or up. Game Boy buttons only go down while the game runs.
     /// A window that shows only the game (`--scale`) only plays it and fast
-    /// forwards, so nothing can come up over the game.
+    /// forwards (no rewinding either), so nothing can come up over the game.
     fn perform(&mut self, action: Action, pressed: bool) -> Task<Message> {
         if let Some(key) = action.game_boy_key() {
             let running = self.is_running();
@@ -238,7 +238,9 @@ impl App {
         }
 
         if action == Action::Rewind {
-            if let Some(game) = &mut self.game {
+            if self.screen_scale.is_none()
+                && let Some(game) = &mut self.game
+            {
                 game.session.hold_rewind(pressed);
             }
             return Task::none();

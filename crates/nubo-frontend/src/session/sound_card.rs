@@ -298,6 +298,9 @@ impl EmulatorThread {
         }
 
         if self.machine.playback.rewinding {
+            // Fast forward's buffers still due belong to the time being
+            // rewound; running them after the rewind would undo part of it.
+            self.fast_forward.clear();
             if self.machine.audio.needs_samples() {
                 self.activity.buffers.fetch_add(1, Ordering::Relaxed);
                 if self.machine.rewind_buffer().1 {
@@ -387,6 +390,11 @@ impl FastForward {
     /// are none left.
     fn time_until_next_buffer(&self) -> Option<Duration> {
         (self.remaining > 0).then(|| self.next_at.saturating_duration_since(Instant::now()))
+    }
+
+    /// Drops the unplayed buffers still due.
+    fn clear(&mut self) {
+        self.remaining = 0;
     }
 
     /// Counts one unplayed buffer as emulated, returning `false` if there

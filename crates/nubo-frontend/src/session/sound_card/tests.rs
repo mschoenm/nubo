@@ -105,3 +105,14 @@ fn fast_forward_spreads_its_buffers_over_the_played_one() {
     assert!(!fast_forward.take_buffer());
     assert_eq!(fast_forward.time_until_next_buffer(), None);
 }
+
+#[test]
+fn clearing_fast_forward_drops_the_buffers_still_due() {
+    let mut fast_forward = FastForward::new();
+    fast_forward.spread(3, Duration::from_millis(20));
+
+    fast_forward.clear();
+
+    assert!(!fast_forward.take_buffer());
+    assert_eq!(fast_forward.time_until_next_buffer(), None);
+}
