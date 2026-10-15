@@ -1,13 +1,18 @@
 //! The PPU's shortcuts, which `Gpu::run_dots` takes so that it doesn't have to run every dot one
 //! at a time: steady stretches, in which nothing but the dot count, OAM scan and the renderer
-//! changes, run in bulk (`run_steady_dots`), and quiet stretches, in which nothing the rest of the
-//! hardware sees can happen, are left for later (`quiet_dots`). Both must give exactly what
+//! changes, run in bulk (`run_steady_dots`), and so do a line's first dots and HBlank's first dots
+//! while the STAT line can't rise (`run_line_start`, `run_hblank_start`), which a line would
+//! otherwise run one at a time for their timing events. Quiet stretches, in which nothing the rest
+//! of the hardware sees can happen, are left for later (`quiet_dots`). All must give exactly what
 //! `Gpu::tick_dot` gives dot by dot, which the randomized tests in `tests/random_scenes.rs` check.
 
+use crate::address_bus::hdma::HdmaState;
 use crate::gpu::pipeline::Pipeline;
 use crate::gpu::{
-    DOTS_PER_FRAME, DOTS_PER_LINE, DRAWING_START_DOT, Gpu, HBLANK_MODE, LAST_LINE,
-    LAST_LINE_ZERO_COMPARE_DOT, LAST_VISIBLE_LINE, LineState, NO_OAM_SCAN_ROW, OAM_SCAN_END_DOT,
+    Countdowns, DOTS_PER_FRAME, DOTS_PER_LINE, DOUBLE_SPEED_MODE_3_STAT_DOT,
+    DOUBLE_SPEED_PALETTE_BLOCK_DOT, DOUBLE_SPEED_STAT_SAMPLE_DOT, DRAWING_START_DOT, Gpu,
+    HBLANK_MODE, LAST_LINE, LAST_LINE_ZERO_COMPARE_DOT, LAST_VISIBLE_LINE, LineState,
+    MODE_2_STAT_DOT, MODE_3_STAT_DOT, NO_OAM_SCAN_ROW, OAM_MODE, OAM_SCAN_END_DOT,
     STAT_WRITABLE_BITS, VBLANK_START_DOT, VBLANK_START_LINE, dots_up_to,
 };
 
@@ -27,6 +32,15 @@ const LAST_LINE_STEADY_START_DOT: u16 = LAST_LINE_ZERO_COMPARE_DOT;
 const STEADY_END_DOT: u16 = 451;
 /// The last dot of a line.
 const LAST_DOT_OF_LINE: u16 = DOTS_PER_LINE - 1;
+
+// `Gpu::run_line_start` handles the events of a line's first dots, up to `STEADY_START_DOT`, but
+// not the ones that come later in OAM scan.
+const _: () = assert!(
+    STEADY_START_DOT < MODE_3_STAT_DOT
+        && STEADY_START_DOT < DOUBLE_SPEED_MODE_3_STAT_DOT
+        && STEADY_START_DOT < DOUBLE_SPEED_PALETTE_BLOCK_DOT
+        && STEADY_START_DOT < OAM_SCAN_END_DOT
+);
 
 impl Gpu {
     /// How many of the coming dots the PPU can be left to run later, because nothing the rest of
@@ -137,6 +151,151 @@ impl Gpu {
             && self.lyc_source_line.is_none()
             && self.previous_lyc_flag == self.lyc_flag
             && self.previous_lcdc == self.lcdc
+    }
+
+    /// Whether the coming dots are the start of one of lines 1-143, from the last dot of the line
+    /// before up to the steady stretch of OAM scan (`STEADY_START_DOT`), that `run_line_start` can
+    /// take in one go: the STAT line stays low (`stat_line_stays_low`), so it can't request an
+    /// interrupt, and nothing else is on its way, as `has_steady_shape` asks of a steady stretch.
+    pub(super) fn has_quiet_line_start(&self) -> bool {
+        let at_line_start = match self.line_state {
+            LineState::HBlank => {
+                self.line_dot == LAST_DOT_OF_LINE && self.line + 1 < VBLANK_START_LINE
+            }
+            LineState::OamScan => {
+                self.line_dot < STEADY_START_DOT && (1..VBLANK_START_LINE).contains(&self.line)
+            }
+            LineState::Drawing | LineState::VBlank => false,
+        };
+        at_line_start
+            && !self.first_line_after_lcd_on
+            && self.mode_0_interrupt_delay == 0
+            && self.hdma_start_delay == 0
+            && self.countdowns.is_idle()
+            && self.lyc_source_line.is_none()
+            && self.previous_lcdc == self.lcdc
+            && self.stat_line_stays_low()
+    }
+
+    /// Runs up to `dots` dots of a line's start (see `has_quiet_line_start`) and returns how many
+    /// it ran, with the effects `tick_dot` has at each of those dots: the new line, STAT's mode 2,
+    /// the WY check and the OAM entries checked every two dots, a double speed CPU's look at STAT,
+    /// and the LY=LYC flag, which only the last two dots decide. The STAT line stays low.
+    pub(super) fn run_line_start(&mut self, dots: u32) -> u32 {
+        let first_dot = if self.line_state == LineState::HBlank {
+            0
+        } else {
+            self.line_dot + 1
+        };
+        let count = dots_up_to(dots, STEADY_START_DOT + 1 - first_dot);
+        let last_dot = first_dot + count - 1;
+        if self.line_state == LineState::HBlank {
+            self.start_next_line();
+        }
+        let runs_through = |dot: u16| (first_dot..=last_dot).contains(&dot);
+
+        if self.in_double_speed() && runs_through(DOUBLE_SPEED_STAT_SAMPLE_DOT) {
+            self.stat_at_line_start = self.stat;
+        }
+        let (_, window_y_check_dot, _) = self.window_y_check_dots();
+        if runs_through(window_y_check_dot) {
+            self.update_window_y_trigger();
+        }
+        if runs_through(MODE_2_STAT_DOT) {
+            self.visible_mode = OAM_MODE;
+        }
+        // Every second dot from dot 2 on checks the next OAM entry; each even dot from dot 0 on
+        // sets the row OAM scan reads.
+        let last_entry_dot = last_dot / 2 * 2;
+        let first_entry_dot = first_dot.max(1).next_multiple_of(2);
+        if first_entry_dot <= last_entry_dot {
+            self.scan_oam_entries(first_entry_dot / 2 - 1..last_entry_dot / 2);
+        }
+        if last_entry_dot >= first_dot {
+            self.oam_scan_row = (last_entry_dot * 2) as u8;
+        }
+
+        let lyc_flag_at = |gpu: &mut Self, dot: u16| {
+            gpu.line_dot = dot;
+            gpu.ly_for_comparison() == Some(gpu.compared_lyc)
+        };
+        if count > 1 {
+            self.previous_lyc_flag = lyc_flag_at(self, last_dot - 1);
+        } else {
+            self.previous_lyc_flag = self.lyc_flag;
+        }
+        self.lyc_flag = lyc_flag_at(self, last_dot);
+        self.stat_line_high = false;
+        u32::from(count)
+    }
+
+    /// Whether the coming dots are the start of HBlank, while the countdowns that start with it
+    /// (`mode_0_interrupt_delay`, `hdma_start_delay`, and the mode 0 interrupt source and palette
+    /// RAM unblocking in `Countdowns`) still run, that `run_hblank_start` can take in one go: the
+    /// STAT line stays low, as `has_quiet_line_start` asks, and no other countdown runs.
+    pub(super) fn has_quiet_hblank_start(&self) -> bool {
+        self.line_state == LineState::HBlank
+            && self.line_dot < LAST_DOT_OF_LINE
+            && Countdowns {
+                early_hblank: 0,
+                palette_unblock: 0,
+                ..self.countdowns
+            }
+            .is_idle()
+            && self.lyc_source_line.is_none()
+            && self.previous_lcdc == self.lcdc
+            && self.stat_line_stays_low()
+    }
+
+    /// Runs up to `dots` dots of HBlank's start (see `has_quiet_hblank_start`), until its
+    /// countdowns have run out, and returns how many it ran, with the effects `tick_dot` has at
+    /// each of those dots: STAT shows mode 0, the countdowns count down, `hdma` hears that HBlank
+    /// started, and palette RAM is unblocked. The STAT line stays low.
+    pub(super) fn run_hblank_start(&mut self, dots: u32, hdma: &mut HdmaState) -> u32 {
+        let countdowns_left = self
+            .mode_0_interrupt_delay
+            .max(self.hdma_start_delay)
+            .max(self.countdowns.early_hblank)
+            .max(self.countdowns.palette_unblock)
+            .max(1);
+        let count = dots_up_to(
+            dots,
+            u16::from(countdowns_left).min(LAST_DOT_OF_LINE - self.line_dot),
+        );
+        let first_dot = self.line_dot + 1;
+        let last_dot = self.line_dot + count;
+        // Whether a countdown at `left` runs out within these dots, after which it is idle.
+        let count_down_through = |left: &mut u8| {
+            let runs_out = *left != 0 && u16::from(*left) <= count;
+            *left = u8::try_from(u16::from(*left).saturating_sub(count)).unwrap_or(0);
+            runs_out
+        };
+
+        if count_down_through(&mut self.countdowns.early_hblank) {
+            self.early_hblank_interrupt = true;
+        }
+        if count_down_through(&mut self.countdowns.palette_unblock) {
+            self.palette_ram_blocked = false;
+        }
+        let (_, _, window_y_check_dot) = self.window_y_check_dots();
+        if self.line < LAST_VISIBLE_LINE && (first_dot..=last_dot).contains(&window_y_check_dot) {
+            self.update_window_y_trigger();
+        }
+        self.visible_mode = HBLANK_MODE;
+        count_down_through(&mut self.mode_0_interrupt_delay);
+        if count_down_through(&mut self.hdma_start_delay) {
+            hdma.set_hblank_started(true);
+        }
+
+        if count > 1 {
+            self.line_dot = last_dot - 1;
+            self.update_lyc_flag();
+        }
+        self.previous_lyc_flag = self.lyc_flag;
+        self.line_dot = last_dot;
+        self.update_lyc_flag();
+        self.stat_line_high = false;
+        u32::from(count)
     }
 
     /// Whether the LY=LYC flag and the STAT line are what this dot's `tick_dot` would make them.

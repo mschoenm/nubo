@@ -1,12 +1,13 @@
 # Speed plan
 
-Nubo runs the benchmark games with 16 to 33% fewer instructions than at the start of this work, with
+Nubo runs the benchmark games with 20 to 41% fewer instructions than at the start of this work, with
 results that are bit for bit the same. Gambatte, the fastest emulator in
 [the comparison](EMULATOR_COMPARISON.md), is still ahead: 54 to 92 M instructions per emulated second
-against Nubo's 83 to 193 M, and 2.2 to 3.9 times Nubo's speed, down from 3 to 4.3 times. The small, safe
-steps are used up; what is left are two larger changes, to be tried as separate prototypes. This file
-says what was done, what was learned from other emulators, what was tried without gain, and the work
-left. Update it as parts get done.
+against Nubo's 72 to 185 M, and 2.2 to 3.9 times Nubo's speed (measured before the line renderer's
+first part), down from 3 to 4.3 times. The small, safe steps are used up; the line renderer's first
+part is built, and what is left are its second part and predicted register reads. This file says what
+was done, what was learned from other emulators, what was tried without gain, and the work left.
+Update it as parts get done.
 
 ## The research
 
@@ -38,14 +39,20 @@ Each change is a shortcut that must give exactly what running every dot one at a
 | #95 | The seven dots that shift out a line's dummy pixels at once, and a run of plain tiles that may begin just before the screen (fine scrolling) | 1 to 2% more |
 | #98 | Plain CPU reads of ROM, work RAM and HRAM take a short inlined path (`AddressBus::cpu_read_plain_byte`), everything else out of line | 2 to 3% more |
 | #98 | The bulk OAM scan stops at ten objects, checks the y range with one comparison and sets its bus latches once | about 1.5% more |
+| next | The line renderer's first part: runs of plain tiles keep the next row's bitplanes in locals and draw whole rows unrolled, with branchless tile addresses | 1 to 2% more |
+| next | The same part: a line's first dots and HBlank's first dots, which every line ran one at a time for their timing events (about eleven dots a line), run in one go while the STAT line can't rise (`Gpu::run_line_start`, `Gpu::run_hblank_start`); the bulk OAM scan walks OAM as a slice | 3 to 8% more |
 
 How it was checked, for each commit:
 
 - The fingerprints of every frame, sample and end state, recorded before the work, still match on the
   benchmark games and on all of the roughly 9,000 test ROM runs (`cargo benchmark --compare`).
 - 2,000 random scenes of `gpu/tests/random_scenes.rs` matched running dot by dot (a local run; the test
-  in CI runs 18). That run caught one bug before it was committed. The nightly run now tries 10,000
-  scenes with a new seed each night (`NUBO_RANDOM_SCENES`, `NUBO_RANDOM_SEED`).
+  in CI runs 18), and 3,000 for each of the line renderer's commits. That run caught one bug before it
+  was committed. The nightly run now tries 10,000 scenes with a new seed each night
+  (`NUBO_RANDOM_SCENES`, `NUBO_RANDOM_SEED`). Since the line renderer, the test compares every byte of
+  the save state after each stretch, not only at the end of a frame, ends many stretches near a line's
+  timing events, and runs an HBlank DMA: the comparison at the end of a frame missed mistakes that a
+  later dot put right, which a save state taken in between would still show.
 - `cargo test-roms` still passes 6,793 of 6,824 runs, 261 of 264 on the Shootout's table.
 - The `eager` build takes none of the shortcuts, so matching the old build also means matching it.
 
@@ -53,18 +60,18 @@ How it was checked, for each commit:
 
 Callgrind, millions of instructions per emulated second, 20 emulated seconds per game and model:
 
-| Game | Model | Before | After | Change |
-|---|---|---|---|---|
-| µCity | DMG | 123 | 83 | −33% |
-| µCity | CGB | 181 | 129 | −29% |
-| Tobu Tobu Girl | CGB | 185 | 134 | −28% |
-| Tobu Tobu Girl | DMG | 148 | 110 | −26% |
-| Geometrix | CGB | 232 | 179 | −23% |
-| Geometrix | DMG | 231 | 193 | −16% |
+| Game | Model | Before | After #98 | After the line renderer's first part | Change |
+|---|---|---|---|---|---|
+| µCity | DMG | 123 | 83 | 72 | −41% |
+| µCity | CGB | 181 | 129 | 117 | −35% |
+| Tobu Tobu Girl | CGB | 185 | 134 | 121 | −35% |
+| Tobu Tobu Girl | DMG | 148 | 110 | 99 | −33% |
+| Geometrix | CGB | 232 | 179 | 167 | −28% |
+| Geometrix | DMG | 231 | 193 | 185 | −20% |
 
 In time, best of 3 rounds of 30 s with `cargo xtask compare-emulators` (the tables are in
 [EMULATOR_COMPARISON.md](EMULATOR_COMPARISON.md)), the gap to Gambatte shrank from 3 to 4.3 times
-(2026-10-13) to 2.2 to 3.9 times (2026-10-15). Nubo now runs as fast as mGBA or faster on four of the six
+(2026-10-13) to 2.2 to 3.9 times (2026-10-15, after #98). Nubo now runs as fast as mGBA or faster on four of the six
 runs. Times vary by up to 50% on shared machines, so the gap to the other emulators, measured in the
 same run, is what to compare.
 
@@ -83,15 +90,29 @@ none was kept:
   start of a line, HBlank's delays, the countdowns) one by one without asking before each.
 - **Skipping idle countdowns** in `Gpu::tick_dot`.
 
+## The line renderer
+
+The reports estimated 1.3 to 2 times the speed from a whole-line renderer with a model of mode 3's
+length. Measuring Nubo after #98 showed why that is too high now: 96% of mode 3's dots already ran in
+runs of plain tiles, at about 180 instructions a tile (about 23 a pixel), close to what safe Rust gets
+from that loop. What cost more was everything around it: every visible line ran about eleven dots one
+at a time around its timing events, and the PPU as a whole took about half of all instructions, the
+CPU and the address bus most of the rest. So the work was split in two parts:
+
+1. **Lines without objects or the window (done).** The tile loop got a little tighter, and the dots
+   around each line's timing events now run in one go (see the table above). What is left on such a
+   line: the two dots before the renderer starts, the line's last pixels (from 151 on, a pixel at a
+   time) and the dot mode 3 ends, together about 2 to 3% of all instructions.
+2. **Lines with objects (not started).** An object stops the run of plain tiles, and its fetch (6 to
+   11 dots) runs one dot at a time. On the benchmark games 2 to 13% of lines have objects, and their
+   slow dots take only about 2 to 3% of all instructions, so a model of mode 3's length with objects
+   would gain little there, at high risk: it must give the exact length for every arrangement of
+   objects, the window and fine scrolling. Games that show many objects on a line would gain more. A
+   safer first step would take an object's fetch in one go, as the plain tiles do, without a model.
+
 ## The work left
 
-Both are large and carry risk, so each is to be tried as a separate prototype first.
-
-1. **A whole-line renderer** with a model of mode 3's length derived from Nubo's own pipeline, which
-   stays the reference and the fallback. The estimates range from 1.3 to 2 times the speed. High risk:
-   the model must give mode 3's exact length for every arrangement of objects, the window and fine
-   scrolling, and every PPU quirk must either be handled in both renderers or send the line to the
-   reference one.
+1. **The line renderer's second part**, above.
 2. **Answer LY and STAT reads from the predicted timeline** instead of catching the PPU up, and let the
    quiet dots reach the next real STAT edge (5 to 15% on games that poll; more on games with raster
    effects). Medium to high risk; needs the timing model of the line renderer for mode 3.

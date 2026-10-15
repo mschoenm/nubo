@@ -943,6 +943,14 @@ impl Gpu {
                 remaining -= self.run_steady_dots(remaining);
                 debug_assert!(self.stat_settled(), "a steady stretch leaves STAT settled");
                 settled = true;
+            } else if self.has_quiet_line_start() {
+                remaining -= self.run_line_start(remaining);
+                debug_assert!(self.stat_settled(), "a line's start leaves STAT settled");
+                settled = true;
+            } else if self.has_quiet_hblank_start() {
+                remaining -= self.run_hblank_start(remaining, hdma);
+                debug_assert!(self.stat_settled(), "HBlank's start leaves STAT settled");
+                settled = true;
             } else {
                 self.tick_dot(hdma);
                 remaining -= 1;
