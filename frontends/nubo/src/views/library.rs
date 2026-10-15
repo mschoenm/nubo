@@ -128,6 +128,26 @@ impl<'a> Shelves<'a> {
             .copied()
     }
 
+    /// Where the card at `index` of `before` is on these shelves, such as
+    /// after the window was resized and "Continue playing" holds a
+    /// different number of games: the same game on the same shelf while
+    /// it's still there, or else on All games.
+    pub fn same_card(&self, before: &Shelves, index: usize) -> Option<usize> {
+        let entry = before.entry(index)?;
+        let on_recent = || self.recent.iter().position(|game| game.path == entry.path);
+        let on_games = || {
+            self.games
+                .iter()
+                .position(|game| game.path == entry.path)
+                .map(|position| self.recent.len() + position)
+        };
+        if index < before.recent.len() {
+            on_recent().or_else(on_games)
+        } else {
+            on_games()
+        }
+    }
+
     /// The card the D-pad moves to from `index` in `direction`, in a
     /// window `window_width` wide. Up and down move between rows, and
     /// between the two shelves at their edges. At the ends, `wrap` goes

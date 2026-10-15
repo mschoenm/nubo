@@ -137,3 +137,24 @@ fn down_from_a_full_row_of_five_lands_under_the_same_card() {
     assert_eq!(shelves.step(4, Action::Down, 1280.0, false), 9);
     assert_eq!(shelves.step(9, Action::Up, 1280.0, false), 4);
 }
+
+#[test]
+fn a_resize_keeps_the_same_game_selected() {
+    let games = entries(6);
+    let wide = Shelves {
+        recent: games[..5].iter().collect(),
+        games: games.iter().collect(),
+    };
+    let narrow = Shelves {
+        recent: games[..3].iter().collect(),
+        games: games.iter().collect(),
+    };
+
+    // A game still in "Continue playing" stays there.
+    assert_eq!(narrow.same_card(&wide, 1), Some(1));
+    // One that no longer fits moves to the same game on All games.
+    assert_eq!(narrow.same_card(&wide, 4), Some(3 + 4));
+    // A card on All games stays on the same game there.
+    assert_eq!(narrow.same_card(&wide, 5 + 2), Some(3 + 2));
+    assert_eq!(wide.same_card(&narrow, 3 + 2), Some(5 + 2));
+}
