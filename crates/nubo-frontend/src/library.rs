@@ -329,6 +329,11 @@ impl Library {
         self.title_screens.get(path)
     }
 
+    /// Whether any game shows box art.
+    pub fn has_box_art(&self) -> bool {
+        !self.box_art.is_empty()
+    }
+
     /// The box art of the game at `path`, if it was read or downloaded.
     pub fn box_art(&self, path: &Path) -> Option<&Picture> {
         self.box_art.get(path)

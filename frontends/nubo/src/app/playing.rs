@@ -431,7 +431,10 @@ impl App {
             header,
             model,
             StartOptions {
-                keep_saves: !self.fresh,
+                // A scene's game keeps no battery saves, and so runs its
+                // cartridge clock on emulated time, as headless runs do,
+                // so its frames come out the same every time.
+                keep_saves: !self.fresh && !self.held_for_scene(),
                 fast_forward: self.speed,
             },
             &self.notices,

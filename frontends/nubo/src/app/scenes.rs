@@ -13,7 +13,13 @@
 //!   is kept, the scene's frames run from it, and a picture of the window
 //!   becomes the scene's preview, exactly what `capture` shows of it later.
 //!   Scenes keep no toasts or questions: the toasts are left out of the
-//!   preview, and nothing is recorded while a question is open.
+//!   preview, and nothing is recorded while a question is open. Nor do they
+//!   keep the player's own data, so nothing is recorded while it shows (see
+//!   [`unkept`]): box art, a cheat that is on, or a page of the pause menu
+//!   that lists saved states or cheats.
+//!
+//! A scene's game keeps no battery saves, with its cartridge clock on
+//! emulated time, so a clock doesn't make two pictures of a scene differ.
 //!
 //! A scene never changes the emulation: it only pauses the game and runs
 //! frames the way the game would have.
@@ -359,6 +365,11 @@ impl App {
                 .error("Answer the question first: scenes don't keep questions");
             return Task::none();
         }
+        if let Some(reason) = unkept(&self.on_screen()) {
+            self.toasts
+                .error(format!("Couldn't record the scene: {reason}"));
+            return Task::none();
+        }
 
         let (scene, state) = match self.scene_now() {
             Ok(scene) => scene,
@@ -386,6 +397,30 @@ impl App {
                 Some(id) => window::screenshot(id).map(|shot| SceneMessage::Recorded(shot).into()),
                 None => Task::none(),
             })
+    }
+
+    /// What is on screen that a scene might not keep.
+    fn on_screen(&self) -> OnScreen {
+        match &self.game {
+            Some(game) => {
+                let cheats = game.session.cheats();
+                OnScreen {
+                    box_art: false,
+                    cheats_on: cheats.iter().any(|cheat| cheat.enabled),
+                    cheats_listed: !cheats.is_empty(),
+                    page: game.menu(),
+                    saved_slots: game
+                        .session
+                        .slots()
+                        .iter()
+                        .any(|slot| slot.saved_at.is_some()),
+                }
+            }
+            None => OnScreen {
+                box_art: self.settings.shared.download_box_art && self.library.has_box_art(),
+                ..OnScreen::default()
+            },
+        }
     }
 
     /// The scene on screen right now, with the game's state if a game is
@@ -506,6 +541,41 @@ impl App {
     /// one being recorded until the picture of the window is taken.
     pub(super) fn held_for_scene(&self) -> bool {
         self.scene_run.is_some() || self.recording.is_some()
+    }
+}
+
+/// What is on screen that a scene doesn't keep, because it is the
+/// player's own data rather than the game's state or the settings.
+#[derive(Debug, Default)]
+struct OnScreen {
+    /// Whether the library shows box art, which captures never download.
+    box_art: bool,
+    /// Whether a cheat is on, which save states don't keep.
+    cheats_on: bool,
+    /// Whether the game has cheats for the cheats page to list.
+    cheats_listed: bool,
+    /// The page of the pause menu that is open.
+    page: Option<PauseMenu>,
+    /// Whether the save state pages list saved slots.
+    saved_slots: bool,
+}
+
+/// Why the moment `on_screen` can't be recorded as a scene, if it can't:
+/// a scene shows again only what it keeps (its state, what is open and the
+/// settings), so it can't show the player's box art, cheats or save states.
+fn unkept(on_screen: &OnScreen) -> Option<&'static str> {
+    if on_screen.box_art {
+        Some("scenes don't keep box art; turn it off in Settings › Library first")
+    } else if on_screen.cheats_on {
+        Some("scenes don't keep cheats; turn them off first")
+    } else if matches!(on_screen.page, Some(PauseMenu::Save | PauseMenu::Load))
+        && on_screen.saved_slots
+    {
+        Some("scenes don't keep save states, so this page would show empty slots")
+    } else if on_screen.page == Some(PauseMenu::Cheats) && on_screen.cheats_listed {
+        Some("scenes don't keep cheats, so this page would list none")
+    } else {
+        None
     }
 }
 

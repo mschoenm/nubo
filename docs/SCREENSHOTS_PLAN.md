@@ -31,7 +31,9 @@ Where the build differs from the plan below:
   bottom corners and plain window buttons, not libadwaita's round ones. A newer GNOME would draw a newer
   border, and GNOME's version decides the pixels of those pictures.
 - **The recorder's preview** leaves out the toasts and isn't taken while a question is open, since scenes keep
-  neither, and the scene keeps the light or dark look on screen rather than "System". `--record-scenes`
+  neither; nor while the player's own data shows (box art, a cheat that is on, or a pause menu page listing
+  saved states or cheats), which a capture never has. A scene's game keeps no battery saves, with its cartridge
+  clock on emulated time, as in `explore`, and the scene keeps the light or dark look on screen rather than "System". `--record-scenes`
   refuses `--fresh` too, which hides the save state rows a capture shows.
 - **Explore's previews** show the game's picture alone, as the app shows it with the default settings, not
   the whole window.

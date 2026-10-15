@@ -38,3 +38,55 @@ fn scenes_are_saved_in_a_new_folder_named_after_the_game() {
     );
     std::fs::remove_dir_all(&parent).unwrap();
 }
+
+#[test]
+fn the_players_own_data_is_never_recorded() {
+    assert_eq!(unkept(&OnScreen::default()), None);
+    let empty_pages = [
+        PauseMenu::Main,
+        PauseMenu::Save,
+        PauseMenu::Load,
+        PauseMenu::Cheats,
+    ];
+    for page in empty_pages {
+        let on_screen = OnScreen {
+            page: Some(page),
+            ..OnScreen::default()
+        };
+        assert_eq!(unkept(&on_screen), None, "{page:?}");
+    }
+
+    let refused = [
+        OnScreen {
+            box_art: true,
+            ..OnScreen::default()
+        },
+        OnScreen {
+            cheats_on: true,
+            cheats_listed: true,
+            ..OnScreen::default()
+        },
+        OnScreen {
+            page: Some(PauseMenu::Load),
+            saved_slots: true,
+            ..OnScreen::default()
+        },
+        OnScreen {
+            page: Some(PauseMenu::Cheats),
+            cheats_listed: true,
+            ..OnScreen::default()
+        },
+    ];
+    for on_screen in refused {
+        assert!(unkept(&on_screen).is_some(), "{on_screen:?}");
+    }
+
+    // Saved slots and cheats that are off only matter on their pages.
+    let elsewhere = OnScreen {
+        page: Some(PauseMenu::Main),
+        saved_slots: true,
+        cheats_listed: true,
+        ..OnScreen::default()
+    };
+    assert_eq!(unkept(&elsewhere), None);
+}
