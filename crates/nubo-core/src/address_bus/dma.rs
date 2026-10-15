@@ -477,7 +477,7 @@ mod tests {
     fn should_transfer_byte_from_source_to_destination() {
         let mut address_bus = initialize_test_address_bus();
 
-        let mut rom = build_rom(CART_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
         rom[0x1200] = 0x12;
         address_bus
             .load_rom(rom, empty_cartridge_effects())
@@ -499,7 +499,7 @@ mod tests {
     fn should_stop_dma_transfer_after_transferring_160_bytes() {
         let mut address_bus = initialize_test_address_bus();
 
-        let mut rom = build_rom(CART_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
         rom[0x129F] = 0x12;
         address_bus
             .load_rom(rom, empty_cartridge_effects())

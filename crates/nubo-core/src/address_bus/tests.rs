@@ -15,7 +15,7 @@ fn setup_test_address_bus() -> AddressBus {
     address_bus.boot_rom[2] = 0x03;
     address_bus.boot_rom[3] = 0x4D;
 
-    let mut rom = build_rom(CART_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
+    let mut rom = build_rom(CARTRIDGE_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
 
     rom[0] = 0x1E;
     rom[1] = 0xF2;
@@ -317,7 +317,7 @@ fn reads_joyp_register() {
 fn loads_rom_buffer_into_emulator() {
     let mut address_bus = setup_test_address_bus();
 
-    let mut rom = build_rom(CART_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
+    let mut rom = build_rom(CARTRIDGE_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
     rom[0] = 0xA0;
     rom[1] = 0xCC;
     rom[2] = 0x3B;

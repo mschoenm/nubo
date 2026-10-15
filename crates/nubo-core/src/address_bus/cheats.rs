@@ -343,7 +343,7 @@ mod tests {
         let mut address_bus = initialize_test_address_bus();
         address_bus.set_model(Model::CgbE);
 
-        let mut test_rom = build_rom(CART_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut test_rom = build_rom(CARTRIDGE_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_2KB);
         test_rom[0x5D56] = 0x8E;
         address_bus
             .load_rom(test_rom, empty_cartridge_effects())

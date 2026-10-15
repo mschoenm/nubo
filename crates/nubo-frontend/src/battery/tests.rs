@@ -8,7 +8,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process;
 
-const CART_TYPE_MBC1_RAM_BATTERY: u8 = 0x03;
+const CARTRIDGE_TYPE_MBC1_RAM_BATTERY: u8 = 0x03;
 const ROM_SIZE_32KB: u8 = 0x00;
 const RAM_SIZE_8KB: u8 = 0x02;
 
@@ -29,7 +29,7 @@ fn saves_in(directory: &Path) -> Arc<BatterySaves> {
 fn battery_backed_rom() -> Vec<u8> {
     let mut rom = vec![0; 0x8000];
     rom[0x134..0x13B].copy_from_slice(b"BATTERY");
-    rom[0x147] = CART_TYPE_MBC1_RAM_BATTERY;
+    rom[0x147] = CARTRIDGE_TYPE_MBC1_RAM_BATTERY;
     rom[0x148] = ROM_SIZE_32KB;
     rom[0x149] = RAM_SIZE_8KB;
     rom

@@ -7,14 +7,16 @@
 
 use crate::address_bus::bank_utils::{banked_read, banked_write};
 use crate::address_bus::constants::{
-    CART_TYPE_HUC1_RAM_BATTERY, CART_TYPE_MBC1, CART_TYPE_MBC1_RAM, CART_TYPE_MBC1_RAM_BATTERY,
-    CART_TYPE_MBC2, CART_TYPE_MBC2_BATTERY, CART_TYPE_MBC3, CART_TYPE_MBC3_RAM,
-    CART_TYPE_MBC3_RAM_BATTERY, CART_TYPE_MBC3_TIMER_BATTERY, CART_TYPE_MBC3_TIMER_RAM_BATTERY,
-    CART_TYPE_MBC5, CART_TYPE_MBC5_RAM, CART_TYPE_MBC5_RAM_BATTERY, CART_TYPE_MBC5_RUMBLE,
-    CART_TYPE_MBC5_RUMBLE_RAM, CART_TYPE_MBC5_RUMBLE_RAM_BATTERY, CART_TYPE_ROM_ONLY,
-    CART_TYPE_ROM_RAM, CART_TYPE_ROM_RAM_BATTERY, CARTRIDGE_TYPE_ADDRESS, CGB_COMPATIBILITY_INDEX,
-    HEADER_END_ADDRESS, MINIMUM_ROM_SIZE, RAM_BANK_SIZE, RAM_SIZE_ADDRESS, ROM_BANK_SIZE,
-    ROM_SIZE_ADDRESS, SGB_SUPPORT_ADDRESS, TITLE_END_ADDRESS, TITLE_START_ADDRESS,
+    CARTRIDGE_TYPE_ADDRESS, CARTRIDGE_TYPE_HUC1_RAM_BATTERY, CARTRIDGE_TYPE_MBC1,
+    CARTRIDGE_TYPE_MBC1_RAM, CARTRIDGE_TYPE_MBC1_RAM_BATTERY, CARTRIDGE_TYPE_MBC2,
+    CARTRIDGE_TYPE_MBC2_BATTERY, CARTRIDGE_TYPE_MBC3, CARTRIDGE_TYPE_MBC3_RAM,
+    CARTRIDGE_TYPE_MBC3_RAM_BATTERY, CARTRIDGE_TYPE_MBC3_TIMER_BATTERY,
+    CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY, CARTRIDGE_TYPE_MBC5, CARTRIDGE_TYPE_MBC5_RAM,
+    CARTRIDGE_TYPE_MBC5_RAM_BATTERY, CARTRIDGE_TYPE_MBC5_RUMBLE, CARTRIDGE_TYPE_MBC5_RUMBLE_RAM,
+    CARTRIDGE_TYPE_MBC5_RUMBLE_RAM_BATTERY, CARTRIDGE_TYPE_ROM_ONLY, CARTRIDGE_TYPE_ROM_RAM,
+    CARTRIDGE_TYPE_ROM_RAM_BATTERY, CGB_COMPATIBILITY_INDEX, HEADER_END_ADDRESS, MINIMUM_ROM_SIZE,
+    RAM_BANK_SIZE, RAM_SIZE_ADDRESS, ROM_BANK_SIZE, ROM_SIZE_ADDRESS, SGB_SUPPORT_ADDRESS,
+    TITLE_END_ADDRESS, TITLE_START_ADDRESS,
 };
 use crate::address_bus::effects::RtcClock;
 use crate::address_bus::effects::{CartridgeEffects, empty_cartridge_effects};
@@ -420,22 +422,24 @@ impl MapperKind {
     /// Nubo doesn't emulate it.
     fn from_cartridge_type(cartridge_type: u8) -> Option<Self> {
         match cartridge_type {
-            CART_TYPE_ROM_ONLY => Some(Self::RomOnly),
-            CART_TYPE_ROM_RAM | CART_TYPE_ROM_RAM_BATTERY => Some(Self::RomRam),
-            CART_TYPE_MBC1 | CART_TYPE_MBC1_RAM | CART_TYPE_MBC1_RAM_BATTERY => Some(Self::Mbc1),
-            CART_TYPE_MBC2 | CART_TYPE_MBC2_BATTERY => Some(Self::Mbc2),
-            CART_TYPE_MBC3
-            | CART_TYPE_MBC3_RAM
-            | CART_TYPE_MBC3_RAM_BATTERY
-            | CART_TYPE_MBC3_TIMER_BATTERY
-            | CART_TYPE_MBC3_TIMER_RAM_BATTERY => Some(Self::Mbc3),
-            CART_TYPE_MBC5
-            | CART_TYPE_MBC5_RAM
-            | CART_TYPE_MBC5_RAM_BATTERY
-            | CART_TYPE_MBC5_RUMBLE
-            | CART_TYPE_MBC5_RUMBLE_RAM
-            | CART_TYPE_MBC5_RUMBLE_RAM_BATTERY => Some(Self::Mbc5),
-            CART_TYPE_HUC1_RAM_BATTERY => Some(Self::Huc1),
+            CARTRIDGE_TYPE_ROM_ONLY => Some(Self::RomOnly),
+            CARTRIDGE_TYPE_ROM_RAM | CARTRIDGE_TYPE_ROM_RAM_BATTERY => Some(Self::RomRam),
+            CARTRIDGE_TYPE_MBC1 | CARTRIDGE_TYPE_MBC1_RAM | CARTRIDGE_TYPE_MBC1_RAM_BATTERY => {
+                Some(Self::Mbc1)
+            }
+            CARTRIDGE_TYPE_MBC2 | CARTRIDGE_TYPE_MBC2_BATTERY => Some(Self::Mbc2),
+            CARTRIDGE_TYPE_MBC3
+            | CARTRIDGE_TYPE_MBC3_RAM
+            | CARTRIDGE_TYPE_MBC3_RAM_BATTERY
+            | CARTRIDGE_TYPE_MBC3_TIMER_BATTERY
+            | CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY => Some(Self::Mbc3),
+            CARTRIDGE_TYPE_MBC5
+            | CARTRIDGE_TYPE_MBC5_RAM
+            | CARTRIDGE_TYPE_MBC5_RAM_BATTERY
+            | CARTRIDGE_TYPE_MBC5_RUMBLE
+            | CARTRIDGE_TYPE_MBC5_RUMBLE_RAM
+            | CARTRIDGE_TYPE_MBC5_RUMBLE_RAM_BATTERY => Some(Self::Mbc5),
+            CARTRIDGE_TYPE_HUC1_RAM_BATTERY => Some(Self::Huc1),
             _ => None,
         }
     }
@@ -502,15 +506,15 @@ fn ram_bank_count(ram_size: usize) -> u8 {
 fn is_battery_backed(cartridge_type: u8) -> bool {
     matches!(
         cartridge_type,
-        CART_TYPE_MBC1_RAM_BATTERY
-            | CART_TYPE_MBC2_BATTERY
-            | CART_TYPE_ROM_RAM_BATTERY
-            | CART_TYPE_MBC3_TIMER_BATTERY
-            | CART_TYPE_MBC3_TIMER_RAM_BATTERY
-            | CART_TYPE_MBC3_RAM_BATTERY
-            | CART_TYPE_MBC5_RAM_BATTERY
-            | CART_TYPE_MBC5_RUMBLE_RAM_BATTERY
-            | CART_TYPE_HUC1_RAM_BATTERY
+        CARTRIDGE_TYPE_MBC1_RAM_BATTERY
+            | CARTRIDGE_TYPE_MBC2_BATTERY
+            | CARTRIDGE_TYPE_ROM_RAM_BATTERY
+            | CARTRIDGE_TYPE_MBC3_TIMER_BATTERY
+            | CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY
+            | CARTRIDGE_TYPE_MBC3_RAM_BATTERY
+            | CARTRIDGE_TYPE_MBC5_RAM_BATTERY
+            | CARTRIDGE_TYPE_MBC5_RUMBLE_RAM_BATTERY
+            | CARTRIDGE_TYPE_HUC1_RAM_BATTERY
     )
 }
 
@@ -747,32 +751,32 @@ mod tests {
 
     #[test]
     fn rejects_an_invalid_ram_size() {
-        let rom = build_rom(CART_TYPE_MBC1, 0x01, 0x09);
+        let rom = build_rom(CARTRIDGE_TYPE_MBC1, 0x01, 0x09);
         let result = load_cartridge(rom, empty_cartridge_effects());
         assert_eq!(result.err(), Some(LoadRomError::InvalidRamSize(0x09)));
     }
 
     const SUPPORTED_CARTRIDGE_TYPES: [u8; 20] = [
-        CART_TYPE_ROM_ONLY,
-        CART_TYPE_ROM_RAM,
-        CART_TYPE_ROM_RAM_BATTERY,
-        CART_TYPE_MBC1,
-        CART_TYPE_MBC1_RAM,
-        CART_TYPE_MBC1_RAM_BATTERY,
-        CART_TYPE_MBC2,
-        CART_TYPE_MBC2_BATTERY,
-        CART_TYPE_MBC3_TIMER_BATTERY,
-        CART_TYPE_MBC3_TIMER_RAM_BATTERY,
-        CART_TYPE_MBC3,
-        CART_TYPE_MBC3_RAM,
-        CART_TYPE_MBC3_RAM_BATTERY,
-        CART_TYPE_MBC5,
-        CART_TYPE_MBC5_RAM,
-        CART_TYPE_MBC5_RAM_BATTERY,
-        CART_TYPE_MBC5_RUMBLE,
-        CART_TYPE_MBC5_RUMBLE_RAM,
-        CART_TYPE_MBC5_RUMBLE_RAM_BATTERY,
-        CART_TYPE_HUC1_RAM_BATTERY,
+        CARTRIDGE_TYPE_ROM_ONLY,
+        CARTRIDGE_TYPE_ROM_RAM,
+        CARTRIDGE_TYPE_ROM_RAM_BATTERY,
+        CARTRIDGE_TYPE_MBC1,
+        CARTRIDGE_TYPE_MBC1_RAM,
+        CARTRIDGE_TYPE_MBC1_RAM_BATTERY,
+        CARTRIDGE_TYPE_MBC2,
+        CARTRIDGE_TYPE_MBC2_BATTERY,
+        CARTRIDGE_TYPE_MBC3_TIMER_BATTERY,
+        CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY,
+        CARTRIDGE_TYPE_MBC3,
+        CARTRIDGE_TYPE_MBC3_RAM,
+        CARTRIDGE_TYPE_MBC3_RAM_BATTERY,
+        CARTRIDGE_TYPE_MBC5,
+        CARTRIDGE_TYPE_MBC5_RAM,
+        CARTRIDGE_TYPE_MBC5_RAM_BATTERY,
+        CARTRIDGE_TYPE_MBC5_RUMBLE,
+        CARTRIDGE_TYPE_MBC5_RUMBLE_RAM,
+        CARTRIDGE_TYPE_MBC5_RUMBLE_RAM_BATTERY,
+        CARTRIDGE_TYPE_HUC1_RAM_BATTERY,
     ];
 
     /// Writes many values to every controller register and then reads and
@@ -840,7 +844,7 @@ mod tests {
     #[test]
     fn a_controller_keeps_its_power_on_registers_in_a_state_of_another_controller() {
         let mut mbc1 = load_cartridge(
-            build_rom(CART_TYPE_MBC1_RAM_BATTERY, 0x05, 0x03),
+            build_rom(CARTRIDGE_TYPE_MBC1_RAM_BATTERY, 0x05, 0x03),
             empty_cartridge_effects(),
         )
         .unwrap();
@@ -849,7 +853,7 @@ mod tests {
         mbc1.serialize(&mut state).unwrap();
 
         let mut mbc5 = load_cartridge(
-            build_rom(CART_TYPE_MBC5_RAM_BATTERY, 0x05, 0x03),
+            build_rom(CARTRIDGE_TYPE_MBC5_RAM_BATTERY, 0x05, 0x03),
             empty_cartridge_effects(),
         )
         .unwrap();
@@ -878,7 +882,7 @@ mod tests {
 
     #[test]
     fn the_header_ram_size_does_not_depend_on_the_save_file() {
-        let rom = build_rom(CART_TYPE_MBC1_RAM_BATTERY, 0x01, 0x03);
+        let rom = build_rom(CARTRIDGE_TYPE_MBC1_RAM_BATTERY, 0x01, 0x03);
         let cartridge =
             load_cartridge(rom.clone(), Box::new(SavedRam(vec![0x5A; 0x2000]))).unwrap();
         assert_eq!(cartridge.header().ram_bank_count, 4);
@@ -901,14 +905,14 @@ mod tests {
 
     #[test]
     fn a_long_save_file_is_kept_whole() {
-        let rom = build_rom(CART_TYPE_MBC5_RAM_BATTERY, 0x01, 0x02);
+        let rom = build_rom(CARTRIDGE_TYPE_MBC5_RAM_BATTERY, 0x01, 0x02);
         let cartridge = load_cartridge(rom, Box::new(SavedRam(vec![0x5A; 0x2030]))).unwrap();
         assert_eq!(cartridge.ram(), [0x5A; 0x2030]);
     }
 
     #[test]
     fn a_huc1_game_with_an_empty_save_file_can_still_save() {
-        let rom = build_rom(CART_TYPE_HUC1_RAM_BATTERY, 0x01, 0x03);
+        let rom = build_rom(CARTRIDGE_TYPE_HUC1_RAM_BATTERY, 0x01, 0x03);
         let mut cartridge = load_cartridge(rom, Box::new(SavedRam(Vec::new()))).unwrap();
         cartridge.write_rom(0x0000, 0x0A);
         cartridge.write_ram(0x0005, 0xCC);
@@ -922,7 +926,7 @@ mod tests {
     fn loading_a_save_state_does_not_save_the_ram() {
         let saves = crate::address_bus::effects::Shared::<usize>::default();
         let mut cartridge = test_utils::build_cartridge_mapper_with_effects(
-            CART_TYPE_MBC1_RAM_BATTERY,
+            CARTRIDGE_TYPE_MBC1_RAM_BATTERY,
             0x01,
             0x03,
             Box::new(test_utils::RamSaveCounter(saves.clone())),
@@ -970,7 +974,7 @@ mod tests {
 
     #[test]
     fn reads_the_title_up_to_the_cgb_flag() {
-        let mut rom = build_rom(CART_TYPE_ROM_ONLY, 0x00, 0x00);
+        let mut rom = build_rom(CARTRIDGE_TYPE_ROM_ONLY, 0x00, 0x00);
         rom[TITLE_START_ADDRESS..=TITLE_END_ADDRESS].copy_from_slice(b"POKEMON CRYSTAL\xC0");
         let cartridge = load_cartridge(rom, empty_cartridge_effects()).unwrap();
         assert_eq!(cartridge.title(), "POKEMON CRYSTAL");
@@ -991,7 +995,7 @@ mod tests {
 
     #[test]
     fn reads_the_cgb_flag() {
-        let mut rom = build_rom(CART_TYPE_ROM_ONLY, 0x00, 0x00);
+        let mut rom = build_rom(CARTRIDGE_TYPE_ROM_ONLY, 0x00, 0x00);
         assert!(!read_header(&rom).unwrap().supports_cgb);
 
         rom[TITLE_END_ADDRESS] = 0x80;
@@ -1004,14 +1008,14 @@ mod tests {
     #[test]
     fn pads_a_small_rom_so_every_rom_address_can_be_read() {
         let mut rom = vec![0; 0x200];
-        rom[CARTRIDGE_TYPE_ADDRESS] = CART_TYPE_ROM_ONLY;
+        rom[CARTRIDGE_TYPE_ADDRESS] = CARTRIDGE_TYPE_ROM_ONLY;
         let cartridge = load_cartridge(rom, empty_cartridge_effects()).unwrap();
         assert_eq!(cartridge.read_rom(0x7FFF), 0xFF);
     }
 
     #[test]
     fn rom_and_ram_needs_no_enable_and_repeats_a_small_ram() {
-        let mut cartridge = test_utils::build_cartridge_mapper(CART_TYPE_ROM_RAM, 0x00, 0x01);
+        let mut cartridge = test_utils::build_cartridge_mapper(CARTRIDGE_TYPE_ROM_RAM, 0x00, 0x01);
         assert_eq!(cartridge.ram().len(), 0x800);
         cartridge.write_ram(0x0000, 0x12);
         assert_eq!(cartridge.read_ram(0x0000), 0x12);
@@ -1026,14 +1030,14 @@ mod tests {
 
     #[test]
     fn rom_and_ram_without_ram_in_its_header_reads_open_bus() {
-        let mut cartridge = test_utils::build_cartridge_mapper(CART_TYPE_ROM_RAM, 0x00, 0x00);
+        let mut cartridge = test_utils::build_cartridge_mapper(CARTRIDGE_TYPE_ROM_RAM, 0x00, 0x00);
         cartridge.write_ram(0x0000, 0x12);
         assert_eq!(cartridge.read_ram(0x0000), 0xFF);
     }
 
     #[test]
     fn rom_only_has_no_ram_whatever_its_header_says() {
-        let mut cartridge = test_utils::build_cartridge_mapper(CART_TYPE_ROM_ONLY, 0x00, 0x02);
+        let mut cartridge = test_utils::build_cartridge_mapper(CARTRIDGE_TYPE_ROM_ONLY, 0x00, 0x02);
         cartridge.write_ram(0x0000, 0x12);
         assert_eq!(cartridge.read_ram(0x0000), 0xFF);
     }
@@ -1041,11 +1045,11 @@ mod tests {
     #[test]
     fn only_rom_and_ram_with_a_battery_saves_its_ram() {
         assert_eq!(
-            test_utils::ram_saves_after_writing(CART_TYPE_ROM_RAM_BATTERY, 0x00),
+            test_utils::ram_saves_after_writing(CARTRIDGE_TYPE_ROM_RAM_BATTERY, 0x00),
             1
         );
         assert_eq!(
-            test_utils::ram_saves_after_writing(CART_TYPE_ROM_RAM, 0x0A),
+            test_utils::ram_saves_after_writing(CARTRIDGE_TYPE_ROM_RAM, 0x0A),
             0
         );
     }
