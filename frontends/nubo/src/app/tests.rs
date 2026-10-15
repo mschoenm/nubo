@@ -6,6 +6,7 @@ use super::{App, GameMessage, SettingsMessage, cycle};
 use crate::command_line::Options;
 use crate::dialog::{DialogKind, ResetChoices};
 use crate::settings::Appearance;
+use crate::views::settings::SettingsTab;
 use nubo_frontend::rom::Rom;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -169,4 +170,23 @@ fn the_reset_toast_names_what_was_done() {
         ]),
         "Settings reset, game folders removed and in-game saves deleted"
     );
+}
+
+#[test]
+fn picking_another_settings_tab_scrolls_its_page_to_the_top() {
+    let (mut app, _) = App::new(
+        None,
+        &Options {
+            fresh: true,
+            ..Options::default()
+        },
+    );
+    let _ = app.update(SettingsMessage::Open.into());
+
+    let task = app.update(SettingsMessage::TabSelected(SettingsTab::Controls).into());
+    assert_eq!(app.settings_tab, Some(SettingsTab::Controls));
+    assert_eq!(task.units(), 1);
+
+    let task = app.update(SettingsMessage::TabSelected(SettingsTab::Controls).into());
+    assert_eq!(task.units(), 0);
 }

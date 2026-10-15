@@ -10,6 +10,8 @@ use crate::views;
 use crate::views::settings::ModelOption;
 use crate::views::settings::{SettingsFocus, SettingsRow, SettingsTab};
 use iced::Task;
+use iced::widget::operation;
+use iced::widget::scrollable::RelativeOffset;
 use nubo_frontend::background;
 use nubo_frontend::battery;
 use nubo_frontend::controls::{Action, Controls, Device};
@@ -94,8 +96,7 @@ impl App {
                 } else if self.settings_focus.is_some() {
                     self.settings_focus = Some(SettingsFocus::Tabs);
                 }
-                self.settings_tab = Some(tab);
-                self.capture = None;
+                return self.open_settings_tab(tab);
             }
             SettingsMessage::AppearanceSelected(appearance) => {
                 self.change_settings(|settings| settings.appearance = appearance);
@@ -389,8 +390,7 @@ impl App {
                     let tabs = SettingsTab::all();
                     let current = tabs.iter().position(|&known| known == tab).unwrap_or(0);
                     let next = selection::moved(current, step, tabs.len(), !held);
-                    self.settings_tab = Some(tabs[next]);
-                    self.capture = None;
+                    return self.open_settings_tab(tabs[next]);
                 } else if layout.enters_page(action) && !rows.is_empty() {
                     self.settings_focus = Some(SettingsFocus::Row(0));
                     return scroll_settings(0, rows.len());
@@ -550,6 +550,20 @@ impl App {
             }
             SettingsRow::Folder(index) => Some(LibraryMessage::RemoveFolder(index).into()),
             _ => None,
+        }
+    }
+
+    /// Shows `tab` in the settings window, from the top of its page when it
+    /// wasn't open already: every page scrolls in the same place, which
+    /// would otherwise keep the last page's position.
+    fn open_settings_tab(&mut self, tab: SettingsTab) -> Task<Message> {
+        let changed = self.settings_tab != Some(tab);
+        self.settings_tab = Some(tab);
+        self.capture = None;
+        if changed {
+            operation::snap_to(views::settings::scroll_id(), RelativeOffset::START)
+        } else {
+            Task::none()
         }
     }
 }
