@@ -234,3 +234,14 @@ fn settings_written_by_an_earlier_version_write_back_byte_for_byte() {
         without_iced_app_settings
     );
 }
+
+#[test]
+fn the_raw_screen_is_the_look_with_every_effect_off() {
+    let plain = Settings {
+        dmg_palette: DmgPalette::Gray,
+        color_correction: false,
+        frame_blending: false,
+        ..Settings::default()
+    };
+    assert_eq!(plain.screen_look(), ScreenLook::RAW);
+}

@@ -241,7 +241,11 @@ from `--get-startuptime`. The test ROM runner's `HARNESS_SPEED` and `HARNESS_STA
 (`tools/nubo-test-rom-runner/src/shootout.rs`) must stay this class's `speed` and `startup_time`.
 
 It downloads the latest release's `Nubo-windows-x64.zip` and starts
-`nubo.exe <rom> --model dmg|cgb|sgb --scale 1 --fresh --speed 4`.
+`nubo.exe <rom> --model dmg|cgb|sgb --scale 1 --fresh --speed 4 --raw-screen`. `--raw-screen` shows the
+emulator's own picture: plain grays and no color correction or frame blending, whatever the defaults
+are, as the harness has GSE (`--apply-color-correction false`), Emulicious, bgb and SameBoy turn off
+theirs. Color correction is on for players since 0.9.0 and would cost the three CGB `rtc3test`s; the
+option is in releases from 0.9.0 on, so the pull request to the Shootout waits for 0.9.0.
 
 On a Super Game Boy, `--scale 1` makes the window 256×224, the TV picture with the border around the
 Game Boy screen at (48, 40), as mGBA's and NO$GMB's classes expect too; `getScreenshot` crops the
@@ -260,8 +264,8 @@ crates. **Done**: `.github/shootout/nubo.py` and the workflow's `EMULATOR_SPECS`
 
 1. Install Python 3 (and 7-Zip, which only other emulators' downloads need). Clone `gbdev/GBEmulatorShootout`, then run
    `python -m pip install -r requirements-core.txt -r requirements.txt`.
-2. Add the files from Part 2. Releases from 0.6.0 on have `--scale`, `--fresh`, `--speed` and the
-   Super Game Boy, so the harness downloads the latest one. To test an unreleased change, copy a
+2. Add the files from Part 2. Releases from 0.9.0 on have `--scale`, `--fresh`, `--speed`,
+   `--raw-screen` and the Super Game Boy, so the harness downloads the latest one. To test an unreleased change, copy a
    build of `main` (`cargo xtask windows` makes the zip) to `downloads/nubo.zip`, as CI does, so
    `downloadGithubRelease` leaves it alone and `extract` unpacks it.
 3. Run a quick subset first: `python main.py --emulator nubo --test daid`. Then measure startup time

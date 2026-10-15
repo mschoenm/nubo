@@ -179,6 +179,42 @@ impl Settings {
     pub fn effective_volume(&self) -> f32 {
         if self.muted { 0.0 } else { self.volume }
     }
+
+    /// How the player wants games' pictures to look.
+    pub fn screen_look(&self) -> ScreenLook {
+        ScreenLook {
+            dmg_palette: self.dmg_palette,
+            color_correction: self.color_correction,
+            frame_blending: self.frame_blending,
+        }
+    }
+}
+
+/// How a game's picture is shown on top of what the emulator draws: the
+/// colors of original Game Boy games and the screen effects (see `lcd`).
+/// Every choice that changes the Game Boy screen's pixels belongs here, so
+/// that [`ScreenLook::RAW`] has to name it too. What frames the screen, such
+/// as the Super Game Boy's border, is not part of it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScreenLook {
+    /// The colors original Game Boy games are shown in.
+    pub dmg_palette: DmgPalette,
+    /// Whether Game Boy Color games look as on its own screen.
+    pub color_correction: bool,
+    /// Whether each frame is mixed with the one before.
+    pub frame_blending: bool,
+}
+
+impl ScreenLook {
+    /// The emulator's own picture, with plain grays and no screen effects:
+    /// what test harnesses such as the GB Emulator Shootout's compare with
+    /// their reference screenshots, which other emulators' pictures are
+    /// judged on too.
+    pub const RAW: ScreenLook = ScreenLook {
+        dmg_palette: DmgPalette::Gray,
+        color_correction: false,
+        frame_blending: false,
+    };
 }
 
 /// How many times faster than real time fast forward runs.

@@ -1,7 +1,7 @@
 //! The options the app takes on the command line, read with clap:
 //!
 //! ```text
-//! nubo [rom] [--cgb | --model <name>] [--scale <n>] [--fresh] [--speed <n>]
+//! nubo [rom] [--cgb | --model <name>] [--scale <n>] [--fresh] [--speed <n>] [--raw-screen]
 //! nubo measure-efficiency <rom> [--cgb | --model <name>]
 //! nubo --help | --version
 //! ```
@@ -19,6 +19,13 @@
 //!   problems printed on stderr.
 //! - `--speed <n>` starts the game fast forwarding at `n` times real time,
 //!   one of the fast forward speeds the settings offer.
+//! - `--raw-screen` shows the Game Boy screen as the emulator draws it,
+//!   whatever palette and screen effects the settings pick: plain grays,
+//!   no color correction or other screen effect
+//!   (`nubo_frontend::settings::ScreenLook::RAW`) and a Super Game Boy
+//!   game's own colors rather than ones the player picked. A Super Game Boy's
+//!   border still shows or not as the settings say; it frames the screen
+//!   without changing it, and the Shootout's harness crops it off.
 //!
 //! The `measure-efficiency` command opens no window: it measures how often
 //! the emulator thread wakes up while the ROM plays (`efficiency`) and
@@ -27,10 +34,12 @@
 //! a ROM file named exactly `measure-efficiency` opens as
 //! `./measure-efficiency`.
 //!
-//! `--scale`, `--fresh` and `--speed` are what the GB Emulator Shootout's
-//! harness runs the app with (`docs/SHOOTOUT_PLAN.md`). The browser build
-//! gets no command line, so it starts without any of them and doesn't
-//! include clap.
+//! The GB Emulator Shootout's harness runs the app with `--model` and all
+//! but `--cgb` (`docs/SHOOTOUT_PLAN.md`). `--raw-screen` makes its
+//! screenshots judge the emulation alone, as its harness has other emulators
+//! turn off their color correction and blending, while players get the
+//! corrected colors by default. The browser build gets no command line, so
+//! it starts without any of them and doesn't include clap.
 
 use nubo_core::Model;
 use nubo_frontend::settings::FastForwardSpeed;
@@ -50,6 +59,9 @@ pub struct Options {
     pub fresh: bool,
     /// With `--speed`: start the game fast forwarding at this speed.
     pub speed: Option<FastForwardSpeed>,
+    /// With `--raw-screen`: show the Game Boy screen as the emulator draws
+    /// it, without the settings' palette and screen effects.
+    pub raw_screen: bool,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -129,6 +141,11 @@ mod parser {
         #[arg(long, value_name = "N", value_parser = parse_speed)]
         speed: Option<FastForwardSpeed>,
 
+        /// Show the Game Boy screen as the emulator draws it, without the
+        /// settings' palette and screen effects
+        #[arg(long)]
+        raw_screen: bool,
+
         #[command(subcommand)]
         command: Option<Command>,
     }
@@ -180,6 +197,7 @@ mod parser {
                 scale: arguments.scale,
                 fresh: arguments.fresh,
                 speed: arguments.speed,
+                raw_screen: arguments.raw_screen,
             }),
         })
     }
@@ -193,6 +211,7 @@ mod parser {
                 || self.scale.is_some()
                 || self.fresh
                 || self.speed.is_some()
+                || self.raw_screen
         }
     }
 

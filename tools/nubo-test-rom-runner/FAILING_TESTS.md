@@ -288,7 +288,8 @@ behaviour behind those rows is known, there is nothing to model.
 
 The runner runs 261 of the 264 tests of the Shootout's published table (`shootout/...` in
 `passing.txt`), judged the way its harness judges them (`src/shootout.rs`): in grayscale, on a
-screenshot of the app, so in the colors the app shows. All 261 pass: 261 of 264, which would rank
+screenshot of the app, so in the colors the app shows with `--raw-screen`, which the harness class
+passes (color correction, on for players, would cost the three CGB `rtc3test`s). All 261 pass: 261 of 264, which would rank
 first, ahead of the leader, DocBoy, with 255. The three Super Game Boy tests
 (`samesuite/sgb/command_mlt_req.gb`, `samesuite/sgb/command_mlt_req_1_incrementing.gb` and
 `cpp/sgb-ext-test.gb`) pass since Nubo emulates the Super Game Boy's commands; on the published table

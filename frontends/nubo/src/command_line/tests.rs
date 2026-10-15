@@ -52,7 +52,15 @@ fn a_rom_and_a_model() {
 fn the_shootouts_options() {
     assert_eq!(
         options(&[
-            "game.gb", "--model", "dmg", "--scale", "1", "--fresh", "--speed", "4",
+            "game.gb",
+            "--model",
+            "dmg",
+            "--scale",
+            "1",
+            "--fresh",
+            "--speed",
+            "4",
+            "--raw-screen",
         ]),
         Options {
             rom_path: Some(std::path::absolute("game.gb").unwrap()),
@@ -60,6 +68,7 @@ fn the_shootouts_options() {
             scale: Some(1),
             fresh: true,
             speed: Some(FastForwardSpeed::try_from(4).unwrap()),
+            raw_screen: true,
         }
     );
 }
@@ -173,7 +182,12 @@ fn measuring_efficiency_needs_a_rom_and_runs_on_dmg() {
         mistake(&["measure-efficiency", "game.gb", "--fresh"]),
         ErrorKind::UnknownArgument
     );
-    for first in [&["--fresh"][..], &["game.gb"], &["--model", "cgb"]] {
+    for first in [
+        &["--fresh"][..],
+        &["game.gb"],
+        &["--model", "cgb"],
+        &["--raw-screen"],
+    ] {
         let args = [first, &["measure-efficiency", "x.gb"]].concat();
         assert_eq!(mistake(&args), ErrorKind::ArgumentConflict, "{args:?}");
     }
