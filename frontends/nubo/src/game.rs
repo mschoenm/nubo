@@ -124,11 +124,11 @@ impl Game {
         self.menu_selection
     }
 
-    /// Moves the highlighted menu row by `step`, staying within the
-    /// `rows` rows of the current page.
-    pub fn move_menu_selection(&mut self, step: isize, rows: usize) {
-        let last = rows.saturating_sub(1);
-        self.menu_selection = self.menu_selection.saturating_add_signed(step).min(last);
+    /// Moves the highlighted menu row by `step` on a page of `rows` rows.
+    /// With `wrap`, going up from the first row lands on the last and down
+    /// from the last on the first; without it, the selection stops there.
+    pub fn move_menu_selection(&mut self, step: isize, rows: usize, wrap: bool) {
+        self.menu_selection = moved_selection(self.menu_selection, step, rows, wrap);
     }
 
     /// Adds the cheat the player typed, or keeps the form's error.
@@ -174,6 +174,21 @@ impl Game {
     }
 }
 
+/// Row `selection` of `rows` moved by `step`: around the other end with
+/// `wrap`, or stopped at the first or last row without it.
+fn moved_selection(selection: usize, step: isize, rows: usize, wrap: bool) -> usize {
+    if rows == 0 {
+        return 0;
+    }
+    let last = rows - 1;
+    match selection.checked_add_signed(step) {
+        Some(moved) if moved <= last => moved,
+        _ if !wrap => selection.saturating_add_signed(step).min(last),
+        _ if step < 0 => last,
+        _ => 0,
+    }
+}
+
 /// The new cheat the player is typing on the cheats page, and what was
 /// wrong with the last one they tried to add.
 #[derive(Debug, Clone, Default)]
@@ -182,3 +197,6 @@ pub struct CheatForm {
     pub code: String,
     pub error: Option<String>,
 }
+
+#[cfg(test)]
+mod tests;

@@ -706,8 +706,11 @@ impl App {
     }
 
     /// Moves through the pause menu: up and down move between its rows, A
-    /// or Start picks one, and B steps back.
-    pub(super) fn navigate_pause_menu(&mut self, action: Action) -> Task<Message> {
+    /// or Start picks one, and B steps back. A fresh press of up on the
+    /// first row goes to the last and down on the last to the first, while
+    /// a `held` key repeating stops at either end, so holding it doesn't
+    /// go round and round.
+    pub(super) fn navigate_pause_menu(&mut self, action: Action, held: bool) -> Task<Message> {
         let Some(game) = &mut self.game else {
             return Task::none();
         };
@@ -727,7 +730,8 @@ impl App {
 
         match action {
             Action::Up | Action::Down => {
-                game.move_menu_selection(if action == Action::Up { -1 } else { 1 }, rows);
+                let step = if action == Action::Up { -1 } else { 1 };
+                game.move_menu_selection(step, rows, !held);
                 if page == PauseMenu::SuperGameBoy {
                     return scroll_pause_menu(game.menu_selection(), rows);
                 }
