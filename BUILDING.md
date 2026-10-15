@@ -69,7 +69,7 @@ cargo cpu-tests                     # Every CPU instruction, checked cycle by cy
 - `crates/nubo-frontend`: everything an app needs besides drawing: settings, saves, the game library and running a game with its sound.
 - `frontends/nubo`: the desktop and browser app, drawn with [Iced](https://iced.rs).
 - `frontends/nubo-libretro`: the RetroArch core.
-- `tools/`: the developer tools, such as the test ROM runner and the benchmark.
+- `tools/`: the developer tools, such as the test ROM runner and the benchmark, with `crates/nubo-download`, which downloads their test data.
 - `xtask/`: the web build, packaging and the other project tasks ([`xtask/AGENTS.md`](xtask/AGENTS.md) lists them all).
 
 ## Contributing

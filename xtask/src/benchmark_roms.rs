@@ -4,10 +4,10 @@
 //! checksums. The games aren't part of Nubo; they are only downloaded to
 //! run them.
 
-use crate::{Result, http, target_dir};
-use sha2::{Digest, Sha256};
+use crate::{Result, target_dir};
+use nubo_download::has_checksum;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// A homebrew game to download.
 struct BenchmarkRom {
@@ -58,7 +58,7 @@ pub fn ensure_benchmark_roms() -> Result<PathBuf> {
         if has_checksum(&path, rom.sha256) {
             continue;
         }
-        http::download(rom.url, &path)?;
+        nubo_download::download(rom.url, &path)?;
         if !has_checksum(&path, rom.sha256) {
             let _ = fs::remove_file(&path);
             return Err(format!(
@@ -69,16 +69,4 @@ pub fn ensure_benchmark_roms() -> Result<PathBuf> {
     }
 
     Ok(folder)
-}
-
-/// Whether the file at `path` exists and has the SHA-256 checksum `expected`.
-fn has_checksum(path: &Path, expected: &str) -> bool {
-    let Ok(bytes) = fs::read(path) else {
-        return false;
-    };
-    let checksum: String = Sha256::digest(&bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
-    checksum == expected
 }

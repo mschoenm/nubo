@@ -6,11 +6,10 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+nubo-download.workspace = true
 nubo-core.workspace = true
 clap = { version = "4", features = ["derive"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
-sha2 = "0.11"
-ureq.workspace = true
 zip = { version = "9", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [lints]
