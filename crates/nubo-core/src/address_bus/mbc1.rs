@@ -6,7 +6,7 @@
 
 use crate::address_bus::bank_utils::{banked_read, banked_write};
 use crate::address_bus::constants::{
-    CART_TYPE_MBC1_RAM, CART_TYPE_MBC1_RAM_BATTERY, RAM_BANK_SIZE,
+    CARTRIDGE_TYPE_MBC1_RAM, CARTRIDGE_TYPE_MBC1_RAM_BATTERY, RAM_BANK_SIZE,
 };
 use nubo_serializable_derive::Serializable;
 
@@ -63,7 +63,7 @@ impl Mbc1CartridgeMapper {
             is_multicart: is_multicart(rom),
             has_ram: matches!(
                 cartridge_type,
-                CART_TYPE_MBC1_RAM | CART_TYPE_MBC1_RAM_BATTERY
+                CARTRIDGE_TYPE_MBC1_RAM | CARTRIDGE_TYPE_MBC1_RAM_BATTERY
             ),
         }
     }
@@ -161,7 +161,8 @@ mod tests {
 
     #[test]
     fn enable_external_ram_if_correct_cartridge_type() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut mapper =
+            build_cartridge_mapper(CARTRIDGE_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_2KB);
 
         mapper.write_rom(0x0000, 0xA);
 
@@ -172,7 +173,7 @@ mod tests {
     #[test]
     fn enable_external_ram_if_correct_cartridge_type_scenario_two() {
         let mut mapper =
-            build_cartridge_mapper(CART_TYPE_MBC1_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_2KB);
+            build_cartridge_mapper(CARTRIDGE_TYPE_MBC1_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_2KB);
 
         mapper.write_rom(0x0000, 0xA);
 
@@ -182,7 +183,8 @@ mod tests {
 
     #[test]
     fn enable_external_ram_if_lower_nibble_is_equal_to_a() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut mapper =
+            build_cartridge_mapper(CARTRIDGE_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_2KB);
 
         mapper.write_rom(0x0000, 0x1A);
 
@@ -192,7 +194,7 @@ mod tests {
 
     #[test]
     fn not_enable_external_ram_if_incorrect_cartridge_type() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut mapper = build_cartridge_mapper(CARTRIDGE_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
 
         mapper.write_rom(0x0000, 0xA);
 
@@ -202,7 +204,8 @@ mod tests {
 
     #[test]
     fn disable_external_ram_if_correct_cartridge_type() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut mapper =
+            build_cartridge_mapper(CARTRIDGE_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_2KB);
 
         mapper.write_rom(0x0000, 0xA);
 
@@ -217,7 +220,7 @@ mod tests {
 
     #[test]
     fn set_rom_bank_number() {
-        let mut rom = build_rom(CART_TYPE_MBC1, ROM_SIZE_128KB, RAM_SIZE_2KB);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC1, ROM_SIZE_128KB, RAM_SIZE_2KB);
         rom[0xC005] = 0xA1;
         let mut mapper = load_cartridge(rom, empty_cartridge_effects()).unwrap();
 
@@ -229,7 +232,7 @@ mod tests {
 
     #[test]
     fn correctly_sets_lower_and_upper_bits_of_the_rom_bank_number() {
-        let mut rom = build_rom(CART_TYPE_MBC1, ROM_SIZE_2MB, RAM_SIZE_2KB);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC1, ROM_SIZE_2MB, RAM_SIZE_2KB);
         rom[0x0011_0005] = 0xA1;
         let mut mapper = load_cartridge(rom, empty_cartridge_effects()).unwrap();
 
@@ -242,7 +245,7 @@ mod tests {
 
     #[test]
     fn reads_bank_zero_as_bank_one() {
-        let mut rom = build_rom(CART_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
         rom[0x4005] = 0xCC;
         let mut mapper = load_cartridge(rom, empty_cartridge_effects()).unwrap();
 
@@ -254,7 +257,7 @@ mod tests {
 
     #[test]
     fn masks_bank_number_to_required_number_of_bits() {
-        let mut rom = build_rom(CART_TYPE_MBC1, ROM_SIZE_256KB, RAM_SIZE_2KB);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC1, ROM_SIZE_256KB, RAM_SIZE_2KB);
         rom[0] = 0xB1;
         rom[1] = 0xD2;
         rom[0x8000] = 0xBB;
@@ -269,7 +272,8 @@ mod tests {
 
     #[test]
     fn sets_ram_bank_number() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_32KB);
+        let mut mapper =
+            build_cartridge_mapper(CARTRIDGE_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_32KB);
 
         // Enable RAM
         mapper.write_rom(0x0000, 0xA);
@@ -292,7 +296,8 @@ mod tests {
 
     #[test]
     fn only_allow_reading_from_ram_if_it_is_enabled() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_32KB);
+        let mut mapper =
+            build_cartridge_mapper(CARTRIDGE_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_32KB);
 
         // Try writing to RAM even though RAM is not enabled
         mapper.write_ram(0x0005, 0xCC);
@@ -309,7 +314,7 @@ mod tests {
 
     #[test]
     fn maps_upper_bank_bits_into_the_lower_rom_area_in_mode_one() {
-        let mut rom = build_rom(CART_TYPE_MBC1, ROM_SIZE_2MB, RAM_SIZE_2KB);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC1, ROM_SIZE_2MB, RAM_SIZE_2KB);
         rom[0x0010_0005] = 0xA1;
         let mut mapper = load_cartridge(rom, empty_cartridge_effects()).unwrap();
 
@@ -322,7 +327,8 @@ mod tests {
 
     #[test]
     fn wraps_ram_banks_beyond_the_ram_size() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_8KB);
+        let mut mapper =
+            build_cartridge_mapper(CARTRIDGE_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_8KB);
 
         mapper.write_rom(0x0000, 0xA);
         mapper.write_rom(0x6000, 0x1);
@@ -335,7 +341,7 @@ mod tests {
 
     #[test]
     fn uses_four_bit_bank_numbers_on_multicarts() {
-        let mut rom = build_rom(CART_TYPE_MBC1, ROM_SIZE_1MB, RAM_SIZE_2KB);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC1, ROM_SIZE_1MB, RAM_SIZE_2KB);
         for game_start in [0x40000, 0x80000, 0xC0000] {
             rom[game_start + 0x104] = 0xCE;
         }

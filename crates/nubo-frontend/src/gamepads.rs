@@ -1,11 +1,10 @@
-//! Game controllers (gamepads), read with gilrs (the `gamepads` feature).
-//! Each controller's state is reported in the order of gilrs's numbers for
-//! them ([`Controllers`]): the game gives each one to its own player when a
-//! Super Game Boy game asks for more than one, and menus and shortcuts use them
-//! all combined. The app hears about them
-//! whatever it shows (Nubo's app turns them into an Iced subscription), so
-//! controllers work on every screen: to play, to use shortcuts such as the
-//! pause menu, and to pick buttons in the settings.
+//! Game controllers (gamepads), read with gilrs (the `gamepads` feature). Each
+//! controller's state is reported in the order of gilrs's numbers for them
+//! ([`Controllers`]): the game gives each one to its own player when a Super
+//! Game Boy game asks for more than one, and menus and shortcuts use them all
+//! combined. The app hears about them whatever it shows (Nubo's app turns them
+//! into an Iced subscription), so controllers work on every screen: to play, to
+//! use shortcuts such as the pause menu, and to pick buttons in the settings.
 //!
 //! The desktop build reads them on a thread of its own, which sleeps until
 //! a controller has something to report and sends it over a `futures`

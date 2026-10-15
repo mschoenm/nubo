@@ -1,3 +1,9 @@
+/*
+    The Super Game Boy's multiplayer reads (which player JOYP shows, and when it moves on to the
+    next) are ported from SameBoy's sgb.c and joypad.c (https://github.com/LIJI32/SameBoy, Expat
+    License, Copyright (c) 2015-2026 Lior Halphon; see the notice in apu.rs).
+*/
+
 //! The joypad: the Game Boy's eight buttons and the JOYP register (0xFF00)
 //! the game reads them through.
 //!

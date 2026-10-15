@@ -162,7 +162,7 @@ Nubo also runs in [RetroArch](https://www.retroarch.com/) as a core, with what R
 
 ## Help and Feedback
 
-If a game doesn't play correctly or something else is wrong, [open an issue](https://github.com/mschoenm/nubo/issues) with the game's name, the Nubo version (Settings > General, under About), your system and, if you chose one, the Game Boy model you played it on.
+If a game doesn't play correctly or something else is wrong, [open an issue](https://github.com/mschoenm/nubo/issues) with the game's name, the Nubo version (Settings > About), your system and, if you chose one, the Game Boy model you played it on.
 
 ## Building and Contributing
 

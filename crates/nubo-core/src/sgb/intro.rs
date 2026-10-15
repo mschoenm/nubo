@@ -3,21 +3,24 @@
 //! Boy plays an animation and a jingle of Nintendo's; Nubo shows its own
 //! logo instead, silently, for as long (`INTRO_FRAMES` in `sgb.rs`).
 //!
-//! The logo fades in on a deep purple, stays, and fades out again before the
+//! The logo fades in on a dark purple, stays, and fades out again before the
 //! game's picture takes over.
 
 use crate::sgb::INTRO_FRAMES;
+use crate::sgb::border::nubo_colors;
 
-/// The screen's width and height in pixels.
+/// The screen's width in pixels.
 const SCREEN_WIDTH: usize = 160;
+/// The screen's height in pixels.
 const SCREEN_HEIGHT: usize = 144;
 /// The logo's size in pixels.
 const LOGO_SIZE: usize = 64;
 /// The color behind the logo: the dark rim around the screen in Nubo's
 /// border.
-const BACKGROUND: [u8; 3] = [0x14, 0x0E, 0x38];
-/// When the logo starts fading in, and how long that takes, in frames.
+const BACKGROUND: [u8; 3] = nubo_colors::RIM;
+/// When the logo starts fading in, in frames.
 const FADE_IN_START: u16 = 20;
+/// How long the logo takes to fade in, in frames.
 const FADE_IN_FRAMES: u16 = 50;
 /// How long the logo takes to fade out at the end, in frames.
 const FADE_OUT_FRAMES: u16 = 40;

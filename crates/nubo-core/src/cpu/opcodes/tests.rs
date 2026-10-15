@@ -9,7 +9,7 @@ use crate::model::Model;
 use crate::serializable::Serializable;
 
 fn init_rom_with_test_instructions(test_instructions: &[u8]) -> Vec<u8> {
-    let mut rom = build_rom(CART_TYPE_ROM_ONLY, ROM_SIZE_64KB, RAM_SIZE_2KB);
+    let mut rom = build_rom(CARTRIDGE_TYPE_ROM_ONLY, ROM_SIZE_64KB, RAM_SIZE_2KB);
     rom[..test_instructions.len()].copy_from_slice(test_instructions);
     rom
 }

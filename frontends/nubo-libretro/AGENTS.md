@@ -21,6 +21,6 @@ cargo xtask libretro              # The zip players install, in target/bundle/ (
 ## Keep in Mind
 
 - **The info file** (`nubo_libretro.info`) is what RetroArch reads before loading the core; without it RetroArch turns rewind and run-ahead off. `tests/info_file.rs` checks that its `display_version` is Nubo's version, so the release that bumps the version updates it too.
-- **No panic crosses into C.** Every exported function runs under `guard`, which catches a panic, logs it and fails the call.
+- **No panic crosses into C.** Every exported function that does more than store a callback or return a constant runs under `guard`, which catches a panic, logs it and fails the call.
 - **Callbacks are global**, as a dynamic library's are: the tests in `ffi/tests.rs` take turns through a lock and play RetroArch's part with test callbacks.
 - **Real RetroArch.** `.github/workflows/libretro.yml` plays a game in the RetroArch Ubuntu packages, headless, with run-ahead, rewind and an auto-saved state. To do the same locally, see its "Play a game in RetroArch" step: RetroArch needs the null drivers and a D-Bus session (`dbus-run-session`), or its GameMode support aborts.

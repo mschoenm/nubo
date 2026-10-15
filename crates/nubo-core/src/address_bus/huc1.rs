@@ -110,7 +110,7 @@ mod tests {
     #[test]
     fn enable_ir_mode() {
         let mut mapper =
-            build_cartridge_mapper(CART_TYPE_HUC1_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_2KB);
+            build_cartridge_mapper(CARTRIDGE_TYPE_HUC1_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_2KB);
 
         mapper.write_rom(0x0000, 0xE);
 
@@ -120,7 +120,7 @@ mod tests {
     #[test]
     fn enable_external_ram() {
         let mut mapper =
-            build_cartridge_mapper(CART_TYPE_HUC1_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_2KB);
+            build_cartridge_mapper(CARTRIDGE_TYPE_HUC1_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_2KB);
 
         mapper.write_rom(0x0000, 0xA);
 
@@ -130,7 +130,11 @@ mod tests {
 
     #[test]
     fn set_rom_bank_number() {
-        let mut rom = build_rom(CART_TYPE_HUC1_RAM_BATTERY, ROM_SIZE_128KB, RAM_SIZE_2KB);
+        let mut rom = build_rom(
+            CARTRIDGE_TYPE_HUC1_RAM_BATTERY,
+            ROM_SIZE_128KB,
+            RAM_SIZE_2KB,
+        );
         rom[0xC005] = 0xA1;
         let mut mapper = load_cartridge(rom, empty_cartridge_effects()).unwrap();
 
@@ -142,8 +146,11 @@ mod tests {
 
     #[test]
     fn sets_ram_bank_number() {
-        let mut mapper =
-            build_cartridge_mapper(CART_TYPE_HUC1_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_32KB);
+        let mut mapper = build_cartridge_mapper(
+            CARTRIDGE_TYPE_HUC1_RAM_BATTERY,
+            ROM_SIZE_64KB,
+            RAM_SIZE_32KB,
+        );
 
         // Enable RAM
         mapper.write_rom(0x0000, 0xA);
@@ -163,7 +170,7 @@ mod tests {
 
     #[test]
     fn ignores_ram_writes_when_the_cartridge_has_no_ram() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_HUC1_RAM_BATTERY, ROM_SIZE_64KB, 0);
+        let mut mapper = build_cartridge_mapper(CARTRIDGE_TYPE_HUC1_RAM_BATTERY, ROM_SIZE_64KB, 0);
         mapper.write_rom(0x0000, 0xA);
 
         mapper.write_ram(0x0005, 0xCC);
@@ -173,7 +180,13 @@ mod tests {
 
     #[test]
     fn ram_is_saved_once_per_report_but_not_in_infrared_mode() {
-        assert_eq!(ram_saves_after_writing(CART_TYPE_HUC1_RAM_BATTERY, 0x0A), 1);
-        assert_eq!(ram_saves_after_writing(CART_TYPE_HUC1_RAM_BATTERY, 0x0E), 0);
+        assert_eq!(
+            ram_saves_after_writing(CARTRIDGE_TYPE_HUC1_RAM_BATTERY, 0x0A),
+            1
+        );
+        assert_eq!(
+            ram_saves_after_writing(CARTRIDGE_TYPE_HUC1_RAM_BATTERY, 0x0E),
+            0
+        );
     }
 }

@@ -421,7 +421,7 @@ mod tests {
         let mut address_bus = AddressBus::new(false);
         address_bus.cgb_mode = true;
 
-        let mut test_instructions = build_rom(CART_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut test_instructions = build_rom(CARTRIDGE_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
         for i in 0..32 {
             test_instructions[0x71A0 + i] = 0xA1;
         }
@@ -457,7 +457,7 @@ mod tests {
         let mut address_bus = AddressBus::new(false);
         address_bus.cgb_mode = true;
 
-        let mut test_instructions = build_rom(CART_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut test_instructions = build_rom(CARTRIDGE_TYPE_MBC1, ROM_SIZE_64KB, RAM_SIZE_2KB);
         for i in 0..32 {
             test_instructions[0x71A0 + i] = 0xA1;
         }

@@ -4,8 +4,8 @@
 
 use crate::address_bus::bank_utils::{banked_read, banked_write};
 use crate::address_bus::constants::{
-    CART_TYPE_MBC5_RAM, CART_TYPE_MBC5_RAM_BATTERY, CART_TYPE_MBC5_RUMBLE,
-    CART_TYPE_MBC5_RUMBLE_RAM, CART_TYPE_MBC5_RUMBLE_RAM_BATTERY, RAM_BANK_SIZE,
+    CARTRIDGE_TYPE_MBC5_RAM, CARTRIDGE_TYPE_MBC5_RAM_BATTERY, CARTRIDGE_TYPE_MBC5_RUMBLE,
+    CARTRIDGE_TYPE_MBC5_RUMBLE_RAM, CARTRIDGE_TYPE_MBC5_RUMBLE_RAM_BATTERY, RAM_BANK_SIZE,
 };
 use nubo_serializable_derive::Serializable;
 
@@ -38,16 +38,16 @@ impl Mbc5CartridgeMapper {
             ram_bank_number: 0,
             has_ram: matches!(
                 cartridge_type,
-                CART_TYPE_MBC5_RAM
-                    | CART_TYPE_MBC5_RAM_BATTERY
-                    | CART_TYPE_MBC5_RUMBLE_RAM
-                    | CART_TYPE_MBC5_RUMBLE_RAM_BATTERY
+                CARTRIDGE_TYPE_MBC5_RAM
+                    | CARTRIDGE_TYPE_MBC5_RAM_BATTERY
+                    | CARTRIDGE_TYPE_MBC5_RUMBLE_RAM
+                    | CARTRIDGE_TYPE_MBC5_RUMBLE_RAM_BATTERY
             ),
             has_rumble: matches!(
                 cartridge_type,
-                CART_TYPE_MBC5_RUMBLE
-                    | CART_TYPE_MBC5_RUMBLE_RAM
-                    | CART_TYPE_MBC5_RUMBLE_RAM_BATTERY
+                CARTRIDGE_TYPE_MBC5_RUMBLE
+                    | CARTRIDGE_TYPE_MBC5_RUMBLE_RAM
+                    | CARTRIDGE_TYPE_MBC5_RUMBLE_RAM_BATTERY
             ),
         }
     }
@@ -131,7 +131,8 @@ mod tests {
 
     #[test]
     fn enable_external_ram_if_correct_cartridge_type() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_MBC5_RAM, ROM_SIZE_64KB, RAM_SIZE_8KB);
+        let mut mapper =
+            build_cartridge_mapper(CARTRIDGE_TYPE_MBC5_RAM, ROM_SIZE_64KB, RAM_SIZE_8KB);
 
         mapper.write_rom(0x0000, 0xA);
 
@@ -142,7 +143,7 @@ mod tests {
     #[test]
     fn enable_external_ram_if_correct_cartridge_type_scenario_two() {
         let mut mapper =
-            build_cartridge_mapper(CART_TYPE_MBC5_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_8KB);
+            build_cartridge_mapper(CARTRIDGE_TYPE_MBC5_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_8KB);
 
         mapper.write_rom(0x0000, 0xA);
 
@@ -152,7 +153,8 @@ mod tests {
 
     #[test]
     fn enable_external_ram_if_lower_nibble_is_equal_to_a() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_MBC5_RAM, ROM_SIZE_64KB, RAM_SIZE_8KB);
+        let mut mapper =
+            build_cartridge_mapper(CARTRIDGE_TYPE_MBC5_RAM, ROM_SIZE_64KB, RAM_SIZE_8KB);
 
         mapper.write_rom(0x0000, 0x1A);
 
@@ -162,7 +164,7 @@ mod tests {
 
     #[test]
     fn not_enable_external_ram_if_incorrect_cartridge_type() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_MBC5, ROM_SIZE_64KB, RAM_SIZE_8KB);
+        let mut mapper = build_cartridge_mapper(CARTRIDGE_TYPE_MBC5, ROM_SIZE_64KB, RAM_SIZE_8KB);
 
         mapper.write_rom(0x0000, 0xA);
 
@@ -172,7 +174,8 @@ mod tests {
 
     #[test]
     fn disable_external_ram_if_correct_cartridge_type() {
-        let mut mapper = build_cartridge_mapper(CART_TYPE_MBC5_RAM, ROM_SIZE_64KB, RAM_SIZE_8KB);
+        let mut mapper =
+            build_cartridge_mapper(CARTRIDGE_TYPE_MBC5_RAM, ROM_SIZE_64KB, RAM_SIZE_8KB);
 
         mapper.write_rom(0x0000, 0xA);
 
@@ -187,7 +190,7 @@ mod tests {
 
     #[test]
     fn set_rom_bank_number() {
-        let mut rom = build_rom(CART_TYPE_MBC5_RAM, ROM_SIZE_128KB, RAM_SIZE_8KB);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC5_RAM, ROM_SIZE_128KB, RAM_SIZE_8KB);
         rom[0xC005] = 0xA1;
         let mut mapper = load_cartridge(rom, empty_cartridge_effects()).unwrap();
 
@@ -199,7 +202,7 @@ mod tests {
 
     #[test]
     fn set_rom_bank_number_to_zero() {
-        let mut rom = build_rom(CART_TYPE_MBC5_RAM, ROM_SIZE_64KB, RAM_SIZE_8KB);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC5_RAM, ROM_SIZE_64KB, RAM_SIZE_8KB);
         rom[0x0005] = 0xA1;
         let mut mapper = load_cartridge(rom, empty_cartridge_effects()).unwrap();
 
@@ -211,7 +214,7 @@ mod tests {
 
     #[test]
     fn correctly_sets_lower_and_upper_bits_of_the_rom_bank_number() {
-        let mut rom = build_rom(CART_TYPE_MBC5_RAM, ROM_SIZE_8MB, RAM_SIZE_8KB);
+        let mut rom = build_rom(CARTRIDGE_TYPE_MBC5_RAM, ROM_SIZE_8MB, RAM_SIZE_8KB);
         rom[0x0041_4005] = 0xA1;
         let mut mapper = load_cartridge(rom, empty_cartridge_effects()).unwrap();
 
@@ -224,8 +227,11 @@ mod tests {
 
     #[test]
     fn sets_ram_bank_number() {
-        let mut mapper =
-            build_cartridge_mapper(CART_TYPE_MBC5_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_128KB);
+        let mut mapper = build_cartridge_mapper(
+            CARTRIDGE_TYPE_MBC5_RAM_BATTERY,
+            ROM_SIZE_64KB,
+            RAM_SIZE_128KB,
+        );
 
         // Enable RAM
         mapper.write_rom(0x0000, 0xA);
@@ -246,7 +252,7 @@ mod tests {
     #[test]
     fn saves_bit_three_for_rumble_flag() {
         let mut mapper = build_cartridge_mapper(
-            CART_TYPE_MBC5_RUMBLE_RAM_BATTERY,
+            CARTRIDGE_TYPE_MBC5_RUMBLE_RAM_BATTERY,
             ROM_SIZE_64KB,
             RAM_SIZE_128KB,
         );
@@ -269,7 +275,7 @@ mod tests {
 
     #[test]
     fn sets_rumble_flag_from_bit_three() {
-        let mut mapper = Mbc5CartridgeMapper::new(CART_TYPE_MBC5_RUMBLE);
+        let mut mapper = Mbc5CartridgeMapper::new(CARTRIDGE_TYPE_MBC5_RUMBLE);
 
         mapper.write_rom(0x4000, 0x8);
         assert!(mapper.is_rumbling);
@@ -280,8 +286,11 @@ mod tests {
 
     #[test]
     fn only_allow_reading_from_ram_if_it_is_enabled() {
-        let mut mapper =
-            build_cartridge_mapper(CART_TYPE_MBC5_RAM_BATTERY, ROM_SIZE_64KB, RAM_SIZE_32KB);
+        let mut mapper = build_cartridge_mapper(
+            CARTRIDGE_TYPE_MBC5_RAM_BATTERY,
+            ROM_SIZE_64KB,
+            RAM_SIZE_32KB,
+        );
 
         // Try writing to RAM even though RAM is not enabled
         mapper.write_ram(0x0005, 0xCC);
@@ -298,12 +307,18 @@ mod tests {
 
     #[test]
     fn battery_backed_ram_is_saved_once_per_report_while_enabled() {
-        assert_eq!(ram_saves_after_writing(CART_TYPE_MBC5_RAM_BATTERY, 0x0A), 1);
         assert_eq!(
-            ram_saves_after_writing(CART_TYPE_MBC5_RUMBLE_RAM_BATTERY, 0x0A),
+            ram_saves_after_writing(CARTRIDGE_TYPE_MBC5_RAM_BATTERY, 0x0A),
             1
         );
-        assert_eq!(ram_saves_after_writing(CART_TYPE_MBC5_RAM_BATTERY, 0x00), 0);
-        assert_eq!(ram_saves_after_writing(CART_TYPE_MBC5_RAM, 0x0A), 0);
+        assert_eq!(
+            ram_saves_after_writing(CARTRIDGE_TYPE_MBC5_RUMBLE_RAM_BATTERY, 0x0A),
+            1
+        );
+        assert_eq!(
+            ram_saves_after_writing(CARTRIDGE_TYPE_MBC5_RAM_BATTERY, 0x00),
+            0
+        );
+        assert_eq!(ram_saves_after_writing(CARTRIDGE_TYPE_MBC5_RAM, 0x0A), 0);
     }
 }

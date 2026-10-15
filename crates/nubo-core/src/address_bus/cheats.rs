@@ -148,6 +148,7 @@ pub fn validate_gamegenie_code(code: &str) -> Result<(), CheatError> {
 }
 
 impl CheatState {
+    /// No cheats turned on.
     pub(super) fn new() -> CheatState {
         CheatState {
             registered: Vec::new(),
@@ -175,11 +176,13 @@ impl CheatState {
         Ok(())
     }
 
+    /// Turns off the cheat registered under `cheat_id`, if there is one.
     pub(crate) fn unregister(&mut self, cheat_id: &str) {
         self.registered
             .retain(|registered| registered.id != cheat_id);
     }
 
+    /// Parses a GameShark `code` and turns it on under `cheat_id`.
     pub(crate) fn register_gameshark_cheat(
         &mut self,
         cheat_id: &str,
@@ -189,6 +192,7 @@ impl CheatState {
         self.register(cheat_id, cheat)
     }
 
+    /// Parses a Game Genie `code` and turns it on under `cheat_id`.
     pub(crate) fn register_gamegenie_cheat(
         &mut self,
         cheat_id: &str,
@@ -343,7 +347,7 @@ mod tests {
         let mut address_bus = initialize_test_address_bus();
         address_bus.set_model(Model::CgbE);
 
-        let mut test_rom = build_rom(CART_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_2KB);
+        let mut test_rom = build_rom(CARTRIDGE_TYPE_MBC1_RAM, ROM_SIZE_64KB, RAM_SIZE_2KB);
         test_rom[0x5D56] = 0x8E;
         address_bus
             .load_rom(test_rom, empty_cartridge_effects())

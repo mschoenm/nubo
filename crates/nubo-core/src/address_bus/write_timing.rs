@@ -16,7 +16,8 @@
 //! A write normally lands at the end of its M-cycle. For the registers listed
 //! in `write_timing` the PPU is first run a few dots short of
 //! the boundary ("early") or a dot past it ("late"), the write happens, and
-//! the difference is kept in `ppu_dot_debt` so the next M-cycle makes it up.
+//! the difference is kept in `ppu_dot_debt` so the next M-cycle makes it up
+//! (or, when it can't, the one after: see `take_cycle_dots`).
 
 use crate::address_bus::{AddressBus, MemoryMapped, reaches_ppu, writes_plain_memory};
 use crate::gpu::CGB_STAT_CLEAR_DELAY_DOTS;

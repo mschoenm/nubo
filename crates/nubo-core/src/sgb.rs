@@ -220,7 +220,10 @@ pub(crate) struct Sgb {
     attribute_map: [u8; ATTRIBUTE_SQUARES],
     /// The attribute maps `ATTR_SET` picks from, which `ATTR_TRN` sends.
     attribute_files: [u8; ATTRIBUTE_TRANSFER_SIZE],
+    /// What `MASK_EN` does to the picture now.
     mask: Mask,
+    /// The `_TRN` command waiting for the frame in which the screen is read,
+    /// if any.
     transfer: Option<Transfer>,
     /// The border on the picture.
     border: Border,
@@ -275,8 +278,9 @@ pub(crate) struct Sgb {
     /// The border as last drawn, so it is only drawn again when it changes.
     #[serializable(skip)]
     border_cache: BorderCache,
-    /// Whether the last picture was drawn with colors a game set, rather
-    /// than in the Game Boy's grays.
+    /// Whether the game screen in the last picture uses colors other than
+    /// the four `DMG_SHADES`: the intro's, a game's own, or the palette the
+    /// player picked from the menu.
     #[serializable(skip)]
     frame_colorized: bool,
     /// Whether the last picture is a frame of the game that `redraw` can
@@ -434,9 +438,10 @@ impl Sgb {
         self.buttons_held
     }
 
-    /// Whether the last picture was drawn with colors a game set. Until a
-    /// game sets some, the game screen in the pictures uses only the four
-    /// `DMG_SHADES` (apart from where a game's border covers it).
+    /// Whether the game screen in the last picture uses colors other than
+    /// the four `DMG_SHADES` (apart from where a game's border covers it):
+    /// during the intro, once a game sets colors, or while the player's
+    /// palette from the menu applies.
     pub(crate) fn frame_colorized(&self) -> bool {
         self.frame_colorized
     }
