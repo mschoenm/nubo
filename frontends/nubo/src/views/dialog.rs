@@ -119,7 +119,8 @@ pub fn scroll_id() -> widget::Id {
 /// A question's checkboxes, `(index, choice)` by their place among its
 /// choices, in a card with thin lines between them. Each is a row that
 /// ticks or unticks it, highlighted while the D-pad is on it, and a ticked
-/// box that deletes something shows its label in red.
+/// box that deletes something shows its label in red. A box that can't be
+/// ticked is greyed out, with its description, which says why, readable.
 fn checkboxes<'a>(boxes: Vec<(usize, Choice)>, selection: usize) -> Element<'a, Message> {
     let mut card = Column::new();
     for (place, (index, choice)) in boxes.into_iter().enumerate() {
@@ -131,10 +132,12 @@ fn checkboxes<'a>(boxes: Vec<(usize, Choice)>, selection: usize) -> Element<'a, 
                     .style(theme::divider),
             );
         }
-        let (mark, mark_style): (Icon, fn(&iced::Theme) -> text::Style) = if choice.checked {
-            (Icon::SquareCheckBig, theme::accent_text)
+        let mark = if choice.checked {
+            icon(Icon::SquareCheckBig).style(theme::accent_text)
+        } else if choice.enabled {
+            icon(Icon::Square).style(theme::muted_text)
         } else {
-            (Icon::Square, theme::muted_text)
+            icon(Icon::Square)
         };
         let label = text(choice.label).size(14);
         let label = if choice.checked && choice.style == ChoiceStyle::Danger {
@@ -147,15 +150,11 @@ fn checkboxes<'a>(boxes: Vec<(usize, Choice)>, selection: usize) -> Element<'a, 
             words = words.push(text(description).size(12).style(theme::muted_text));
         }
         card = card.push(
-            button(
-                row![icon(mark).style(mark_style), words]
-                    .spacing(12)
-                    .align_y(Alignment::Start),
-            )
-            .padding([10, 12])
-            .width(Fill)
-            .style(theme::segment(index == selection))
-            .on_press(choice.action.into_message()),
+            button(row![mark, words].spacing(12).align_y(Alignment::Start))
+                .padding([10, 12])
+                .width(Fill)
+                .style(theme::segment(index == selection))
+                .on_press_maybe(choice.enabled.then(|| choice.action.into_message())),
         );
     }
     container(card)

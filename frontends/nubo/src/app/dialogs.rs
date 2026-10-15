@@ -110,14 +110,13 @@ impl App {
 
     /// What the reset can do besides the settings in this build and this
     /// run. Saves can't be deleted while a game is open, which would write
-    /// its own again, and nothing kept between runs is touched with
-    /// `--fresh`.
+    /// its own again, so their boxes are greyed out then, and nothing kept
+    /// between runs is touched with `--fresh`.
     pub(super) fn reset_offers(&self) -> ResetOffers {
         let keeps_data = !self.fresh;
-        let no_game = self.game.is_none();
         ResetOffers {
-            delete_battery_saves: keeps_data && no_game,
-            delete_save_states: keeps_data && no_game && save_states::AVAILABLE,
+            delete_battery_saves: keeps_data,
+            delete_save_states: keeps_data && save_states::AVAILABLE,
             remove_folders: keeps_data
                 && library::AVAILABLE
                 && !self.settings.shared.library_folders.is_empty(),
@@ -127,7 +126,7 @@ impl App {
                 } else {
                     rom::REMEMBERS_LAST_GAME && self.remembered.is_some()
                 },
-            close_game_first: keeps_data && !no_game,
+            game_open: self.game.is_some(),
         }
     }
 
@@ -569,27 +568,38 @@ fn revisions_page(entry: &LibraryEntry, console: Console) -> DialogContent {
     }
 }
 
-/// What the question that starts over offers besides the settings, which
-/// it always offers (see `App::reset_offers`).
+/// What the question that starts over shows a box for besides the
+/// settings, which it always offers (see `App::reset_offers`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResetOffers {
     pub delete_battery_saves: bool,
     pub delete_save_states: bool,
     pub remove_folders: bool,
     pub clear_recently_played: bool,
-    /// Whether to say that closing the game would offer to delete saves too.
-    pub close_game_first: bool,
+    /// Whether a game is open, which greys out the boxes that delete saves,
+    /// with a note to close the game first.
+    pub game_open: bool,
+}
+
+impl ResetOffers {
+    /// Whether the boxes that delete saves can be ticked.
+    fn can_delete_saves(self) -> bool {
+        !self.game_open
+    }
 }
 
 impl ResetChoices {
     /// These choices as far as `offers` allows them: a box that isn't on
-    /// show resets nothing, such as a deleting one a game that opened
-    /// meanwhile took away.
+    /// show or is greyed out resets nothing, such as a deleting one that a
+    /// game opened meanwhile greyed out.
     pub fn within(self, offers: ResetOffers) -> ResetChoices {
+        let can_delete = offers.can_delete_saves();
         ResetChoices {
             reset_settings: self.reset_settings,
-            delete_battery_saves: self.delete_battery_saves && offers.delete_battery_saves,
-            delete_save_states: self.delete_save_states && offers.delete_save_states,
+            delete_battery_saves: self.delete_battery_saves
+                && offers.delete_battery_saves
+                && can_delete,
+            delete_save_states: self.delete_save_states && offers.delete_save_states && can_delete,
             remove_folders: self.remove_folders && offers.remove_folders,
             clear_recently_played: self.clear_recently_played && offers.clear_recently_played,
         }
@@ -604,9 +614,20 @@ impl ResetChoices {
 /// The question what to start over with: a box for the settings, ticked at
 /// first, and one for each other thing `offers` lets it reset, ticked as in
 /// `choices`. A box ticks or unticks itself with
-/// `DialogMessage::ResetChoicesChanged`. The button says what it does, and
-/// is greyed out while nothing is ticked.
+/// `DialogMessage::ResetChoicesChanged`. While a game is open, the boxes
+/// that delete saves are greyed out and unticked, and say to close the game
+/// first, so nobody wonders whether the reset deletes them anyway. The
+/// button says what it does, and is greyed out while nothing is ticked.
 fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
+    let effective = choices.within(offers);
+    let can_delete = offers.can_delete_saves();
+    let delete_description = |description: &'static str| {
+        if can_delete {
+            description
+        } else {
+            "Kept while a game is open. Close the game first to delete them."
+        }
+    };
     let toggle = |change: fn(&mut ResetChoices)| {
         let mut changed = choices;
         change(&mut changed);
@@ -622,22 +643,32 @@ fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
         toggle(|choices| choices.reset_settings = !choices.reset_settings),
     )];
     if offers.delete_battery_saves {
-        boxes.push(Choice::checkbox(
-            "Delete in-game saves",
-            "What every game saved itself, so each one starts from the beginning again.",
-            choices.delete_battery_saves,
-            ChoiceStyle::Danger,
-            toggle(|choices| choices.delete_battery_saves = !choices.delete_battery_saves),
-        ));
+        boxes.push(
+            Choice::checkbox(
+                "Delete in-game saves",
+                delete_description(
+                    "What every game saved itself, so each one starts from the beginning again.",
+                ),
+                effective.delete_battery_saves,
+                ChoiceStyle::Danger,
+                toggle(|choices| choices.delete_battery_saves = !choices.delete_battery_saves),
+            )
+            .enabled(can_delete),
+        );
     }
     if offers.delete_save_states {
-        boxes.push(Choice::checkbox(
-            "Delete save states",
-            "Where you left off, the quick save and slots 1 to 3, for every game.",
-            choices.delete_save_states,
-            ChoiceStyle::Danger,
-            toggle(|choices| choices.delete_save_states = !choices.delete_save_states),
-        ));
+        boxes.push(
+            Choice::checkbox(
+                "Delete save states",
+                delete_description(
+                    "Where you left off, the quick save and slots 1 to 3, for every game.",
+                ),
+                effective.delete_save_states,
+                ChoiceStyle::Danger,
+                toggle(|choices| choices.delete_save_states = !choices.delete_save_states),
+            )
+            .enabled(can_delete),
+        );
     }
     if offers.remove_folders {
         boxes.push(Choice::checkbox(
@@ -669,12 +700,6 @@ fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
         ));
     }
 
-    let mut text = String::from("Tick what to put back or remove.");
-    if offers.close_game_first {
-        text.push_str(" To delete saves too, close the game first.");
-    }
-
-    let effective = choices.within(offers);
     let notice = if effective.deletes() {
         Notice {
             text: String::from("Deleted saves can't be brought back."),
@@ -715,7 +740,7 @@ fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
 
     DialogContent {
         title: String::from("Start over?"),
-        text: Some(text),
+        text: Some(String::from("Tick what to put back or remove.")),
         notice: Some(notice),
         layout: Layout::Buttons,
         choices: boxes,

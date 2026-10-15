@@ -264,7 +264,8 @@ pub fn secondary_button(theme: &Theme, status: button::Status) -> button::Style 
 }
 
 /// One option of a segmented control: the selected option is tinted with
-/// the accent color, the others look like icon buttons.
+/// the accent color, the others look like icon buttons, and a disabled one
+/// has greyed-out text either way.
 pub fn segment(selected: bool) -> impl Fn(&Theme, button::Status) -> button::Style {
     move |theme, status| {
         if !selected {
@@ -272,10 +273,15 @@ pub fn segment(selected: bool) -> impl Fn(&Theme, button::Status) -> button::Sty
         }
 
         let palette = theme.extended_palette();
+        let text_color = if status == button::Status::Disabled {
+            icon_button(theme, status).text_color
+        } else {
+            palette.background.base.text
+        };
 
         button::Style {
             background: Some(palette.primary.weak.color.scale_alpha(0.35).into()),
-            text_color: palette.background.base.text,
+            text_color,
             border: Border::default()
                 .rounded(CORNER_RADIUS - 2.0)
                 .width(1)
