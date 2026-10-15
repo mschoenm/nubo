@@ -203,3 +203,107 @@ fn a_rom_named_like_the_command_opens_by_its_path() {
         "help"
     );
 }
+
+#[test]
+fn recording_scenes_needs_the_app_as_players_see_it() {
+    let folder = options(&["game.gb", "--record-scenes", "scenes"])
+        .record_scenes
+        .unwrap();
+    assert!(folder.is_absolute());
+    assert!(folder.ends_with("scenes"));
+    assert_eq!(options(&[]).record_scenes, None);
+    for other in [&["--scale", "2"][..], &["--raw-screen"], &["--fresh"]] {
+        let args = [&["game.gb", "--record-scenes", "scenes"][..], other].concat();
+        assert_eq!(mistake(&args), ErrorKind::ArgumentConflict, "{args:?}");
+    }
+}
+
+/// What `capture` with `args` after its scene asked for.
+fn capture(args: &[&str]) -> CaptureRequest {
+    let all = [
+        &["capture", "scene", "--games", "games", "--home", "home"][..],
+        args,
+    ]
+    .concat();
+    match parse_args(&all) {
+        Ok(Request::Capture(request)) => request,
+        other => panic!("{all:?} gave {other:?}"),
+    }
+}
+
+#[test]
+fn capturing_a_scene() {
+    let request = capture(&[]);
+    assert!(request.scene.is_absolute() && request.scene.ends_with("scene"));
+    assert!(request.games.ends_with("games") && request.home.ends_with("home"));
+    assert_eq!(
+        (request.size, request.scale, request.output),
+        (None, None, None)
+    );
+    assert!(!request.fullscreen);
+
+    let request = capture(&[
+        "--set",
+        "appearance=dark",
+        "--set",
+        "dmg_palette = \"green\"",
+        "--size",
+        "1000x780",
+        "--pause-menu",
+        "main",
+        "--settings-tab",
+        "none",
+        "--output",
+        "shot.png",
+    ]);
+    assert_eq!(
+        request.changes,
+        [
+            (String::from("appearance"), String::from("dark")),
+            (String::from("dmg_palette"), String::from("\"green\"")),
+        ]
+    );
+    assert_eq!(request.size, Some((1000.0, 780.0)));
+    assert_eq!(request.pause_menu.as_deref(), Some("main"));
+    assert_eq!(request.settings_tab.as_deref(), Some("none"));
+    assert!(request.output.unwrap().ends_with("shot.png"));
+
+    assert!(capture(&["--fullscreen"]).fullscreen);
+    assert_eq!(capture(&["--scale", "3"]).scale, Some(3));
+}
+
+#[test]
+fn capturing_refuses_what_doesnt_fit() {
+    let base = ["capture", "scene", "--games", "games", "--home", "home"];
+    for (args, kind) in [
+        (&["--set", "appearance"][..], ErrorKind::ValueValidation),
+        (&["--size", "big"], ErrorKind::ValueValidation),
+        (&["--size", "0x10"], ErrorKind::ValueValidation),
+        (&["--scale", "9"], ErrorKind::ValueValidation),
+        (
+            &["--scale", "2", "--fullscreen"],
+            ErrorKind::ArgumentConflict,
+        ),
+        (
+            &["--scale", "2", "--size", "10x10"],
+            ErrorKind::ArgumentConflict,
+        ),
+        (&["--raw-screen"], ErrorKind::UnknownArgument),
+    ] {
+        let all = [&base[..], args].concat();
+        assert_eq!(mistake(&all), kind, "{all:?}");
+    }
+    assert_eq!(
+        mistake(&["capture", "scene"]),
+        ErrorKind::MissingRequiredArgument
+    );
+    assert_eq!(
+        mistake(&[&["--fresh"][..], &base].concat()),
+        ErrorKind::ArgumentConflict
+    );
+    let help = parse_args(&["--help"]).unwrap_err().to_string();
+    assert!(
+        !help.contains("capture") && !help.contains("record-scenes"),
+        "{help}"
+    );
+}

@@ -263,3 +263,38 @@ fn loading_a_state_forgets_the_history_before_it() {
     assert!(answer.recv().unwrap().is_ok());
     assert_eq!(machine.history.len(), 0);
 }
+
+#[test]
+fn frames_run_from_a_state_come_out_the_same_every_time() {
+    let mut machine = machine();
+    machine.play_buffer();
+    let saved = save_state(&mut machine);
+    let run_frames = |machine: &mut Machine| {
+        ask(
+            |command| {
+                machine.handle(command);
+            },
+            |reply| Command::RunFrames(3, reply),
+        )
+        .unwrap()
+    };
+
+    let frames = run_frames(&mut machine);
+    assert_eq!(frames.len(), 2, "the last two frames come back");
+    let after = save_state(&mut machine);
+
+    ask(
+        |command| {
+            machine.handle(command);
+        },
+        |reply| Command::LoadState(saved, reply),
+    )
+    .unwrap()
+    .unwrap();
+    let again = run_frames(&mut machine);
+    assert_eq!(
+        again.iter().map(|frame| &frame.pixels).collect::<Vec<_>>(),
+        frames.iter().map(|frame| &frame.pixels).collect::<Vec<_>>()
+    );
+    assert_eq!(save_state(&mut machine), after);
+}
