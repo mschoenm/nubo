@@ -39,10 +39,10 @@ SameBoy (https://github.com/LIJI32/SameBoy)
 
 The APU channel timing and quirks, the mode 3 pixel pipeline, the OAM
 corruption bug, the OAM DMA bus conflicts and their effect on the PPU, the CGB
-speed switch timing, the PPU register write timing, the serial clock, the
-Super Game Boy's commands, colors and borders and the
-Game Boy Color boot ROM (modified to show the Nubo logo and animation) are
-ported from SameBoy.
+speed switch timing, STOP mode, the PPU register write timing, the serial
+clock, the MBC3's banks and clock latch, the Super Game Boy's commands,
+colors, borders and multiplayer reads and the Game Boy Color boot ROM
+(modified to show the Nubo logo and animation) are ported from SameBoy.
 
 Expat License
 
