@@ -40,9 +40,16 @@ pub fn build_macos_app() -> Result<PathBuf> {
 
     let bundle_dir = target_dir().join("bundle");
     let app = bundle_dir.join(format!("{APP_NAME}.app"));
-    let contents = app.join("Contents");
-    if app.exists() {
-        fs::remove_dir_all(&app).map_err(|error| error.to_string())?;
+    // Put the bundle together under a name that isn't an app and rename it
+    // at the end: macOS registers a `.app` folder as soon as its Info.plist
+    // appears, and would keep showing a bundle caught before its icon as
+    // having none.
+    let staging = bundle_dir.join(format!("{APP_NAME}.app-staging"));
+    let contents = staging.join("Contents");
+    for folder in [&app, &staging] {
+        if folder.exists() {
+            fs::remove_dir_all(folder).map_err(|error| error.to_string())?;
+        }
     }
     for folder in ["MacOS", "Resources"] {
         fs::create_dir_all(contents.join(folder)).map_err(|error| error.to_string())?;
@@ -67,6 +74,7 @@ pub fn build_macos_app() -> Result<PathBuf> {
         .arg("--output")
         .arg(contents.join("Resources").join(format!("{APP_NAME}.icns"))))?;
     fs::remove_dir_all(&iconset).map_err(|error| error.to_string())?;
+    fs::rename(&staging, &app).map_err(|error| error.to_string())?;
 
     // Sign the bundle for this Mac only ("ad hoc"), so macOS treats the
     // copied binary and its resources as one app.
