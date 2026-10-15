@@ -22,7 +22,7 @@ cargo xtask web                     # Build the app for the browser and serve it
 cargo screenshot path/to/rom.gb 10  # Run headless for 10 emulated seconds and save a screenshot to target/screenshots/
 ```
 
-The other command-line options are in `frontends/nubo/src/command_line.rs`.
+`cargo play --help` lists the command-line options, and `frontends/nubo/src/command_line.rs` explains them.
 
 ## Packaging
 

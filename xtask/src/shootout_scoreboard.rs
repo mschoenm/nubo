@@ -24,20 +24,20 @@ const RAW_URL: &str = "https://raw.githubusercontent.com/gbdev/GBEmulatorShootou
 const SCOREBOARD: &str = "tools/nubo-test-rom-runner/shootout_published.txt";
 const SECONDS_PER_DAY: i64 = 86_400;
 
-/// Runs `shootout-scoreboard <commit>`.
-pub fn run(args: &[String]) -> Result {
-    let [commit] = args else {
-        return Err(String::from(
-            "usage: cargo xtask shootout-scoreboard <commit of the Shootout's gh-pages branch>",
-        ));
-    };
-    if commit.len() != 40 || !commit.chars().all(|digit| digit.is_ascii_hexdigit()) {
-        return Err(format!(
-            "{commit} is not a full commit hash; the scoreboard pins the publication by its 40 \
-             hexadecimal digits"
-        ));
+/// Reads the commit `shootout-scoreboard` is given: a full hash, since the
+/// scoreboard pins the publication by its 40 hexadecimal digits.
+pub fn parse_commit(text: &str) -> Result<String> {
+    if text.len() == 40 && text.chars().all(|digit| digit.is_ascii_hexdigit()) {
+        Ok(text.to_owned())
+    } else {
+        Err(String::from(
+            "expected a full commit hash of 40 hexadecimal digits",
+        ))
     }
+}
 
+/// Runs `shootout-scoreboard <commit>`.
+pub fn run(commit: &str) -> Result {
     let folder = target_dir().join("shootout-scoreboard").join(commit);
     fs::create_dir_all(&folder)
         .map_err(|error| format!("failed to create {}: {error}", folder.display()))?;

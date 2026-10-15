@@ -2,7 +2,8 @@
 //! `nubo_frontend::session` (on a thread of its own on the desktop, on each
 //! frame tick in the browser build) and the window shows the latest frame.
 //! Run it with `cargo play [rom] [--cgb | --model <name>] [--scale <n>]
-//! [--fresh] [--speed <n>]`; `command_line` explains the options.
+//! [--fresh] [--speed <n>]`; `command_line` explains the options, and
+//! `cargo play --help` lists them.
 
 // Release builds are Windows apps rather than console programs, so no empty
 // console window opens next to Nubo. Debug builds keep the console for
@@ -13,7 +14,6 @@ use app::App;
 use command_line::Options;
 use nubo_core::Emulator;
 use nubo_frontend::rom::Rom;
-use std::env;
 use std::process::ExitCode;
 
 const DEFAULT_SCALE_FACTOR: f32 = 4.0;
@@ -51,17 +51,16 @@ fn main() -> ExitCode {
     console_error_panic_hook::set_once();
 
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(exit_code) = efficiency::run_from_command_line() {
-        std::process::exit(exit_code);
-    }
-
-    let options = match command_line::parse(env::args().skip(1)) {
-        Ok(options) => options,
-        Err(error) => {
-            eprintln!("{error}\n{}", command_line::USAGE);
-            return ExitCode::from(2);
+    let options = match command_line::parse(std::env::args_os()) {
+        Ok(command_line::Request::Play(options)) => options,
+        Ok(command_line::Request::MeasureEfficiency { rom_path, model }) => {
+            return efficiency::run(&rom_path, model);
         }
+        Err(error) => error.exit(),
     };
+    #[cfg(target_arch = "wasm32")]
+    let options = Options::default();
+
     let rom = match read_rom(&options) {
         Ok(rom) => rom,
         Err(error) => {

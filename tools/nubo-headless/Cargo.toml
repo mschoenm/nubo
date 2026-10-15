@@ -7,7 +7,7 @@ edition.workspace = true
 [dependencies]
 nubo-core.workspace = true
 chrono = "0.4"
-clap = { version = "4", features = ["derive"] }
+clap.workspace = true
 image = "0.25"
 
 [lints]

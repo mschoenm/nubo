@@ -6,6 +6,7 @@
 //! sign. The installer script is `frontends/nubo/windows/nubo.wxs`.
 
 use super::{Result, cargo, licenses, release, run, target_dir, workspace_root};
+use clap::Args;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -26,40 +27,26 @@ const BANNER_HEIGHT: u32 = 58;
 const BANNER_LOGO_SIZE: u32 = 44;
 const BANNER_LOGO_MARGIN: u32 = 7;
 
-/// What `cargo xtask windows` was asked for.
-#[derive(Debug, Default, PartialEq, Eq)]
-struct Options {
-    /// The date of a nightly build (`--nightly <YYYY-MM-DD>`), which goes in
-    /// the files' names and in the name Windows shows for the installed app.
+/// What `cargo xtask windows` was asked for. The doc comments on its fields
+/// are the help that `cargo xtask windows --help` prints.
+#[derive(Args, Debug, Default, PartialEq, Eq)]
+pub struct Options {
+    /// Name the downloads as the nightly build of this date (YYYY-MM-DD), in the files' names
+    /// and in the name Windows shows for the installed app
+    #[arg(long, value_name = "DATE", value_parser = parse_date)]
     nightly: Option<String>,
-    /// Another version than `Cargo.toml`'s (`--version <x.y.z>`), to build
-    /// older and newer installers that test updates and downgrades.
+    /// Build them as another version than Cargo.toml's (x.y.z), to make older and newer
+    /// installers that test updates and downgrades
+    #[arg(long = "as-version", value_name = "VERSION")]
     version: Option<String>,
 }
 
-impl Options {
-    /// Reads the options after `cargo xtask windows`: `--nightly` and
-    /// `--version`, each followed by its value.
-    fn parse(args: &[String]) -> Result<Options> {
-        let mut options = Options::default();
-        let mut args = args.iter();
-        while let Some(arg) = args.next() {
-            if !matches!(arg.as_str(), "--nightly" | "--version") {
-                return Err(format!("unknown option {arg}"));
-            }
-            let value = args
-                .next()
-                .ok_or_else(|| format!("{arg} needs a value"))?
-                .clone();
-            match arg.as_str() {
-                "--nightly" if release::is_date(&value) => options.nightly = Some(value),
-                "--nightly" => {
-                    return Err(format!("--nightly needs a YYYY-MM-DD date, not {value}"));
-                }
-                _ => options.version = Some(value),
-            }
-        }
-        Ok(options)
+/// Reads the value of `--nightly`: a YYYY-MM-DD date.
+fn parse_date(text: &str) -> Result<String> {
+    if release::is_date(text) {
+        Ok(text.to_owned())
+    } else {
+        Err(String::from("expected a YYYY-MM-DD date"))
     }
 }
 
@@ -115,8 +102,7 @@ impl Naming {
 /// `target/bundle/Nubo-<version>-windows-<arch>.zip` (`Nubo-nightly-<date>-…`
 /// with `--nightly <date>`), returning both paths. Needs Windows with the WiX
 /// Toolset.
-pub fn build_windows_downloads(args: &[String]) -> Result<(PathBuf, PathBuf)> {
-    let options = Options::parse(args)?;
+pub fn build_windows_downloads(options: &Options) -> Result<(PathBuf, PathBuf)> {
     if !cfg!(target_os = "windows") {
         return Err(String::from(
             "the Windows downloads can only be built on Windows",
@@ -127,7 +113,7 @@ pub fn build_windows_downloads(args: &[String]) -> Result<(PathBuf, PathBuf)> {
         "aarch64" => "arm64",
         other => return Err(format!("Windows on {other} isn't supported")),
     };
-    let naming = Naming::new(&options, arch)?;
+    let naming = Naming::new(options, arch)?;
     let wix = wix()?;
 
     run(cargo().args(["build", "--release", "--package", EXECUTABLE]))?;
@@ -281,13 +267,21 @@ fn banner_bitmap() -> Vec<u8> {
 mod tests {
     use super::*;
 
-    fn args(text: &str) -> Vec<String> {
-        text.split_whitespace().map(str::to_owned).collect()
+    /// Reads `text` as the options after `cargo xtask windows`.
+    fn parse(text: &str) -> std::result::Result<Options, clap::Error> {
+        /// A command line that is only the options.
+        #[derive(clap::Parser)]
+        struct Command {
+            #[command(flatten)]
+            options: Options,
+        }
+        let args = std::iter::once("windows").chain(text.split_whitespace());
+        <Command as clap::Parser>::try_parse_from(args).map(|command| command.options)
     }
 
     #[test]
     fn a_release_is_named_after_its_version() {
-        let naming = Naming::new(&Options::parse(&[]).unwrap(), "x64").unwrap();
+        let naming = Naming::new(&parse("").unwrap(), "x64").unwrap();
         let version = env!("CARGO_PKG_VERSION");
         assert_eq!(
             naming,
@@ -302,7 +296,7 @@ mod tests {
 
     #[test]
     fn a_nightly_build_carries_its_date_in_its_names() {
-        let options = Options::parse(&args("--nightly 2026-10-14 --version 1.2.3")).unwrap();
+        let options = parse("--nightly 2026-10-14 --as-version 1.2.3").unwrap();
         let naming = Naming::new(&options, "arm64").unwrap();
         assert_eq!(
             naming,
@@ -317,13 +311,13 @@ mod tests {
 
     #[test]
     fn wrong_options_are_refused() {
-        assert!(Options::parse(&args("--nightly 14-10-2026")).is_err());
-        assert!(Options::parse(&args("--nightly")).is_err());
+        assert!(parse("--nightly 14-10-2026").is_err());
+        assert!(parse("--nightly").is_err());
         assert_eq!(
-            Options::parse(&args("--quick")),
-            Err(String::from("unknown option --quick"))
+            parse("--quick").unwrap_err().kind(),
+            clap::error::ErrorKind::UnknownArgument
         );
-        let options = Options::parse(&args("--version 1.0.0-beta")).unwrap();
+        let options = parse("--as-version 1.0.0-beta").unwrap();
         assert!(Naming::new(&options, "x64").is_err());
     }
 

@@ -34,15 +34,15 @@ struct Args {
     screenshot: bool,
 
     /// Directory to save the screenshot (defaults to current directory)
-    #[arg(long)]
+    #[arg(long, value_name = "FOLDER")]
     screenshot_path: Option<PathBuf>,
 
     /// Run in CGB (Game Boy Color) mode, the same as --model cgb
-    #[arg(long)]
+    #[arg(long, conflicts_with = "model")]
     cgb: bool,
 
     /// Hardware model: dmg-0, dmg, mgb, sgb, sgb2, cgb-0, cgb-a, cgb-b, cgb-c, cgb-d, cgb-e (or cgb), agb
-    #[arg(long)]
+    #[arg(long, value_name = "NAME")]
     model: Option<Model>,
 }
 

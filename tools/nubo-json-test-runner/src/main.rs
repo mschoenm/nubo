@@ -2,10 +2,10 @@
 //! that check the CPU registers, the memory and every memory access after
 //! each instruction.
 
+use clap::Parser;
 use nubo_core::{BusActivityEntry, BusActivityKind, Emulator, Registers};
 use serde::Deserialize;
 use std::any::Any;
-use std::env;
 use std::fs;
 use std::io;
 use std::panic::{self, AssertUnwindSafe};
@@ -265,11 +265,19 @@ fn run_test_files(files: &[PathBuf]) -> Vec<Result<usize, String>> {
     results
 }
 
+/// Run the GameboyCPUTests suite: every CPU opcode, checked cycle by cycle
+#[derive(Parser)]
+#[command(name = "nubo-json-test-runner")]
+struct Args {
+    /// A folder of the suite's .json files to run instead of the downloaded suite
+    tests_dir: Option<PathBuf>,
+}
+
 /// Finds the tests (downloading them unless a directory is given), runs
 /// them and reports the result. Fails when there are no test files, or when
 /// any file fails.
 fn main() -> ExitCode {
-    let tests_dir = match env::args().nth(1).map(PathBuf::from) {
+    let tests_dir = match Args::parse().tests_dir {
         Some(path) => path,
         None => match download::ensure_cpu_tests() {
             Ok(path) => path,

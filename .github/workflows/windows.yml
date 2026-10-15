@@ -223,7 +223,7 @@ jobs:
           # to, and to downgrade from.
           $versions = Join-Path $env:RUNNER_TEMP "versions"
           New-Item -ItemType Directory $versions | Out-Null
-          foreach ($options in @(@("--version", "0.0.1"), @("--version", "255.0.0", "--nightly", "2001-01-01"))) {
+          foreach ($options in @(@("--as-version", "0.0.1"), @("--as-version", "255.0.0", "--nightly", "2001-01-01"))) {
             cargo xtask windows @options
             if ($LASTEXITCODE -ne 0) { throw "cargo xtask windows $options failed" }
           }

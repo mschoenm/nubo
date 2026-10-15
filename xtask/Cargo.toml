@@ -6,6 +6,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+clap.workspace = true
 image = { version = "0.25", default-features = false, features = ["png"] }
 nubo-download.workspace = true
 nubo-logo.workspace = true

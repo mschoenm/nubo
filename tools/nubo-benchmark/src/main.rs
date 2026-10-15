@@ -50,24 +50,29 @@ struct Args {
     seconds: f64,
 
     /// Hardware models to run every game on, separated by commas
-    #[arg(long, value_delimiter = ',', default_value = "dmg,cgb")]
+    #[arg(
+        long,
+        value_name = "MODEL,...",
+        value_delimiter = ',',
+        default_value = "dmg,cgb"
+    )]
     models: Vec<Model>,
 
     /// Write the fingerprints of this run to a file
-    #[arg(long)]
+    #[arg(long, value_name = "FILE")]
     record: Option<PathBuf>,
 
     /// Check the fingerprints of this run against a file written with --record
-    #[arg(long)]
+    #[arg(long, value_name = "FILE")]
     compare: Option<PathBuf>,
 
     /// How many games to run at the same time. More than one makes the speeds
     /// less reliable, but checking fingerprints faster
-    #[arg(long, default_value_t = 1)]
+    #[arg(short, long, value_name = "N", default_value_t = 1)]
     jobs: usize,
 
     /// Save each game's last frame as a PNG in this folder
-    #[arg(long)]
+    #[arg(long, value_name = "FOLDER")]
     screenshots: Option<PathBuf>,
 
     /// Halfway through each run, save a state, load it into a new emulator
@@ -78,7 +83,7 @@ struct Args {
 
     /// Run only one of several equal parts of the ROMs, such as 2/4 for the
     /// second of four, so several machines can share a long check
-    #[arg(long, value_parser = parse_shard)]
+    #[arg(long, value_name = "PART", value_parser = parse_shard)]
     shard: Option<Shard>,
 }
 

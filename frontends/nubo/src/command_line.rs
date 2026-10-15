@@ -1,7 +1,9 @@
-//! The options the app takes on the command line:
+//! The options the app takes on the command line, read with clap:
 //!
 //! ```text
 //! nubo [rom] [--cgb | --model <name>] [--scale <n>] [--fresh] [--speed <n>]
+//! nubo --measure-efficiency <rom> [--cgb | --model <name>]
+//! nubo --help | --version
 //! ```
 //!
 //! - `--cgb` and `--model <name>` start the game on that hardware model
@@ -17,23 +19,21 @@
 //!   problems printed on stderr.
 //! - `--speed <n>` starts the game fast forwarding at `n` times real time,
 //!   one of the fast forward speeds the settings offer.
+//! - `--measure-efficiency` opens no window: it measures how often the
+//!   emulator thread wakes up while the ROM plays (`efficiency`) and prints
+//!   it as JSON, for the nightly CI. `--help` leaves it out, as it isn't for
+//!   players.
 //!
 //! `--scale`, `--fresh` and `--speed` are what the GB Emulator Shootout's
 //! harness runs the app with (`docs/SHOOTOUT_PLAN.md`). The browser build
-//! gets no command line, so it starts without any of them.
+//! gets no command line, so it starts without any of them and doesn't
+//! include clap.
 
 use nubo_core::Model;
 use nubo_frontend::settings::FastForwardSpeed;
 use std::path::PathBuf;
 
-/// How to use the options, printed with a mistake in them.
-pub const USAGE: &str =
-    "usage: nubo [rom] [--cgb | --model <name>] [--scale <1-8>] [--fresh] [--speed <2|3|4|8>]";
-
-/// The largest `--scale`.
-const MAX_SCALE: u32 = 8;
-
-/// What the command line asked for.
+/// What the command line asked the app to start with.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Options {
     /// The ROM to start, as an absolute path.
@@ -49,60 +49,134 @@ pub struct Options {
     pub speed: Option<FastForwardSpeed>,
 }
 
-/// Reads the options from the command line's arguments, without the
-/// program's name. Returns what is wrong with them, such as a missing or
-/// invalid value or an unknown option.
-pub fn parse(args: impl IntoIterator<Item = String>) -> Result<Options, String> {
-    let mut options = Options::default();
+#[cfg(not(target_arch = "wasm32"))]
+pub use parser::{Request, parse};
 
-    let mut args = args.into_iter();
-    while let Some(arg) = args.next() {
-        let mut value = || args.next().ok_or_else(|| format!("{arg} needs a value"));
+/// Reading the command line with clap, which only the desktop build has.
+#[cfg(not(target_arch = "wasm32"))]
+mod parser {
+    use super::Options;
+    use clap::Parser;
+    use nubo_core::Model;
+    use nubo_frontend::settings::FastForwardSpeed;
+    use std::ffi::OsString;
+    use std::path::PathBuf;
 
-        if matches!(arg.as_str(), "--cgb" | "--model") && options.model.is_some() {
-            return Err(String::from(
-                "give the model once, with --cgb or --model, not both",
-            ));
-        }
+    /// The largest `--scale`.
+    const MAX_SCALE: u32 = 8;
 
-        match arg.as_str() {
-            "--cgb" => options.model = Some(Model::CgbE),
-            "--model" => options.model = Some(value()?.parse()?),
-            "--scale" => options.scale = Some(parse_scale(&value()?)?),
-            "--fresh" => options.fresh = true,
-            "--speed" => options.speed = Some(parse_speed(&value()?)?),
-            option if option.starts_with("--") => {
-                return Err(format!("{option} isn't an option"));
-            }
-            // The library keeps the path and watches its folder, so it
-            // mustn't depend on the folder the app was started in.
-            _ => options.rom_path = Some(std::path::absolute(&arg).unwrap_or(PathBuf::from(arg))),
-        }
+    /// What the command line asked for.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub enum Request {
+        /// Open the app's window.
+        Play(Options),
+        /// `--measure-efficiency`: measure the emulator thread on a ROM and
+        /// print the result, without a window.
+        MeasureEfficiency {
+            /// The game to measure.
+            rom_path: PathBuf,
+            /// The model to run it on: DMG unless `--cgb` or `--model` says
+            /// otherwise.
+            model: Model,
+        },
     }
 
-    if options.scale.is_some() && options.rom_path.is_none() {
-        return Err(String::from("--scale needs a ROM to show"));
+    /// The command line as clap reads it. The doc comments on its fields
+    /// are the help that `--help` prints.
+    #[derive(Parser, Debug)]
+    #[command(
+        name = "nubo",
+        version,
+        about = "Nubo, a Game Boy and Game Boy Color emulator",
+        long_about = None,
+    )]
+    struct Arguments {
+        /// The game to start (.gb, .gbc or .zip); without one, the library
+        /// opens
+        rom: Option<PathBuf>,
+
+        /// Start the game on a Game Boy Color, the same as --model cgb
+        #[arg(long, conflicts_with = "model")]
+        cgb: bool,
+
+        /// Start the game on this hardware model instead of the one the
+        /// settings pick: dmg-0, dmg, mgb, sgb, sgb2, cgb-0 to cgb-e (or
+        /// cgb), agb
+        #[arg(long, value_name = "NAME")]
+        model: Option<Model>,
+
+        /// Show only the game screen, this many times its size (1 to 8)
+        #[arg(
+            long,
+            value_name = "N",
+            requires = "rom",
+            value_parser = clap::value_parser!(u32).range(1..=i64::from(MAX_SCALE)),
+        )]
+        scale: Option<u32>,
+
+        /// Start like a new install and leave nothing behind: default
+        /// settings, no library, saves or screenshots
+        #[arg(long)]
+        fresh: bool,
+
+        /// Start the game fast forwarding at this many times real time: 2,
+        /// 3, 4 or 8
+        #[arg(long, value_name = "N", value_parser = parse_speed)]
+        speed: Option<FastForwardSpeed>,
+
+        /// Measure how often the emulator thread wakes up while the game
+        /// plays and print it as JSON, without a window
+        #[arg(
+            long,
+            hide = true,
+            requires = "rom",
+            conflicts_with_all = ["scale", "fresh", "speed"],
+        )]
+        measure_efficiency: bool,
     }
 
-    Ok(options)
+    /// Reads the command line's arguments, starting with the program's
+    /// name. A mistake in them, or `--help` or `--version`, comes back as
+    /// clap's error, whose `exit` prints it and ends the program.
+    pub fn parse<T>(args: impl IntoIterator<Item = T>) -> Result<Request, clap::Error>
+    where
+        T: Into<OsString> + Clone,
+    {
+        let arguments = Arguments::try_parse_from(args)?;
+        let model = if arguments.cgb {
+            Some(Model::CgbE)
+        } else {
+            arguments.model
+        };
+        // The library keeps the path and watches its folder, so it mustn't
+        // depend on the folder the app was started in.
+        let rom_path = arguments
+            .rom
+            .map(|path| std::path::absolute(&path).unwrap_or(path));
+
+        Ok(match (arguments.measure_efficiency, rom_path) {
+            (true, Some(rom_path)) => Request::MeasureEfficiency {
+                rom_path,
+                model: model.unwrap_or(Model::Dmg),
+            },
+            (_, rom_path) => Request::Play(Options {
+                rom_path,
+                model,
+                scale: arguments.scale,
+                fresh: arguments.fresh,
+                speed: arguments.speed,
+            }),
+        })
+    }
+
+    /// Reads the value of `--speed`: one of the fast forward speeds.
+    fn parse_speed(value: &str) -> Result<FastForwardSpeed, String> {
+        let multiplier: u32 = value
+            .parse()
+            .map_err(|_| format!("{value} isn't a number"))?;
+        FastForwardSpeed::try_from(multiplier)
+    }
 }
 
-/// Reads the value of `--scale`: a whole number from 1 to `MAX_SCALE`.
-fn parse_scale(value: &str) -> Result<u32, String> {
-    value
-        .parse()
-        .ok()
-        .filter(|scale| (1..=MAX_SCALE).contains(scale))
-        .ok_or_else(|| format!("--scale needs a whole number from 1 to {MAX_SCALE}, not {value}"))
-}
-
-/// Reads the value of `--speed`: one of the fast forward speeds.
-fn parse_speed(value: &str) -> Result<FastForwardSpeed, String> {
-    let multiplier: u32 = value
-        .parse()
-        .map_err(|_| format!("--speed needs a number, not {value}"))?;
-    FastForwardSpeed::try_from(multiplier)
-}
-
-#[cfg(test)]
+#[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests;

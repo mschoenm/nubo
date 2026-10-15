@@ -9,6 +9,7 @@
 //! builds other emulators from their C and C++ sources; nothing else needs
 //! more than Rust.
 
+use clap::{Parser, Subcommand};
 use std::env;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
@@ -38,50 +39,89 @@ const APP_ID: &str = "io.github.mschoenm.nubo";
 /// app stores show), which the Flatpak installs.
 const LINUX_FILES: &str = "frontends/nubo/linux";
 
-const USAGE: &str = "\
-Usage: cargo xtask <command>
+/// The command line of `cargo xtask`. The doc comments on its tasks and
+/// their options are the help that `cargo xtask help` prints.
+#[derive(Parser)]
+#[command(
+    name = "xtask",
+    bin_name = "cargo xtask",
+    about = "Nubo's project tasks",
+    long_about = None,
+    arg_required_else_help = true
+)]
+struct Arguments {
+    #[command(subcommand)]
+    task: Task,
+}
 
-Commands:
-  web [--quick] Build the Iced frontend for the browser and serve it at http://127.0.0.1:8080
-  build-web [--quick]
-                Build the Iced frontend for the browser into target/web, ready to publish;
-                --quick builds it much faster, but bigger and slower to run
-  macos         Build Nubo.app, the macOS app with its icon, into target/bundle (macOS only)
-  flatpak       Build the desktop app as a Flatpak, install it for this user and write it into
-                target/bundle as a .flatpak file to share (Linux with flatpak-builder only)
-  windows [--nightly <YYYY-MM-DD>] [--version <x.y.z>]
-                Build the Windows installer (an MSI, with the WiX Toolset) and a zip to run
-                without installing into target/bundle (Windows only); --nightly names them as
-                that night's nightly build, --version gives them another version (to test updates)
-  libretro      Build the RetroArch core for this computer into target/bundle as a folder and a
-                zip: the core under RetroArch's file name, its info file and the licenses
-  icon <path>   Write the Nubo logo to <path>: an SVG if it ends in .svg, a Windows icon if it
-                ends in .ico, else a 256 pixel PNG
-  licenses <folder>
-                Write Nubo's license files and the licenses of the crates the desktop app is built
-                from into <folder> (every package includes them)
-  release-notes [tag]
-                Check that the newest release in the AppStream file is the version in Cargo.toml
-                (and that the tag, such as v1.2.3, names it) and print its notes as Markdown
-  benchmark-roms
-                Download the free homebrew games the nightly CI benchmarks into
-                target/benchmark-roms and check their checksums
-  compare-emulators [roms or folders] [--seconds <s>] [--rounds <n>] [--models dmg,cgb]
-                    [--emulators nubo,nubo-eager,sameboy,gambatte,mgba,binjgb,gearboy]
-                    [--instructions] [--screenshots]
-                Measure Nubo's speed next to other emulators on the benchmark games (or the
-                ROMs given), building them into target/emulator-comparison; --instructions
-                counts instructions with Valgrind instead of timing (Linux and macOS; needs git,
-                a C/C++ compiler, make, RGBDS and CMake)
-  review-units [next --state <rotation.json> --date <YYYY-MM-DD> --commit <sha>]
-                List the parts the nightly review splits the code into, or pick tonight's part
-                and record it in the rotation's state
-  metrics append <metrics.jsonl> <night.json> | metrics report <metrics.jsonl>
-                Add a night to the nightly metrics log, or write the Nightly metrics wiki page
-  shootout-scoreboard <commit>
-                Read the GB Emulator Shootout's published table from its gh-pages branch at
-                <commit> (a full hash) into tools/nubo-test-rom-runner/shootout_published.txt
-  help          Show this message";
+/// The tasks `cargo xtask` runs.
+#[derive(Subcommand)]
+enum Task {
+    /// Build the Iced frontend for the browser and serve it at http://127.0.0.1:8080
+    Web {
+        /// Build much faster, but bigger and slower to run
+        #[arg(long)]
+        quick: bool,
+    },
+    /// Build the Iced frontend for the browser into target/web, ready to publish
+    BuildWeb {
+        /// Build much faster, but bigger and slower to run
+        #[arg(long)]
+        quick: bool,
+    },
+    /// Build Nubo.app, the macOS app with its icon, into target/bundle (macOS only)
+    Macos,
+    /// Build the desktop app as a Flatpak, install it for this user and write it into
+    /// target/bundle as a .flatpak file to share (Linux with flatpak-builder only)
+    Flatpak,
+    /// Build the Windows installer (an MSI, with the WiX Toolset) and a zip to run without
+    /// installing into target/bundle (Windows only)
+    Windows(windows::Options),
+    /// Build the RetroArch core for this computer into target/bundle as a folder and a zip: the
+    /// core under RetroArch's file name, its info file and the licenses
+    Libretro,
+    /// Write the Nubo logo to a file: an SVG if it ends in .svg, a Windows icon if it ends in
+    /// .ico, else a 256 pixel PNG
+    Icon {
+        /// The file to write
+        path: PathBuf,
+    },
+    /// Write Nubo's license files and the licenses of the crates the desktop app is built from
+    /// into a folder (every package includes them)
+    Licenses {
+        /// The folder to write them into
+        folder: PathBuf,
+    },
+    /// Check that the newest release in the AppStream file is the version in Cargo.toml and
+    /// print its notes as Markdown
+    ReleaseNotes {
+        /// The release's tag, such as v1.2.3, which must name that version too
+        tag: Option<String>,
+    },
+    /// Download the free homebrew games the nightly CI benchmarks into target/benchmark-roms
+    /// and check their checksums
+    BenchmarkRoms,
+    /// Measure Nubo's speed next to other emulators on the benchmark games (or the ROMs
+    /// given), building them into target/emulator-comparison (Linux and macOS; needs git, a
+    /// C/C++ compiler, make, RGBDS and CMake)
+    CompareEmulators(compare_emulators::Arguments),
+    /// List the parts the nightly review splits the code into, or pick tonight's part and
+    /// record it in the rotation's state
+    ReviewUnits {
+        #[command(subcommand)]
+        command: Option<review_units::Command>,
+    },
+    /// Add a night to the nightly metrics log, or write the Nightly metrics wiki page
+    #[command(subcommand)]
+    Metrics(metrics::Command),
+    /// Read the GB Emulator Shootout's published table from its gh-pages branch into
+    /// tools/nubo-test-rom-runner/shootout_published.txt
+    ShootoutScoreboard {
+        /// The commit of the gh-pages branch to read, as a full hash
+        #[arg(value_parser = shootout_scoreboard::parse_commit)]
+        commit: String,
+    },
+}
 
 /// Every task reports failures as a message for the user.
 type Result<T = ()> = std::result::Result<T, String>;
@@ -196,8 +236,8 @@ fn build_wasm_package(package: &str, artifact: &str, profile: &str) -> Result<Pa
 }
 
 /// Builds the Iced frontend for WebAssembly next to its `index.html` and the
-/// license files, and returns the directory to serve. `options` are the
-/// command's arguments: `--quick` builds with `QUICK_WASM_PROFILE`.
+/// license files, and returns the directory to serve. `quick` (`--quick`)
+/// builds with `QUICK_WASM_PROFILE`.
 ///
 /// The JavaScript glue is generated with the `wasm-bindgen-cli-support`
 /// library, so neither wasm-pack nor Node.js is needed. It only works with
@@ -205,11 +245,11 @@ fn build_wasm_package(package: &str, artifact: &str, profile: &str) -> Result<Pa
 /// pinned to the same version in the root `Cargo.toml` and upgraded
 /// together. The result in `target/web` is what `deploy.yml` publishes to
 /// GitHub Pages.
-fn build_iced_web(options: &[String]) -> Result<PathBuf> {
-    let profile = match options {
-        [] => WASM_PROFILE,
-        [quick] if quick == "--quick" => QUICK_WASM_PROFILE,
-        _ => return Err(format!("unknown options {}\n\n{USAGE}", options.join(" "))),
+fn build_iced_web(quick: bool) -> Result<PathBuf> {
+    let profile = if quick {
+        QUICK_WASM_PROFILE
+    } else {
+        WASM_PROFILE
     };
     let input = build_wasm_package(ICED_PACKAGE, ICED_ARTIFACT, profile)?;
     let output_dir = target_dir().join("web");
@@ -311,21 +351,18 @@ fn content_type(path: &Path) -> &'static str {
 }
 
 fn main() -> ExitCode {
-    let command = env::args().nth(1);
-    let options: Vec<String> = env::args().skip(2).collect();
-
-    let result = match command.as_deref() {
-        Some("web") => build_iced_web(&options).and_then(|root| serve(&root)),
-        Some("build-web") => build_iced_web(&options).map(|root| {
+    let result = match Arguments::parse().task {
+        Task::Web { quick } => build_iced_web(quick).and_then(|root| serve(&root)),
+        Task::BuildWeb { quick } => build_iced_web(quick).map(|root| {
             println!("Built the web version in {}", root.display());
         }),
-        Some("macos") => macos::build_macos_app().map(|app| {
+        Task::Macos => macos::build_macos_app().map(|app| {
             println!(
                 "Built {}. Drag it to the Applications folder to install it.",
                 app.display()
             );
         }),
-        Some("flatpak") => flatpak::build_flatpak().map(|bundle| {
+        Task::Flatpak => flatpak::build_flatpak().map(|bundle| {
             println!(
                 "Installed the Nubo Flatpak for this user: start it from the app grid or with \
                  `flatpak run {APP_ID}`, and `flatpak uninstall --user {APP_ID}` removes it. \
@@ -333,46 +370,36 @@ fn main() -> ExitCode {
                 bundle.display()
             );
         }),
-        Some("windows") => windows::build_windows_downloads(&options).map(|(installer, zip)| {
-            println!(
-                "Built {}, which installs Nubo for the current user, and {}, which runs without \
-                 installing.",
-                installer.display(),
-                zip.display()
-            );
-        }),
-        Some("libretro") => libretro::build_libretro_core().map(|zip| {
+        Task::Windows(options) => {
+            windows::build_windows_downloads(&options).map(|(installer, zip)| {
+                println!(
+                    "Built {}, which installs Nubo for the current user, and {}, which runs \
+                     without installing.",
+                    installer.display(),
+                    zip.display()
+                );
+            })
+        }
+        Task::Libretro => libretro::build_libretro_core().map(|zip| {
             println!(
                 "Built {}. Copy the core into RetroArch's cores folder and the .info file into \
                  its info folder.",
                 zip.display()
             );
         }),
-        Some("icon") => match env::args().nth(2) {
-            Some(path) => icon::write_icon(Path::new(&path), 256),
-            None => Err(format!("icon needs a path to write to\n\n{USAGE}")),
-        },
-        Some("licenses") => match env::args().nth(2) {
-            Some(folder) => licenses::host_target().and_then(|target| {
-                licenses::write_license_files(Path::new(&folder), ICED_PACKAGE, &target)
-            }),
-            None => Err(format!("licenses needs a folder to write to\n\n{USAGE}")),
-        },
-        Some("release-notes") => {
-            release::release_notes(env::args().nth(2).as_deref()).map(|notes| print!("{notes}"))
+        Task::Icon { path } => icon::write_icon(&path, 256),
+        Task::Licenses { folder } => licenses::host_target()
+            .and_then(|target| licenses::write_license_files(&folder, ICED_PACKAGE, &target)),
+        Task::ReleaseNotes { tag } => {
+            release::release_notes(tag.as_deref()).map(|notes| print!("{notes}"))
         }
-        Some("benchmark-roms") => benchmark_roms::ensure_benchmark_roms().map(|folder| {
+        Task::BenchmarkRoms => benchmark_roms::ensure_benchmark_roms().map(|folder| {
             println!("The benchmark games are in {}", folder.display());
         }),
-        Some("compare-emulators") => compare_emulators::run_comparison(&options),
-        Some("review-units") => review_units::run(&options),
-        Some("metrics") => metrics::run(&options),
-        Some("shootout-scoreboard") => shootout_scoreboard::run(&options),
-        Some("help") | None => {
-            println!("{USAGE}");
-            Ok(())
-        }
-        Some(unknown) => Err(format!("unknown command '{unknown}'\n\n{USAGE}")),
+        Task::CompareEmulators(arguments) => compare_emulators::run_comparison(arguments),
+        Task::ReviewUnits { command } => review_units::run(command),
+        Task::Metrics(command) => metrics::run(command),
+        Task::ShootoutScoreboard { commit } => shootout_scoreboard::run(&commit),
     };
 
     match result {

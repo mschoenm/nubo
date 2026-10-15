@@ -1,6 +1,6 @@
 # xtask
 
-Project tasks written in Rust, run as `cargo xtask <task>`. Each task's module docs explain it. Only Rust is needed, except for the packaging tasks (their platform's tools) and `compare-emulators` (git, a C/C++ compiler, make, RGBDS and CMake; Linux and macOS).
+Project tasks written in Rust, run as `cargo xtask <task>`. Each task's module docs explain it; `cargo xtask help` lists the tasks and `cargo xtask <task> --help` a task's options, read with clap (`Task` in `main.rs`, and the options' types in the tasks' modules). Only Rust is needed, except for the packaging tasks (their platform's tools) and `compare-emulators` (git, a C/C++ compiler, make, RGBDS and CMake; Linux and macOS).
 
 ```bash
 # Web version (the Iced app built for the browser)
@@ -11,7 +11,7 @@ cargo xtask build-web --quick # Much faster to build, bigger and slower to run (
 # Packages and the logo
 cargo xtask macos             # Nubo.app into target/bundle/ (macOS)
 cargo xtask flatpak           # Build, install for this user and export target/bundle/Nubo-<version>-linux-<arch>.flatpak (Linux, needs flatpak-builder)
-cargo xtask windows           # The installer (an MSI) and a zip into target/bundle/ (Windows, needs the WiX Toolset); --nightly <date> names them as a nightly build
+cargo xtask windows           # The installer (an MSI) and a zip into target/bundle/ (Windows, needs the WiX Toolset); --nightly <date> names them as a nightly build, --as-version <x.y.z> builds another version (to test updates)
 cargo xtask libretro          # The RetroArch core's zip into target/bundle/ (Linux, Windows; universal on macOS)
 cargo xtask icon <path.png|path.svg|path.ico>   # Write the logo (images/icon.png and images/icon.svg in the README)
 cargo xtask licenses <folder> # LICENSE, NOTICE and every crate's license for the desktop app
