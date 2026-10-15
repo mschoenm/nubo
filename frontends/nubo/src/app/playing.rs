@@ -295,14 +295,14 @@ impl App {
     /// starts on that one, and Undo goes back to where they left off.
     ///
     /// While a reset deletes saves, the game waits until they are gone (see
-    /// `App::deleting_saves`).
+    /// `App::deletions_running`).
     ///
     /// Restarting the same ROM stops it first, so its battery save and
     /// where the player left off are written before it loads again and
     /// reads them; another ROM replaces the running game only once it has
     /// loaded.
     pub(super) fn start_game(&mut self, rom: Rom, resume: bool) {
-        if self.deleting_saves {
+        if self.deletions_running > 0 {
             self.start_after_deleting = Some((rom, resume));
             return;
         }

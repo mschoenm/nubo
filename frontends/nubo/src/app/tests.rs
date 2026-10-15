@@ -81,7 +81,7 @@ fn a_reset_that_deletes_takes_away_an_earlier_resets_undo() {
 }
 
 #[test]
-fn a_game_waits_for_the_saves_a_reset_deletes() {
+fn a_game_waits_for_every_reset_deleting_saves() {
     let (mut app, _) = App::new(
         None,
         &Options {
@@ -89,14 +89,22 @@ fn a_game_waits_for_the_saves_a_reset_deletes() {
             ..Options::default()
         },
     );
-    app.deleting_saves = true;
+    app.deletions_running = 2;
     app.remembered = Some(Rom {
         path: PathBuf::from("game.gb"),
         bytes: Arc::from(vec![0; 0x8000]),
     });
 
     let _ = app.update(GameMessage::PlayRemembered.into());
+    let _ = app.update(
+        SettingsMessage::SavesDeleted {
+            deleted: vec!["save states"],
+            errors: Vec::new(),
+        }
+        .into(),
+    );
 
     assert!(app.game.is_none());
     assert!(app.start_after_deleting.is_some());
+    assert_eq!(app.deletions_running, 1);
 }

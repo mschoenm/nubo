@@ -142,9 +142,10 @@ pub struct App {
     dialog: Option<Dialog>,
     /// What the newest toast's Undo button puts back, if it has one.
     undo: Option<playing::UndoPoint>,
-    /// Whether a reset is deleting saves in the background. No game starts
-    /// meanwhile, since it could read a save about to go and write it back.
-    deleting_saves: bool,
+    /// How many resets are deleting saves in the background. No game starts
+    /// until they are all done, since it could read a save about to go and
+    /// write it back.
+    deletions_running: u32,
     /// The game to start once the saves are deleted, and whether it
     /// continues where the player left off, if one was asked for meanwhile.
     start_after_deleting: Option<(Rom, bool)>,
@@ -239,7 +240,7 @@ impl App {
             box_art_problem: None,
             dialog: None,
             undo: None,
-            deleting_saves: false,
+            deletions_running: 0,
             start_after_deleting: None,
             newer_version: None,
             remembered: if options.fresh {
