@@ -24,9 +24,16 @@ impl App {
             .collect()
     }
 
+    /// Whether the settings or a dialog cover the game, so shortcuts that
+    /// pause, restart, save or rewind it wait until they close.
+    fn covers_game(&self) -> bool {
+        self.settings_tab.is_some() || self.dialog.is_some()
+    }
+
     /// Handles a key going down or up: picking a key in the settings, the
-    /// fixed shortcuts, and then the player's controls. A window that shows
-    /// only the game (`--scale`) has no shortcuts.
+    /// fixed shortcuts (pausing and restarting the game wait while the
+    /// settings or a dialog cover it), and then the player's controls. A
+    /// window that shows only the game (`--scale`) has no shortcuts.
     pub(super) fn handle_key(&mut self, input: &KeyInput) -> Task<Message> {
         if input.pressed && !input.repeat && self.screen_scale.is_none() {
             if let Some((device, action)) = self.capture {
@@ -51,6 +58,13 @@ impl App {
             }
 
             if let Some(message) = input::fixed_shortcut(&input.key, input.modifiers) {
+                let acts_on_game = matches!(
+                    message,
+                    Message::Game(GameMessage::TogglePause | GameMessage::Reset)
+                );
+                if acts_on_game && self.covers_game() {
+                    return Task::none();
+                }
                 return self.update(message);
             }
         }
@@ -216,9 +230,13 @@ impl App {
     }
 
     /// Does what a key or controller button is bound to, as it goes down
-    /// (`pressed`) or up. Game Boy buttons only go down while the game runs.
-    /// A window that shows only the game (`--scale`) only plays it and fast
-    /// forwards (no rewinding either), so nothing can come up over the game.
+    /// (`pressed`) or up. Game Boy buttons only go down while the game runs,
+    /// and shortcuts other than fullscreen don't go down while the settings
+    /// or a dialog are open, so trying out a button there doesn't save, load
+    /// or rewind the game. Letting go always counts, so a shortcut held as
+    /// they open still stops. A window that shows only the game (`--scale`) only plays it
+    /// and fast forwards (no rewinding either), so nothing can come up over
+    /// the game.
     fn perform(&mut self, action: Action, pressed: bool) -> Task<Message> {
         if let Some(key) = action.game_boy_key() {
             let running = self.is_running();
@@ -229,6 +247,10 @@ impl App {
                     game.session.press(key);
                 }
             }
+            return Task::none();
+        }
+
+        if pressed && action != Action::Fullscreen && self.covers_game() {
             return Task::none();
         }
 

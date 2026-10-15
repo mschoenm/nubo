@@ -261,7 +261,7 @@ pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec
             rows.extend([SettingsRow::FastForwardSpeed, SettingsRow::Volume]);
         }
         SettingsTab::Controls => {
-            rows.push(SettingsRow::Device);
+            rows.extend([SettingsRow::Device, SettingsRow::ResetControls]);
             rows.extend(Action::GAME_BOY.map(SettingsRow::Binding));
             rows.extend(
                 shortcuts(state.device)
@@ -269,7 +269,6 @@ pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec
                     .copied()
                     .map(SettingsRow::Binding),
             );
-            rows.push(SettingsRow::ResetControls);
         }
         SettingsTab::Library => {
             rows.extend((0..settings.shared.library_folders.len()).map(SettingsRow::Folder));
@@ -1178,8 +1177,9 @@ fn palette_button<'a>(palette: DmgPalette, selected: bool) -> Element<'a, Messag
     .into()
 }
 
-/// The keyboard or controller switch, the bindings of the Game Boy's
-/// buttons and the shortcuts, and a button that resets them.
+/// The keyboard or controller switch with a button beside it (under it in
+/// a narrow window) that resets that device's bindings, then the bindings
+/// of the Game Boy's buttons and the shortcuts.
 fn controls<'a>(
     settings: &'a Settings,
     page: &PageState<'a>,
@@ -1187,7 +1187,7 @@ fn controls<'a>(
 ) -> Element<'a, Message> {
     let device = page.device;
 
-    let header = rings.around(
+    let switch = rings.around(
         segmented(
             &Device::ALL,
             device,
@@ -1201,6 +1201,21 @@ fn controls<'a>(
         ),
         SettingsRow::Device,
     );
+    let reset = rings.around(
+        small_button(
+            Icon::RotateCcw,
+            "Reset to defaults",
+            Message::Settings(SettingsMessage::ResetControls(device)),
+        ),
+        SettingsRow::ResetControls,
+    );
+    let header: Element<'a, Message> = if page.layout.stacks_wide_controls() {
+        column![switch, reset].spacing(8).into()
+    } else {
+        row![switch, space::horizontal(), reset]
+            .align_y(Alignment::Center)
+            .into()
+    };
 
     let hint = match device {
         Device::Keyboard => {
@@ -1243,20 +1258,10 @@ fn controls<'a>(
     }
     shortcut_rows.extend(bindings(shortcuts(device)));
 
-    let reset = rings.around(
-        small_button(
-            Icon::RotateCcw,
-            "Reset to defaults",
-            Message::Settings(SettingsMessage::ResetControls(device)),
-        ),
-        SettingsRow::ResetControls,
-    );
-
     column![
         column![header, container(note_text(hint)).padding([0, 6])].spacing(4),
         group("Game Boy buttons", None, game_boy, None),
         group("Shortcuts", None, shortcut_rows, None),
-        row![space::horizontal(), reset],
     ]
     .spacing(20)
     .into()
