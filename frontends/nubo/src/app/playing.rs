@@ -295,7 +295,8 @@ impl App {
     /// starts on that one, and Undo goes back to where they left off.
     ///
     /// While a reset deletes saves, the game waits until they are gone (see
-    /// `App::deletions_running`).
+    /// `App::deletions_running`), and a reset can't be undone once a game
+    /// starts.
     ///
     /// Restarting the same ROM stops it first, so its battery save and
     /// where the player left off are written before it loads again and
@@ -305,6 +306,12 @@ impl App {
         if self.deletions_running > 0 {
             self.start_after_deleting = Some((rom, resume));
             return;
+        }
+        // Undoing a reset puts the library back as it was, which would
+        // forget that this game was just played.
+        if matches!(self.undo, Some(UndoPoint::Settings { .. })) {
+            self.undo = None;
+            self.toasts.forget_undo();
         }
         let header = match Emulator::read_rom_header(&rom.bytes) {
             Ok(header) => header,

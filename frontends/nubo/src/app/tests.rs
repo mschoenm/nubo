@@ -108,3 +108,25 @@ fn a_game_waits_for_every_reset_deleting_saves() {
     assert!(app.start_after_deleting.is_some());
     assert_eq!(app.deletions_running, 1);
 }
+
+#[test]
+fn starting_a_game_takes_away_a_resets_undo() {
+    let (mut app, _) = App::new(
+        None,
+        &Options {
+            fresh: true,
+            ..Options::default()
+        },
+    );
+    app.settings.appearance = Appearance::Dark;
+    let _ = app.update(SettingsMessage::Reset(ResetChoices::default()).into());
+    app.remembered = Some(Rom {
+        path: PathBuf::from("game.gb"),
+        bytes: Arc::from(vec![0; 3]),
+    });
+
+    let _ = app.update(GameMessage::PlayRemembered.into());
+    let _ = app.update(GameMessage::Undo.into());
+
+    assert_eq!(app.settings.appearance, Appearance::System);
+}
