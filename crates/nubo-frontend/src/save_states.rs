@@ -19,7 +19,7 @@ use std::fmt;
 use std::path::Path;
 
 #[cfg(feature = "desktop")]
-pub use store::{keep_aside_in, load_in, save_in, slot_info_in, thumbnail_in};
+pub use store::{delete_all_in, keep_aside_in, load_in, save_in, slot_info_in, thumbnail_in};
 
 /// Whether this build can keep save states: only the desktop build can.
 pub const AVAILABLE: bool = cfg!(feature = "desktop");
@@ -110,6 +110,14 @@ pub fn load(rom_path: &Path, slot: Slot) -> Result<Option<SaveState>, String> {
 pub fn delete(rom_path: &Path, slot: Slot) -> Result<(), String> {
     store::delete(rom_path, slot)
         .map_err(|error| format!("Couldn't delete the save state: {error}"))
+}
+
+/// Deletes the save states of every game, with their pictures and the
+/// states kept aside because they couldn't be loaded. A running game would
+/// save where it was left again, so apps only offer this while no game
+/// runs.
+pub fn delete_all() -> Result<(), String> {
+    store::delete_all().map_err(|error| format!("Couldn't delete the save states: {error}"))
 }
 
 /// Whether any of the game at `rom_path`'s slots holds a state.

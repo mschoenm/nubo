@@ -23,6 +23,11 @@ pub fn delete(_rom_path: &Path, _slot: Slot) -> Result<(), String> {
     Err(String::from("save states aren't available in the browser"))
 }
 
+#[expect(clippy::unnecessary_wraps, reason = "matches the file store")]
+pub fn delete_all() -> Result<(), String> {
+    Ok(())
+}
+
 pub fn keep_aside(_rom_path: &Path, _slot: Slot) -> Result<PathBuf, String> {
     Err(String::from("save states aren't available in the browser"))
 }

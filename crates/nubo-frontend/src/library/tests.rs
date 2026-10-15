@@ -376,3 +376,67 @@ fn a_model_picked_during_a_scan_stays() {
 
     assert_eq!(merged[0].model(), Some(Model::Sgb2));
 }
+
+#[cfg(feature = "desktop")]
+#[test]
+fn a_reset_forgets_the_picked_models_and_keeps_the_play_times_unless_asked() {
+    let mut library = library_with_two_played_games("reset-models");
+    library
+        .set_model(Path::new("/games/Tetris.gb"), Some(Model::Sgb2))
+        .unwrap();
+
+    library.reset_games(false).unwrap();
+
+    assert_eq!(
+        library
+            .entry(Path::new("/games/Tetris.gb"))
+            .unwrap()
+            .model(),
+        None
+    );
+    assert_eq!(library.recently_played(4).len(), 2);
+
+    library.reset_games(true).unwrap();
+
+    assert!(library.recently_played(4).is_empty());
+}
+
+#[cfg(feature = "desktop")]
+#[test]
+fn a_restored_snapshot_brings_back_the_games_and_ignores_the_running_scan() {
+    let mut library = library_with_two_played_games("restore");
+    library
+        .set_model(Path::new("/games/Tetris.gb"), Some(Model::Sgb2))
+        .unwrap();
+    let snapshot = library.snapshot();
+    library.reset_games(true).unwrap();
+    let scan = library.start_scan(Vec::new());
+    assert!(scan.is_some());
+    let generation = library.scan_generation;
+
+    library.restore(snapshot).unwrap();
+    library
+        .finish_scan(ScanResult {
+            generation,
+            entries: Vec::new(),
+            missing_folders: Vec::new(),
+            unavailable: Vec::new(),
+            checked: library
+                .entries
+                .iter()
+                .map(|entry| entry.path.clone())
+                .collect(),
+            error: None,
+        })
+        .unwrap();
+
+    assert_eq!(library.recently_played(4).len(), 2);
+    assert_eq!(
+        library
+            .entry(Path::new("/games/Tetris.gb"))
+            .unwrap()
+            .model(),
+        Some(Model::Sgb2)
+    );
+    assert!(!library.is_scanning());
+}

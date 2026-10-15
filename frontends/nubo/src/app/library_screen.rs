@@ -395,7 +395,7 @@ impl App {
 
     /// Whether this build keeps a library and this run may use it: not with
     /// `--fresh`, which leaves the player's library alone.
-    fn keeps_library(&self) -> bool {
+    pub(super) fn keeps_library(&self) -> bool {
         library::AVAILABLE && !self.fresh
     }
 

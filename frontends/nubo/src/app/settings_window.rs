@@ -1,8 +1,10 @@
 //! The settings window: opening and closing it, changing the settings on
 //! its pages, and moving through them with the D-pad.
 
+use super::playing::UndoPoint;
 use super::{App, GameMessage, LibraryMessage, Message, cycle};
-use crate::settings::Appearance;
+use crate::dialog::ResetChoices;
+use crate::settings::{Appearance, Settings};
 use crate::views;
 use crate::views::settings::ModelOption;
 use crate::views::settings::{SettingsFocus, SettingsRow, SettingsTab};
@@ -10,9 +12,13 @@ use iced::Task;
 use iced::widget;
 use iced::widget::scrollable::RelativeOffset;
 use nubo_frontend::background;
+use nubo_frontend::battery;
 use nubo_frontend::controls::{Action, Controls, Device};
+use nubo_frontend::library::LibrarySnapshot;
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::palettes::DmgPalette;
+use nubo_frontend::rom::{self, Rom};
+use nubo_frontend::save_states;
 use nubo_frontend::settings::FastForwardSpeed;
 use nubo_frontend::updates;
 
@@ -49,6 +55,11 @@ pub enum SettingsMessage {
     CaptureBinding(Device, Action),
     ClearBinding(Device, Action),
     ResetControls(Device),
+    /// Asks whether to reset every setting, and what else.
+    AskReset,
+    /// Resets every setting and what else the player ticked, as they
+    /// confirmed.
+    Reset(ResetChoices),
 }
 
 impl From<SettingsMessage> for Message {
@@ -152,9 +163,112 @@ impl App {
                 self.capture = None;
                 self.change_controls(|controls| controls.reset(device));
             }
+            SettingsMessage::AskReset => {
+                self.capture = None;
+                self.ask_reset();
+            }
+            SettingsMessage::Reset(choices) => return self.reset_settings(choices),
         }
 
         Task::none()
+    }
+
+    /// Puts every setting back to how it started (see `Settings::reset`),
+    /// forgets the model picked for each game, and does what else `choices`
+    /// ticks, as far as this build and run offer it (see
+    /// `App::reset_offers`). Unless something was deleted, the toast that
+    /// says so offers to undo it all.
+    fn reset_settings(&mut self, choices: ResetChoices) -> Task<Message> {
+        let offers = self.reset_offers();
+        let before = UndoPoint::Settings {
+            settings: Box::new(self.settings.clone()),
+            library: self.keeps_library().then(|| self.library.snapshot()),
+            remembered: self.remembered.clone(),
+        };
+
+        let mut deleted = Vec::new();
+        if choices.delete_battery_saves && offers.delete_battery_saves {
+            match battery::delete_all() {
+                Ok(()) => deleted.push("in-game saves"),
+                Err(error) => self.toasts.error(error),
+            }
+        }
+        if choices.delete_save_states && offers.delete_save_states {
+            match save_states::delete_all() {
+                Ok(()) => deleted.push("save states"),
+                Err(error) => self.toasts.error(error),
+            }
+        }
+        let clear_recent = choices.clear_recently_played && offers.clear_recently_played;
+        if self.keeps_library()
+            && let Err(error) = self.library.reset_games(clear_recent)
+        {
+            self.toasts.error(error);
+        }
+        if clear_recent && rom::REMEMBERS_LAST_GAME {
+            match rom::forget() {
+                Ok(()) => self.remembered = None,
+                Err(error) => self.toasts.error(error),
+            }
+        }
+
+        let remove_folders = choices.remove_folders && offers.remove_folders;
+        let reset = self.settings.reset(remove_folders);
+        self.model_override = None;
+        self.change_settings(|settings| *settings = reset);
+
+        if choices.deletes() {
+            if !deleted.is_empty() {
+                self.toasts.info(format!(
+                    "Settings reset, and the {} deleted",
+                    deleted.join(" and ")
+                ));
+            }
+        } else {
+            self.undo = Some(before);
+            self.toasts
+                .info_with_undo("Settings are back to how they started");
+        }
+        self.settings_replaced()
+    }
+
+    /// Puts back the settings, the library's games and the last game played
+    /// as they were before a reset, for its Undo button.
+    pub(super) fn restore_settings(
+        &mut self,
+        settings: Settings,
+        library: Option<LibrarySnapshot>,
+        remembered: Option<Rom>,
+    ) -> Task<Message> {
+        self.change_settings(|current| *current = settings);
+        if let Some(snapshot) = library
+            && let Err(error) = self.library.restore(snapshot)
+        {
+            self.toasts.error(error);
+        }
+        if let Some(rom) = remembered.filter(|_| self.remembered.is_none()) {
+            if let Err(error) = rom::remember(&rom) {
+                self.toasts.error(error);
+            }
+            self.remembered = Some(rom);
+        }
+        self.toasts.info("Settings put back");
+        self.settings_replaced()
+    }
+
+    /// Catches up with settings replaced all at once, by a reset or its
+    /// undo: the running game gets them, the library is scanned again for
+    /// its folders and redrawn in the palette, and newer versions are
+    /// looked for if that is on again.
+    fn settings_replaced(&mut self) -> Task<Message> {
+        self.capture = None;
+        self.library_selection = None;
+        self.apply_settings_to_game();
+        Task::batch([
+            self.rescan(),
+            self.load_pictures(false),
+            self.look_for_updates(),
+        ])
     }
 
     /// Changes the controls, saves them and hands them to the running game.
@@ -366,6 +480,7 @@ impl App {
                 settings.shared.check_for_updates != Some(true),
             )
             .into(),
+            SettingsRow::ResetSettings => SettingsMessage::AskReset.into(),
             _ => return self.adjust_setting(row, 1, true),
         })
     }

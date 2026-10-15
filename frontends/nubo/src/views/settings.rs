@@ -227,11 +227,13 @@ pub enum SettingsRow {
     RetryBoxArt,
     /// The switch that looks for newer versions.
     CheckForUpdates,
+    /// The button that asks whether to reset every setting.
+    ResetSettings,
 }
 
 /// The rows of `tab` in the order the D-pad moves through them, which is
 /// the order the page shows them in (a test checks that the pages draw them
-/// in this order). The About tab has none.
+/// in this order).
 pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec<SettingsRow> {
     let mut rows = Vec::new();
 
@@ -283,6 +285,7 @@ pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec
             if updates::AVAILABLE {
                 rows.push(SettingsRow::CheckForUpdates);
             }
+            rows.push(SettingsRow::ResetSettings);
         }
     }
 
@@ -1019,7 +1022,8 @@ fn volume<'a>(settings: &Settings) -> Element<'a, Message> {
 }
 
 /// The version, the copyright, the license, where to read it and where to get
-/// the source code, which the GPL asks every copy to show.
+/// the source code, which the GPL asks every copy to show, and the button
+/// that resets the settings.
 fn about<'a>(
     settings: &'a Settings,
     newer_version: Option<&'a str>,
@@ -1133,6 +1137,26 @@ fn about<'a>(
                  the GNU General Public License, version 3 or later. It comes with no \
                  warranty.",
         ),
+    ))
+    .push(group(
+        "Start over",
+        None,
+        vec![rings.row(
+            setting(
+                "Reset all settings",
+                Some(String::from(
+                    "Puts every setting back to how it was when you installed Nubo. You pick \
+                     whether your saves and the library go too.",
+                )),
+                small_button(
+                    Icon::RotateCcw,
+                    "Reset…",
+                    Message::Settings(SettingsMessage::AskReset),
+                ),
+            ),
+            SettingsRow::ResetSettings,
+        )],
+        Some("Only the keys or buttons: Controls › Reset to defaults."),
     ))
     .into()
 }

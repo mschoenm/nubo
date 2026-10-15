@@ -71,6 +71,17 @@ pub fn remember(rom: &Rom) -> Result<(), String> {
         })
 }
 
+/// Forgets the last game played, if this build keeps one, so the next
+/// start doesn't offer it.
+pub fn forget() -> Result<(), String> {
+    if !REMEMBERS_LAST_GAME {
+        return Ok(());
+    }
+    crate::storage::platform()
+        .write(crate::storage::Entry::LastGame, &[])
+        .map_err(|error| format!("Couldn't forget the last game played: {error}"))
+}
+
 /// The last game played, if this build keeps one and it was kept (an empty
 /// entry is a forgotten one).
 pub fn remembered() -> Option<Rom> {

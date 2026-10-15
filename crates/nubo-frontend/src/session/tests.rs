@@ -42,6 +42,14 @@ impl Storage for Memory {
     fn location(&self, entry: Entry<'_>) -> String {
         entry.file_name().display().to_string()
     }
+
+    fn delete_battery_saves(&self) -> Result<(), String> {
+        self.entries
+            .lock()
+            .unwrap()
+            .retain(|name, _| !name.ends_with(".sav") && !name.ends_with(".rtc"));
+        Ok(())
+    }
 }
 
 const NORMAL_SPEED: Playback = Playback {

@@ -175,6 +175,25 @@ impl Default for Settings {
 }
 
 impl Settings {
+    /// These settings put back to how they start, as "Reset all settings"
+    /// leaves them: the library folders stay unless `remove_folders`, and
+    /// so does `controls_revision`, since the default controls already have
+    /// every action. The questions about box art and new versions count as
+    /// unanswered again, so nothing is downloaded until the player answers
+    /// them.
+    #[must_use]
+    pub fn reset(&self, remove_folders: bool) -> Settings {
+        Settings {
+            library_folders: if remove_folders {
+                Vec::new()
+            } else {
+                self.library_folders.clone()
+            },
+            controls_revision: self.controls_revision,
+            ..Settings::default()
+        }
+    }
+
     /// The volume to play at, taking mute into account.
     pub fn effective_volume(&self) -> f32 {
         if self.muted { 0.0 } else { self.volume }

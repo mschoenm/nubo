@@ -653,6 +653,37 @@ impl Library {
         self.save()
     }
 
+    /// Forgets the model the player picked for each game and, with
+    /// `forget_played`, which games they played, for a player resetting the
+    /// settings. Games opened from elsewhere than the library folders then
+    /// leave at the next scan, as after [`Library::forget_played`].
+    pub fn reset_games(&mut self, forget_played: bool) -> Result<(), String> {
+        for entry in &mut self.entries {
+            entry.model = None;
+            if forget_played {
+                entry.last_played = None;
+            }
+        }
+        self.save()
+    }
+
+    /// A copy of what the library knows about its games, which
+    /// [`Library::restore`] puts back, such as when the player undoes a
+    /// reset of the settings.
+    pub fn snapshot(&self) -> LibrarySnapshot {
+        LibrarySnapshot(self.entries.clone())
+    }
+
+    /// Puts the games back as `snapshot` knew them and saves them. A scan
+    /// that is running started from what the library knew before, so its
+    /// result is ignored: scan again afterwards.
+    pub fn restore(&mut self, snapshot: LibrarySnapshot) -> Result<(), String> {
+        self.scan_generation += 1;
+        self.scanning = false;
+        self.replace_entries(snapshot.0);
+        self.save()
+    }
+
     /// Keeps `pixels`, the last frame of the game at `path`, as its thumbnail.
     pub fn set_thumbnail(&mut self, path: &Path, pixels: Vec<u8>) -> Result<(), String> {
         let saved = store::save_thumbnail(&self.cache, path, &pixels);
@@ -672,6 +703,11 @@ impl Library {
             .map_err(|error| format!("The game library couldn't be saved: {error}"))
     }
 }
+
+/// What the library knew about its games at one moment (see
+/// [`Library::snapshot`]).
+#[derive(Debug, Clone)]
+pub struct LibrarySnapshot(Vec<LibraryEntry>);
 
 /// News from watching the library folders (see `watch`).
 #[derive(Debug, Clone)]

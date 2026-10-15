@@ -1,7 +1,9 @@
 //! The small dialogs the app opens over the current screen: questions such
 //! as whether to download box art, and menus such as a library game's. Each
-//! is a title, maybe a short text, and a few choices; the D-pad moves
-//! between the choices, A picks one and B or Esc dismisses the dialog (or
+//! is a title, maybe a short text, and a few choices; a question can also
+//! have checkboxes above its buttons, such as what else a reset of the
+//! settings deletes. The D-pad moves between the choices, checkboxes
+//! included, A picks one (or ticks it) and B or Esc dismisses the dialog (or
 //! goes back a page in a menu). What each dialog says and offers is worked
 //! out by the app (`app/dialogs.rs`), so the view and the D-pad handling see
 //! the same choices.
@@ -27,6 +29,32 @@ pub enum DialogKind {
     FolderMenu(usize),
     /// Asks whether to delete the save states of the game at the path.
     DeleteSaveStates(PathBuf),
+    /// Asks whether to reset every setting, with what else to reset ticked
+    /// so far.
+    ResetSettings(ResetChoices),
+}
+
+/// What "Reset all settings" does besides putting the settings back, as
+/// the player ticks it in its dialog. Everything starts unticked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ResetChoices {
+    /// Deletes every game's battery saves: the progress games save
+    /// themselves.
+    pub delete_battery_saves: bool,
+    /// Deletes every game's save states.
+    pub delete_save_states: bool,
+    /// Takes every folder out of the library.
+    pub remove_folders: bool,
+    /// Empties "Continue playing", or in the browser forgets the last game
+    /// played.
+    pub clear_recently_played: bool,
+}
+
+impl ResetChoices {
+    /// Whether the reset deletes something that can't be put back.
+    pub fn deletes(self) -> bool {
+        self.delete_battery_saves || self.delete_save_states
+    }
 }
 
 /// A page of a library game's menu.
@@ -68,7 +96,8 @@ pub enum ChoiceStyle {
 /// How a dialog lays out its choices.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Layout {
-    /// Buttons in a row at the bottom, for a question.
+    /// Buttons in a row at the bottom, for a question, under its
+    /// checkboxes, which come first among the choices.
     Buttons,
     /// Rows from top to bottom, for a menu.
     List,
@@ -99,6 +128,11 @@ pub struct Choice {
     /// Whether a thin line above the row starts a new group of rows in a
     /// list.
     pub starts_group: bool,
+    /// Whether this is a checkbox above a question's buttons, ticked when
+    /// `checked`, rather than a button.
+    pub checkbox: bool,
+    /// What a checkbox does, in small print under its label.
+    pub description: Option<String>,
     pub action: DialogAction,
 }
 
@@ -117,7 +151,25 @@ impl Choice {
             style,
             checked: false,
             starts_group: false,
+            checkbox: false,
+            description: None,
             action,
+        }
+    }
+
+    /// A checkbox of a question, ticked when `checked`, with what it does
+    /// under its label. Its `action` ticks or unticks it.
+    pub fn checkbox(
+        label: impl Into<String>,
+        description: impl Into<String>,
+        checked: bool,
+        style: ChoiceStyle,
+        action: DialogAction,
+    ) -> Choice {
+        Choice {
+            checkbox: true,
+            description: Some(description.into()),
+            ..Choice::new(Icon::Square, label, style, action).checked(checked)
         }
     }
 
@@ -141,6 +193,9 @@ impl Choice {
 pub struct DialogContent {
     pub title: String,
     pub text: Option<String>,
+    /// A line in a row of its own under the text and checkboxes, such as
+    /// that what the ticked boxes delete can't be brought back.
+    pub notice: Option<Notice>,
     pub layout: Layout,
     pub choices: Vec<Choice>,
     /// What dismissing the dialog does (B, Esc).
@@ -148,4 +203,15 @@ pub struct DialogContent {
     /// Whether a click outside the dialog dismisses it too. Questions whose
     /// answer is kept leave it off, so a stray click doesn't answer them.
     pub click_outside_dismisses: bool,
+}
+
+/// A short line under a question's text and checkboxes, in a row of its
+/// own. A question whose notice changes with its boxes keeps it to one line,
+/// so the dialog keeps its height and nothing moves under the pointer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Notice {
+    pub text: String,
+    /// Whether it warns, tinted with the warning color, rather than only
+    /// tells.
+    pub warning: bool,
 }

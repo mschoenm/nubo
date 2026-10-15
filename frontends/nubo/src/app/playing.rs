@@ -5,13 +5,14 @@ use super::window_events::leave_fullscreen_for_game;
 use super::{App, Message};
 use crate::game::{Game, PauseMenu, SgbBorderChoice};
 use crate::rom_picker;
+use crate::settings::Settings;
 use crate::views;
 use iced::Task;
 use iced::widget::{self, scrollable::RelativeOffset};
 use nubo_core::{CartridgeHeader, Emulator, Model, SgbBorder};
 use nubo_frontend::cheats;
 use nubo_frontend::controls::Action;
-use nubo_frontend::library::LibraryEntry;
+use nubo_frontend::library::{LibraryEntry, LibrarySnapshot};
 use nubo_frontend::model::Console;
 use nubo_frontend::picture::Picture;
 use nubo_frontend::rom::{self, Rom};
@@ -92,6 +93,13 @@ pub enum UndoPoint {
         state: SaveState,
         picture: Option<Vec<u8>>,
     },
+    /// The settings before a reset, with what the library knew then (on
+    /// builds that keep one) and the last game played (in the browser).
+    Settings {
+        settings: Box<Settings>,
+        library: Option<LibrarySnapshot>,
+        remembered: Option<Rom>,
+    },
 }
 
 impl From<GameMessage> for Message {
@@ -135,7 +143,7 @@ impl App {
                     }
                 }
             }
-            GameMessage::Undo => self.undo(),
+            GameMessage::Undo => return self.undo(),
             GameMessage::TogglePause => {
                 if let Some(game) = &mut self.game {
                     let page = if game.is_paused() {
@@ -405,20 +413,7 @@ impl App {
             running,
             &self.settings.shared,
         )?;
-        session.set_controls(&self.settings.shared.controls);
-        session.set_screen_look(self.screen_look());
-        session.set_sgb_border(self.settings.shared.sgb_border);
-        if model.is_sgb() {
-            // The Super Game Boy menu's choices are the player's, which save
-            // states don't keep, so they come from the settings.
-            let shared = &self.settings.shared;
-            session.set_sgb_player_palette(self.sgb_player_palette());
-            session.choose_sgb_border(if shared.sgb_nubo_border {
-                SgbBorder::Nubo
-            } else {
-                SgbBorder::Game
-            });
-        }
+        self.apply_settings(&mut session);
         if !self.fresh {
             match cheats::load(&session.rom().path) {
                 Ok(cheats) => session.set_cheats(cheats),
@@ -427,6 +422,35 @@ impl App {
         }
         session.set_controller_states(self.controller_states_for_game());
         Ok(Game::new(session, !self.fresh))
+    }
+
+    /// Hands the controls, the look of the picture and the Super Game Boy
+    /// choices in the settings to `session`, a game that starts or whose
+    /// settings were just replaced.
+    fn apply_settings(&self, session: &mut GameSession) {
+        let shared = &self.settings.shared;
+        session.set_controls(&shared.controls);
+        session.set_screen_look(self.screen_look());
+        session.set_sgb_border(shared.sgb_border);
+        if session.model().is_sgb() {
+            // The Super Game Boy menu's choices are the player's, which save
+            // states don't keep, so they come from the settings.
+            session.set_sgb_player_palette(self.sgb_player_palette());
+            session.choose_sgb_border(if shared.sgb_nubo_border {
+                SgbBorder::Nubo
+            } else {
+                SgbBorder::Game
+            });
+        }
+    }
+
+    /// Hands the settings to the running game, after they were replaced
+    /// (see [`App::apply_settings`]).
+    pub(super) fn apply_settings_to_game(&mut self) {
+        if let Some(mut game) = self.game.take() {
+            self.apply_settings(&mut game.session);
+            self.game = Some(game);
+        }
     }
 
     /// Stops the running game. It saves where the player left off (if the
@@ -494,8 +518,9 @@ impl App {
     }
 
     /// Puts back what the newest toast's Undo button offers: the game as it
-    /// was before a load or a restart, or a slot as it was before a save.
-    fn undo(&mut self) {
+    /// was before a load or a restart, a slot as it was before a save, or
+    /// the settings as they were before a reset.
+    fn undo(&mut self) -> Task<Message> {
         self.toasts.forget_undo();
         match self.undo.take() {
             Some(UndoPoint::Game { rom_path, state }) => {
@@ -519,8 +544,14 @@ impl App {
                 Ok(()) => self.toasts.info(format!("Put the earlier {slot} back")),
                 Err(error) => self.toasts.error(format!("Couldn't undo: {error}")),
             },
+            Some(UndoPoint::Settings {
+                settings,
+                library,
+                remembered,
+            }) => return self.restore_settings(*settings, library, remembered),
             None => {}
         }
+        Task::none()
     }
 
     /// Loads `state` into the running game, restarting it first on the
