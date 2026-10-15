@@ -50,6 +50,14 @@ impl App {
                 return Task::none();
             }
 
+            #[cfg(not(target_arch = "wasm32"))]
+            if self.scene_recorder.is_some()
+                && input.modifiers.command()
+                && input.key == keyboard::Key::Named(Named::F12)
+            {
+                return self.record_scene();
+            }
+
             if let Some(message) = input::fixed_shortcut(&input.key, input.modifiers) {
                 return self.update(message);
             }

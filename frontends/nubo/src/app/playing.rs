@@ -351,7 +351,8 @@ impl App {
             .map_or_else(|| self.model_for(&rom.path, &header), |state| state.model);
         let path = rom.path.clone();
 
-        match self.start_session(rom, header, model, true) {
+        let running = !self.held_for_scene();
+        match self.start_session(rom, header, model, running) {
             Ok(mut game) => {
                 if let Some(state) = resume_state {
                     match game.session.load(state.data) {

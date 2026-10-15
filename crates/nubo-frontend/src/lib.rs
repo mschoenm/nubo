@@ -23,7 +23,9 @@
 //!   sound card on the desktop and by the screen's refreshes in the
 //!   browser, and what an app shows and keeps of the game (playback,
 //!   cheats, palette, save state slots and the picture on screen);
-//! - game controllers (`gamepads`), combined into one controller state.
+//! - game controllers (`gamepads`), combined into one controller state;
+//! - scenes ([`scenes`]): recorded moments of a game, which the
+//!   documentation's screenshots are made from again.
 //!
 //! # Features
 //!
@@ -59,6 +61,7 @@ pub mod palettes;
 pub mod picture;
 pub mod rom;
 pub mod save_states;
+pub mod scenes;
 pub mod screenshots;
 #[cfg(any(feature = "desktop", feature = "web"))]
 pub mod session;

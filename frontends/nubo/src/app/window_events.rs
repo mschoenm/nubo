@@ -43,7 +43,10 @@ impl App {
         match message {
             WindowMessage::ToggleFullscreen => return toggle_fullscreen(),
             WindowMessage::MouseMoved(y) => {
-                if let Some(game) = &mut self.game {
+                // A scene's picture shows the game without the bar a moving
+                // mouse brings up (see `scenes`).
+                let held = self.held_for_scene();
+                if let Some(game) = self.game.as_mut().filter(|_| !held) {
                     game.mouse_moved(y);
                 }
             }

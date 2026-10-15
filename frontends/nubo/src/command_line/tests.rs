@@ -69,6 +69,7 @@ fn the_shootouts_options() {
             fresh: true,
             speed: Some(FastForwardSpeed::try_from(4).unwrap()),
             raw_screen: true,
+            record_scenes: None,
         }
     );
 }

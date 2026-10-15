@@ -1,0 +1,111 @@
+# The games scenes may use (see docs/SCREENSHOTS_PLAN.md and
+# xtask/src/screenshots/lists.rs): free homebrew games whose licenses let
+# anyone share pictures of them, downloaded at a fixed commit of the gbdev
+# Homebrew Hub database by `cargo xtask screenshots`. `file` is the name
+# the game is saved under, which the app shows as the game's name, and the
+# name scenes know the game by. Every game in a published screenshot must be
+# credited in the README with its title (a test and the task check it).
+
+[[game]]
+file = "Tobu Tobu Girl Deluxe.gb"
+title = "Tobu Tobu Girl Deluxe"
+authors = "Tangram Games"
+url = "https://raw.githubusercontent.com/gbdev/database/50293559a496a3e20382fbf6a2e84b70ec622f88/entries/tobutobugirldeluxe/tobudx.gb"
+sha256 = "0a0e8018dbbc8d7f8cd99f05e7cdc7b4cc9e358ecfe9377ebfb2291a84c6e310"
+license = "MIT (code), CC BY 4.0 (graphics)"
+
+[[game]]
+file = "Big2Small.gb"
+title = "Big2Small"
+authors = "Matthew D. Steele"
+url = "https://raw.githubusercontent.com/gbdev/database/50293559a496a3e20382fbf6a2e84b70ec622f88/entries/big2small/big2small.gb"
+sha256 = "59c096333f93c12c8eb25a5fcffa2be15001abcd5d20b9a82c2bc2dae7e625b2"
+license = "GPL-3.0-or-later"
+
+[[game]]
+file = "Rebound.gbc"
+title = "Rebound"
+authors = "DevEd"
+url = "https://raw.githubusercontent.com/gbdev/database/50293559a496a3e20382fbf6a2e84b70ec622f88/entries/rebound/Rebound.gbc"
+sha256 = "195765b8ca3b0fb7d37b7b92d0242d6c7e01ec71f27f93e565fa081e449cbb92"
+license = "MIT"
+
+[[game]]
+file = "Moki the Monster Kid.gb"
+title = "Moki the Monster Kid"
+authors = "Sleeping Panda Games"
+url = "https://raw.githubusercontent.com/gbdev/database/50293559a496a3e20382fbf6a2e84b70ec622f88/entries/sleepingpandagames__moki-the-monster-kid/moki007_jam.gb"
+sha256 = "39bb44cc69b04d7ec16eb93e853d14ed57653ebb5bbd59724ecc3a600c06e561"
+license = "MPL-2.0"
+
+[[game]]
+file = "Rhythm Land.gb"
+title = "Rhythm Land"
+authors = "Sinusoid Studios"
+url = "https://raw.githubusercontent.com/gbdev/database/50293559a496a3e20382fbf6a2e84b70ec622f88/entries/rhythm-land/rhythm-land.gb"
+sha256 = "ca7ae6e97011fb423e85514aa9ca245967c01fcfe084ca4232106a39dd6ee9a4"
+license = "MIT"
+
+[[game]]
+file = "El Dueloroso.gb"
+title = "El Dueloroso"
+authors = "Adrián JG"
+url = "https://raw.githubusercontent.com/gbdev/database/50293559a496a3e20382fbf6a2e84b70ec622f88/entries/el-dueloroso/ElDueloroso.gb"
+sha256 = "21b8c78aec985c9c9335db154b186adde9e2aaba32fc7ed76c9cf37cb8ffcf3c"
+license = "GPL-3.0"
+
+[[game]]
+file = "Airaki.gb"
+title = "Airaki"
+authors = "furrtek"
+url = "https://raw.githubusercontent.com/gbdev/database/50293559a496a3e20382fbf6a2e84b70ec622f88/entries/airaki/airaki.gb"
+sha256 = "fd8fe6e023d9969935e05e7469c0f687f34a430d1a71fdeb5bb30183ce1ea2dd"
+license = "GPL-3.0"
+
+[[game]]
+file = "Dawn Will Come.gb"
+title = "Dawn Will Come"
+authors = "eishiya, with art by H0lyhandgrenade and eishiya and music by Kezia Salmon"
+url = "https://raw.githubusercontent.com/gbdev/database/50293559a496a3e20382fbf6a2e84b70ec622f88/entries/dawn-will-come/DawnWillCome.gb"
+sha256 = "3a3b9881b5a3a3708e217efd73f443f6a97782d3b0d3a2086e1a00ac176e5e9f"
+license = "MIT (code), CC BY 4.0 (art and music)"
+
+[[game]]
+file = "Europa Rescue.gbc"
+title = "Europa Rescue"
+authors = "godai"
+url = "https://raw.githubusercontent.com/gbdev/database/50293559a496a3e20382fbf6a2e84b70ec622f88/entries/europa-rescue/Europa%20Rescue.gbc"
+sha256 = "96ed044ab6bb97683bd4369a749e8f07679feb1b02decb92f14e9b79afc6b82c"
+license = "CC BY-SA 4.0"
+
+[[game]]
+file = "Froggy Kong.gbc"
+title = "Froggy Kong"
+authors = "videogamestorytime"
+url = "https://raw.githubusercontent.com/gbdev/database/50293559a496a3e20382fbf6a2e84b70ec622f88/entries/videogamestorytime__froggykong/Froggy_Kong_jam.gbc"
+sha256 = "7d6c53032c444cdf99bf03ece3fee1ed3e9540deb8b7b8b5abb527b34793b0fc"
+license = "GPL-3.0"
+
+[[game]]
+file = "Sushi Nights.gb"
+title = "Sushi Nights"
+authors = "Zalo, Kirblue, MaikelOrtega_ and sergiodeprado"
+url = "https://raw.githubusercontent.com/gbdev/database/50293559a496a3e20382fbf6a2e84b70ec622f88/entries/sushi-nights/SushiNights.gb"
+sha256 = "5b3203e60e8815acf75e25c5ae369815da047c0f46b81ad3bcc8513ce7167e25"
+license = "MIT"
+
+[[game]]
+file = "Geometrix.gbc"
+title = "Geometrix"
+authors = "Antonio Niño Díaz"
+url = "https://raw.githubusercontent.com/gbdev/database/50293559a496a3e20382fbf6a2e84b70ec622f88/entries/geometrix/geometrix.gbc"
+sha256 = "f13575af6bf87003c3eef8c2cab67a49ca6b02aa23ff6a31a38beb96d6eb1795"
+license = "GPL-3.0-or-later"
+
+[[game]]
+file = "µCity.gbc"
+title = "µCity"
+authors = "Antonio Niño Díaz"
+url = "https://raw.githubusercontent.com/gbdev/database/50293559a496a3e20382fbf6a2e84b70ec622f88/entries/ucity/ucity.gbc"
+sha256 = "0d608db175dd8ba22780be5df5fc17bf135876f6964f58ee141e4f8d81c62947"
+license = "GPL-3.0-or-later"

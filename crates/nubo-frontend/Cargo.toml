@@ -10,8 +10,9 @@ rust-version.workspace = true
 [features]
 # Files in the user's folders: settings, battery saves, save states, cheats,
 # screenshots and the game library (see src/storage/files.rs), with the
-# library's folder watcher and box art downloads; and the desktop's sound
-# for running a game (src/session/audio.rs).
+# library's folder watcher and box art downloads; the desktop's sound for
+# running a game (src/session/audio.rs); and the checksums scenes name their
+# game by (src/scenes.rs).
 desktop = [
     "dep:cpal",
     "dep:crc32fast",
@@ -19,6 +20,7 @@ desktop = [
     "dep:image",
     "dep:notify-debouncer-mini",
     "dep:opener",
+    "dep:sha2",
     "dep:ureq",
 ]
 # Game controllers, read with gilrs (src/gamepads.rs). On the desktop a
@@ -44,6 +46,8 @@ image = { version = "0.25", default-features = false, features = ["png"], option
 notify-debouncer-mini = { version = "0.7", optional = true }
 # Opening web pages and folders in the system's own apps (src/links.rs).
 opener = { version = "0.9", default-features = false, optional = true }
+# The checksums scenes name their game's ROM by (src/scenes.rs).
+sha2 = { version = "0.11", optional = true }
 # Box art downloads (src/library/box_art/download.rs).
 ureq = { workspace = true, optional = true }
 # The sound of a running game (src/session/audio.rs).

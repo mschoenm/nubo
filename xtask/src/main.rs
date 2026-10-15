@@ -2,8 +2,9 @@
 //! frontend for the browser and serving it locally, building the macOS app
 //! bundle, the Flatpak, the Windows installer and the RetroArch core, writing the logo and the
 //! license files that go with them, checking a release's version and notes,
-//! timing Nubo next to other emulators, the nightly review's tooling, and
-//! reading the GB Emulator Shootout's published table.
+//! timing Nubo next to other emulators, the nightly review's tooling,
+//! reading the GB Emulator Shootout's published table, and making the
+//! documentation's screenshots from recorded scenes.
 //!
 //! The packaging tasks need their platform's tools, and `compare-emulators`
 //! builds other emulators from their C and C++ sources; nothing else needs
@@ -118,6 +119,20 @@ enum Task {
         /// The commit of the gh-pages branch to read, as a full hash
         #[arg(value_parser = shootout_scoreboard::parse_commit)]
         commit: String,
+    },
+    /// Make scenes for the screenshots: play a game headless with an input script and save
+    /// candidates, or keep one in images/scenes
+    #[command(subcommand)]
+    Scene(scene::Command),
+    /// Make the screenshots images/screenshots.toml lists from their scenes, in a headless
+    /// GNOME Shell (Linux; prints what to install)
+    Screenshots(screenshots::Arguments),
+    /// Take the pictures of a plan in headless GNOME Shells, on the D-Bus session bus
+    /// `cargo xtask screenshots` starts (see screenshots/gnome.rs)
+    #[command(hide = true)]
+    GnomeSession {
+        /// The plan, as JSON
+        plan: PathBuf,
     },
 }
 
@@ -398,6 +413,9 @@ fn main() -> ExitCode {
         Task::ReviewUnits(command) => review_units::run(command),
         Task::Metrics(command) => metrics::run(command),
         Task::ShootoutScoreboard { commit } => shootout_scoreboard::run(&commit),
+        Task::Scene(command) => scene::run(command),
+        Task::Screenshots(arguments) => screenshots::run_screenshots(&arguments),
+        Task::GnomeSession { plan } => screenshots::gnome::run_session(&plan),
     };
 
     match result {
@@ -435,5 +453,7 @@ mod macos;
 mod metrics;
 mod release;
 mod review_units;
+mod scene;
+mod screenshots;
 mod shootout_scoreboard;
 mod windows;

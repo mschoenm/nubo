@@ -7,7 +7,7 @@
 
 use super::{SaveState, Slot, SlotInfo};
 use crate::picture::{Picture, SCREEN_HEIGHT, SCREEN_WIDTH};
-use crate::storage::files::{decode_png, encode_png, project_directories, write_atomically};
+use crate::storage::files::{data_folder, decode_png, encode_png, write_atomically};
 use nubo_core::{SaveStateError, SaveStateHeader};
 use std::fs;
 use std::io::ErrorKind;
@@ -190,7 +190,7 @@ fn file_stem(slot: Slot) -> String {
 }
 
 fn states_directory() -> Result<PathBuf, String> {
-    project_directories()
-        .map(|directories| directories.data_dir().join("states"))
+    data_folder()
+        .map(|folder| folder.join("states"))
         .ok_or_else(|| String::from("the system has no data folder for us"))
 }

@@ -397,6 +397,26 @@ impl GameSession {
         self.session.load_state(data)
     }
 
+    /// Runs `count` frames from where the game is, paused or not, and shows
+    /// the last one (mixed with the one before it, with frame blending on).
+    /// The same state and count always give the same picture, which is how
+    /// the app's hidden `capture` command makes a recorded moment again.
+    /// Frames the emulator handed over before are skipped, so a later
+    /// [`GameSession::refresh_screen`] doesn't show an older one.
+    pub fn run_frames(&mut self, count: u32) -> Result<(), String> {
+        let frames = super::ask(
+            |command| self.session.send(command),
+            |reply| Command::RunFrames(count, reply),
+        )?;
+        if let Some((sequence, _)) = self.session.frame_since(self.screen.sequence) {
+            self.screen.sequence = sequence;
+        }
+        for frame in frames {
+            self.screen.show(frame);
+        }
+        Ok(())
+    }
+
     /// Emulates the frames due by the screen's latest refresh (see
     /// `Session::run_due_frames`).
     #[cfg(target_arch = "wasm32")]

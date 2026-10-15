@@ -40,6 +40,8 @@ pub use dialogs::DialogMessage;
 pub use library_screen::LibraryMessage;
 pub use nubo_frontend::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
 pub use playing::GameMessage;
+#[cfg(not(target_arch = "wasm32"))]
+pub use scenes::{SceneMessage, prepare as prepare_capture};
 pub use settings_window::SettingsMessage;
 pub use window_events::{WindowMessage, screen_only_size};
 
@@ -155,6 +157,17 @@ pub struct App {
     remembered: Option<Rom>,
     /// A newer version than this one, once the app found one is out.
     newer_version: Option<String>,
+    /// With `--record-scenes`: the folder Ctrl+F12 saves scenes in (see
+    /// `scenes`).
+    #[cfg(not(target_arch = "wasm32"))]
+    scene_recorder: Option<std::path::PathBuf>,
+    /// The scene Ctrl+F12 is saving, until the picture of the window is
+    /// taken.
+    #[cfg(not(target_arch = "wasm32"))]
+    recording: Option<scenes::PendingRecording>,
+    /// The scene the `capture` command shows.
+    #[cfg(not(target_arch = "wasm32"))]
+    scene_run: Option<scenes::SceneRun>,
 }
 
 /// Everything the user or the window can ask the application to do.
@@ -181,6 +194,9 @@ pub enum Message {
     OpenLink(&'static str),
     /// The newest version was looked up: its number, or why not.
     LatestVersion(Result<String, String>),
+    /// What a scene being shown or recorded hears back (see `scenes`).
+    #[cfg(not(target_arch = "wasm32"))]
+    Scene(SceneMessage),
 }
 
 impl App {
@@ -244,6 +260,12 @@ impl App {
             deletions_running: 0,
             start_after_deleting: None,
             newer_version: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            scene_recorder: options.record_scenes.clone(),
+            #[cfg(not(target_arch = "wasm32"))]
+            recording: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            scene_run: None,
             remembered: if options.fresh {
                 None
             } else {
@@ -338,6 +360,8 @@ impl App {
                 self.toasts.dismiss(index);
                 Task::none()
             }
+            #[cfg(not(target_arch = "wasm32"))]
+            Message::Scene(message) => self.update_scene(message),
         };
 
         self.apply_to_game();
@@ -411,7 +435,7 @@ impl App {
             layers.push(views::drop_target());
         }
 
-        if !self.toasts.is_empty() {
+        if !self.toasts.is_empty() && !self.hides_toasts() {
             let over_game = self.game.is_some() && self.settings_tab.is_none();
             layers.push(self.toasts.view(
                 Message::DismissToast,
@@ -547,8 +571,8 @@ impl App {
     }
 
     /// Whether a game is running: not paused, not behind the settings or a
-    /// dialog, and not in a window in the background if the settings pause
-    /// it there.
+    /// dialog, not in a window in the background if the settings pause it
+    /// there, and not held still for a scene (see `scenes`).
     fn is_running(&self) -> bool {
         let in_background = !self.focused && self.settings.pause_in_background;
         self.game.as_ref().is_some_and(|game| {
@@ -556,7 +580,35 @@ impl App {
                 && self.settings_tab.is_none()
                 && self.dialog.is_none()
                 && !in_background
+                && !self.held_for_scene()
         })
+    }
+
+    /// Whether the toasts are left out of the window, while a scene's
+    /// picture is taken: scenes don't keep them (see `scenes`).
+    #[cfg(not(target_arch = "wasm32"))]
+    fn hides_toasts(&self) -> bool {
+        self.recording.is_some()
+    }
+
+    /// The browser build has no scenes, so its toasts always show.
+    #[cfg(target_arch = "wasm32")]
+    #[expect(
+        clippy::unused_self,
+        reason = "the desktop build's version reads the app's scenes"
+    )]
+    fn hides_toasts(&self) -> bool {
+        false
+    }
+
+    /// The browser build has no scenes, so nothing holds its game still.
+    #[cfg(target_arch = "wasm32")]
+    #[expect(
+        clippy::unused_self,
+        reason = "the desktop build's version reads the app's scenes"
+    )]
+    fn held_for_scene(&self) -> bool {
+        false
     }
 
     /// Tells the emulator whether to run, how fast and how loud.
@@ -644,6 +696,8 @@ mod dialogs;
 mod library_screen;
 mod player_input;
 mod playing;
+#[cfg(not(target_arch = "wasm32"))]
+mod scenes;
 mod settings_window;
 #[cfg(test)]
 mod tests;

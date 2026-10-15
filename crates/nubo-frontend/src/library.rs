@@ -167,8 +167,7 @@ impl Cache {
     pub fn for_user() -> Cache {
         Cache {
             #[cfg(feature = "desktop")]
-            data_folder: crate::storage::files::project_directories()
-                .map(|directories| directories.data_dir().to_path_buf()),
+            data_folder: crate::storage::files::data_folder(),
         }
     }
 
@@ -506,6 +505,15 @@ impl Library {
         self.scanning
     }
 
+    /// Whether the library is still finding its games or their title
+    /// screens: a scan runs, or a game hasn't been run for its title screen
+    /// yet. Box art isn't counted, since a download may never finish.
+    pub fn is_busy(&self) -> bool {
+        self.scanning
+            || !self.captures.is_idle()
+            || self.entries.iter().any(|entry| !entry.title_screen_checked)
+    }
+
     /// Whether the library `folder` couldn't be found during the last
     /// scan.
     pub fn is_missing(&self, folder: &Path) -> bool {
@@ -613,7 +621,19 @@ impl Library {
     /// Notes that the game at `path` just started, adding it to the library
     /// if it wasn't known yet.
     pub fn record_played(&mut self, path: &Path, header: &CartridgeHeader) -> Result<(), String> {
-        let now = seconds_since_epoch(SystemTime::now());
+        self.record_played_at(path, header, SystemTime::now())
+    }
+
+    /// Notes that the game at `path` was played at `time`, adding it to the
+    /// library if it wasn't known yet. Scenes of the library list their
+    /// played games this way, each as long ago as the scene says.
+    pub fn record_played_at(
+        &mut self,
+        path: &Path,
+        header: &CartridgeHeader,
+        time: SystemTime,
+    ) -> Result<(), String> {
+        let now = seconds_since_epoch(time);
 
         if let Some(entry) = self.entries.iter_mut().find(|entry| entry.path == path) {
             entry.last_played = Some(now);
