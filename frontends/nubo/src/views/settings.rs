@@ -3,21 +3,24 @@
 //! rows in a rounded card, each row with its name and a short description
 //! at the left and its control at the right (or under them, for a control
 //! too wide to share the row), and any longer note under its group. The
-//! window grows with the app's window, up to [`MAX_HEIGHT`], and arranges
-//! itself for the window's width (see [`SettingsLayout`]): the tabs are in a
-//! sidebar in a wide window and in a row above the page in a narrow one.
+//! window is as tall as its tallest page needs on every tab, so it keeps
+//! its size from tab to tab, and no taller than the app's window, where
+//! the page scrolls instead (see [`tallest`]). It arranges itself for the
+//! window's width (see [`SettingsLayout`]): the tabs are in a sidebar in a
+//! wide window and in a row above the page in a narrow one.
 
 use crate::app::{GameMessage, LibraryMessage, Message, SettingsMessage};
 use crate::settings::{Appearance, Settings};
 use crate::ui::icons::{Icon, icon};
 use crate::ui::logo::logo;
+use crate::ui::tallest::tallest;
 use crate::ui::theme;
 use crate::ui::widgets::{chips, icon_button, segmented, with_tooltip};
 use iced::widget::text::Wrapping;
 use iced::widget::{
     Column, Row, button, column, container, row, scrollable, slider, space, text, toggler, tooltip,
 };
-use iced::{Alignment, Color, Element, Fill, Padding, Theme, widget};
+use iced::{Alignment, Color, Element, Fill, Padding, Shrink, Theme, widget};
 use nubo_core::Model;
 use nubo_frontend::controls::{Action, Device};
 use nubo_frontend::library::{self, Library, box_art};
@@ -34,9 +37,6 @@ const RELEASE_NOTES: &str = concat!(
     "/releases/tag/v",
     env!("CARGO_PKG_VERSION")
 );
-/// The tallest the window gets. Below that it fills the app's window, less
-/// the margin `views::modal` leaves around it.
-const MAX_HEIGHT: f32 = 640.0;
 const SIDEBAR_WIDTH: f32 = 170.0;
 /// The space between the settings window's edge and what it shows.
 const PANEL_PADDING: f32 = 24.0;
@@ -425,12 +425,13 @@ pub fn view<'a>(
         Some(SettingsFocus::Row(index)) => rows(tab, settings, state).get(index).copied(),
         _ => None,
     };
-    let page = page(tab, settings, library, state, &Rings::new(focused));
-
-    let page = scrollable(container(page).padding([0, 4]))
+    let shown = page_scroller(page(tab, settings, library, state, &Rings::new(focused)))
         .id(scroll_id())
-        .spacing(12)
         .height(Fill);
+    let measured = SettingsTab::all()
+        .iter()
+        .map(|&tab| page_scroller(page(tab, settings, library, state, &Rings::new(None))).into());
+    let page = tallest(shown, measured);
     let tabs_focused = focus == Some(SettingsFocus::Tabs);
     let body: Element<'a, Message> = if state.layout.has_sidebar() {
         row![sidebar(tab, tabs_focused), page]
@@ -457,10 +458,16 @@ pub fn view<'a>(
     container(panel)
         .padding(PANEL_PADDING)
         .width(WIDTH)
-        .height(Fill)
-        .max_height(MAX_HEIGHT)
         .style(theme::panel)
         .into()
+}
+
+/// A page in the scrollable it is shown in. It shrinks to the page, which
+/// is how the window measures every page.
+fn page_scroller<'a>(page: Element<'a, Message>) -> widget::Scrollable<'a, Message> {
+    scrollable(container(page).padding([0, 4]))
+        .spacing(12)
+        .height(Shrink)
 }
 
 /// The list of tabs at the left of the window, with About set apart below
@@ -768,8 +775,8 @@ fn display<'a>(settings: &'a Settings, rings: &Rings) -> Element<'a, Message> {
                     setting(
                         "Game Boy Color colors as on its screen",
                         Some(String::from(
-                            "Softer colors, as the Game Boy Color's own screen showed them. \
-                             Off, they are as bright as the game sets them."
+                            "Softer colors, as its screen showed them. Off, as bright as the \
+                             game sets them."
                         )),
                         switch(settings.shared.color_correction, |enabled| {
                             Message::Settings(SettingsMessage::ColorCorrectionToggled(enabled))
@@ -781,8 +788,8 @@ fn display<'a>(settings: &'a Settings, rings: &Rings) -> Element<'a, Message> {
                     setting(
                         "Smooth out flicker",
                         Some(String::from(
-                            "Mixes each frame with the one before, as the Game Boy's slow \
-                             screen did, so sprites games blink on and off look see-through."
+                            "Blends each frame with the one before, as the slow screen did, \
+                             so blinking sprites look see-through."
                         )),
                         switch(settings.shared.frame_blending, |enabled| {
                             Message::Settings(SettingsMessage::FrameBlendingToggled(enabled))
@@ -794,9 +801,8 @@ fn display<'a>(settings: &'a Settings, rings: &Rings) -> Element<'a, Message> {
                     setting(
                         "Sharp pixels",
                         Some(String::from(
-                            "Grow the screen only in whole steps (2×, 3×, …), so every pixel \
-                             is the same size. Off, the picture fills the window, and some \
-                             pixels come out a little bigger than others."
+                            "Grows the screen in whole steps (2×, 3×, …) so every pixel is \
+                             the same size. Off, it fills the window."
                         )),
                         switch(settings.integer_scaling, |enabled| {
                             Message::Settings(SettingsMessage::IntegerScalingToggled(enabled))
@@ -844,9 +850,8 @@ fn playing<'a>(
     let preference = settings.shared.model;
     let model_description = match preference {
         ModelPreference::Automatic => String::from(
-            "Each game starts on the Game Boy it was made for, Super Game Boy games with \
-             their colors and border. A game's menu in the library can pick another for \
-             that game.",
+            "Each game starts on the Game Boy it was made for. A game's menu in the \
+             library can pick another.",
         ),
         ModelPreference::Fixed(model) if revisions(preference).is_empty() => {
             format!("Every game starts on this model. {}", model::about(model))
@@ -917,10 +922,7 @@ fn playing<'a>(
     games.push(rings.row(
         setting(
             "Pause in the background",
-            Some(String::from(
-                "The game waits while another window is in front, and goes on when you \
-                 come back.",
-            )),
+            Some(String::from("While another window is in front.")),
             switch(settings.pause_in_background, |pause| {
                 Message::Settings(SettingsMessage::PauseInBackgroundToggled(pause))
             }),
@@ -1134,8 +1136,8 @@ fn about<'a>(
             setting(
                 "Reset settings and data",
                 Some(String::from(
-                    "Put the settings back to how they started, clear Continue playing or \
-                     delete your saves. You pick what goes.",
+                    "Reset the settings, clear Continue playing or delete saves. You pick \
+                     what goes.",
                 )),
                 small_button(
                     Icon::RotateCcw,
@@ -1222,8 +1224,8 @@ fn controls<'a>(
              D-pad.",
         ),
         Device::Controller => format!(
-            "Connected: {}. Click a button, then press the new one; Backspace leaves it \
-             unset. The left stick always works as the D-pad.",
+            "Connected: {}. Click a button, then press the new one; Backspace clears. \
+             The left stick is always the D-pad.",
             page.controllers.join(", ")
         ),
     };
