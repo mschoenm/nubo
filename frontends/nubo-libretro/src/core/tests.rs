@@ -553,6 +553,38 @@ fn save_states_are_padded_to_one_size_with_their_length_first() {
 }
 
 #[test]
+fn a_restart_onto_a_super_game_boy_still_saves_states() {
+    let mut core = booted(ROM_ONLY, 0, TONE);
+    let size = core.serialize_size();
+    for model in [Model::Sgb2, Model::CgbE, Model::Dmg] {
+        core.set_options(Options {
+            model: ModelPreference::Fixed(model),
+            ..Options::default()
+        });
+        core.reset().unwrap();
+        run(&mut core, BOOT_FRAMES);
+        assert_eq!(core.model(), model);
+        assert_eq!(core.serialize_size(), size, "RetroArch's size stays");
+        let mut state = vec![0; size];
+        assert!(core.serialize(&mut state), "a state on the {model:?} fits");
+        assert!(core.unserialize(&state));
+    }
+}
+
+#[test]
+fn cartridge_ram_is_copied_as_its_index_lays_it_out() {
+    for length in [0, 512, 2048, 0x2000, 0x8000, CARTRIDGE_RAM_SIZE] {
+        let ram: Vec<u8> = (0..length).map(|index| (index % 251) as u8 + 1).collect();
+        let mut copied = vec![0xEE; CARTRIDGE_RAM_SIZE];
+        copy_cartridge_ram(&mut copied, &ram);
+        let expected: Vec<u8> = (0..CARTRIDGE_RAM_SIZE)
+            .map(|index| cartridge_ram_index(index, length).map_or(0, |index| ram[index]))
+            .collect();
+        assert!(copied == expected, "RAM of {length} bytes");
+    }
+}
+
+#[test]
 fn a_save_state_buffer_too_small_is_left_alone() {
     let mut core = booted(ROM_ONLY, 0, TONE);
     let mut small = vec![0xAB; 100];
