@@ -268,6 +268,45 @@ where
     row(buttons).spacing(6).wrap().into()
 }
 
+/// Like [`chips`], in rows of `columns` chips that share each row's width
+/// equally, so a choice too long for one row breaks into an even grid
+/// rather than a ragged second row.
+pub fn chip_grid<'a, T, Message>(
+    options: &[T],
+    columns: usize,
+    selected: T,
+    label: impl Fn(T) -> String,
+    on_select: impl Fn(T) -> Message,
+) -> Element<'a, Message>
+where
+    T: Copy + PartialEq,
+    Message: Clone + 'a,
+{
+    let rows = options.chunks(columns.max(1)).map(|chunk| {
+        let mut cells = row![].spacing(6);
+        for &option in chunk {
+            cells = cells.push(
+                button(
+                    text(label(option))
+                        .size(13)
+                        .align_x(Alignment::Center)
+                        .width(Fill),
+                )
+                .padding([6, 12])
+                .width(Fill)
+                .style(theme::chip(option == selected))
+                .on_press(on_select(option)),
+            );
+        }
+        for _ in chunk.len()..columns {
+            cells = cells.push(iced::widget::space().width(Fill));
+        }
+        cells.into()
+    });
+
+    column(rows).spacing(6).into()
+}
+
 /// The bar along the top of a screen, with a thin line under it.
 pub fn top_bar<'a, Message: 'a>(content: iced::widget::Row<'a, Message>) -> Element<'a, Message> {
     column![bar_body(content), divider()].into()

@@ -38,8 +38,8 @@ fn the_grid_fits_as_many_columns_as_iced_does() {
 fn the_starting_window_fits_a_whole_continue_playing_row() {
     assert_eq!(columns(FULL_ROW_WINDOW_WIDTH), STARTING_COLUMNS);
     // The cards are at their full size.
-    let full_height = CARD_MAX_WIDTH * CARD_ASPECT.1 / CARD_ASPECT.0;
-    assert!((card_height(FULL_ROW_WINDOW_WIDTH) - full_height).abs() < 0.01);
+    let full_height = CARD_MAX_WIDTH * RECENT_CARD_ASPECT.1 / RECENT_CARD_ASPECT.0;
+    assert!((card_height(FULL_ROW_WINDOW_WIDTH, true) - full_height).abs() < 0.01);
 }
 
 #[test]

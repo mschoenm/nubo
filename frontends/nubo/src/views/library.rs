@@ -51,8 +51,12 @@ const STARTING_COLUMNS: usize = 4;
 /// Cards are at most this wide; the grid fits as many columns as it can.
 const CARD_MAX_WIDTH: f32 = 210.0;
 const CARD_SPACING: f32 = 16.0;
-/// A card's width to its height.
-const CARD_ASPECT: (f32, f32) = (160.0, 196.0);
+/// A card's width to its height, which leaves about a square for its
+/// picture above the game's name.
+const CARD_ASPECT: (f32, f32) = (160.0, 180.0);
+/// The same for a "Continue playing" card, a line taller for when the game
+/// was played.
+const RECENT_CARD_ASPECT: (f32, f32) = (160.0, 196.0);
 /// The width of the dark frame around a title screen on a card.
 const SCREEN_FRAME: f32 = 6.0;
 const CONTENT_MAX_WIDTH: f32 = 1100.0;
@@ -249,26 +253,27 @@ impl<'a> Shelves<'a> {
     /// estimated from the layout, so the app can scroll it into view.
     pub fn card_bounds(&self, index: usize, window_width: f32) -> (f32, f32) {
         let columns = columns(window_width);
-        let row_height = card_height(window_width) + CARD_SPACING;
+        let recent = index < self.recent.len();
+        let row_height = |recent| card_height(window_width, recent) + CARD_SPACING;
         let shelf_top = PAGE_PADDING.0 + HEADING_HEIGHT + SECTION_SPACING;
 
-        let top = if index < self.recent.len() {
-            shelf_top + (index / columns) as f32 * row_height
+        let top = if recent {
+            shelf_top + (index / columns) as f32 * row_height(true)
         } else {
             let recent_rows = self.recent.len().div_ceil(columns) as f32;
             let games_top = if self.recent.is_empty() {
                 shelf_top
             } else {
                 shelf_top
-                    + recent_rows * row_height
+                    + recent_rows * row_height(true)
                     + SECTION_SPACING * 2.0
                     + SHELF_GAP
                     + HEADING_HEIGHT
             };
-            games_top + ((index - self.recent.len()) / columns) as f32 * row_height
+            games_top + ((index - self.recent.len()) / columns) as f32 * row_height(false)
         };
 
-        (top, top + card_height(window_width))
+        (top, top + card_height(window_width, recent))
     }
 }
 
@@ -289,10 +294,22 @@ fn columns(window_width: f32) -> usize {
         .max(1)
 }
 
-fn card_height(window_width: f32) -> f32 {
+/// How tall a card is in a window `window_width` wide, on "Continue
+/// playing" with `recent`.
+fn card_height(window_width: f32, recent: bool) -> f32 {
     let columns = columns(window_width) as f32;
     let width = (content_width(window_width) - CARD_SPACING * (columns - 1.0)) / columns;
-    width * CARD_ASPECT.1 / CARD_ASPECT.0
+    let (wide, high) = card_aspect(recent);
+    width * high / wide
+}
+
+/// A card's width to its height, on "Continue playing" with `recent`.
+fn card_aspect(recent: bool) -> (f32, f32) {
+    if recent {
+        RECENT_CARD_ASPECT
+    } else {
+        CARD_ASPECT
+    }
 }
 
 /// The scrolling page of the library, so the app can scroll it.
@@ -778,7 +795,10 @@ fn card_grid<'a>(
     }))
     .fluid(CARD_MAX_WIDTH)
     .spacing(CARD_SPACING)
-    .height(grid::aspect_ratio(CARD_ASPECT.0, CARD_ASPECT.1))
+    .height(grid::aspect_ratio(
+        card_aspect(recent).0,
+        card_aspect(recent).1,
+    ))
     .into()
 }
 
