@@ -3,7 +3,7 @@ name: Release
 # Pushing a version tag such as v0.2.0 runs every check, the nightly ones
 # included, builds the Flatpaks, the Windows installer and the RetroArch core
 # and publishes a GitHub release with them. Nothing is published unless every check passes;
-# the notes are read over in the release's pull request, before the tag.
+# the notes are written in the release's pull request, which is merged before the tag.
 # The release skill (.claude/skills/release/SKILL.md) lists the steps.
 on:
   push:
