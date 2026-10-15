@@ -4,7 +4,8 @@
 //! nubo [rom] [--cgb | --model <name>] [--scale <n>] [--fresh] [--speed <n>] [--raw-screen]
 //! nubo [rom] [--cgb | --model <name>] --record-scenes <folder>
 //! nubo measure-efficiency <rom> [--cgb | --model <name>]
-//! nubo capture <scene> --games <folder> --home <folder> [--set <key=value>]... [--size <WxH> | --fullscreen | --scale <n>] [--output <png>]
+//! nubo capture <scene> --games <folder> --home <folder> [--set <key=value>]... [--size <WxH> | --fullscreen | --scale <n>]
+//!              [--pause-menu <page>] [--settings-tab <tab>] [--output <png>]
 //! nubo --help | --version
 //! ```
 //!
@@ -49,7 +50,9 @@
 //!   it reads and writes nothing of the player's. The window's inside is
 //!   `--size` (or the scene's size), or it fills the screen with
 //!   `--fullscreen`, or it shows only the game's picture with `--scale`, as
-//!   above. With `--output` it saves a picture of the window there
+//!   above. `--pause-menu` and `--settings-tab` open another page of the
+//!   pause menu or another settings tab than the scene has open, or close
+//!   it with `none`. With `--output` it saves a picture of the window there
 //!   and quits; without, it prints `ready` once the scene shows and keeps
 //!   showing it, for a harness that captures the window itself (with its
 //!   border, `cargo xtask screenshots`).
@@ -106,6 +109,10 @@ pub struct CaptureRequest {
     /// Show only the game's picture, this many times its size, as `--scale`
     /// does.
     pub scale: Option<u32>,
+    /// The pause menu page to open instead of the scene's, or `none`.
+    pub pause_menu: Option<String>,
+    /// The settings tab to open instead of the scene's, or `none`.
+    pub settings_tab: Option<String>,
     /// Where to save the window's picture, or `None` to keep showing the
     /// scene for a harness that captures the window itself.
     pub output: Option<PathBuf>,
@@ -266,6 +273,16 @@ mod parser {
             )]
             scale: Option<u32>,
 
+            /// Open this page of the pause menu instead of the scene's: main,
+            /// save, load, cheats, super-game-boy, or none
+            #[arg(long, value_name = "PAGE")]
+            pause_menu: Option<String>,
+
+            /// Open this settings tab instead of the scene's: display,
+            /// playing, controls, library, about, or none
+            #[arg(long, value_name = "TAB")]
+            settings_tab: Option<String>,
+
             /// Save the window's picture here as PNG and quit; without it,
             /// print "ready" once the scene shows and keep showing it
             #[arg(long, value_name = "PNG")]
@@ -302,6 +319,8 @@ mod parser {
                 size,
                 fullscreen,
                 scale,
+                pause_menu,
+                settings_tab,
                 output,
             }) => Request::Capture(CaptureRequest {
                 scene: absolute(scene),
@@ -311,6 +330,8 @@ mod parser {
                 size,
                 fullscreen,
                 scale,
+                pause_menu,
+                settings_tab,
                 output: output.map(absolute),
             }),
             None => Request::Play(Options {

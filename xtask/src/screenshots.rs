@@ -181,6 +181,15 @@ fn capture_of(
         arguments.push(String::from("--set"));
         arguments.push(change);
     }
+    for (option, value) in [
+        ("--pause-menu", &tile.pause_menu),
+        ("--settings-tab", &tile.settings_tab),
+    ] {
+        if let Some(value) = value {
+            arguments.push(option.to_owned());
+            arguments.push(value.clone());
+        }
+    }
 
     let window = tile
         .size

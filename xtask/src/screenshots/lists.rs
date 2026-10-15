@@ -43,6 +43,12 @@ pub struct Screenshot {
     /// Changes to the scene's settings, by the names `settings.toml` uses.
     #[serde(default)]
     pub settings: toml::Table,
+    /// The page of the pause menu to open instead of the scene's (`main`,
+    /// `save`, `load`, `cheats`, `super-game-boy`), or `none` to close it.
+    pub pause_menu: Option<String>,
+    /// The settings tab to open instead of the scene's (`display`,
+    /// `playing`, `controls`, `library`, `about`), or `none` to close it.
+    pub settings_tab: Option<String>,
     /// GNOME's style, which colors the window's border: `light` or `dark`.
     /// Unless given, it follows the app's appearance, and an app that
     /// follows the system gets this style too.
@@ -113,6 +119,10 @@ pub struct Variant {
     /// Changes to the settings, on top of the screenshot's.
     #[serde(default)]
     pub settings: toml::Table,
+    /// The page of the pause menu to open, if not the screenshot's.
+    pub pause_menu: Option<String>,
+    /// The settings tab to open, if not the screenshot's.
+    pub settings_tab: Option<String>,
 }
 
 /// One picture the app takes for a screenshot: the screenshot itself, or
@@ -126,6 +136,8 @@ pub struct Tile {
     /// The changes to the scene's settings, the screenshot's and the
     /// variant's together.
     pub settings: toml::Table,
+    pub pause_menu: Option<String>,
+    pub settings_tab: Option<String>,
     pub style: Option<Style>,
 }
 
@@ -174,30 +186,30 @@ impl Screenshot {
     /// The pictures the app takes for this screenshot: one, or one for
     /// each variant.
     pub fn tiles(&self) -> Vec<Tile> {
-        let tile = |scene: &str, extra: &toml::Table| {
+        let tile = |variant: &Variant| {
             let mut settings = self.settings.clone();
-            merge(&mut settings, extra);
+            merge(&mut settings, &variant.settings);
             Tile {
-                scene: scene.to_owned(),
+                scene: variant.scene.clone().unwrap_or_else(|| self.scene.clone()),
                 frame: self.frame,
                 size: self.size,
                 scale: self.scale,
                 settings,
+                pause_menu: variant
+                    .pause_menu
+                    .clone()
+                    .or_else(|| self.pause_menu.clone()),
+                settings_tab: variant
+                    .settings_tab
+                    .clone()
+                    .or_else(|| self.settings_tab.clone()),
                 style: self.style,
             }
         };
         if self.variants.is_empty() {
-            vec![tile(&self.scene, &toml::Table::new())]
+            vec![tile(&Variant::default())]
         } else {
-            self.variants
-                .iter()
-                .map(|variant| {
-                    tile(
-                        variant.scene.as_deref().unwrap_or(&self.scene),
-                        &variant.settings,
-                    )
-                })
-                .collect()
+            self.variants.iter().map(tile).collect()
         }
     }
 

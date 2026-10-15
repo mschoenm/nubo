@@ -100,13 +100,21 @@ pub struct PreparedCapture {
     pub fullscreen: bool,
 }
 
-/// Reads the scene `request` names and sets up the run's own folder
+/// Reads the scene `request` names, with the pause menu page and settings
+/// tab it asks for, and sets up the run's own folder
 /// (`--home`), which then replaces the player's for the whole run: the
 /// scene's settings with `--set`'s changes as `settings.toml`, never asking
 /// about box art or new versions, and for a scene of the library a folder
 /// with its games. Checks that the game is the one the scene was made with.
 pub fn prepare(request: &CaptureRequest) -> Result<PreparedCapture, String> {
-    let scene = Scene::read(&request.scene)?;
+    let mut scene = Scene::read(&request.scene)?;
+    let chosen = |name: &String| (name != "none").then(|| name.clone());
+    if let Some(page) = &request.pause_menu {
+        scene.view.pause_menu = chosen(page);
+    }
+    if let Some(tab) = &request.settings_tab {
+        scene.view.settings_tab = chosen(tab);
+    }
     if !use_folder(&request.home) {
         return Err(String::from("the run's folder was already set"));
     }

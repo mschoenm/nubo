@@ -149,9 +149,14 @@ fn explore(arguments: &ExploreArguments) -> Result {
     sheet
         .save(&sheet_path)
         .map_err(|error| format!("couldn't write {}: {error}", sheet_path.display()))?;
+    let count = exploration.candidates.len();
     println!(
-        "Saved {} candidates; their contact sheet is {}",
-        exploration.candidates.len(),
+        "Saved {count} {}; the contact sheet is {}",
+        if count == 1 {
+            "candidate"
+        } else {
+            "candidates"
+        },
         sheet_path.display()
     );
     Ok(())
