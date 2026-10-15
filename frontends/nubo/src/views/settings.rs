@@ -15,7 +15,7 @@ use crate::ui::icons::{Icon, icon};
 use crate::ui::logo::logo;
 use crate::ui::tallest::tallest;
 use crate::ui::theme;
-use crate::ui::widgets::{chips, icon_button, segmented, with_tooltip};
+use crate::ui::widgets::{chip_grid, chips, icon_button, segmented, with_tooltip};
 use iced::widget::text::Wrapping;
 use iced::widget::{
     Column, Row, button, column, container, row, scrollable, slider, space, text, toggler, tooltip,
@@ -72,6 +72,8 @@ const BINDING_ROW_PADDING: Padding = Padding {
 /// The least height of a group's title row, which grows to fit a button
 /// next to the title.
 const HEADING_HEIGHT: f32 = 28.0;
+/// The Game Boy model buttons come in rows of this many, all the same width.
+const MODEL_COLUMNS: usize = 3;
 /// The width of the chips that show the key or button of an action.
 const CHIP_WIDTH: f32 = 140.0;
 
@@ -773,9 +775,8 @@ fn display<'a>(settings: &'a Settings, rings: &Rings) -> Element<'a, Message> {
                     setting(
                         "Original screen look",
                         Some(String::from(
-                            "Softer colors and gentle blur on moving things, as each Game \
-                             Boy's own screen showed them. Off, the picture is sharp and \
-                             bright."
+                            "Softer colors and a gentle blur, as each Game Boy's own screen \
+                             showed them. Off, sharp and bright."
                         )),
                         switch(settings.shared.original_screen, |enabled| {
                             Message::Settings(SettingsMessage::OriginalScreenToggled(enabled))
@@ -852,8 +853,9 @@ fn playing<'a>(
         rings.row(
             column![
                 label("Game Boy model", Some(model_description)),
-                chips(
+                chip_grid(
                     &ModelOption::ALL,
+                    MODEL_COLUMNS,
                     ModelOption::of(preference),
                     ModelOption::label,
                     move |option| Message::Settings(SettingsMessage::ModelSelected(
@@ -1164,7 +1166,7 @@ fn palette_button<'a>(palette: DmgPalette, selected: bool) -> Element<'a, Messag
 
     button(
         column![
-            container(swatches).style(theme::swatch_frame),
+            container(swatches).padding(1).style(theme::swatch_frame),
             text(palette.to_string()).size(13),
         ]
         .spacing(6)
@@ -1266,7 +1268,7 @@ fn pause_menu_key<'a>() -> Element<'a, Message> {
     row![
         label(
             Action::PauseMenu.label(),
-            Some(String::from("Always Esc on the keyboard"))
+            Some(String::from("Fixed, so the menu can always be opened"))
         ),
         button(text("Esc").size(13).align_x(Alignment::Center).width(Fill))
             .padding([5, 12])
