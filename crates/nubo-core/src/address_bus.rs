@@ -99,7 +99,8 @@ const EAGER: bool = cfg!(feature = "eager");
 /// VRAM DMA registers from LCDC (0xFF40) to HDMA5 (0xFF55), the CGB palette
 /// registers and OPRI, and IE, which decides whether the PPU's STAT requests
 /// matter before anyone reads IF (see `Gpu::run_dots`). The PPU catches up
-/// before such an access. Every register whose writes `write_timing.rs` times
+/// before such an access, except for reads that see the same without it
+/// (`AddressBus::ppu_read_can_wait`). Every register whose writes `write_timing.rs` times
 /// to the dot must be one of these (its tests check that).
 pub(crate) fn reaches_ppu(address: u16) -> bool {
     matches!(
@@ -284,6 +285,10 @@ pub struct AddressBus {
     /// deliver a frame or signal HBlank DMA, counted from where it last caught
     /// up. 0 makes it catch up on every M-cycle.
     ppu_quiet_dots: u32,
+    /// Whether the PPU can't request any interrupt at all in its quiet dots,
+    /// not only none IE enables: then a read of IF sees the same flags without
+    /// the PPU catching up (`ppu_read_can_wait`).
+    ppu_quiet_dots_hold_no_interrupt: bool,
     /// Set during an M-cycle in which the CPU writes to PPU state, whose dots then
     /// run as they come so the write lands on the right one.
     ppu_eager: bool,
@@ -335,6 +340,7 @@ impl AddressBus {
             elapsed_dots: 0,
             ppu_owed_dots: 0,
             ppu_quiet_dots: 0,
+            ppu_quiet_dots_hold_no_interrupt: false,
             ppu_eager: false,
             deferred_cycles: 0,
             deferral_budget: 0,
@@ -620,6 +626,7 @@ impl AddressBus {
             elapsed_dots: self.elapsed_dots,
             ppu_owed_dots: self.ppu_owed_dots,
             ppu_quiet_dots: self.ppu_quiet_dots,
+            ppu_quiet_dots_hold_no_interrupt: self.ppu_quiet_dots_hold_no_interrupt,
             ppu_eager: self.ppu_eager,
             deferred_cycles: self.deferred_cycles,
             deferral_budget: self.deferral_budget,
@@ -874,7 +881,19 @@ impl AddressBus {
                 &mut self.hdma,
                 stat_interrupt_enabled,
             );
+            self.ppu_quiet_dots_hold_no_interrupt =
+                stat_interrupt_enabled || self.gpu.stat_line_stays_low();
         }
+    }
+
+    /// Whether a CPU read of `address`, which reaches the PPU, sees the same
+    /// value without the PPU catching up first. That holds for IF while the
+    /// PPU's quiet dots hold no interrupt request at all: they hold none IE
+    /// enables, and the STAT interrupt is either one of those or can't be
+    /// requested (`Gpu::stat_line_stays_low`). Only writes the PPU catches up
+    /// for can change that, and those end the quiet dots.
+    pub(crate) fn ppu_read_can_wait(&self, address: u16) -> bool {
+        address == 0xFF0F && self.ppu_quiet_dots_hold_no_interrupt
     }
 
     /// Runs the dots the PPU is owed, so its state is up to date.
@@ -1101,7 +1120,7 @@ impl AddressBus {
     /// anything that reaches it (`reaches_ppu`), which debug builds check.
     pub(crate) fn peek(&self, address: u16) -> u8 {
         debug_assert!(
-            self.ppu_owed_dots == 0 || !reaches_ppu(address),
+            self.ppu_owed_dots == 0 || !reaches_ppu(address) || self.ppu_read_can_wait(address),
             "{address:#06X} is read while the PPU is behind"
         );
         if let Some(processor_test_ram) = &self.processor_test_ram {
@@ -1207,7 +1226,7 @@ fn zeroed_memory<const SIZE: usize>() -> Box<[u8; SIZE]> {
 ///   nothing outside it (see `Gpu::run_dots`).
 /// - `ppu_quiet_dots` and `deferral_budget` say how long the PPU and the plain
 ///   M-cycles may wait; 0, which loading sets, makes the next M-cycle work
-///   them out again.
+///   them out again (and `ppu_quiet_dots_hold_no_interrupt` with them).
 /// - `deferred_cycles`, `boot_rom_exited`, `vram_dma_bus`,
 ///   `pause_oam_dma_after_cycle` and `ppu_eager` are always zero, `None` or
 ///   false between calls into the emulator, and `dot_limit` is `u64::MAX`
