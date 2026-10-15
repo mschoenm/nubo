@@ -38,7 +38,7 @@
 //! but `--cgb` (`docs/SHOOTOUT_PLAN.md`). `--raw-screen` makes its
 //! screenshots judge the emulation alone, as its harness has other emulators
 //! turn off their color correction and blending, while players get the
-//! corrected colors by default. The browser build gets no command line, so
+//! original screen look by default. The browser build gets no command line, so
 //! it starts without any of them and doesn't include clap.
 
 use nubo_core::Model;

@@ -203,8 +203,7 @@ pub enum SettingsFocus {
 pub enum SettingsRow {
     Appearance,
     Palette,
-    ColorCorrection,
-    FrameBlending,
+    OriginalScreen,
     SharpPixels,
     SgbBorder,
     Model,
@@ -241,8 +240,7 @@ pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec
         SettingsTab::Display => rows.extend([
             SettingsRow::Appearance,
             SettingsRow::Palette,
-            SettingsRow::ColorCorrection,
-            SettingsRow::FrameBlending,
+            SettingsRow::OriginalScreen,
             SettingsRow::SharpPixels,
             SettingsRow::SgbBorder,
         ]),
@@ -766,29 +764,17 @@ fn display<'a>(settings: &'a Settings, rings: &Rings) -> Element<'a, Message> {
                 ),
                 rings.row(
                     setting(
-                        "Game Boy Color colors as on its screen",
+                        "Original screen look",
                         Some(String::from(
-                            "Softer colors, as the Game Boy Color's own screen showed them. \
-                             Off, they are as bright as the game sets them."
+                            "Softer colors and gentle blur on moving things, as each Game \
+                             Boy's own screen showed them. Off, the picture is sharp and \
+                             bright."
                         )),
-                        switch(settings.shared.color_correction, |enabled| {
-                            Message::Settings(SettingsMessage::ColorCorrectionToggled(enabled))
+                        switch(settings.shared.original_screen, |enabled| {
+                            Message::Settings(SettingsMessage::OriginalScreenToggled(enabled))
                         }),
                     ),
-                    SettingsRow::ColorCorrection,
-                ),
-                rings.row(
-                    setting(
-                        "Smooth out flicker",
-                        Some(String::from(
-                            "Mixes each frame with the one before, as the Game Boy's slow \
-                             screen did, so sprites games blink on and off look see-through."
-                        )),
-                        switch(settings.shared.frame_blending, |enabled| {
-                            Message::Settings(SettingsMessage::FrameBlendingToggled(enabled))
-                        }),
-                    ),
-                    SettingsRow::FrameBlending,
+                    SettingsRow::OriginalScreen,
                 ),
                 rings.row(
                     setting(
