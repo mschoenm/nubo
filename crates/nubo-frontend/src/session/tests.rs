@@ -48,6 +48,7 @@ const NORMAL_SPEED: Playback = Playback {
     running: true,
     fast_forward: None,
     volume: 1.0,
+    rewinding: false,
 };
 
 /// A machine running an empty cartridge, without a sound device, keeping its
@@ -176,4 +177,31 @@ fn fast_forward_emulates_its_speed_in_buffers_per_played_one() {
         fast.buffers_per_played(),
         FastForwardSpeed::default().multiplier()
     );
+}
+
+#[test]
+fn rewinding_steps_back_through_the_states_kept_while_playing() {
+    let (mut machine, _) = machine_with(Arc::new(Memory::default()));
+    let mut frames = 0;
+    while frames < history::FRAMES_PER_STATE * 10 {
+        if machine.play_buffer().1 {
+            frames += 1;
+        }
+    }
+    let kept = machine.history.len();
+    assert!(kept >= 9, "{kept}");
+
+    machine.handle(Command::SetPlayback(Playback {
+        rewinding: true,
+        ..NORMAL_SPEED
+    }));
+    let mut shown = 0;
+    for _ in 0..200 {
+        if machine.rewind_buffer().1 {
+            shown += 1;
+        }
+    }
+
+    assert_eq!(shown, kept);
+    assert_eq!(machine.history.len(), 0);
 }

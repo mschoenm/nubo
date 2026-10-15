@@ -24,7 +24,7 @@ use iced::widget::Stack;
 use iced::{Element, Subscription, Task, Theme, event, keyboard, system, window};
 use nubo_core::{CartridgeHeader, ControllerState, Model};
 use nubo_frontend::background;
-use nubo_frontend::controls::{Action, Device};
+use nubo_frontend::controls::{self, Action, Device};
 use nubo_frontend::gamepads::{ControllerEvent, Controllers};
 use nubo_frontend::library::box_art::GameList;
 use nubo_frontend::library::{Library, LibraryEntry};
@@ -209,8 +209,16 @@ impl App {
             undo: None,
         };
 
+        // Saving over settings that couldn't be read would lose them.
+        let settings_read = settings_error.is_none();
         for error in [settings_error, library_error].into_iter().flatten() {
             app.toasts.error(error);
+        }
+        if settings_read && app.settings.shared.controls_revision < controls::REVISION {
+            app.change_settings(|settings| {
+                controls::add_new_actions(&mut settings.shared.controls);
+                settings.shared.controls_revision = controls::REVISION;
+            });
         }
 
         if let Some(rom) = rom {

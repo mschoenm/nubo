@@ -64,6 +64,8 @@ pub enum Action {
     Fullscreen,
     /// Saves a picture of the screen.
     Screenshot,
+    /// Goes back through the game's recent past while held.
+    Rewind,
 }
 
 impl Action {
@@ -81,7 +83,8 @@ impl Action {
 
     /// The shortcuts that can go on a keyboard key. The pause menu isn't one,
     /// because Esc always opens it.
-    pub const KEYBOARD_SHORTCUTS: [Action; 5] = [
+    pub const KEYBOARD_SHORTCUTS: [Action; 6] = [
+        Action::Rewind,
         Action::FastForward,
         Action::QuickSave,
         Action::QuickLoad,
@@ -90,8 +93,9 @@ impl Action {
     ];
 
     /// The shortcuts that can go on a controller button.
-    pub const CONTROLLER_SHORTCUTS: [Action; 6] = [
+    pub const CONTROLLER_SHORTCUTS: [Action; 7] = [
         Action::PauseMenu,
+        Action::Rewind,
         Action::FastForward,
         Action::QuickSave,
         Action::QuickLoad,
@@ -116,6 +120,7 @@ impl Action {
             Action::QuickLoad => "Quick load",
             Action::Fullscreen => "Fullscreen",
             Action::Screenshot => "Screenshot",
+            Action::Rewind => "Rewind (hold)",
         }
     }
 
@@ -292,6 +297,7 @@ pub fn default_keyboard() -> Bindings<KeyCode> {
         (Action::QuickLoad, KeyCode::F8),
         (Action::Fullscreen, KeyCode::F11),
         (Action::Screenshot, KeyCode::F12),
+        (Action::Rewind, KeyCode::KeyR),
     ])
 }
 
@@ -314,7 +320,37 @@ pub fn default_controller() -> Bindings<PadButton> {
         ),
         (Action::QuickLoad, PadButton(ControllerButton::LeftTrigger)),
         (Action::QuickSave, PadButton(ControllerButton::RightTrigger)),
+        (Action::Rewind, PadButton(ControllerButton::West)),
     ])
+}
+
+/// The round of new actions [`add_new_actions`] gives keys for, which
+/// `Settings::controls_revision` counts up to.
+pub const REVISION: u32 = 1;
+
+/// Gives each action added after the player's controls were saved, such as
+/// rewind, the input a new player gets, on the keyboard and the controller,
+/// if that input does nothing yet. Returns whether anything changed. An app calls it once, after which
+/// the player's own choice (even no input at all) stays.
+pub fn add_new_actions(controls: &mut Controls) -> bool {
+    let mut changed = false;
+    let keyboard = default_keyboard();
+    if controls.keyboard.input(Action::Rewind).is_none()
+        && let Some(key) = keyboard.input(Action::Rewind)
+        && controls.keyboard.action(key).is_none()
+    {
+        controls.keyboard.bind(Action::Rewind, Some(key));
+        changed = true;
+    }
+    let controller = default_controller();
+    if controls.controller.input(Action::Rewind).is_none()
+        && let Some(button) = controller.input(Action::Rewind)
+        && controls.controller.action(button).is_none()
+    {
+        controls.controller.bind(Action::Rewind, Some(button));
+        changed = true;
+    }
+    changed
 }
 
 impl fmt::Display for KeyCode {

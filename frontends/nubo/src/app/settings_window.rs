@@ -27,6 +27,8 @@ pub enum SettingsMessage {
     AppearanceSelected(Appearance),
     PaletteSelected(DmgPalette),
     IntegerScalingToggled(bool),
+    ColorCorrectionToggled(bool),
+    FrameBlendingToggled(bool),
     SgbBorderToggled(bool),
     ModelSelected(ModelPreference),
     ResumeGamesToggled(bool),
@@ -82,6 +84,14 @@ impl App {
                     game.session.set_palette(palette);
                 }
                 return self.load_pictures(false);
+            }
+            SettingsMessage::ColorCorrectionToggled(enabled) => {
+                self.change_settings(|settings| settings.shared.color_correction = enabled);
+                self.apply_screen_effects();
+            }
+            SettingsMessage::FrameBlendingToggled(enabled) => {
+                self.change_settings(|settings| settings.shared.frame_blending = enabled);
+                self.apply_screen_effects();
             }
             SettingsMessage::IntegerScalingToggled(enabled) => {
                 self.change_settings(|settings| settings.integer_scaling = enabled);
@@ -142,6 +152,15 @@ impl App {
     }
 
     /// Changes the controls, saves them and hands them to the running game.
+    /// Shows the running game with the screen effects the settings pick.
+    fn apply_screen_effects(&mut self) {
+        let shared = &self.settings.shared;
+        if let Some(game) = &mut self.game {
+            game.session
+                .set_screen_effects(shared.color_correction, shared.frame_blending);
+        }
+    }
+
     pub(super) fn change_controls(&mut self, change: impl FnOnce(&mut Controls)) {
         self.change_settings(|settings| change(&mut settings.shared.controls));
         if let Some(game) = &mut self.game {
@@ -292,6 +311,12 @@ impl App {
         Some(match row {
             SettingsRow::SharpPixels => {
                 SettingsMessage::IntegerScalingToggled(!settings.integer_scaling).into()
+            }
+            SettingsRow::ColorCorrection => {
+                SettingsMessage::ColorCorrectionToggled(!settings.shared.color_correction).into()
+            }
+            SettingsRow::FrameBlending => {
+                SettingsMessage::FrameBlendingToggled(!settings.shared.frame_blending).into()
             }
             SettingsRow::SgbBorder => {
                 SettingsMessage::SgbBorderToggled(!settings.shared.sgb_border).into()

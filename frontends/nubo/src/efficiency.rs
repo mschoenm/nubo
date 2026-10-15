@@ -103,6 +103,7 @@ pub fn measure(rom_path: &Path, model: Model) -> Result<String, String> {
         running: true,
         fast_forward: None,
         volume: 0.0,
+        rewinding: false,
     };
 
     let playing = measure_session(&rom, saves(), model, normal, |_| ())?;

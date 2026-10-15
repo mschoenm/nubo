@@ -27,15 +27,22 @@ use crate::rom::Rom;
 use crate::settings::FastForwardSpeed;
 use crate::time::Duration;
 use audio::AudioOutput;
+use history::History;
 use nubo_core::{
     CartridgeEffects, ControllerMapping, ControllerState, Emulator, Key, Model, NoSaves, RtcClock,
     SgbBorder,
 };
+use pacing::FRAME_DURATION;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::mpsc::{self, Sender};
 
 pub use game::{GameSession, StartOptions};
+
+/// How many times faster than play rewinding goes back.
+const REWIND_SPEED: f64 = 2.0;
+/// How many samples of silence a buffer holds while rewinding.
+const REWIND_BUFFER_SAMPLES: usize = 512;
 #[cfg(target_arch = "wasm32")]
 pub use screen_refresh::Session;
 #[cfg(not(target_arch = "wasm32"))]
@@ -50,6 +57,9 @@ pub struct Playback {
     pub fast_forward: Option<FastForwardSpeed>,
     /// How loud to play, from 0 (silent) to 1 (as loud as the game).
     pub volume: f32,
+    /// Whether the game goes back through its recent past instead of
+    /// forward (see `history`), silently.
+    pub rewinding: bool,
 }
 
 impl Playback {
@@ -137,13 +147,16 @@ pub enum Command {
 }
 
 /// The emulated Game Boy with its sound output and battery saves, playing
-/// the way the last [`Playback`] said. Dropping it writes the battery saves
-/// still waiting.
+/// the way the last [`Playback`] said, with its recent past for rewinding.
+/// Dropping it writes the battery saves still waiting.
 struct Machine {
     emulator: Emulator,
     audio: AudioOutput,
     saves: Saves,
     playback: Playback,
+    history: History,
+    /// Playing time gone by while rewinding since the last step back.
+    rewind_time: Duration,
 }
 
 impl Machine {
@@ -188,6 +201,8 @@ impl Machine {
             audio,
             saves,
             playback,
+            history: History::default(),
+            rewind_time: Duration::ZERO,
         })
     }
 
@@ -244,7 +259,7 @@ impl Machine {
     fn play_buffer(&mut self) -> (Duration, bool) {
         let (left, right) = self.emulator.step_until_next_audio_buffer();
         let playing_time = self.audio.queue(left, right);
-        (playing_time, self.emulator.take_frame().is_some())
+        (playing_time, self.frame_finished())
     }
 
     /// Emulates one audio buffer's worth of time without playing it, for
@@ -252,9 +267,53 @@ impl Machine {
     /// and whether a frame finished meanwhile.
     fn skip_buffer(&mut self) -> (Duration, bool) {
         let samples = self.emulator.step_until_next_audio_buffer().0.len();
-        let emulated_time =
-            Duration::from_secs_f64(samples as f64 / f64::from(self.audio.sample_rate()));
-        (emulated_time, self.emulator.take_frame().is_some())
+        let emulated_time = self.samples_time(samples);
+        (emulated_time, self.frame_finished())
+    }
+
+    /// Whether the emulator finished a frame since this was last asked,
+    /// keeping a state for rewinding every few frames.
+    fn frame_finished(&mut self) -> bool {
+        let finished = self.emulator.take_frame().is_some();
+        if finished && self.history.frame_finished() {
+            self.history.push(self.emulator.save_state());
+        }
+        finished
+    }
+
+    /// How long `samples` take to play at the sound card's rate.
+    fn samples_time(&self, samples: usize) -> Duration {
+        Duration::from_secs_f64(samples as f64 / f64::from(self.audio.sample_rate()))
+    }
+
+    /// Plays one buffer of silence while rewinding, and when it is time,
+    /// steps back to the newest state kept (see [`History`]), running to the
+    /// end of the frame after it to show it. That goes back at
+    /// [`REWIND_SPEED`] times the speed of play. Returns how long the
+    /// silence takes to play, and whether there is a new frame to show; at
+    /// the oldest state kept the picture stays.
+    fn rewind_buffer(&mut self) -> (Duration, bool) {
+        let silence = vec![0.0; REWIND_BUFFER_SAMPLES];
+        let playing_time = self.audio.queue(&silence, &silence);
+        self.rewind_time += playing_time;
+
+        let step = FRAME_DURATION.mul_f64(f64::from(history::FRAMES_PER_STATE) / REWIND_SPEED);
+        if self.rewind_time < step {
+            return (playing_time, false);
+        }
+        self.rewind_time = Duration::ZERO;
+
+        let Some(state) = self.history.pop() else {
+            return (playing_time, false);
+        };
+        if self.emulator.load_state(&state).is_err() {
+            self.history.clear();
+            return (playing_time, false);
+        }
+        while self.emulator.take_frame().is_none() {
+            self.emulator.step_until_next_audio_buffer();
+        }
+        (playing_time, true)
     }
 }
 
@@ -283,6 +342,7 @@ fn stopped_error() -> String {
 
 mod audio;
 mod game;
+mod history;
 #[cfg_attr(
     all(not(target_arch = "wasm32"), not(test)),
     expect(

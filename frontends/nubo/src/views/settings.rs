@@ -182,6 +182,8 @@ pub enum SettingsFocus {
 pub enum SettingsRow {
     Appearance,
     Palette,
+    ColorCorrection,
+    FrameBlending,
     SharpPixels,
     SgbBorder,
     Model,
@@ -214,6 +216,8 @@ pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec
         SettingsTab::Display => rows.extend([
             SettingsRow::Appearance,
             SettingsRow::Palette,
+            SettingsRow::ColorCorrection,
+            SettingsRow::FrameBlending,
             SettingsRow::SharpPixels,
             SettingsRow::SgbBorder,
         ]),
@@ -598,6 +602,32 @@ fn display<'a>(settings: &'a Settings, rings: &Rings) -> Element<'a, Message> {
                     ]
                     .spacing(10),
                     SettingsRow::Palette,
+                ),
+                rings.row(
+                    setting(
+                        "Game Boy Color colors as on its screen",
+                        Some(String::from(
+                            "Softer colors, as the Game Boy Color's own screen showed them. \
+                             Off, they are as bright as the game sets them."
+                        )),
+                        switch(settings.shared.color_correction, |enabled| {
+                            Message::Settings(SettingsMessage::ColorCorrectionToggled(enabled))
+                        }),
+                    ),
+                    SettingsRow::ColorCorrection,
+                ),
+                rings.row(
+                    setting(
+                        "Smooth out flicker",
+                        Some(String::from(
+                            "Mixes each frame with the one before, as the Game Boy's slow \
+                             screen did, so sprites games blink on and off look see-through."
+                        )),
+                        switch(settings.shared.frame_blending, |enabled| {
+                            Message::Settings(SettingsMessage::FrameBlendingToggled(enabled))
+                        }),
+                    ),
+                    SettingsRow::FrameBlending,
                 ),
                 rings.row(
                     setting(

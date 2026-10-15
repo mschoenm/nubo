@@ -213,7 +213,9 @@ impl Session {
     fn run_frame(&mut self, play: bool) {
         self.screen_off_credit += FRAME_DURATION.as_secs_f64();
         loop {
-            let (playing_time, new_frame) = if play {
+            let (playing_time, new_frame) = if self.machine.playback.rewinding {
+                self.machine.rewind_buffer()
+            } else if play {
                 self.machine.play_buffer()
             } else {
                 self.machine.skip_buffer()

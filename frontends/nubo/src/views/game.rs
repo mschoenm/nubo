@@ -73,7 +73,9 @@ pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Ele
         .into(),
     ];
 
-    if game.session.is_fast_forwarding() {
+    if game.session.is_rewinding() && !game.is_paused() {
+        layers.push(corner_badge(Icon::Rewind, String::from("Rewinding")));
+    } else if game.session.is_fast_forwarding() {
         layers.push(fast_forward_badge(game, settings));
     }
 
@@ -199,18 +201,21 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
 
 /// The label in the top-right corner while fast forwarding.
 fn fast_forward_badge<'a>(game: &Game, settings: &Settings) -> Element<'a, Message> {
+    corner_badge(
+        Icon::FastForward,
+        game.session
+            .fast_forward_speed(&settings.shared)
+            .to_string(),
+    )
+}
+
+/// A small label in the top-right corner of the picture, such as while
+/// fast forwarding or rewinding.
+fn corner_badge<'a>(symbol: Icon, label: String) -> Element<'a, Message> {
     let badge = container(
-        row![
-            icon(Icon::FastForward).size(14),
-            text(
-                game.session
-                    .fast_forward_speed(&settings.shared)
-                    .to_string()
-            )
-            .size(13),
-        ]
-        .spacing(6)
-        .align_y(Alignment::Center),
+        row![icon(symbol).size(14), text(label).size(13)]
+            .spacing(6)
+            .align_y(Alignment::Center),
     )
     .padding([4, 10])
     .style(theme::floating_card);

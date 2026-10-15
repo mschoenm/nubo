@@ -8,6 +8,7 @@ use super::FrameListener;
 use super::{Command, Playback, Saves, Session};
 use crate::cheats::{self, Cheat};
 use crate::controls::Controls;
+use crate::lcd;
 use crate::notices::Notices;
 use crate::palettes::DmgPalette;
 use crate::picture::{Frame, Picture};
@@ -235,6 +236,16 @@ impl GameSession {
         cheats::save(&self.rom.path, &self.cheats)
     }
 
+    /// Shows Game Boy Color games as on its own screen (on a Game Boy Color
+    /// only: the Game Boy Advance's screen and a Super Game Boy's TV showed
+    /// them differently), and mixes each frame with the one before, as
+    /// these say (see `lcd`).
+    pub fn set_screen_effects(&mut self, color_correction: bool, frame_blending: bool) {
+        let color_screen = self.model.is_cgb() && self.model != Model::Agb;
+        self.screen
+            .set_effects(color_correction && color_screen, frame_blending);
+    }
+
     /// Shows original Game Boy games in `palette` from now on, repainting
     /// the frame on screen.
     pub fn set_palette(&mut self, palette: DmgPalette) {
@@ -292,6 +303,17 @@ impl GameSession {
     /// Fast forwards while `held`, such as while a key is held down.
     pub fn hold_fast_forward(&mut self, held: bool) {
         self.playback.fast_forward_held = held;
+    }
+
+    /// Goes back through the game's recent past while `held`, such as while
+    /// a key is held down.
+    pub fn hold_rewind(&mut self, held: bool) {
+        self.playback.rewinding = held;
+    }
+
+    /// Whether the game goes back through its recent past.
+    pub fn is_rewinding(&self) -> bool {
+        self.playback.rewinding
     }
 
     /// Switches fast forward on or off, such as with a button.
@@ -392,6 +414,14 @@ struct Screen {
     palette: DmgPalette,
     /// Whether a Super Game Boy's border shows around the screen.
     border: bool,
+    /// Whether the colors are shown as on a Game Boy Color's screen (see
+    /// `lcd::correct_colors`).
+    correct_colors: bool,
+    /// Whether each frame is mixed with the one before (see `lcd::blend`).
+    blend_frames: bool,
+    /// The pixels of the frame before the newest, as the emulator drew
+    /// them, to blend the newest with.
+    previous: Option<Vec<u8>>,
     /// The sequence number of the frame shown, to skip unchanged frames.
     sequence: u64,
 }
@@ -403,6 +433,9 @@ impl Screen {
             raw: None,
             palette: DmgPalette::default(),
             border: true,
+            correct_colors: false,
+            blend_frames: false,
+            previous: None,
             sequence: 0,
         }
     }
@@ -411,15 +444,44 @@ impl Screen {
     /// without any border. Save states and the library keep it as their
     /// picture.
     fn screen_pixels(&self) -> Option<Vec<u8>> {
-        let raw = self.raw.as_ref()?;
+        let mut raw = self.raw.clone()?;
+        self.correct(&mut raw);
         let picture = raw.shown(self.palette, false);
         Some(picture.pixels().to_vec())
     }
 
-    /// Shows a frame as the emulator drew it, in the chosen palette.
+    /// Shows a frame as the emulator drew it, in the chosen palette, mixed
+    /// with the one before and with its colors corrected if the player wants.
     fn show(&mut self, frame: Frame) {
-        self.picture = Some(frame.shown(self.palette, self.border));
+        let mut shown = frame.clone();
+        if self.blend_frames
+            && let Some(previous) = &self.previous
+        {
+            lcd::blend(&mut shown.pixels, previous);
+        }
+        self.correct(&mut shown);
+        self.picture = Some(shown.shown(self.palette, self.border));
+        self.previous = Some(frame.pixels.clone());
         self.raw = Some(frame);
+    }
+
+    /// Corrects the colors of a Game Boy Color frame, if the player wants.
+    /// Frames in the Game Boy's grays and Super Game Boy frames, which a TV
+    /// showed, stay as they are.
+    fn correct(&self, frame: &mut Frame) {
+        if self.correct_colors && !frame.in_dmg_shades && frame.sgb_menu.is_none() {
+            lcd::correct_colors(&mut frame.pixels);
+        }
+    }
+
+    /// Shows Game Boy Color colors as on its screen, and mixes frames, from
+    /// now on as these say, repainting the frame on screen.
+    fn set_effects(&mut self, correct_colors: bool, blend_frames: bool) {
+        if (correct_colors, blend_frames) != (self.correct_colors, self.blend_frames) {
+            self.correct_colors = correct_colors;
+            self.blend_frames = blend_frames;
+            self.show_again();
+        }
     }
 
     /// Shows original Game Boy games in `palette` from now on, repainting
@@ -460,6 +522,8 @@ struct PlaybackControl {
     /// The fast forward speed for this game instead of the settings' one
     /// (see [`StartOptions::fast_forward`]).
     speed: Option<FastForwardSpeed>,
+    /// Whether the rewind key is held down.
+    rewinding: bool,
     /// How the emulator was last told to play.
     sent: Playback,
 }
@@ -473,10 +537,12 @@ impl PlaybackControl {
             fast_forward_held: false,
             fast_forward_on: fast_forward.is_some(),
             speed: fast_forward,
+            rewinding: false,
             sent: Playback {
                 running,
                 fast_forward,
                 volume: settings.effective_volume(),
+                rewinding: false,
             },
         }
     }
@@ -495,6 +561,7 @@ impl PlaybackControl {
                 .is_fast_forwarding()
                 .then_some(self.speed.unwrap_or(settings.fast_forward_speed)),
             volume: settings.effective_volume(),
+            rewinding: running && self.rewinding,
         };
 
         (wanted != self.sent).then(|| {

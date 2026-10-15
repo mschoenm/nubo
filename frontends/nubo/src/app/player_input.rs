@@ -237,6 +237,13 @@ impl App {
             return Task::none();
         }
 
+        if action == Action::Rewind {
+            if let Some(game) = &mut self.game {
+                game.session.hold_rewind(pressed);
+            }
+            return Task::none();
+        }
+
         if !pressed || self.screen_scale.is_some() {
             return Task::none();
         }

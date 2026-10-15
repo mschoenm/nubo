@@ -279,7 +279,9 @@ impl EmulatorThread {
     /// plays (see [`super::Playback::buffers_per_played`]): the played one
     /// when the queue needs it, and the others spread over the time that one
     /// takes to play (see [`FastForward`]). The sound card still paces the
-    /// loop, and the sound stays at its normal pitch.
+    /// loop, and the sound stays at its normal pitch. While rewinding it
+    /// plays silence instead, stepping back through the game's recent past
+    /// (see `Machine::rewind_buffer`).
     fn step(&mut self) {
         self.machine.saves.flush_when_settled();
 
@@ -289,6 +291,19 @@ impl EmulatorThread {
         if !self.machine.playback.running {
             self.count_wakeup();
             thread::park();
+            return;
+        }
+
+        if self.machine.playback.rewinding {
+            if self.machine.audio.needs_samples() {
+                self.activity.buffers.fetch_add(1, Ordering::Relaxed);
+                if self.machine.rewind_buffer().1 {
+                    publish_frame(&self.frame, &self.machine.emulator);
+                }
+            } else {
+                self.count_wakeup();
+                self.machine.audio.wait_until_samples_needed(LONGEST_SLEEP);
+            }
             return;
         }
 
