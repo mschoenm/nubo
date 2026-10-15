@@ -8,7 +8,7 @@ const EVERYTHING: ResetOffers = ResetOffers {
     delete_save_states: true,
     remove_folders: true,
     clear_recently_played: true,
-    close_game_first: false,
+    game_open: false,
 };
 
 /// The labels of `content`'s checkboxes, then of its buttons.
@@ -49,7 +49,6 @@ fn only_what_is_offered_gets_a_box() {
     let offers = ResetOffers {
         delete_battery_saves: false,
         delete_save_states: false,
-        close_game_first: true,
         ..EVERYTHING
     };
 
@@ -63,12 +62,42 @@ fn only_what_is_offered_gets_a_box() {
             "Clear Continue playing"
         ]
     );
-    assert!(
-        content
-            .text
-            .unwrap()
-            .contains("To delete saves too, close the game first.")
+}
+
+#[test]
+fn an_open_game_greys_out_deleting_saves_and_says_why() {
+    let offers = ResetOffers {
+        game_open: true,
+        ..EVERYTHING
+    };
+
+    let content = reset_question(ResetChoices::default(), offers);
+
+    assert_eq!(
+        labels(&content).0,
+        [
+            "Reset settings",
+            "Delete in-game saves",
+            "Delete save states",
+            "Remove game folders",
+            "Clear Continue playing"
+        ]
     );
+    let enabled: Vec<bool> = content.choices[..5]
+        .iter()
+        .map(|choice| choice.enabled)
+        .collect();
+    assert_eq!(enabled, [true, false, false, true, true]);
+    for choice in &content.choices[1..3] {
+        assert!(!choice.checked);
+        assert!(
+            choice
+                .description
+                .as_deref()
+                .unwrap()
+                .contains("Close the game first")
+        );
+    }
 }
 
 #[test]
@@ -148,14 +177,13 @@ fn a_ticked_box_no_longer_offered_deletes_nothing() {
         ..ResetChoices::default()
     };
     let offers = ResetOffers {
-        delete_battery_saves: false,
-        delete_save_states: false,
-        close_game_first: true,
+        game_open: true,
         ..EVERYTHING
     };
 
     let content = reset_question(choices, offers);
 
+    assert!(!content.choices[1].checked);
     assert_eq!(labels(&content).1, ["Cancel", "Reset"]);
     assert!(!content.notice.unwrap().warning);
 }

@@ -381,8 +381,8 @@ impl App {
                 }
                 self.game = Some(game);
                 self.settings_tab = None;
-                // The reset question offered to delete saves, which it
-                // can't while a game runs, so it closes with the settings.
+                // The reset question belongs to the settings, so it closes
+                // with them.
                 if self
                     .dialog
                     .as_ref()
