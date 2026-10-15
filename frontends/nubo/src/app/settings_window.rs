@@ -535,16 +535,16 @@ fn delete_saves(
 ) -> (Vec<&'static str>, Vec<String>) {
     let mut deleted = Vec::new();
     let mut errors = Vec::new();
-    let jobs: [(bool, &'static str, fn() -> Result<(), String>); 2] = [
-        (delete_battery_saves, "in-game saves", battery::delete_all),
-        (delete_save_states, "save states", save_states::delete_all),
-    ];
-    for (asked, kind, delete) in jobs {
-        if asked {
-            match delete() {
-                Ok(()) => deleted.push(kind),
-                Err(error) => errors.push(error),
-            }
+    if delete_battery_saves {
+        match battery::delete_all() {
+            Ok(()) => deleted.push("in-game saves"),
+            Err(error) => errors.push(error),
+        }
+    }
+    if delete_save_states {
+        match save_states::delete_all() {
+            Ok(()) => deleted.push("save states"),
+            Err(error) => errors.push(error),
         }
     }
     (deleted, errors)
