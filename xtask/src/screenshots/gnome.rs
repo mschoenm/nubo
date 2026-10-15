@@ -55,13 +55,17 @@ const SHELL_START: Duration = Duration::from_secs(60);
 const CAPTURE_TIME: Duration = Duration::from_secs(180);
 /// What the namespace runs as root before starting xtask again on a
 /// session bus of its own: empty folders over the container's
-/// `/run/systemd`, `/run/dbus` and `/tmp/.X11-unix`, and a system bus.
+/// `/run/systemd`, `/run/dbus` and `/tmp/.X11-unix`, and a system bus,
+/// which it stops once the session ends, failed or not (the namespace only
+/// isolates mounts, so the bus would outlive it).
 const NAMESPACE_SCRIPT: &str = "set -e; \
     for folder in /run/systemd /run/dbus /tmp/.X11-unix; do mkdir -p $folder; done; \
     mount -t tmpfs none /run/systemd; mount -t tmpfs none /run/dbus; \
     mount -t tmpfs -o mode=1777 none /tmp/.X11-unix; \
-    dbus-daemon --system --fork; \
-    exec dbus-run-session -- \"$@\"";
+    bus=$(dbus-daemon --system --fork --print-pid); \
+    status=0; dbus-run-session -- \"$@\" || status=$?; \
+    kill \"$bus\" 2>/dev/null || true; \
+    exit $status";
 
 /// Every picture to take, in the order they were added.
 #[derive(Debug, Default, Serialize, Deserialize)]

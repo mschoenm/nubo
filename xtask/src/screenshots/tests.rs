@@ -181,6 +181,13 @@ fn differences_are_painted_red() {
     let difference = pictures::difference(&old, &new);
     assert_eq!(*difference.get_pixel(0, 0), Rgba([128, 128, 128, 255]));
     assert_eq!(*difference.get_pixel(1, 0), Rgba([255, 0, 0, 255]));
+
+    // A part cropped away is red too.
+    let cropped = RgbaImage::from_pixel(1, 1, Rgba([0, 0, 0, 255]));
+    let difference = pictures::difference(&old, &cropped);
+    assert_eq!(difference.dimensions(), (2, 1));
+    assert_eq!(*difference.get_pixel(0, 0), Rgba([128, 128, 128, 255]));
+    assert_eq!(*difference.get_pixel(1, 0), Rgba([255, 0, 0, 255]));
 }
 
 #[test]

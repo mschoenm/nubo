@@ -64,17 +64,22 @@ pub fn compose(screenshot: &Screenshot, tiles: &[PathBuf]) -> Result<RgbaImage> 
 
 /// `new` with every pixel that differs from `old` painted red, and the
 /// others faded, so the differences stand out. Pictures of different sizes
-/// differ everywhere outside the part they share.
+/// differ wherever only one of them has pixels: the picture covers both, so
+/// a part that was cropped away shows in red too.
 pub fn difference(old: &RgbaImage, new: &RgbaImage) -> RgbaImage {
-    RgbaImage::from_fn(new.width(), new.height(), |x, y| {
-        let pixel = *new.get_pixel(x, y);
-        let same = x < old.width() && y < old.height() && *old.get_pixel(x, y) == pixel;
-        if same {
-            let [red, green, blue, alpha] = pixel.0;
-            let fade = |channel: u8| 128 + channel / 2;
-            image::Rgba([fade(red), fade(green), fade(blue), alpha])
-        } else {
-            image::Rgba([255, 0, 0, 255])
+    let width = old.width().max(new.width());
+    let height = old.height().max(new.height());
+    RgbaImage::from_fn(width, height, |x, y| {
+        let pixel = |picture: &RgbaImage| {
+            (x < picture.width() && y < picture.height()).then(|| *picture.get_pixel(x, y))
+        };
+        match (pixel(old), pixel(new)) {
+            (Some(old), Some(new)) if old == new => {
+                let [red, green, blue, alpha] = new.0;
+                let fade = |channel: u8| 128 + channel / 2;
+                image::Rgba([fade(red), fade(green), fade(blue), alpha])
+            }
+            _ => image::Rgba([255, 0, 0, 255]),
         }
     })
 }
