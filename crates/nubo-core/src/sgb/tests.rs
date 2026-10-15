@@ -512,24 +512,27 @@ fn save_states_keep_what_the_game_did_but_not_the_players_choices() {
 }
 
 #[test]
-fn a_loaded_state_keeps_the_colors_the_game_took_back() {
+fn picking_a_palette_after_the_game_took_its_colors_back_leaves_the_state_alone() {
     use crate::serializable::Serializable;
 
     let mut console = Console::new();
     console.send(&[header(command::PAL_PRI, 1), 0x01]);
+    console.send(&pal01([0, 0x7C00, 0, 0, 0x7C00, 0, 0]));
+    let mut before = Vec::new();
+    console.sgb.serialize(&mut before).unwrap();
+
     console.sgb.set_player_palette(Some(PLAYER_PALETTE));
+    assert_eq!(console.sgb.player_palette(), Some(PLAYER_PALETTE));
+    let mut after = Vec::new();
+    console.sgb.serialize(&mut after).unwrap();
+    assert_eq!(before, after);
+
+    // A player's pick also stays when a state loads, as with run-ahead
+    // every frame, until the game takes its colors back again.
+    console.sgb.deserialize(&mut before.as_slice()).unwrap();
+    assert_eq!(console.sgb.player_palette(), Some(PLAYER_PALETTE));
     console.send(&pal01([0, 0x7C00, 0, 0, 0x7C00, 0, 0]));
     assert_eq!(console.sgb.player_palette(), None);
-
-    let mut bytes = Vec::new();
-    console.sgb.serialize(&mut bytes).unwrap();
-    let mut loaded = Console::new();
-    loaded.sgb.set_player_palette(Some(PLAYER_PALETTE));
-    loaded.sgb.deserialize(&mut bytes.as_slice()).unwrap();
-    assert_eq!(loaded.sgb.player_palette(), None);
-
-    loaded.sgb.set_player_palette(Some(PLAYER_PALETTE));
-    assert_eq!(loaded.sgb.player_palette(), Some(PLAYER_PALETTE));
 }
 
 #[test]

@@ -249,9 +249,14 @@ pub(crate) struct Sgb {
     /// Whether the game turned the attraction mode off (`ATRC_EN`).
     attraction_disabled: bool,
     /// Whether the game took its colors back from the player's palette
-    /// (`PAL_PRI`, or `ICON_EN` taking the palettes away), until the player
-    /// picks a palette again.
+    /// (`PAL_PRI`, or `ICON_EN` taking the palettes away). Only the game
+    /// changes it, so the player's choices never change a save state.
     palette_taken_back: bool,
+    /// Whether the player picked a palette since the game last took its
+    /// colors back, which shows it again. Save states leave it out, like
+    /// `player_palette`, so each netplay player can pick their own colors.
+    #[serializable(skip)]
+    palette_picked_since: bool,
     /// The palette the player picked from the menu, four RGB555 colors from
     /// the lightest shade to the darkest, or `None` for the game's colors.
     /// Save states leave it out, like `border_choice`: the player's choices
@@ -331,6 +336,7 @@ impl Sgb {
             game_palette_priority: false,
             attraction_disabled: false,
             palette_taken_back: false,
+            palette_picked_since: false,
             player_palette: None,
             border_choice: SgbBorder::Game,
             idle_frames: 0,
@@ -386,10 +392,13 @@ impl Sgb {
     }
 
     /// The palette the player picked, while it colors the screen: not
-    /// while the game has taken the palettes away or its colors back.
+    /// while the game has taken the palettes away, nor after it took its
+    /// colors back until the player picks a palette again.
     pub(crate) fn player_palette(&self) -> Option<[u16; 4]> {
-        self.player_palette
-            .filter(|_| !self.palette_taken_back && !self.player_palettes_disabled)
+        self.player_palette.filter(|_| {
+            !self.player_palettes_disabled
+                && (!self.palette_taken_back || self.palette_picked_since)
+        })
     }
 
     /// The player picks `palette`, four RGB555 colors from lightest to
@@ -400,7 +409,7 @@ impl Sgb {
     pub(crate) fn set_player_palette(&mut self, palette: Option<[u16; 4]>) {
         self.player_palette = palette;
         if palette.is_some() && !self.player_palettes_disabled {
-            self.palette_taken_back = false;
+            self.palette_picked_since = true;
         }
     }
 
@@ -483,7 +492,7 @@ impl Sgb {
             command::ICON_EN => {
                 self.player_palettes_disabled = command[1] & 0x01 != 0;
                 if self.player_palettes_disabled {
-                    self.palette_taken_back = true;
+                    self.take_colors_back();
                 }
                 // Bit 1 bars the menu's controller setup, which Nubo's menu
                 // doesn't have: the apps' own controls settings serve
@@ -530,8 +539,14 @@ impl Sgb {
     fn game_sets_colors(&mut self) {
         self.colorized = true;
         if self.game_palette_priority {
-            self.palette_taken_back = true;
+            self.take_colors_back();
         }
+    }
+
+    /// The game takes its colors back from the player's palette.
+    fn take_colors_back(&mut self) {
+        self.palette_taken_back = true;
+        self.palette_picked_since = false;
     }
 
     /// Sets the color at `index` (palette × 4 + color) of `palettes`.
