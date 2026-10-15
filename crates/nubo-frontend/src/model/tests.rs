@@ -38,10 +38,10 @@ fn automatic_picks_the_model_from_the_header() {
 }
 
 #[test]
-fn automatic_starts_super_game_boy_games_on_the_game_boy_they_were_made_for() {
+fn automatic_starts_super_game_boy_games_on_one_unless_they_have_color() {
     assert_eq!(
         ModelPreference::Automatic.model_for(&sgb_header(false, true)),
-        Model::Dmg
+        Model::Sgb
     );
     assert_eq!(
         ModelPreference::Automatic.model_for(&sgb_header(true, true)),

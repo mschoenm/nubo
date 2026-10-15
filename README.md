@@ -47,7 +47,7 @@ Point it at your games folder and your games appear in a library with their titl
 
 ## Features
 
-- **Models:** the original Game Boy, the Game Boy Pocket, the Super Game Boy 1 and 2, every revision of the Game Boy Color, and the Game Boy Advance playing Game Boy games. Nubo picks a model for each game. You can choose another in the settings, console first and then its revision, or for one game from its menu in the library.
+- **Models:** the original Game Boy, the Game Boy Pocket, the Super Game Boy 1 and 2, every revision of the Game Boy Color, and the Game Boy Advance playing Game Boy games. Nubo picks a model for each game, the Super Game Boy for games made for it. You can choose another in the settings, console first and then its revision, or for one game from its menu in the library.
 - **Super Game Boy:** games made for it show their own colors and border, and games for several players can be played by up to four, each on their own controller. The pause menu lets you pick other colors, your own included, and another border.
 - **Library:** built from your game folders, with each game's title screen or box art, search, sorting by name or by when you played or added a game, and a Continue playing row with the games you played last. Each game has a menu (right click it) to pick the model it starts on, open its folder or delete its save states.
 - **Saves:** save states with a picture, quick save and quick load, and continuing games where you left off. Loading a state, restarting a game or saving over a slot can be undone from the message that confirms it. In-game saves are plain `.sav` files that move between the app and the [RetroArch core](#retroarch-core).

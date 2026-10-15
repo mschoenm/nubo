@@ -690,8 +690,9 @@ fn playing<'a>(
     let preference = settings.shared.model;
     let model_description = match preference {
         ModelPreference::Automatic => String::from(
-            "Each game starts on the Game Boy it was made for. A game's menu in the library \
-             can pick another for that game.",
+            "Each game starts on the Game Boy it was made for, Super Game Boy games with \
+             their colors and border. A game's menu in the library can pick another for \
+             that game.",
         ),
         ModelPreference::Fixed(model) if revisions(preference).is_empty() => {
             format!("Every game starts on this model. {}", model::about(model))
