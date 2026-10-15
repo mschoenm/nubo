@@ -2,7 +2,7 @@
 
 Every night at 04:07 Amsterdam time a Claude cloud routine reviews the day's changes and one small part of the code in detail, fixes what is clearly better, and opens a pull request for the morning when it changed something. This file is its instructions; the routine's prompt only points here, so the job changes through pull requests like the code.
 
-The nightly CI (`.github/workflows/nightly.yml`) runs first, at 01:17 Amsterdam time. Besides the slow test suites it measures speed, instructions and battery use (`cargo xtask benchmark-roms`, `nubo --measure-efficiency`), appends them to the metrics log in the repository's wiki (`cargo xtask metrics`) and picks tonight's part (`cargo xtask review-units next`). CI is the only writer of the wiki, and only its scheduled runs write to it; the review only reads it.
+The nightly CI (`.github/workflows/nightly.yml`) runs first, at 01:17 Amsterdam time. Besides the slow test suites it measures speed, instructions and battery use (`cargo xtask benchmark-roms`, `nubo measure-efficiency`), appends them to the metrics log in the repository's wiki (`cargo xtask metrics`) and picks tonight's part (`cargo xtask review-units next`). CI is the only writer of the wiki, and only its scheduled runs write to it; the review only reads it.
 
 ## 1. Set up
 

@@ -1,7 +1,7 @@
 //! Measures how much the desktop app's emulator thread (the session paced
 //! by the sound card, in `nubo_frontend::session`) wakes the processor,
 //! which is most of what a running game costs a laptop's battery besides the
-//! emulation itself. Run it with `nubo --measure-efficiency <rom> [--cgb |
+//! emulation itself. Run it with `nubo measure-efficiency <rom> [--cgb |
 //! --model <name>]` (`command_line`): it plays the game without a window or
 //! sound for a few seconds in each situation below and prints one line of
 //! JSON, which the nightly CI keeps in its metrics log.
@@ -39,7 +39,7 @@ struct Rates {
     frames: f64,
 }
 
-/// Runs the measurement that `nubo --measure-efficiency <rom>` asks for
+/// Runs the measurement that `nubo measure-efficiency <rom>` asks for
 /// (`command_line`), printing its JSON, and returns the exit code.
 pub fn run(rom_path: &Path, model: Model) -> ExitCode {
     match measure(rom_path, model) {

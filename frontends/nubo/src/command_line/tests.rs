@@ -146,31 +146,45 @@ fn help_and_version() {
     assert_eq!(mistake(&["--version"]), ErrorKind::DisplayVersion);
     let help = parse_args(&["--help"]).unwrap_err().to_string();
     assert!(help.contains("--scale"), "{help}");
-    assert!(!help.contains("--measure-efficiency"), "{help}");
+    assert!(!help.contains("measure-efficiency"), "{help}");
 }
 
 #[test]
 fn measuring_efficiency_needs_a_rom_and_runs_on_dmg() {
     assert_eq!(
-        parse_args(&["--measure-efficiency", "game.gb"]).unwrap(),
+        parse_args(&["measure-efficiency", "game.gb"]).unwrap(),
         Request::MeasureEfficiency {
             rom_path: std::path::absolute("game.gb").unwrap(),
             model: Model::Dmg,
         }
     );
     assert_eq!(
-        parse_args(&["--measure-efficiency", "game.gb", "--model", "cgb"]).unwrap(),
+        parse_args(&["measure-efficiency", "game.gb", "--cgb"]).unwrap(),
         Request::MeasureEfficiency {
             rom_path: std::path::absolute("game.gb").unwrap(),
             model: Model::CgbE,
         }
     );
     assert_eq!(
-        mistake(&["--measure-efficiency"]),
+        mistake(&["measure-efficiency"]),
         ErrorKind::MissingRequiredArgument
     );
     assert_eq!(
-        mistake(&["--measure-efficiency", "game.gb", "--fresh"]),
-        ErrorKind::ArgumentConflict
+        mistake(&["measure-efficiency", "game.gb", "--fresh"]),
+        ErrorKind::UnknownArgument
+    );
+    for first in [&["--fresh"][..], &["game.gb"], &["--model", "cgb"]] {
+        let args = [first, &["measure-efficiency", "x.gb"]].concat();
+        assert_eq!(mistake(&args), ErrorKind::ArgumentConflict, "{args:?}");
+    }
+}
+
+#[test]
+fn a_rom_named_like_the_command_opens_by_its_path() {
+    let path = options(&["./measure-efficiency"]).rom_path.unwrap();
+    assert!(path.ends_with("measure-efficiency"));
+    assert_eq!(
+        options(&["help"]).rom_path.unwrap().file_name().unwrap(),
+        "help"
     );
 }

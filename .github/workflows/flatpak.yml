@@ -62,7 +62,7 @@ jobs:
         run: |
           cargo xtask benchmark-roms
           dbus-run-session -- flatpak run --user io.github.mschoenm.nubo \
-            --measure-efficiency "$PWD/target/benchmark-roms/tobudx.gb" | tee "$RUNNER_TEMP/efficiency.json"
+            measure-efficiency "$PWD/target/benchmark-roms/tobudx.gb" | tee "$RUNNER_TEMP/efficiency.json"
           jq -e '.playing.buffers_per_second > 0 and .playing.frames_per_second > 0' "$RUNNER_TEMP/efficiency.json"
 
       # Flathub shows the AppStream file as it is in the repository, so it

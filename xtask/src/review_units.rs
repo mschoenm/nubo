@@ -47,10 +47,12 @@ struct Module {
     folder: Option<PathBuf>,
 }
 
-/// What `cargo xtask review-units` can be asked to do besides listing the
-/// parts. The doc comments are the help that `--help` prints.
+/// What `cargo xtask review-units` can do. The doc comments are the help
+/// that `--help` prints.
 #[derive(Subcommand, Debug)]
 pub enum Command {
+    /// List the parts with their number of lines
+    List,
     /// Pick tonight's part, record it in the rotation's state and print what the review should
     /// cover as JSON
     Next(NextOptions),
@@ -70,11 +72,11 @@ pub struct NextOptions {
     commit: String,
 }
 
-/// Runs the command: none lists the parts, `next` picks tonight's part and
-/// records it in the rotation's state.
-pub fn run(command: Option<Command>) -> Result {
+/// Runs the command: `list` lists the parts, `next` picks tonight's part
+/// and records it in the rotation's state.
+pub fn run(command: Command) -> Result {
     match command {
-        None => {
+        Command::List => {
             let parts = parts()?;
             for part in &parts {
                 println!("{:>6}  {}", part.lines, part.name);
@@ -83,7 +85,7 @@ pub fn run(command: Option<Command>) -> Result {
             println!("{} parts, {lines} lines", parts.len());
             Ok(())
         }
-        Some(Command::Next(options)) => {
+        Command::Next(options) => {
             println!("{}", next_part(&options)?);
             Ok(())
         }

@@ -107,10 +107,8 @@ enum Task {
     CompareEmulators(compare_emulators::Arguments),
     /// List the parts the nightly review splits the code into, or pick tonight's part and
     /// record it in the rotation's state
-    ReviewUnits {
-        #[command(subcommand)]
-        command: Option<review_units::Command>,
-    },
+    #[command(subcommand)]
+    ReviewUnits(review_units::Command),
     /// Add a night to the nightly metrics log, or write the Nightly metrics wiki page
     #[command(subcommand)]
     Metrics(metrics::Command),
@@ -397,7 +395,7 @@ fn main() -> ExitCode {
             println!("The benchmark games are in {}", folder.display());
         }),
         Task::CompareEmulators(arguments) => compare_emulators::run_comparison(arguments),
-        Task::ReviewUnits { command } => review_units::run(command),
+        Task::ReviewUnits(command) => review_units::run(command),
         Task::Metrics(command) => metrics::run(command),
         Task::ShootoutScoreboard { commit } => shootout_scoreboard::run(&commit),
     };

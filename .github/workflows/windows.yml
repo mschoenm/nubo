@@ -106,7 +106,7 @@ jobs:
               if (-not (Test-Path (Join-Path $folder $file))) { throw "$file is missing from $folder" }
             }
             $output = Join-Path $env:RUNNER_TEMP "efficiency.json"
-            $exitCode = Invoke-Program (Join-Path $folder "nubo.exe") @("--measure-efficiency", "`"$rom`"") $output
+            $exitCode = Invoke-Program (Join-Path $folder "nubo.exe") @("measure-efficiency", "`"$rom`"") $output
             $json = Get-Content $output -Raw
             $json
             if ($exitCode -ne 0) { throw "nubo.exe in $folder exited with $exitCode" }
