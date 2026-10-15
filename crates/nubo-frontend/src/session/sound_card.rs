@@ -90,7 +90,7 @@ pub struct Session {
 }
 
 /// Counts what the emulator thread does, to measure how often it wakes the
-/// processor (see the app's `nubo --measure-efficiency`). Every wake-up
+/// processor (see the app's `nubo measure-efficiency`). Every wake-up
 /// keeps a laptop's processor from resting, so fewer of them save battery.
 #[derive(Debug, Default)]
 struct Activity {

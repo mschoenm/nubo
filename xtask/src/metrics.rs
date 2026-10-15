@@ -16,10 +16,11 @@
 //! "published_commit": "72fd745"}`. The page's first lines show it.
 
 use crate::Result;
+use clap::Subcommand;
 use serde_json::Value;
 use std::fmt::Write;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// How many nights before the latest one each median covers, shortest
 /// window first.
@@ -73,17 +74,35 @@ fn threshold(key: &str) -> Threshold {
     }
 }
 
+/// What `cargo xtask metrics` can do. The doc comments are the help that
+/// `--help` prints.
+#[derive(Subcommand, Debug)]
+pub enum Command {
+    /// Add a night to the nightly metrics log
+    Append {
+        /// The log, one night of JSON per line
+        #[arg(value_name = "METRICS.JSONL")]
+        log: PathBuf,
+        /// The night to add, as JSON with its date
+        #[arg(value_name = "NIGHT.JSON")]
+        night: PathBuf,
+    },
+    /// Print the Nightly metrics wiki page, made from the log, as Markdown
+    Report {
+        /// The log, one night of JSON per line
+        #[arg(value_name = "METRICS.JSONL")]
+        log: PathBuf,
+    },
+}
+
 /// Runs `append <log> <night.json>` or `report <log>`.
-pub fn run(args: &[String]) -> Result {
-    match args {
-        [command, log, night] if command == "append" => append(Path::new(log), Path::new(night)),
-        [command, log] if command == "report" => {
-            print!("{}", report(&read_log(Path::new(log))?));
+pub fn run(command: Command) -> Result {
+    match command {
+        Command::Append { log, night } => append(&log, &night),
+        Command::Report { log } => {
+            print!("{}", report(&read_log(&log)?));
             Ok(())
         }
-        _ => Err(String::from(
-            "usage: cargo xtask metrics append <metrics.jsonl> <night.json> | report <metrics.jsonl>",
-        )),
     }
 }
 

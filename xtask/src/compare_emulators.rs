@@ -25,6 +25,8 @@
 //! Linux and macOS; `--instructions` needs Valgrind, which runs on Linux.
 
 use crate::{Result, benchmark_roms, build_commit, target_dir};
+use clap::builder::PossibleValue;
+use clap::{Args, ValueEnum};
 use image::RgbImage;
 use std::collections::BTreeMap;
 use std::env;
@@ -198,115 +200,120 @@ impl Model {
     }
 }
 
+impl ValueEnum for Emulator {
+    fn value_variants<'a>() -> &'a [Self] {
+        &EMULATORS
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        Some(PossibleValue::new(self.id()))
+    }
+}
+
+impl ValueEnum for Model {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[Model::Dmg, Model::Cgb]
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        Some(PossibleValue::new(self.id()))
+    }
+}
+
+/// The command line of `cargo xtask compare-emulators`, as clap reads it.
+/// The doc comments on its fields are the help that `--help` prints.
+#[derive(Args, Debug)]
+pub struct Arguments {
+    /// ROM files (.gb or .gbc) or folders to search for them; the benchmark games when none
+    /// are given
+    roms: Vec<PathBuf>,
+    /// Seconds of emulated time to run each game for [default: 30, or 10 with
+    /// --instructions]
+    #[arg(long, value_name = "SECONDS", value_parser = parse_seconds)]
+    seconds: Option<f64>,
+    /// How many times to time each run; the table shows the fastest
+    #[arg(long, value_name = "N", default_value_t = DEFAULT_ROUNDS, value_parser = clap::value_parser!(u32).range(1..))]
+    rounds: u32,
+    /// The hardware models to run every game on, separated by commas
+    #[arg(
+        long,
+        value_name = "MODEL,...",
+        value_delimiter = ',',
+        default_value = "dmg,cgb"
+    )]
+    models: Vec<Model>,
+    /// The emulators to run, separated by commas [default: all of them]
+    #[arg(long, value_name = "EMULATOR,...", value_delimiter = ',')]
+    emulators: Vec<Emulator>,
+    /// Count the instructions each emulator runs with Valgrind instead of timing it (Linux)
+    #[arg(long)]
+    instructions: bool,
+    /// Also keep each run's last frame, to check every emulator got as far
+    #[arg(long)]
+    screenshots: bool,
+}
+
+/// Reads the value of `--seconds`: a positive number.
+fn parse_seconds(text: &str) -> Result<f64> {
+    text.parse::<f64>()
+        .ok()
+        .filter(|seconds| seconds.is_finite() && *seconds > 0.0)
+        .ok_or_else(|| String::from("expected a positive number"))
+}
+
 /// What to compare, from the command line.
 struct Options {
     /// ROM files and folders; the benchmark games when empty.
     roms: Vec<PathBuf>,
     seconds: f64,
     rounds: u32,
+    /// The models to run on, in the order of `Model`, each once.
     models: Vec<Model>,
+    /// The emulators to run, in the order of `EMULATORS`, each once.
     emulators: Vec<Emulator>,
     instructions: bool,
     screenshots: bool,
 }
 
-impl Options {
-    fn parse(args: &[String]) -> Result<Self> {
-        let mut options = Options {
-            roms: Vec::new(),
-            seconds: DEFAULT_SECONDS,
-            rounds: DEFAULT_ROUNDS,
-            models: vec![Model::Dmg, Model::Cgb],
-            emulators: EMULATORS.to_vec(),
-            instructions: false,
-            screenshots: false,
-        };
-        let mut seconds = None;
-        let mut args = args.iter();
-        while let Some(arg) = args.next() {
-            let mut value = || {
-                args.next()
-                    .map(String::as_str)
-                    .ok_or_else(|| format!("{arg} needs a value"))
-            };
-            match arg.as_str() {
-                "--seconds" => {
-                    let text = value()?;
-                    seconds = Some(
-                        text.parse::<f64>()
-                            .ok()
-                            .filter(|seconds| seconds.is_finite() && *seconds > 0.0)
-                            .ok_or_else(|| {
-                                format!("--seconds must be a positive number, not {text}")
-                            })?,
-                    );
-                }
-                "--rounds" => {
-                    let text = value()?;
-                    options.rounds = text
-                        .parse::<u32>()
-                        .ok()
-                        .filter(|rounds| *rounds > 0)
-                        .ok_or_else(|| {
-                            format!("--rounds must be a whole number above 0, not {text}")
-                        })?;
-                }
-                "--models" => {
-                    options.models = parse_list(value()?, &[Model::Dmg, Model::Cgb], Model::id)?;
-                }
-                "--emulators" => {
-                    options.emulators = parse_list(value()?, &EMULATORS, Emulator::id)?;
-                }
-                "--instructions" => options.instructions = true,
-                "--screenshots" => options.screenshots = true,
-                flag if flag.starts_with("--") => return Err(format!("unknown option {flag}")),
-                path => options.roms.push(PathBuf::from(path)),
-            }
-        }
-        options.seconds = seconds.unwrap_or(if options.instructions {
-            DEFAULT_INSTRUCTION_SECONDS
+impl From<Arguments> for Options {
+    fn from(arguments: Arguments) -> Self {
+        let emulators = if arguments.emulators.is_empty() {
+            EMULATORS.to_vec()
         } else {
-            DEFAULT_SECONDS
-        });
-        Ok(options)
+            arguments.emulators
+        };
+        Options {
+            roms: arguments.roms,
+            seconds: arguments.seconds.unwrap_or(if arguments.instructions {
+                DEFAULT_INSTRUCTION_SECONDS
+            } else {
+                DEFAULT_SECONDS
+            }),
+            rounds: arguments.rounds,
+            models: sorted_once(arguments.models),
+            emulators: sorted_once(emulators),
+            instructions: arguments.instructions,
+            screenshots: arguments.screenshots,
+        }
     }
 }
 
-/// Parses a comma-separated list of names, keeping the order of `all`.
-fn parse_list<T: Copy + Ord>(text: &str, all: &[T], id: fn(T) -> &'static str) -> Result<Vec<T>> {
-    let mut chosen = Vec::new();
-    for name in text
-        .split(',')
-        .map(str::trim)
-        .filter(|name| !name.is_empty())
-    {
-        let item = all
-            .iter()
-            .copied()
-            .find(|item| id(*item) == name)
-            .ok_or_else(|| {
-                let names: Vec<&str> = all.iter().map(|item| id(*item)).collect();
-                format!("unknown name {name}; choose from {}", names.join(", "))
-            })?;
-        chosen.push(item);
-    }
-    chosen.sort();
-    chosen.dedup();
-    if chosen.is_empty() {
-        return Err(format!("the list '{text}' names nothing"));
-    }
-    Ok(chosen)
+/// `items` in their own order, each once.
+fn sorted_once<T: Ord>(mut items: Vec<T>) -> Vec<T> {
+    items.sort();
+    items.dedup();
+    items
 }
 
 /// Builds the chosen emulators, runs them on the chosen ROMs and prints the
 /// table.
-pub fn run_comparison(args: &[String]) -> Result {
+pub fn run_comparison(arguments: Arguments) -> Result {
     if cfg!(windows) {
         return Err(String::from(
             "compare-emulators runs on Linux and macOS (on Windows, run it in WSL)",
         ));
     }
-    let options = Options::parse(args)?;
+    let options = Options::from(arguments);
     if options.instructions && !has_tool("valgrind") {
         return Err(String::from(
             "--instructions counts instructions with Valgrind, which wasn't found (it runs on Linux)",
@@ -893,13 +900,21 @@ mod build;
 mod tests {
     use super::*;
 
-    fn args(text: &str) -> Vec<String> {
-        text.split_whitespace().map(str::to_owned).collect()
+    /// Reads `text` as the options after `cargo xtask compare-emulators`.
+    fn parse(text: &str) -> std::result::Result<Options, clap::Error> {
+        /// A command line that is only the options.
+        #[derive(clap::Parser)]
+        struct Command {
+            #[command(flatten)]
+            arguments: Arguments,
+        }
+        let args = std::iter::once("compare-emulators").chain(text.split_whitespace());
+        <Command as clap::Parser>::try_parse_from(args).map(|command| command.arguments.into())
     }
 
     #[test]
     fn options_default_to_every_emulator_on_both_models() {
-        let options = Options::parse(&[]).unwrap();
+        let options = parse("").unwrap();
         assert_eq!(options.emulators, EMULATORS.to_vec());
         assert_eq!(options.models, vec![Model::Dmg, Model::Cgb]);
         assert_eq!(options.seconds, DEFAULT_SECONDS);
@@ -909,10 +924,9 @@ mod tests {
 
     #[test]
     fn options_read_lists_numbers_and_paths() {
-        let options = Options::parse(&args(
-            "roms --emulators sameboy,nubo --models cgb --rounds 5 --seconds 2.5 a.gb",
-        ))
-        .unwrap();
+        let options =
+            parse("roms --emulators sameboy,nubo --models cgb --rounds 5 --seconds 2.5 a.gb")
+                .unwrap();
         assert_eq!(options.emulators, vec![Emulator::Nubo, Emulator::SameBoy]);
         assert_eq!(options.models, vec![Model::Cgb]);
         assert_eq!(options.rounds, 5);
@@ -925,20 +939,20 @@ mod tests {
 
     #[test]
     fn instruction_counts_default_to_shorter_runs() {
-        let options = Options::parse(&args("--instructions")).unwrap();
+        let options = parse("--instructions").unwrap();
         assert_eq!(options.seconds, DEFAULT_INSTRUCTION_SECONDS);
-        let options = Options::parse(&args("--instructions --seconds 4")).unwrap();
+        let options = parse("--instructions --seconds 4").unwrap();
         assert_eq!(options.seconds, 4.0);
     }
 
     #[test]
     fn options_refuse_what_they_dont_know() {
-        assert!(Options::parse(&args("--emulators bgb")).is_err());
-        assert!(Options::parse(&args("--models sgb")).is_err());
-        assert!(Options::parse(&args("--seconds -1")).is_err());
-        assert!(Options::parse(&args("--rounds 0")).is_err());
-        assert!(Options::parse(&args("--seconds")).is_err());
-        assert!(Options::parse(&args("--fast")).is_err());
+        assert!(parse("--emulators bgb").is_err());
+        assert!(parse("--models sgb").is_err());
+        assert!(parse("--seconds -1").is_err());
+        assert!(parse("--rounds 0").is_err());
+        assert!(parse("--seconds").is_err());
+        assert!(parse("--fast").is_err());
     }
 
     #[test]

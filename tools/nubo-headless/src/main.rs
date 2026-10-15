@@ -27,32 +27,36 @@ struct Args {
     rom: PathBuf,
 
     /// Emulated seconds to run: Game Boy time, the same on any machine
+    #[arg(long, default_value_t = 5.0, value_parser = parse_seconds)]
     seconds: f64,
 
-    /// Capture a screenshot at the end
-    #[arg(long)]
-    screenshot: bool,
-
-    /// Directory to save the screenshot (defaults to current directory)
-    #[arg(long)]
-    screenshot_path: Option<PathBuf>,
+    /// Save the last frame as a PNG in this folder, which is created if needed
+    #[arg(long, value_name = "FOLDER")]
+    screenshot: Option<PathBuf>,
 
     /// Run in CGB (Game Boy Color) mode, the same as --model cgb
-    #[arg(long)]
+    #[arg(long, conflicts_with = "model")]
     cgb: bool,
 
     /// Hardware model: dmg-0, dmg, mgb, sgb, sgb2, cgb-0, cgb-a, cgb-b, cgb-c, cgb-d, cgb-e (or cgb), agb
-    #[arg(long)]
+    #[arg(long, value_name = "NAME")]
     model: Option<Model>,
 }
 
+/// Reads the value of `--seconds`: a number of seconds, 0 or more.
+fn parse_seconds(text: &str) -> Result<f64, String> {
+    text.parse::<f64>()
+        .ok()
+        .filter(|seconds| seconds.is_finite() && *seconds >= 0.0)
+        .ok_or_else(|| String::from("expected a number of seconds, 0 or more"))
+}
+
 /// Saves the emulator's latest frame (with its border on a Super Game Boy) as
-/// `<rom name>_<timestamp>.png` in `output_dir` (or the current directory) and
-/// returns the file's path.
+/// `<rom name>_<timestamp>.png` in `output_dir` and returns the file's path.
 fn save_screenshot(
     emulator: &Emulator,
     rom_path: &Path,
-    output_dir: Option<&Path>,
+    output_dir: &Path,
 ) -> Result<PathBuf, String> {
     let screenshot = match emulator.frame_with_border() {
         Some(frame) => RgbaImage::from_raw(SGB_FRAME_WIDTH, SGB_FRAME_HEIGHT, frame.to_vec()),
@@ -72,14 +76,9 @@ fn save_screenshot(
     let timestamp = Local::now().format("%y%m%d_%H%M%S");
     let filename = format!("{rom_stem}_{timestamp}.png");
 
-    let output_path = match output_dir {
-        Some(dir) => {
-            fs::create_dir_all(dir)
-                .map_err(|error| format!("Failed to create output directory: {error}"))?;
-            dir.join(&filename)
-        }
-        None => PathBuf::from(&filename),
-    };
+    fs::create_dir_all(output_dir)
+        .map_err(|error| format!("Failed to create output directory: {error}"))?;
+    let output_path = output_dir.join(&filename);
 
     screenshot
         .save(&output_path)
@@ -108,9 +107,6 @@ fn main() -> ExitCode {
 /// Loads the ROM, runs it for the requested emulated time and saves the
 /// screenshot.
 fn run(args: &Args) -> Result<(), String> {
-    if !(args.seconds.is_finite() && args.seconds >= 0.0) {
-        return Err(format!("Invalid number of seconds {}", args.seconds));
-    }
     // Rounded to whole samples; a run ends with the audio buffer that reaches
     // this many, at most 1/128 of a second later.
     let samples_to_run = (args.seconds * f64::from(SAMPLE_RATE)).round() as u64;
@@ -152,8 +148,8 @@ fn run(args: &Args) -> Result<(), String> {
         frame_count as f64 / elapsed.as_secs_f64()
     );
 
-    if args.screenshot {
-        let path = save_screenshot(&emulator, &args.rom, args.screenshot_path.as_deref())?;
+    if let Some(folder) = &args.screenshot {
+        let path = save_screenshot(&emulator, &args.rom, folder)?;
         println!("Screenshot saved to: {}", path.display());
     }
 

@@ -44,9 +44,9 @@
       },
       "args": [
         "${input:romPath}",
+        "--seconds",
         "${input:seconds}",
         "--screenshot",
-        "--screenshot-path",
         "${workspaceFolder}/target/screenshots"
       ],
       "cwd": "${workspaceFolder}"

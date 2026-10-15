@@ -2861,6 +2861,7 @@ name = "nubo"
 version = "0.9.0"
 dependencies = [
  "bytes",
+ "clap",
  "console_error_panic_hook",
  "iced",
  "lucide-icons",
@@ -2936,6 +2937,7 @@ dependencies = [
 name = "nubo-json-test-runner"
 version = "0.9.0"
 dependencies = [
+ "clap",
  "nubo-core",
  "nubo-download",
  "serde",
@@ -6092,6 +6094,7 @@ checksum = "e450f9b2ed1dff33c94c12589a87338689467b9c4f5d8a5710bd09a847d2c8a7"
 name = "xtask"
 version = "0.9.0"
 dependencies = [
+ "clap",
  "image",
  "nubo-download",
  "nubo-logo",

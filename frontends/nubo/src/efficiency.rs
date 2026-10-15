@@ -1,10 +1,10 @@
 //! Measures how much the desktop app's emulator thread (the session paced
 //! by the sound card, in `nubo_frontend::session`) wakes the processor,
 //! which is most of what a running game costs a laptop's battery besides the
-//! emulation itself. Run it with `nubo --measure-efficiency <rom> [--model
-//! <name>]`: it plays the game without a window or sound for a few seconds in
-//! each situation below and prints one line of JSON, which the nightly CI
-//! keeps in its metrics log.
+//! emulation itself. Run it with `nubo measure-efficiency <rom> [--cgb |
+//! --model <name>]` (`command_line`): it plays the game without a window or
+//! sound for a few seconds in each situation below and prints one line of
+//! JSON, which the nightly CI keeps in its metrics log.
 //!
 //! The emulation's own cost is measured separately, as instructions per
 //! emulated second with `cargo benchmark` under cachegrind. Real battery
@@ -16,8 +16,8 @@ use nubo_frontend::notices::Notices;
 use nubo_frontend::rom::Rom;
 use nubo_frontend::session::{ActivityCount, Command, Playback, Saves, Session};
 use nubo_frontend::settings::FastForwardSpeed;
-use std::env;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::process::ExitCode;
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -39,47 +39,17 @@ struct Rates {
     frames: f64,
 }
 
-/// Runs the measurement when the command line starts with
-/// `--measure-efficiency`, printing its JSON and returning the exit code, or
-/// returns `None` for a normal start of the app.
-pub fn run_from_command_line() -> Option<i32> {
-    let mut args = env::args().skip(1);
-    if args.next().as_deref() != Some("--measure-efficiency") {
-        return None;
-    }
-
-    let mut rom_path = None;
-    let mut model = Model::Dmg;
-    while let Some(arg) = args.next() {
-        if arg == "--model" {
-            match args.next().map(|name| name.parse()) {
-                Some(Ok(parsed)) => model = parsed,
-                Some(Err(error)) => {
-                    eprintln!("{error}");
-                    return Some(2);
-                }
-                None => {
-                    eprintln!("--model needs a value such as dmg, mgb, sgb, cgb or agb");
-                    return Some(2);
-                }
-            }
-        } else {
-            rom_path = Some(PathBuf::from(arg));
-        }
-    }
-    let Some(rom_path) = rom_path else {
-        eprintln!("usage: nubo --measure-efficiency <rom> [--model <name>]");
-        return Some(2);
-    };
-
-    match measure(&rom_path, model) {
+/// Runs the measurement that `nubo measure-efficiency <rom>` asks for
+/// (`command_line`), printing its JSON, and returns the exit code.
+pub fn run(rom_path: &Path, model: Model) -> ExitCode {
+    match measure(rom_path, model) {
         Ok(json) => {
             println!("{json}");
-            Some(0)
+            ExitCode::SUCCESS
         }
         Err(error) => {
             eprintln!("{error}");
-            Some(1)
+            ExitCode::FAILURE
         }
     }
 }

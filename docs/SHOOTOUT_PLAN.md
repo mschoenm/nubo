@@ -220,8 +220,8 @@ exactly 160×144 (the harness's `--get-startuptime` compares it pixel for pixel)
 
 Before Part 3, a cloud session can estimate the results with the headless frontend:
 
-1. Run each Shootout test with `cargo screenshot <rom> <seconds> --model dmg|cgb`, for the boot time
-   plus the test's `runtime`.
+1. Run each Shootout test with `cargo screenshot <rom> --seconds <s> --model dmg|cgb`, for the boot
+   time plus the test's `runtime`.
 2. Compare the PNG with the test's references using the same rule as `compareImage` (grayscale, no
    pixel more than 50 off). Pillow is installed in the cloud container; run Python with `-I` and keep
    the script in the scratchpad, not in the repository.

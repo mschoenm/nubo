@@ -342,7 +342,7 @@ jobs:
 
       - name: Measure battery use
         shell: bash
-        run: target/release/nubo --measure-efficiency target/benchmark-roms/tobudx.gb | tee "$RUNNER_TEMP/efficiency.json"
+        run: target/release/nubo measure-efficiency target/benchmark-roms/tobudx.gb | tee "$RUNNER_TEMP/efficiency.json"
 
       - name: Build the web version
         run: cargo xtask build-web

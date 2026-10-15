@@ -68,6 +68,7 @@ used_underscore_binding = "warn"
 wildcard_imports = "warn"
 
 [workspace.dependencies]
+clap = { version = "4", features = ["derive"] }
 nubo-core = { path = "crates/nubo-core" }
 nubo-download = { path = "crates/nubo-download" }
 nubo-frontend = { path = "crates/nubo-frontend" }

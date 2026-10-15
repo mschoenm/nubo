@@ -369,7 +369,7 @@ without rescanning everything.
   `session` field) with the pause menu page and its highlighted row, the cheat being typed and the
   auto-hiding bar. Opening a save or load page asks the session to list the slots
   (`GameSession::list_slots`), which starts a new listing as the page opening did before.
-- **The efficiency harness** (`nubo --measure-efficiency`) stays in the Iced crate's `efficiency.rs`,
+- **The efficiency harness** (`nubo measure-efficiency`) stays in the Iced crate's `efficiency.rs`,
   where the nightly run calls it, and uses `nubo_frontend::session`. Its numbers are the same before
   and after this step: on `tobudx.gb` and `ucity.gbc --model cgb-e`, 86.2 wake-ups and buffers a
   second while playing (6.0 and 22.8 frames), none while paused, and 344.6 buffers a second while
@@ -385,7 +385,7 @@ This is the largest step.
    `gamepads`.
 3. Make new frames reach the app through a callback.
 
-Before starting, record the efficiency harness's numbers (`nubo --measure-efficiency`). This step
+Before starting, record the efficiency harness's numbers (`nubo measure-efficiency`). This step
 must not add wake-ups, buffers or frames.
 
 **Done when:**

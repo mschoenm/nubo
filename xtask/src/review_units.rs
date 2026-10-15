@@ -13,10 +13,11 @@
 //! folders doesn't send their files to the front or back of the rotation.
 
 use crate::{Result, workspace_root};
+use clap::{Args, Subcommand};
 use serde_json::{Map, Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process;
 
 /// The most lines a part has, unless one file alone has more.
 const PART_LINES: usize = 1200;
@@ -46,11 +47,36 @@ struct Module {
     folder: Option<PathBuf>,
 }
 
-/// Runs the command with its arguments: none lists the parts, `next` picks
-/// tonight's part and records it in the rotation's state.
-pub fn run(args: &[String]) -> Result {
-    match args {
-        [] => {
+/// What `cargo xtask review-units` can do. The doc comments are the help
+/// that `--help` prints.
+#[derive(Subcommand, Debug)]
+pub enum Command {
+    /// List the parts with their number of lines
+    List,
+    /// Pick tonight's part, record it in the rotation's state and print what the review should
+    /// cover as JSON
+    Next(NextOptions),
+}
+
+/// The options of `review-units next`.
+#[derive(Args, Debug)]
+pub struct NextOptions {
+    /// The rotation's state file, which is created when it doesn't exist
+    #[arg(long, value_name = "ROTATION.JSON")]
+    state: PathBuf,
+    /// Tonight's date, YYYY-MM-DD
+    #[arg(long)]
+    date: String,
+    /// The commit tonight's review reads, as a hash
+    #[arg(long, value_name = "SHA")]
+    commit: String,
+}
+
+/// Runs the command: `list` lists the parts, `next` picks tonight's part
+/// and records it in the rotation's state.
+pub fn run(command: Command) -> Result {
+    match command {
+        Command::List => {
             let parts = parts()?;
             for part in &parts {
                 println!("{:>6}  {}", part.lines, part.name);
@@ -59,47 +85,10 @@ pub fn run(args: &[String]) -> Result {
             println!("{} parts, {lines} lines", parts.len());
             Ok(())
         }
-        [next, rest @ ..] if next == "next" => {
-            let options = NextOptions::parse(rest)?;
+        Command::Next(options) => {
             println!("{}", next_part(&options)?);
             Ok(())
         }
-        _ => Err(String::from(
-            "usage: cargo xtask review-units [next --state <rotation.json> --date <YYYY-MM-DD> --commit <sha>]",
-        )),
-    }
-}
-
-/// The options of `review-units next`.
-struct NextOptions {
-    state: PathBuf,
-    date: String,
-    commit: String,
-}
-
-impl NextOptions {
-    fn parse(args: &[String]) -> Result<NextOptions> {
-        let mut state = None;
-        let mut date = None;
-        let mut commit = None;
-        let mut args = args.iter();
-        while let Some(arg) = args.next() {
-            let value = args
-                .next()
-                .ok_or_else(|| format!("{arg} needs a value"))?
-                .clone();
-            match arg.as_str() {
-                "--state" => state = Some(PathBuf::from(value)),
-                "--date" => date = Some(value),
-                "--commit" => commit = Some(value),
-                _ => return Err(format!("unknown option {arg}")),
-            }
-        }
-        Ok(NextOptions {
-            state: state.ok_or("next needs --state")?,
-            date: date.ok_or("next needs --date")?,
-            commit: commit.ok_or("next needs --commit")?,
-        })
     }
 }
 
@@ -189,7 +178,7 @@ enum Change {
 /// The Rust files that changed between the commits `from` and `to`, with
 /// moved files found by git's rename detection.
 fn rust_changes(from: &str, to: &str) -> Result<Vec<Change>> {
-    let output = Command::new("git")
+    let output = process::Command::new("git")
         .args([
             "diff",
             "--name-status",

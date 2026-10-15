@@ -6,7 +6,7 @@ edition.workspace = true
 
 [dependencies]
 nubo-core.workspace = true
-clap = { version = "4", features = ["derive"] }
+clap.workspace = true
 image = { version = "0.25", default-features = false, features = ["png"] }
 
 [lints]

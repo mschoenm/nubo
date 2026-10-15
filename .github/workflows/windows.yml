@@ -106,7 +106,7 @@ jobs:
               if (-not (Test-Path (Join-Path $folder $file))) { throw "$file is missing from $folder" }
             }
             $output = Join-Path $env:RUNNER_TEMP "efficiency.json"
-            $exitCode = Invoke-Program (Join-Path $folder "nubo.exe") @("--measure-efficiency", "`"$rom`"") $output
+            $exitCode = Invoke-Program (Join-Path $folder "nubo.exe") @("measure-efficiency", "`"$rom`"") $output
             $json = Get-Content $output -Raw
             $json
             if ($exitCode -ne 0) { throw "nubo.exe in $folder exited with $exitCode" }
@@ -223,7 +223,7 @@ jobs:
           # to, and to downgrade from.
           $versions = Join-Path $env:RUNNER_TEMP "versions"
           New-Item -ItemType Directory $versions | Out-Null
-          foreach ($options in @(@("--version", "0.0.1"), @("--version", "255.0.0", "--nightly", "2001-01-01"))) {
+          foreach ($options in @(@("--as-version", "0.0.1"), @("--as-version", "255.0.0", "--nightly", "2001-01-01"))) {
             cargo xtask windows @options
             if ($LASTEXITCODE -ne 0) { throw "cargo xtask windows $options failed" }
           }
