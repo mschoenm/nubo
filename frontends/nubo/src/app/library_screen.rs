@@ -277,7 +277,12 @@ impl App {
     /// selected card into view, starts the selected game with A or Start,
     /// and opens its menu with Select.
     pub(super) fn navigate_library(&mut self, action: Action, held: bool) -> Task<Message> {
-        let shelves = views::library::Shelves::new(&self.library, &self.settings, &self.search);
+        let shelves = views::library::Shelves::new(
+            &self.library,
+            &self.settings,
+            &self.search,
+            self.window_width,
+        );
         let count = shelves.len();
         if count == 0 {
             return Task::none();
@@ -429,7 +434,7 @@ impl App {
         }
 
         self.library
-            .recently_played(views::library::RECENT_LIMIT)
+            .recently_played(views::library::most_recent_shown())
             .into_iter()
             .filter(|entry| !entry.in_folder)
             .map(|entry| entry.path.clone())

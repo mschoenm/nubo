@@ -36,7 +36,7 @@ fn the_grid_fits_as_many_columns_as_iced_does() {
 
 #[test]
 fn the_starting_window_fits_a_whole_continue_playing_row() {
-    assert_eq!(columns(FULL_ROW_WINDOW_WIDTH), RECENT_LIMIT);
+    assert_eq!(columns(FULL_ROW_WINDOW_WIDTH), STARTING_COLUMNS);
     // The cards are at their full size.
     let full_height = CARD_MAX_WIDTH * CARD_ASPECT.1 / CARD_ASPECT.0;
     assert!((card_height(FULL_ROW_WINDOW_WIDTH) - full_height).abs() < 0.01);
@@ -120,4 +120,20 @@ fn lower_cards_sit_lower_on_the_page() {
     assert!(games_top > first_bottom);
     assert!(second_row_top > games_top);
     assert_eq!(shelves.card_bounds(3, WIDTH), shelves.card_bounds(2, WIDTH));
+}
+
+#[test]
+fn continue_playing_shows_a_row_of_the_widest_window_at_most() {
+    assert_eq!(most_recent_shown(), 5);
+    assert_eq!(columns(1280.0), most_recent_shown());
+}
+
+#[test]
+fn down_from_a_full_row_of_five_lands_under_the_same_card() {
+    let recent = entries(5);
+    let games = entries(5);
+    let shelves = shelves(&recent, &games);
+
+    assert_eq!(shelves.step(4, Action::Down, 1280.0, false), 9);
+    assert_eq!(shelves.step(9, Action::Up, 1280.0, false), 4);
 }
