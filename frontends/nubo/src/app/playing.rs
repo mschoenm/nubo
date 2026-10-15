@@ -3,6 +3,7 @@
 
 use super::window_events::leave_fullscreen_for_game;
 use super::{App, Message};
+use crate::dialog::DialogKind;
 use crate::game::{Game, PauseMenu, SgbBorderChoice};
 use crate::rom_picker;
 use crate::settings::Settings;
@@ -380,6 +381,15 @@ impl App {
                 }
                 self.game = Some(game);
                 self.settings_tab = None;
+                // The reset question offered to delete saves, which it
+                // can't while a game runs, so it closes with the settings.
+                if self
+                    .dialog
+                    .as_ref()
+                    .is_some_and(|dialog| matches!(dialog.kind, DialogKind::ResetSettings(_)))
+                {
+                    self.dialog = None;
+                }
                 self.search.clear();
                 self.library_selection = None;
 
