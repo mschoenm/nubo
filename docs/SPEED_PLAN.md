@@ -36,8 +36,8 @@ Each change is a shortcut that must give exactly what running every dot one at a
 | #95 | A plain background tile takes the fetcher's eight steps in one go and decodes its pixels through a bit-spreading table. A read of IF no longer makes the PPU catch up while its quiet dots hold no interrupt request at all (`AddressBus::ppu_read_can_wait`), which Nubo's CGB boot ROM does about 500,000 times while it waits for frames | 8 to 18% |
 | #95 | Runs of plain tiles in one loop, with the tile map row, tile data area and row in the tile kept at hand, and the fetcher's registers written back once at the end | 6 to 14% more |
 | #95 | The seven dots that shift out a line's dummy pixels at once, and a run of plain tiles that may begin just before the screen (fine scrolling) | 1 to 2% more |
-| next | Plain CPU reads of ROM, work RAM and HRAM take a short inlined path (`AddressBus::cpu_read_plain_byte`), everything else out of line | 2 to 3% more |
-| next | The bulk OAM scan stops at ten objects, checks the y range with one comparison and sets its bus latches once | about 1.5% more |
+| #98 | Plain CPU reads of ROM, work RAM and HRAM take a short inlined path (`AddressBus::cpu_read_plain_byte`), everything else out of line | 2 to 3% more |
+| #98 | The bulk OAM scan stops at ten objects, checks the y range with one comparison and sets its bus latches once | about 1.5% more |
 
 How it was checked, for each commit:
 
