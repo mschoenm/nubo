@@ -1,7 +1,7 @@
 //! The options the app takes on the command line:
 //!
 //! ```text
-//! nubo [rom] [--cgb | --model <name>] [--scale <n>] [--fresh] [--speed <n>]
+//! nubo [rom] [--cgb | --model <name>] [--scale <n>] [--fresh] [--speed <n>] [--raw-screen]
 //! ```
 //!
 //! - `--cgb` and `--model <name>` start the game on that hardware model
@@ -17,18 +17,27 @@
 //!   problems printed on stderr.
 //! - `--speed <n>` starts the game fast forwarding at `n` times real time,
 //!   one of the fast forward speeds the settings offer.
+//! - `--raw-screen` shows the Game Boy screen as the emulator draws it,
+//!   whatever palette and screen effects the settings pick: plain grays,
+//!   no color correction or other screen effect
+//!   (`nubo_frontend::settings::ScreenLook::RAW`) and a Super Game Boy
+//!   game's own colors rather than ones the player picked. A Super Game Boy's
+//!   border still shows or not as the settings say; it frames the screen
+//!   without changing it, and the Shootout's harness crops it off.
 //!
-//! `--scale`, `--fresh` and `--speed` are what the GB Emulator Shootout's
-//! harness runs the app with (`docs/SHOOTOUT_PLAN.md`). The browser build
-//! gets no command line, so it starts without any of them.
+//! The GB Emulator Shootout's harness runs the app with `--model` and all
+//! but `--cgb` (`docs/SHOOTOUT_PLAN.md`). `--raw-screen` makes its
+//! screenshots judge the emulation alone, as its harness has other emulators
+//! turn off their color correction and blending, while players get the
+//! corrected colors by default. The browser build gets no command line, so
+//! it starts without any of them.
 
 use nubo_core::Model;
 use nubo_frontend::settings::FastForwardSpeed;
 use std::path::PathBuf;
 
 /// How to use the options, printed with a mistake in them.
-pub const USAGE: &str =
-    "usage: nubo [rom] [--cgb | --model <name>] [--scale <1-8>] [--fresh] [--speed <2|3|4|8>]";
+pub const USAGE: &str = "usage: nubo [rom] [--cgb | --model <name>] [--scale <1-8>] [--fresh] [--speed <2|3|4|8>] [--raw-screen]";
 
 /// The largest `--scale`.
 const MAX_SCALE: u32 = 8;
@@ -47,6 +56,9 @@ pub struct Options {
     pub fresh: bool,
     /// With `--speed`: start the game fast forwarding at this speed.
     pub speed: Option<FastForwardSpeed>,
+    /// With `--raw-screen`: show the Game Boy screen as the emulator draws
+    /// it, without the settings' palette and screen effects.
+    pub raw_screen: bool,
 }
 
 /// Reads the options from the command line's arguments, without the
@@ -71,6 +83,7 @@ pub fn parse(args: impl IntoIterator<Item = String>) -> Result<Options, String> 
             "--scale" => options.scale = Some(parse_scale(&value()?)?),
             "--fresh" => options.fresh = true,
             "--speed" => options.speed = Some(parse_speed(&value()?)?),
+            "--raw-screen" => options.raw_screen = true,
             option if option.starts_with("--") => {
                 return Err(format!("{option} isn't an option"));
             }

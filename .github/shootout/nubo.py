@@ -31,6 +31,9 @@ class Nubo(Emulator):
             # Windows doesn't find a relative program path once cwd is set.
             os.path.abspath("emu/nubo/Nubo/nubo.exe"), os.path.abspath(rom),
             "--model", model, "--scale", "1", "--fresh", "--speed", "4",
+            # The emulator's own picture: plain grays, and no color correction or
+            # frame blending, which players get by default.
+            "--raw-screen",
         ], cwd="emu/nubo/Nubo")
 
     def getScreenshot(self):

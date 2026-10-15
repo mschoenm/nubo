@@ -36,7 +36,15 @@ fn a_rom_and_a_model() {
 #[test]
 fn the_shootouts_options() {
     let options = parse_args(&[
-        "game.gb", "--model", "dmg", "--scale", "1", "--fresh", "--speed", "4",
+        "game.gb",
+        "--model",
+        "dmg",
+        "--scale",
+        "1",
+        "--fresh",
+        "--speed",
+        "4",
+        "--raw-screen",
     ])
     .unwrap();
     assert_eq!(
@@ -47,6 +55,7 @@ fn the_shootouts_options() {
             scale: Some(1),
             fresh: true,
             speed: Some(FastForwardSpeed::try_from(4).unwrap()),
+            raw_screen: true,
         }
     );
 }

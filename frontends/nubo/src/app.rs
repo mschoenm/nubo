@@ -31,7 +31,7 @@ use nubo_frontend::library::{Library, LibraryEntry};
 use nubo_frontend::notices::Notices;
 use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states;
-use nubo_frontend::settings::FastForwardSpeed;
+use nubo_frontend::settings::{FastForwardSpeed, ScreenLook};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -67,6 +67,10 @@ pub struct App {
     /// With `--fresh`: the app reads and writes nothing kept between runs,
     /// like a new install (see `command_line`).
     fresh: bool,
+    /// With `--raw-screen`: games show the Game Boy screen as the emulator
+    /// draws it, whatever palette and screen effects the settings pick (see
+    /// `command_line`).
+    raw_screen: bool,
     /// Whether the settings file was read (or there was none). When it
     /// couldn't be, the app saves nothing on its own, such as the window's
     /// size, so it doesn't write the defaults over the player's settings.
@@ -198,6 +202,7 @@ impl App {
             model_override: options.model,
             screen_scale: options.scale,
             fresh: options.fresh,
+            raw_screen: options.raw_screen,
             settings_read: settings_error.is_none(),
             sgb_colors_unsaved: false,
             speed: options.speed,
@@ -549,6 +554,16 @@ impl App {
         let running = self.is_running();
         if let Some(game) = &mut self.game {
             game.session.apply(running, &self.settings.shared);
+        }
+    }
+
+    /// How games' pictures look: as the settings say, or the emulator's own
+    /// picture with `--raw-screen`.
+    fn screen_look(&self) -> ScreenLook {
+        if self.raw_screen {
+            ScreenLook::RAW
+        } else {
+            self.settings.shared.screen_look()
         }
     }
 
