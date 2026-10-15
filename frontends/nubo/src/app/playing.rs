@@ -351,7 +351,8 @@ impl App {
             .map_or_else(|| self.model_for(&rom.path, &header), |state| state.model);
         let path = rom.path.clone();
 
-        match self.start_session(rom, header, model, true) {
+        let running = !self.held_for_scene();
+        match self.start_session(rom, header, model, running) {
             Ok(mut game) => {
                 if let Some(state) = resume_state {
                     match game.session.load(state.data) {
@@ -430,7 +431,10 @@ impl App {
             header,
             model,
             StartOptions {
-                keep_saves: !self.fresh,
+                // A scene's game keeps no battery saves, and so runs its
+                // cartridge clock on emulated time, as headless runs do,
+                // so its frames come out the same every time.
+                keep_saves: !self.fresh && !self.held_for_scene(),
                 fast_forward: self.speed,
             },
             &self.notices,

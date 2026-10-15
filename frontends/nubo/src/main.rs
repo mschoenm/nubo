@@ -56,6 +56,7 @@ fn main() -> ExitCode {
         Ok(command_line::Request::MeasureEfficiency { rom_path, model }) => {
             return efficiency::run(&rom_path, model);
         }
+        Ok(command_line::Request::Capture(request)) => return capture(&request),
         Err(error) => error.exit(),
     };
     #[cfg(target_arch = "wasm32")]
@@ -86,15 +87,54 @@ fn run(rom: Option<Result<Rom, String>>, options: Options) -> iced::Result {
         None => default_window(settings::Settings::load().0.window_size),
     };
 
-    let application = iced::application(
-        move || App::new(rom.clone(), &options),
-        App::update,
-        App::view,
-    )
-    .title(App::title)
-    .subscription(App::subscription)
-    .theme(App::theme)
-    .font(ui::icons::FONT_BYTES);
+    launch(window, move || App::new(rom.clone(), &options))
+}
+
+/// The hidden `capture` command: shows a scene in a window of the scene's
+/// size, or filling the screen, and saves a picture of it or keeps showing
+/// it (see `app::scenes`).
+#[cfg(not(target_arch = "wasm32"))]
+fn capture(request: &command_line::CaptureRequest) -> ExitCode {
+    let prepared = match app::prepare_capture(request) {
+        Ok(prepared) => prepared,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let window = match prepared.options.scale {
+        Some(scale) => screen_only_window(scale),
+        None => iced::window::Settings {
+            fullscreen: prepared.fullscreen,
+            ..default_window(prepared.size)
+        },
+    };
+    let (options, scene) = (prepared.options, prepared.run);
+    let result = launch(window, move || {
+        let (mut app, task) = App::new(None, &options);
+        let scene_task = app.start_scene(scene.clone());
+        (app, iced::Task::batch([task, scene_task]))
+    });
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// Runs the app in a `window` set up as these settings say, starting it
+/// with `boot`, until it closes.
+fn launch(
+    window: iced::window::Settings,
+    boot: impl Fn() -> (App, iced::Task<app::Message>) + 'static,
+) -> iced::Result {
+    let application = iced::application(boot, App::update, App::view)
+        .title(App::title)
+        .subscription(App::subscription)
+        .theme(App::theme)
+        .font(ui::icons::FONT_BYTES);
     ui::theme::FONT_BYTES
         .into_iter()
         .fold(application, iced::Application::font)

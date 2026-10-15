@@ -11,6 +11,11 @@
 //! In the data folder, battery saves go to `saves/`, cheats to `cheats/`,
 //! save states to `states/` (see [`crate::save_states`]) and the library's
 //! cache next to them.
+//!
+//! A run that must not touch the player's data, such as the app's hidden
+//! `capture` command, puts a folder of its own in their place for the whole
+//! run with [`use_folder`]; every lookup of the folders goes through
+//! [`config_folder`] and [`data_folder`], which follow it.
 
 use super::{Entry, Storage};
 use directories::ProjectDirs;
@@ -19,10 +24,50 @@ use image::{ExtendedColorType, ImageEncoder};
 use std::fs;
 use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+
+/// The folder that replaces the player's own for the whole run, once
+/// [`use_folder`] set it.
+static REPLACEMENT_FOLDER: OnceLock<PathBuf> = OnceLock::new();
+
+/// Keeps everything in `folder` for the rest of the run instead of the
+/// player's own folders: the settings in `folder/config` and the rest
+/// (battery saves, save states, cheats, the library, screenshots) in
+/// `folder/data`. For runs that must not touch the player's data, such as
+/// the app's hidden `capture` command, which takes screenshots of the app
+/// for its documentation. Only the first call counts; it returns whether it
+/// was that one.
+pub fn use_folder(folder: &Path) -> bool {
+    REPLACEMENT_FOLDER.set(folder.to_path_buf()).is_ok()
+}
+
+/// The folder `settings.toml` is kept in, or `None` when the operating
+/// system has none for us, for example because the home directory is
+/// unknown.
+pub fn config_folder() -> Option<PathBuf> {
+    match REPLACEMENT_FOLDER.get() {
+        Some(folder) => Some(folder.join("config")),
+        None => project_directories().map(|directories| directories.config_dir().to_path_buf()),
+    }
+}
+
+/// The folder everything but the settings is kept in, or `None` when the
+/// operating system has none for us.
+pub fn data_folder() -> Option<PathBuf> {
+    match REPLACEMENT_FOLDER.get() {
+        Some(folder) => Some(folder.join("data")),
+        None => project_directories().map(|directories| directories.data_dir().to_path_buf()),
+    }
+}
+
+/// Whether [`use_folder`] replaced the player's folders for this run.
+pub fn folders_replaced() -> bool {
+    REPLACEMENT_FOLDER.get().is_some()
+}
 
 /// Nubo's per-user folders, or `None` when the operating system has none
 /// for us, for example because the home directory is unknown.
-pub fn project_directories() -> Option<ProjectDirs> {
+fn project_directories() -> Option<ProjectDirs> {
     ProjectDirs::from("", "", "Nubo")
 }
 
@@ -37,14 +82,12 @@ pub struct Files {
 }
 
 impl Files {
-    /// The player's own folders (see [`project_directories`]).
+    /// The player's own folders, or the one [`use_folder`] put in their
+    /// place.
     pub fn for_user() -> Files {
-        let directories = project_directories();
         Files {
-            config_folder: directories
-                .as_ref()
-                .map(|directories| directories.config_dir().to_path_buf()),
-            data_folder: directories.map(|directories| directories.data_dir().to_path_buf()),
+            config_folder: config_folder(),
+            data_folder: data_folder(),
         }
     }
 

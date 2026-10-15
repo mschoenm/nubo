@@ -16,10 +16,54 @@
 //!
 //! Both work on the picture after the emulator made it, so the emulation
 //! itself never changes. The settings' one switch for both, the original
-//! screen look, turns on only the one each model's screen had (see
-//! `GameSession::set_screen_look`).
+//! screen look, turns on only the one each model's screen had
+//! ([`ScreenEffects`], see `GameSession::set_screen_look`).
 
+use crate::picture::Frame;
+use nubo_core::Model;
 use std::sync::OnceLock;
+
+/// What the picture goes through to look like the model's own screen, when
+/// the player wants the original screen look.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ScreenEffects {
+    /// Whether the colors are shown as on a Game Boy Color's screen (see
+    /// [`correct_colors`]).
+    pub correct_colors: bool,
+    /// Whether each frame is mixed with the one before, as a slow screen
+    /// showed it (see [`blend`]).
+    pub blend_frames: bool,
+}
+
+impl ScreenEffects {
+    /// The effects of `model`'s own screen, or none without the
+    /// `original_screen` look. A Game Boy Color's colors are corrected, and
+    /// an original Game Boy's or Pocket's slow screen blends frames. The Game
+    /// Boy Color's screen was fast enough not to, the Game Boy Advance's
+    /// showed colors differently, and a Super Game Boy's TV did neither.
+    pub fn of(model: Model, original_screen: bool) -> Self {
+        ScreenEffects {
+            correct_colors: original_screen && model.is_cgb() && model != Model::Agb,
+            blend_frames: original_screen && matches!(model, Model::Dmg0 | Model::Dmg | Model::Mgb),
+        }
+    }
+
+    /// Puts the effects on `frame`, as the emulator drew it: mixes it with
+    /// `previous`, the pixels of the frame before as the emulator drew them,
+    /// when frames blend and there is one, and corrects its colors. Frames
+    /// in the Game Boy's grays and Super Game Boy frames, which a TV showed,
+    /// keep their colors.
+    pub fn apply(self, frame: &mut Frame, previous: Option<&[u8]>) {
+        if self.blend_frames
+            && let Some(previous) = previous
+        {
+            blend(&mut frame.pixels, previous);
+        }
+        if self.correct_colors && !frame.in_dmg_shades && frame.sgb_menu.is_none() {
+            correct_colors(&mut frame.pixels);
+        }
+    }
+}
 
 /// How the screen's levels respond to a color's: darker in the middle.
 const SCREEN_GAMMA: f64 = 2.2;

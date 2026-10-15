@@ -1,6 +1,6 @@
 # xtask
 
-Project tasks written in Rust, run as `cargo xtask <task>`. Each task's module docs explain it; `cargo xtask help` lists the tasks and `cargo xtask <task> --help` a task's options, read with clap (`Task` in `main.rs`, and the options' types in the tasks' modules). Only Rust is needed, except for the packaging tasks (their platform's tools) and `compare-emulators` (git, a C/C++ compiler, make, RGBDS and CMake; Linux and macOS).
+Project tasks written in Rust, run as `cargo xtask <task>`. Each task's module docs explain it; `cargo xtask help` lists the tasks and `cargo xtask <task> --help` a task's options, read with clap (`Task` in `main.rs`, and the options' types in the tasks' modules). Only Rust is needed, except for the packaging tasks (their platform's tools), `compare-emulators` (git, a C/C++ compiler, make, RGBDS and CMake; Linux and macOS) and `screenshots` (GNOME Shell, Xwayland, xdotool and D-Bus's tools; Linux).
 
 ```bash
 # Web version (the Iced app built for the browser)
@@ -28,6 +28,12 @@ cargo xtask review-units next --state rotation.json --date <YYYY-MM-DD> --commit
 cargo xtask metrics append metrics.jsonl night.json   # Add a night's measurements to the log
 cargo xtask metrics report metrics.jsonl   # Write the Nightly metrics wiki page from the log
 
+# Screenshots (docs/SCREENSHOTS_PLAN.md; Linux, with GNOME Shell, Xwayland, xdotool and D-Bus's tools)
+cargo xtask screenshots [filter]  # Make the screenshots images/screenshots.toml lists from their scenes in a headless GNOME Shell
+cargo xtask screenshots --check   # Write nothing: say which differ, with the new pictures and their differences in target/screenshots/check/
+cargo xtask scene explore <game | scene> --script "wait 5s; press start; mark" [--every 2s] [--model sgb2]   # Candidate scenes and a contact sheet in target/scenes/
+cargo xtask scene keep <candidate> <name>   # Copy a candidate into images/scenes/<name>/
+
 # The GB Emulator Shootout's published table (docs/SHOOTOUT_PLAN.md, Part 5)
 cargo xtask shootout-scoreboard <commit>   # Read its gh-pages branch at <commit> into tools/nubo-test-rom-runner/shootout_published.txt
 ```
@@ -40,4 +46,5 @@ cargo xtask shootout-scoreboard <commit>   # Read its gh-pages branch at <commit
 - Every package carries `LICENSE`, `LICENSE-APACHE`, `NOTICE` and `THIRD_PARTY_LICENSES.txt`; the licenses task fails when a crate has no license text it can use.
 - The RetroArch core's zip (`libretro.rs`) holds the core under the file name RetroArch looks for, `nubo_libretro.<so|dll|dylib>`, next to `nubo_libretro.info`; `.github/workflows/libretro.yml` builds it on every platform for the nightly build and releases.
 - The other emulators of `compare-emulators` are only built and run locally, never distributed or ported from (Gambatte is GPL-2.0-only).
+- The screenshots are made by the app itself: `screenshots.rs` runs its hidden `capture` command (`frontends/nubo/src/app/scenes.rs`) for each picture, in a headless GNOME Shell (`screenshots/gnome.rs`) that it starts as root in a mount namespace of its own, so a container without systemd or a screen can run it. The app draws with Iced's software renderer there, which makes every picture the same every time; `--check` relies on that. Pictures with GNOME's border depend on GNOME's version too (46 on Ubuntu 24.04). They aren't made in CI: the `screenshots` skill says when and how.
 - Releases: the `release` skill. CI and nightly runs: `docs/CI.md`.

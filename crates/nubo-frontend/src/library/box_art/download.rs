@@ -1,7 +1,7 @@
 //! Finding and downloading box art (the `desktop` feature), with `ureq`. The game
 //! lists are kept in `box_art/lists` in the user's data folder.
 
-use crate::storage::files::{project_directories, write_atomically};
+use crate::storage::files::{data_folder, write_atomically};
 use image::ImageFormat;
 use image::imageops::FilterType;
 use nubo_core::extract_rom;
@@ -265,8 +265,8 @@ fn shrink(picture: &[u8]) -> Option<Vec<u8>> {
 }
 
 fn lists_folder() -> Result<PathBuf, String> {
-    project_directories()
-        .map(|directories| directories.data_dir().join("box_art").join("lists"))
+    data_folder()
+        .map(|folder| folder.join("box_art").join("lists"))
         .ok_or_else(|| String::from("the system has no data folder for us"))
 }
 

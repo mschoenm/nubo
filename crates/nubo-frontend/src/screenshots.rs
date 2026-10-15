@@ -1,6 +1,8 @@
 //! Screenshots of the game's picture as shown (with a Super Game Boy's
 //! border when it shows one), saved as PNG files in a `Nubo` folder in the
-//! user's Pictures folder (only with the `desktop` feature).
+//! user's Pictures folder (only with the `desktop` feature), or in the data
+//! folder's `screenshots/` when the system has no Pictures folder or the run
+//! keeps its data in a folder of its own (`storage::files::use_folder`).
 
 use crate::picture::Picture;
 use std::path::PathBuf;
@@ -12,18 +14,17 @@ pub const AVAILABLE: bool = cfg!(feature = "desktop");
 /// where it went.
 #[cfg(feature = "desktop")]
 pub fn save(game_name: &str, picture: &Picture) -> Result<PathBuf, String> {
-    use crate::storage::files::{encode_png, project_directories, write_atomically};
+    use crate::storage::files::{data_folder, encode_png, folders_replaced, write_atomically};
     use directories::UserDirs;
 
     let folder = UserDirs::new()
+        .filter(|_| !folders_replaced())
         .and_then(|directories| {
             directories
                 .picture_dir()
                 .map(|pictures| pictures.join("Nubo"))
         })
-        .or_else(|| {
-            project_directories().map(|directories| directories.data_dir().join("screenshots"))
-        })
+        .or_else(|| data_folder().map(|folder| folder.join("screenshots")))
         .ok_or("the system has no Pictures folder")?;
 
     let path = (1..)

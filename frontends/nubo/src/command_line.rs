@@ -2,7 +2,10 @@
 //!
 //! ```text
 //! nubo [rom] [--cgb | --model <name>] [--scale <n>] [--fresh] [--speed <n>] [--raw-screen]
+//! nubo [rom] [--cgb | --model <name>] --record-scenes <folder>
 //! nubo measure-efficiency <rom> [--cgb | --model <name>]
+//! nubo capture <scene> --games <folder> --home <folder> [--set <key=value>]... [--size <WxH> | --fullscreen | --scale <n>]
+//!              [--pause-menu <page>] [--settings-tab <tab>] [--output <png>]
 //! nubo --help | --version
 //! ```
 //!
@@ -32,7 +35,27 @@
 //! prints it as JSON, for the nightly CI. `--help` leaves it out, as it
 //! isn't for players. Since a first argument that names it is the command,
 //! a ROM file named exactly `measure-efficiency` opens as
-//! `./measure-efficiency`.
+//! `./measure-efficiency`; the same goes for `capture`.
+//!
+//! Two more are for making the documentation's screenshots and are left out
+//! of `--help` too (see `app::scenes` and `docs/SCREENSHOTS_PLAN.md`):
+//!
+//! - `--record-scenes <folder>` lets Ctrl+F12 save the moment on screen as a
+//!   scene in that folder (`nubo_frontend::scenes`). It can't be combined
+//!   with `--scale`, `--raw-screen` or `--fresh`, which change what the app
+//!   shows, so the scene wouldn't show again as recorded.
+//! - The `capture` command shows a scene with the scene's games from
+//!   `--games` and its settings, changed by any `--set key=value`. It keeps
+//!   its settings and data in `--home` instead of the player's folders, so
+//!   it reads and writes nothing of the player's. The window's inside is
+//!   `--size` (or the scene's size), or it fills the screen with
+//!   `--fullscreen`, or it shows only the game's picture with `--scale`, as
+//!   above. `--pause-menu` and `--settings-tab` open another page of the
+//!   pause menu or another settings tab than the scene has open, or close
+//!   it with `none`. With `--output` it saves a picture of the window there
+//!   and quits; without, it prints `ready` once the scene shows and keeps
+//!   showing it, for a harness that captures the window itself (with its
+//!   border, `cargo xtask screenshots`).
 //!
 //! The GB Emulator Shootout's harness runs the app with `--model` and all
 //! but `--cgb` (`docs/SHOOTOUT_PLAN.md`). `--raw-screen` makes its
@@ -62,6 +85,37 @@ pub struct Options {
     /// With `--raw-screen`: show the Game Boy screen as the emulator draws
     /// it, without the settings' palette and screen effects.
     pub raw_screen: bool,
+    /// With `--record-scenes`: Ctrl+F12 saves the moment on screen as a
+    /// scene in this folder.
+    pub record_scenes: Option<PathBuf>,
+}
+
+/// What the `capture` command asked for (see the module's documentation).
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Debug, Clone, PartialEq)]
+pub struct CaptureRequest {
+    /// The scene's folder.
+    pub scene: PathBuf,
+    /// The folder with the scene's games, by their file names.
+    pub games: PathBuf,
+    /// The folder the run keeps its settings and data in.
+    pub home: PathBuf,
+    /// Settings to change from the scene's, each a key and a value.
+    pub changes: Vec<(String, String)>,
+    /// The window's inside in logical pixels, instead of the scene's size.
+    pub size: Option<(f32, f32)>,
+    /// Whether the window fills the screen.
+    pub fullscreen: bool,
+    /// Show only the game's picture, this many times its size, as `--scale`
+    /// does.
+    pub scale: Option<u32>,
+    /// The pause menu page to open instead of the scene's, or `none`.
+    pub pause_menu: Option<String>,
+    /// The settings tab to open instead of the scene's, or `none`.
+    pub settings_tab: Option<String>,
+    /// Where to save the window's picture, or `None` to keep showing the
+    /// scene for a harness that captures the window itself.
+    pub output: Option<PathBuf>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -70,7 +124,7 @@ pub use parser::{Request, parse};
 /// Reading the command line with clap, which only the desktop build has.
 #[cfg(not(target_arch = "wasm32"))]
 mod parser {
-    use super::Options;
+    use super::{CaptureRequest, Options};
     use clap::error::ErrorKind;
     use clap::{CommandFactory, Parser, Subcommand};
     use nubo_core::Model;
@@ -82,7 +136,7 @@ mod parser {
     const MAX_SCALE: u32 = 8;
 
     /// What the command line asked for.
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(Debug, Clone, PartialEq)]
     pub enum Request {
         /// Open the app's window.
         Play(Options),
@@ -95,6 +149,8 @@ mod parser {
             /// otherwise.
             model: Model,
         },
+        /// `capture`: show a scene and take a picture of the window.
+        Capture(CaptureRequest),
     }
 
     /// The command line as clap reads it. The doc comments on its fields
@@ -146,6 +202,16 @@ mod parser {
         #[arg(long)]
         raw_screen: bool,
 
+        /// Let Ctrl+F12 save the moment on screen as a scene in this folder,
+        /// for the documentation's screenshots
+        #[arg(
+            long,
+            value_name = "FOLDER",
+            hide = true,
+            conflicts_with_all = ["scale", "raw_screen", "fresh"],
+        )]
+        record_scenes: Option<PathBuf>,
+
         #[command(subcommand)]
         command: Option<Command>,
     }
@@ -168,6 +234,60 @@ mod parser {
             #[arg(long, value_name = "NAME")]
             model: Option<Model>,
         },
+        /// Show a scene and save a picture of the window, for the
+        /// documentation's screenshots
+        #[command(hide = true)]
+        Capture {
+            /// The scene's folder (with scene.toml)
+            scene: PathBuf,
+
+            /// The folder with the scene's games, by their file names
+            #[arg(long, value_name = "FOLDER")]
+            games: PathBuf,
+
+            /// A folder for this run's settings and data, instead of the
+            /// player's
+            #[arg(long, value_name = "FOLDER")]
+            home: PathBuf,
+
+            /// Change a setting from the scene's, such as appearance=dark
+            /// (may be given more than once)
+            #[arg(long = "set", value_name = "KEY=VALUE", value_parser = parse_change)]
+            changes: Vec<(String, String)>,
+
+            /// The window's inside in logical pixels, such as 1000x780,
+            /// instead of the scene's size
+            #[arg(long, value_name = "WxH", value_parser = parse_size)]
+            size: Option<(f32, f32)>,
+
+            /// Fill the screen
+            #[arg(long, conflicts_with = "scale")]
+            fullscreen: bool,
+
+            /// Show only the game's picture, this many times its size (1 to 8)
+            #[arg(
+                long,
+                value_name = "N",
+                conflicts_with = "size",
+                value_parser = clap::value_parser!(u32).range(1..=i64::from(MAX_SCALE)),
+            )]
+            scale: Option<u32>,
+
+            /// Open this page of the pause menu instead of the scene's: main,
+            /// save, load, cheats, super-game-boy, or none
+            #[arg(long, value_name = "PAGE")]
+            pause_menu: Option<String>,
+
+            /// Open this settings tab instead of the scene's: display,
+            /// playing, controls, library, about, or none
+            #[arg(long, value_name = "TAB")]
+            settings_tab: Option<String>,
+
+            /// Save the window's picture here as PNG and quit; without it,
+            /// print "ready" once the scene shows and keep showing it
+            #[arg(long, value_name = "PNG")]
+            output: Option<PathBuf>,
+        },
     }
 
     /// Reads the command line's arguments, starting with the program's
@@ -183,7 +303,7 @@ mod parser {
         if arguments.command.is_some() && arguments.opens_the_window() {
             return Err(Arguments::command().error(
                 ErrorKind::ArgumentConflict,
-                "measure-efficiency comes first and takes only its own options",
+                "a command comes first and takes only its own options",
             ));
         }
         Ok(match arguments.command {
@@ -191,6 +311,29 @@ mod parser {
                 rom_path: absolute(rom),
                 model: chosen_model(cgb, model).unwrap_or(Model::Dmg),
             },
+            Some(Command::Capture {
+                scene,
+                games,
+                home,
+                changes,
+                size,
+                fullscreen,
+                scale,
+                pause_menu,
+                settings_tab,
+                output,
+            }) => Request::Capture(CaptureRequest {
+                scene: absolute(scene),
+                games: absolute(games),
+                home: absolute(home),
+                changes,
+                size,
+                fullscreen,
+                scale,
+                pause_menu,
+                settings_tab,
+                output: output.map(absolute),
+            }),
             None => Request::Play(Options {
                 rom_path: arguments.rom.map(absolute),
                 model: chosen_model(arguments.cgb, arguments.model),
@@ -198,6 +341,7 @@ mod parser {
                 fresh: arguments.fresh,
                 speed: arguments.speed,
                 raw_screen: arguments.raw_screen,
+                record_scenes: arguments.record_scenes.map(absolute),
             }),
         })
     }
@@ -212,6 +356,7 @@ mod parser {
                 || self.fresh
                 || self.speed.is_some()
                 || self.raw_screen
+                || self.record_scenes.is_some()
         }
     }
 
@@ -225,6 +370,26 @@ mod parser {
     /// in.
     fn absolute(path: PathBuf) -> PathBuf {
         std::path::absolute(&path).unwrap_or(path)
+    }
+
+    /// Reads a value of `capture`'s `--set`: a setting's key and its new
+    /// value, written as `key=value`.
+    fn parse_change(value: &str) -> Result<(String, String), String> {
+        nubo_frontend::scenes::parse_change(value)
+    }
+
+    /// Reads the value of `capture`'s `--size`: a width and a height in
+    /// logical pixels, written as `1000x780`.
+    fn parse_size(value: &str) -> Result<(f32, f32), String> {
+        let mistake = || format!("{value} isn't a size such as 1000x780");
+        let (width, height) = value.split_once(['x', 'X']).ok_or_else(mistake)?;
+        let length = |text: &str| -> Result<f32, String> {
+            match text.trim().parse::<u32>() {
+                Ok(length) if (1..=16_384).contains(&length) => Ok(length as f32),
+                _ => Err(mistake()),
+            }
+        };
+        Ok((length(width)?, length(height)?))
     }
 
     /// Reads the value of `--speed`: one of the fast forward speeds.

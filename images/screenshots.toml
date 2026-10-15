@@ -1,0 +1,39 @@
+# The screenshots the README and the Flathub listing show, made again from
+# their scenes in images/scenes/ by `cargo xtask screenshots` (see
+# docs/SCREENSHOTS_PLAN.md, xtask/src/screenshots/lists.rs and the
+# `screenshots` skill). None are listed yet: the next ones are collected with
+# the skill and picked by the maintainer.
+#
+# Each [[screenshot]] names its file and its scene, and may say:
+#
+# - frame: "none" (the window's inside, the default), "gnome" (the window with
+#   GNOME's border and shadow), "fullscreen" (the whole screen) or "game" (the
+#   game's picture alone);
+# - size = [width, height]: the window's inside for "none" and "gnome" (the
+#   scene's size unless given), the screen for "fullscreen" (1920×1080 unless
+#   given); scale = n: the game's picture n times its size for "game" (4);
+# - settings = { ... }: changes to the scene's settings, by the names
+#   settings.toml uses, such as { appearance = "dark", dmg_palette = "pocket" };
+# - pause_menu and settings_tab: another page or tab to open, or "none";
+# - style = "light" or "dark": GNOME's style, which colors the border (it
+#   follows the app's appearance unless given);
+# - [[screenshot.variant]] tables (each with its own scene, settings,
+#   pause_menu and settings_tab): pictures that go side by side, laid out with
+#   layout = "row", "column" or "grid" (columns = n), with gap, padding and
+#   background = "#rrggbb".
+#
+# For example, the Game Boy palettes side by side:
+#
+# [[screenshot]]
+# file = "images/screenshots/palettes.png"
+# scene = "el-dueloroso-saloon"
+# frame = "game"
+# gap = 32
+# padding = 16
+# background = "#0d0f14"
+# [[screenshot.variant]]
+# settings = { dmg_palette = "green" }
+# [[screenshot.variant]]
+# settings = { dmg_palette = "pocket" }
+# [[screenshot.variant]]
+# settings = { dmg_palette = "gray" }

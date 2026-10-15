@@ -23,6 +23,7 @@
 use crate::battery::{BatteryCartridgeEffects, BatterySaves};
 use crate::cheats::Cheat;
 use crate::notices::Notices;
+use crate::picture::Frame;
 use crate::rom::Rom;
 use crate::settings::FastForwardSpeed;
 use crate::sgb_menu::BorderClock;
@@ -145,6 +146,10 @@ pub enum Command {
     SetSgbPlayerPalette(Option<[u16; 4]>),
     /// On a Super Game Boy, picks the border around the screen.
     SetSgbBorder(SgbBorder),
+    /// Runs this many frames, whether the game is paused or not, and sends
+    /// back the last two the emulator finished (see
+    /// [`GameSession::run_frames`]).
+    RunFrames(u32, Sender<Vec<Frame>>),
 }
 
 /// The emulated Game Boy with its sound output and battery saves, playing
@@ -247,8 +252,32 @@ impl Machine {
                 self.emulator.set_sgb_border(border);
                 return true;
             }
+            Command::RunFrames(count, reply) => {
+                let _ = reply.send(self.run_frames(count));
+            }
         }
         false
+    }
+
+    /// Runs `count` frames of emulated time with `Emulator::run_frame`,
+    /// without playing their sound, and returns the last two frames that
+    /// finished, the newest last. Runs the same from the same state, so a
+    /// save state and a count make a picture that can always be made again.
+    fn run_frames(&mut self, count: u32) -> Vec<Frame> {
+        let (mut left, mut right) = (Vec::new(), Vec::new());
+        let mut frames = Vec::new();
+        for _ in 0..count {
+            self.emulator.run_frame(&mut left, &mut right);
+            left.clear();
+            right.clear();
+            if self.emulator.take_frame().is_some() {
+                if frames.len() == 2 {
+                    frames.remove(0);
+                }
+                frames.push(Frame::latest(&self.emulator));
+            }
+        }
+        frames
     }
 
     /// Plays as `playback` says from now on. Pausing also writes the battery

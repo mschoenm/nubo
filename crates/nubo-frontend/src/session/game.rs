@@ -8,7 +8,7 @@ use super::FrameListener;
 use super::{Command, Playback, Saves, Session};
 use crate::cheats::{self, Cheat};
 use crate::controls::Controls;
-use crate::lcd;
+use crate::lcd::ScreenEffects;
 use crate::notices::Notices;
 use crate::palettes::DmgPalette;
 use crate::picture::{Frame, Picture};
@@ -397,6 +397,30 @@ impl GameSession {
         self.session.load_state(data)
     }
 
+    /// Runs `count` frames from where the game is, paused or not, and shows
+    /// the last one (mixed with the one before it, when the screen blends
+    /// frames).
+    /// The same state and count always give the same picture, which is how
+    /// the app's hidden `capture` command makes a recorded moment again.
+    /// Frames the emulator handed over before are skipped, so a later
+    /// [`GameSession::refresh_screen`] doesn't show an older one.
+    pub fn run_frames(&mut self, count: u32) -> Result<(), String> {
+        let frames = super::ask(
+            |command| self.session.send(command),
+            |reply| Command::RunFrames(count, reply),
+        )?;
+        if let Some((sequence, _)) = self.session.frame_since(self.screen.sequence) {
+            self.screen.sequence = sequence;
+        }
+        // Only the frames run here are blended, so the picture never
+        // depends on what was on screen before.
+        self.screen.previous = None;
+        for frame in frames {
+            self.screen.show(frame);
+        }
+        Ok(())
+    }
+
     /// Emulates the frames due by the screen's latest refresh (see
     /// `Session::run_due_frames`).
     #[cfg(target_arch = "wasm32")]
@@ -409,32 +433,6 @@ impl GameSession {
         if let Some((sequence, frame)) = self.session.frame_since(self.screen.sequence) {
             self.screen.sequence = sequence;
             self.screen.show(frame);
-        }
-    }
-}
-
-/// What the picture goes through to look like the model's own screen (see
-/// `lcd`), when the player wants the original screen look.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-struct ScreenEffects {
-    /// Whether the colors are shown as on a Game Boy Color's screen (see
-    /// `lcd::correct_colors`).
-    correct_colors: bool,
-    /// Whether each frame is mixed with the one before, as a slow screen
-    /// showed it (see `lcd::blend`).
-    blend_frames: bool,
-}
-
-impl ScreenEffects {
-    /// The effects of `model`'s own screen, or none without the
-    /// `original_screen` look. A Game Boy Color's colors are corrected, and
-    /// an original Game Boy's or Pocket's slow screen blends frames. The Game
-    /// Boy Color's screen was fast enough not to, the Game Boy Advance's
-    /// showed colors differently, and a Super Game Boy's TV did neither.
-    fn of(model: Model, original_screen: bool) -> Self {
-        ScreenEffects {
-            correct_colors: original_screen && model.is_cgb() && model != Model::Agb,
-            blend_frames: original_screen && matches!(model, Model::Dmg0 | Model::Dmg | Model::Mgb),
         }
     }
 }
@@ -488,12 +486,7 @@ impl Screen {
     /// with the one before and with its colors corrected if the player wants.
     fn show(&mut self, frame: Frame) {
         let mut shown = frame.clone();
-        if self.effects.blend_frames
-            && let Some(previous) = &self.previous
-        {
-            lcd::blend(&mut shown.pixels, previous);
-        }
-        self.correct(&mut shown);
+        self.effects.apply(&mut shown, self.previous.as_deref());
         self.picture = Some(shown.shown(self.palette, self.border));
         self.previous = Some(frame.pixels.clone());
         self.raw = Some(frame);
@@ -503,9 +496,7 @@ impl Screen {
     /// Frames in the Game Boy's grays and Super Game Boy frames, which a TV
     /// showed, stay as they are.
     fn correct(&self, frame: &mut Frame) {
-        if self.effects.correct_colors && !frame.in_dmg_shades && frame.sgb_menu.is_none() {
-            lcd::correct_colors(&mut frame.pixels);
-        }
+        self.effects.apply(frame, None);
     }
 
     /// Shows the picture through `effects` from now on, repainting the frame

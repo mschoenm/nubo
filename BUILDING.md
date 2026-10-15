@@ -63,6 +63,18 @@ cargo cpu-tests                     # Every CPU instruction, checked cycle by cy
 
 [docs/ACCURACY.md](docs/ACCURACY.md) lists the test ROM suites, the results and the tests that aren't run.
 
+## Screenshots
+
+The README's and the Flathub listing's screenshots are made again from recorded scenes ([docs/SCREENSHOTS_PLAN.md](docs/SCREENSHOTS_PLAN.md)): moments of free homebrew games, kept with their save states in `images/scenes/`. On Linux, with GNOME Shell installed (the task prints the `apt` line when it isn't), the task takes them in a headless GNOME Shell, with GNOME's own window border where a screenshot asks for one:
+
+```
+cargo xtask screenshots [filter]    # Make the screenshots images/screenshots.toml lists, writing the ones whose pixels changed
+cargo xtask screenshots --check     # Only say which differ, with pictures of the differences in target/screenshots/check/
+cargo xtask scene explore "Rebound.gbc" --script "wait 5s; press start; wait 2s; mark"   # Play headless and save candidate scenes, with a contact sheet
+cargo xtask scene keep target/scenes/rebound-1/01 rebound-start   # Keep a candidate in images/scenes/
+cargo play rom.gb --record-scenes path/to/folder   # Play by hand; Ctrl+F12 saves the moment on screen as a scene
+```
+
 ## Where Things Are
 
 - `crates/nubo-core`: the emulator itself, a plain library with no platform dependencies.
@@ -71,6 +83,7 @@ cargo cpu-tests                     # Every CPU instruction, checked cycle by cy
 - `frontends/nubo-libretro`: the RetroArch core.
 - `tools/`: the developer tools, such as the test ROM runner and the benchmark, with `crates/nubo-download`, which downloads their test data.
 - `xtask/`: the web build, packaging and the other project tasks ([`xtask/AGENTS.md`](xtask/AGENTS.md) lists them all).
+- `images/`: the logo and the screenshots, with the scenes the screenshots are made from in `images/scenes/`.
 
 ## Contributing
 

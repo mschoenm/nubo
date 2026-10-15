@@ -167,6 +167,15 @@ impl Game {
         !self.is_paused() && !self.cursor_near_bar && Instant::now() < self.controls_shown_until
     }
 
+    /// Hides the fullscreen bar and the mouse pointer now, as if the mouse
+    /// had been still for a while, so a scene's picture shows the game
+    /// alone (see `app::scenes`).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn hide_controls(&mut self) {
+        self.controls_shown_until = Instant::now();
+        self.cursor_near_bar = false;
+    }
+
     /// Shows the bar because the mouse moved to `cursor_y` pixels below the
     /// top of the window.
     pub fn mouse_moved(&mut self, cursor_y: f32) {
