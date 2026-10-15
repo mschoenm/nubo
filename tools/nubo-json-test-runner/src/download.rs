@@ -1,13 +1,10 @@
 //! Downloads the CPU tests at a pinned commit and checks them against the
 //! SHA-256 checksums in `v2.sha256`.
 
-use sha2::{Digest, Sha256};
+use nubo_download::{download_all, has_checksum};
 use std::env;
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::thread;
 
 /// The commit of adtennant/GameboyCPUTests the tests are taken from.
 const COMMIT: &str = "d1c8fd48c9e543995397fbd20e55bcbd524d029f";
@@ -18,7 +15,6 @@ const MANIFEST: &str = include_str!("../v2.sha256");
 /// A file written once every test file has been downloaded and checked, so
 /// later runs don't check them again.
 const COMPLETE_MARKER: &str = ".complete";
-const PARALLEL_DOWNLOADS: usize = 16;
 
 /// One line of the manifest.
 struct ManifestEntry {
@@ -41,7 +37,7 @@ pub(crate) fn ensure_cpu_tests() -> Result<PathBuf, String> {
     let entries = manifest();
     let missing: Vec<&ManifestEntry> = entries
         .iter()
-        .filter(|entry| !has_expected_checksum(&tests_dir.join(entry.file_name), entry.sha256))
+        .filter(|entry| !has_checksum(&tests_dir.join(entry.file_name), entry.sha256))
         .collect();
 
     if !missing.is_empty() {
@@ -50,7 +46,7 @@ pub(crate) fn ensure_cpu_tests() -> Result<PathBuf, String> {
 
     let corrupt: Vec<&str> = entries
         .iter()
-        .filter(|entry| !has_expected_checksum(&tests_dir.join(entry.file_name), entry.sha256))
+        .filter(|entry| !has_checksum(&tests_dir.join(entry.file_name), entry.sha256))
         .map(|entry| entry.file_name)
         .collect();
     if !corrupt.is_empty() {
@@ -89,19 +85,6 @@ fn manifest() -> Vec<ManifestEntry> {
         .collect()
 }
 
-/// Whether the file at `path` exists and has the SHA-256 checksum
-/// `expected` (in lowercase hexadecimal).
-fn has_expected_checksum(path: &Path, expected: &str) -> bool {
-    let Ok(bytes) = fs::read(path) else {
-        return false;
-    };
-    let checksum: String = Sha256::digest(&bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
-    checksum == expected
-}
-
 /// Downloads the files of `entries` into `destination`, several at a time.
 fn download(destination: &Path, entries: &[&ManifestEntry]) -> Result<(), String> {
     println!(
@@ -109,51 +92,14 @@ fn download(destination: &Path, entries: &[&ManifestEntry]) -> Result<(), String
         entries.len(),
         &COMMIT[..12]
     );
-
-    let agent = agent();
-    let next = AtomicUsize::new(0);
-    thread::scope(|scope| {
-        let workers: Vec<_> = (0..PARALLEL_DOWNLOADS.min(entries.len()))
-            .map(|_| {
-                scope.spawn(|| {
-                    while let Some(entry) = entries.get(next.fetch_add(1, Ordering::Relaxed)) {
-                        let url = format!("{BASE_URL}/{COMMIT}/v2/{}", entry.file_name);
-                        download_file(&agent, &url, &destination.join(entry.file_name))?;
-                    }
-                    Ok(())
-                })
-            })
-            .collect();
-        workers
-            .into_iter()
-            .try_for_each(|worker| worker.join().expect("a download thread panicked"))
-    })
-}
-
-/// An HTTP client that finds a proxy and trusted certificates the way the
-/// system's own tools do, from the `HTTPS_PROXY` variable and the system's
-/// certificate store.
-fn agent() -> ureq::Agent {
-    ureq::Agent::new_with_config(
-        ureq::Agent::config_builder()
-            .tls_config(
-                ureq::tls::TlsConfig::builder()
-                    .root_certs(ureq::tls::RootCerts::PlatformVerifier)
-                    .build(),
+    let downloads: Vec<(PathBuf, String)> = entries
+        .iter()
+        .map(|entry| {
+            (
+                destination.join(entry.file_name),
+                format!("{BASE_URL}/{COMMIT}/v2/{}", entry.file_name),
             )
-            .build(),
-    )
-}
-
-/// Downloads `url` to `destination`.
-fn download_file(agent: &ureq::Agent, url: &str, destination: &Path) -> Result<(), String> {
-    let response = agent
-        .get(url)
-        .call()
-        .map_err(|error| format!("failed to download {url}: {error}"))?;
-    let mut file = fs::File::create(destination)
-        .map_err(|error| format!("failed to create {}: {error}", destination.display()))?;
-    io::copy(&mut response.into_body().into_reader(), &mut file)
-        .map_err(|error| format!("failed to download {url}: {error}"))?;
-    Ok(())
+        })
+        .collect();
+    download_all(&downloads)
 }

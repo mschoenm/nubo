@@ -12,7 +12,7 @@
 //! each test, so CI never downloads these files. It is updated in a pull
 //! request of its own when the Shootout publishes again.
 
-use crate::{Result, http, target_dir, workspace_root};
+use crate::{Result, target_dir, workspace_root};
 use serde_json::Value;
 use std::fmt::Write;
 use std::fs;
@@ -76,7 +76,7 @@ pub fn run(args: &[String]) -> Result {
 fn download_json(commit: &str, file: &str, folder: &Path) -> Result<Value> {
     let path = folder.join(file);
     let url = format!("{RAW_URL}/{commit}/{}", percent_encode(file));
-    http::download(&url, &path)?;
+    nubo_download::download(&url, &path)?;
     let text = fs::read_to_string(&path)
         .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
     serde_json::from_str(&text).map_err(|error| format!("{file} is not valid JSON: {error}"))

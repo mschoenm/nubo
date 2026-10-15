@@ -2894,6 +2894,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "nubo-download"
+version = "0.8.1"
+dependencies = [
+ "sha2",
+ "ureq",
+]
+
+[[package]]
 name = "nubo-frontend"
 version = "0.8.1"
 dependencies = [
@@ -2929,10 +2937,9 @@ name = "nubo-json-test-runner"
 version = "0.8.1"
 dependencies = [
  "nubo-core",
+ "nubo-download",
  "serde",
  "serde_json",
- "sha2",
- "ureq",
 ]
 
 [[package]]
@@ -2972,8 +2979,7 @@ dependencies = [
  "clap",
  "image",
  "nubo-core",
- "sha2",
- "ureq",
+ "nubo-download",
  "zip",
 ]
 
@@ -6087,12 +6093,12 @@ name = "xtask"
 version = "0.8.1"
 dependencies = [
  "image",
+ "nubo-download",
  "nubo-logo",
  "roxmltree 0.21.1",
  "serde_json",
  "sha2",
  "toml",
- "ureq",
  "wasm-bindgen-cli-support",
 ]
 

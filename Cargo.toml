@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/nubo-core",
+    "crates/nubo-download",
     "crates/nubo-frontend",
     "crates/nubo-logo",
     "crates/nubo-serializable-derive",
@@ -68,6 +69,7 @@ wildcard_imports = "warn"
 
 [workspace.dependencies]
 nubo-core = { path = "crates/nubo-core" }
+nubo-download = { path = "crates/nubo-download" }
 nubo-frontend = { path = "crates/nubo-frontend" }
 nubo-logo = { path = "crates/nubo-logo" }
 nubo-serializable-derive = { path = "crates/nubo-serializable-derive" }
