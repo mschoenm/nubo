@@ -173,6 +173,7 @@ impl App {
             }
             SettingsMessage::Reset(choices) => return self.reset_settings(choices),
             SettingsMessage::SavesDeleted { deleted, errors } => {
+                self.deleting_saves = false;
                 for error in errors {
                     self.toasts.error(error);
                 }
@@ -181,6 +182,9 @@ impl App {
                 } else {
                     format!("Settings reset, and the {} deleted", deleted.join(" and "))
                 });
+                if let Some((rom, resume)) = self.start_after_deleting.take() {
+                    self.start_game(rom, resume);
+                }
             }
         }
 
@@ -223,6 +227,7 @@ impl App {
         self.change_settings(|settings| *settings = reset);
 
         let deletion = if delete_battery_saves || delete_save_states {
+            self.deleting_saves = true;
             Task::perform(
                 background::run(move || delete_saves(delete_battery_saves, delete_save_states)),
                 |result| {

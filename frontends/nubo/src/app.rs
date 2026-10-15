@@ -142,6 +142,12 @@ pub struct App {
     dialog: Option<Dialog>,
     /// What the newest toast's Undo button puts back, if it has one.
     undo: Option<playing::UndoPoint>,
+    /// Whether a reset is deleting saves in the background. No game starts
+    /// meanwhile, since it could read a save about to go and write it back.
+    deleting_saves: bool,
+    /// The game to start once the saves are deleted, and whether it
+    /// continues where the player left off, if one was asked for meanwhile.
+    start_after_deleting: Option<(Rom, bool)>,
     /// The last game played, which the browser's start screen offers to
     /// play again (see `nubo_frontend::rom::remember`).
     remembered: Option<Rom>,
@@ -233,6 +239,8 @@ impl App {
             box_art_problem: None,
             dialog: None,
             undo: None,
+            deleting_saves: false,
+            start_after_deleting: None,
             newer_version: None,
             remembered: if options.fresh {
                 None
