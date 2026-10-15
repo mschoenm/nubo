@@ -15,9 +15,11 @@
 //!   Scenes keep no toasts or questions: the toasts are left out of the
 //!   preview, and nothing is recorded while a question is open. Nor do they
 //!   keep the player's own data, so nothing is recorded while it shows (see
-//!   [`unkept`]): box art, a cheat that is on, or a page of the pause menu
-//!   that lists saved states or cheats; nor while the library is still
-//!   finding its games or holds a search.
+//!   [`unkept`]): box art, a last screen played on a library card, the game
+//!   folders on the Library settings tab, a cheat that is on, or a page of
+//!   the pause menu that lists saved states or cheats; nor while the library
+//!   is still finding its games or holds a search. The buttons held are let
+//!   go first and what scrolls goes back to the top, as a capture starts.
 //!
 //! A scene's game keeps no battery saves, with its cartridge clock on
 //! emulated time, so a clock doesn't make two pictures of a scene differ.
@@ -389,10 +391,27 @@ impl App {
             scene,
             state,
         });
-        // A picture of the window shows what was last drawn, so it waits
-        // until the window has been drawn without the toasts and with the
-        // scene's frames.
-        Task::perform(background::run(|| std::thread::sleep(REDRAW_TIME)), |_| ())
+        // A capture shows the library, the settings and the pause menu
+        // scrolled to the top, as they open. A picture of the window shows
+        // what was last drawn, so it waits until the window has been drawn
+        // scrolled, without the toasts and with the scene's frames.
+        let to_top = |id| {
+            iced::widget::operation::snap_to(
+                id,
+                iced::widget::scrollable::RelativeOffset {
+                    x: Some(0.0),
+                    y: Some(0.0),
+                },
+            )
+        };
+        let scrolled = Task::batch([
+            to_top(crate::views::library::scroll_id()),
+            to_top(crate::views::settings::scroll_id()),
+            to_top(crate::views::game::pause_scroll_id()),
+        ]);
+        let wait = Task::perform(background::run(|| std::thread::sleep(REDRAW_TIME)), |_| ());
+        scrolled
+            .chain(wait)
             .then(|()| window::latest())
             .then(|id| match id {
                 Some(id) => window::screenshot(id).map(|shot| SceneMessage::Recorded(shot).into()),
@@ -402,7 +421,7 @@ impl App {
 
     /// What is on screen that a scene might not keep.
     fn on_screen(&self) -> OnScreen {
-        match &self.game {
+        let mut on_screen = match &self.game {
             Some(game) => {
                 let cheats = game.session.cheats();
                 OnScreen {
@@ -422,9 +441,23 @@ impl App {
                 box_art: self.settings.shared.download_box_art && self.library.has_box_art(),
                 library_busy: self.library.is_busy(),
                 searching: !self.search.is_empty(),
+                last_screens: self
+                    .library
+                    .games("")
+                    .chain(
+                        self.library
+                            .recently_played(crate::views::library::most_recent_shown()),
+                    )
+                    .any(|entry| {
+                        self.library.title_screen(&entry.path).is_none()
+                            && self.library.thumbnail(&entry.path).is_some()
+                    }),
                 ..OnScreen::default()
             },
-        }
+        };
+        on_screen.library_folders = self.settings_tab == Some(SettingsTab::Library)
+            && !self.settings.shared.library_folders.is_empty();
+        on_screen
     }
 
     /// The scene on screen right now, with the game's state if a game is
@@ -461,7 +494,7 @@ impl App {
         let Some(game) = &mut self.game else {
             view.screen = scenes::Screen::Library;
             let now = SystemTime::now();
-            let library = SceneLibrary {
+            let mut library = SceneLibrary {
                 games: self
                     .library
                     .games("")
@@ -483,6 +516,14 @@ impl App {
                     })
                     .collect(),
             };
+            // A game played from outside the library's folders shows under
+            // "Continue playing" too, so its file goes into the scene's
+            // library with the others.
+            for played in &library.played {
+                if !library.games.contains(&played.file) {
+                    library.games.push(played.file.clone());
+                }
+            }
             let scene = Scene {
                 game: None,
                 window,
@@ -495,6 +536,10 @@ impl App {
 
         view.pause_menu = game.menu().map(|page| pause_menu_name(page).to_owned());
         game.session.apply(false, &self.settings.shared);
+        // Save states don't keep the buttons held, and a capture starts with
+        // none, so the scene's frames run without any too.
+        game.session.release_held_keys();
+        game.session.set_controller_states(Vec::new());
         let state = game.session.snapshot()?;
         game.session.run_frames(scenes::RECORDED_FRAMES)?;
         let rom = game.session.rom();
@@ -560,6 +605,12 @@ struct OnScreen {
     /// Whether the library's search field holds text, which scenes don't
     /// keep.
     searching: bool,
+    /// Whether a library card shows the last screen played instead of a
+    /// title screen, which scenes don't keep.
+    last_screens: bool,
+    /// Whether the settings' Library tab shows the player's game folders,
+    /// which scenes don't keep.
+    library_folders: bool,
     /// Whether a cheat is on, which save states don't keep.
     cheats_on: bool,
     /// Whether the game has cheats for the cheats page to list.
@@ -580,6 +631,10 @@ fn unkept(on_screen: &OnScreen) -> Option<&'static str> {
         Some("the library is still finding its games; wait until it is done")
     } else if on_screen.searching {
         Some("scenes don't keep the search; clear it first")
+    } else if on_screen.last_screens {
+        Some("a game shows the last screen you played, which scenes don't keep")
+    } else if on_screen.library_folders {
+        Some("scenes don't keep your game folders; close the Library settings first")
     } else if on_screen.cheats_on {
         Some("scenes don't keep cheats; turn them off first")
     } else if matches!(on_screen.page, Some(PauseMenu::Save | PauseMenu::Load))

@@ -70,6 +70,14 @@ fn the_players_own_data_is_never_recorded() {
             ..OnScreen::default()
         },
         OnScreen {
+            last_screens: true,
+            ..OnScreen::default()
+        },
+        OnScreen {
+            library_folders: true,
+            ..OnScreen::default()
+        },
+        OnScreen {
             cheats_on: true,
             cheats_listed: true,
             ..OnScreen::default()
