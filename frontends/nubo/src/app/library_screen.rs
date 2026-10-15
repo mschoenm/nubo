@@ -272,10 +272,11 @@ impl App {
         Task::none()
     }
 
-    /// Moves through the library's cards with a direction, scrolling the
+    /// Moves through the library's cards with a direction, around the ends
+    /// unless the key is `held` (see `Shelves::step`), scrolling the
     /// selected card into view, starts the selected game with A or Start,
     /// and opens its menu with Select.
-    pub(super) fn navigate_library(&mut self, action: Action) -> Task<Message> {
+    pub(super) fn navigate_library(&mut self, action: Action, held: bool) -> Task<Message> {
         let shelves = views::library::Shelves::new(&self.library, &self.settings, &self.search);
         let count = shelves.len();
         if count == 0 {
@@ -302,7 +303,9 @@ impl App {
             return Task::none();
         }
 
-        let next = current.map_or(0, |index| shelves.step(index, action, self.window_width));
+        let next = current.map_or(0, |index| {
+            shelves.step(index, action, self.window_width, !held)
+        });
         let (top, bottom) = shelves.card_bounds(next, self.window_width);
         self.library_selection = Some(next);
 

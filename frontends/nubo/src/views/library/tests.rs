@@ -47,9 +47,9 @@ fn left_and_right_move_one_card_and_stop_at_the_ends() {
     let (recent, games) = (entries(2), entries(5));
     let shelves = shelves(&recent, &games);
 
-    assert_eq!(shelves.step(0, Action::Left, WIDTH), 0);
-    assert_eq!(shelves.step(1, Action::Right, WIDTH), 2);
-    assert_eq!(shelves.step(6, Action::Right, WIDTH), 6);
+    assert_eq!(shelves.step(0, Action::Left, WIDTH, false), 0);
+    assert_eq!(shelves.step(1, Action::Right, WIDTH, false), 2);
+    assert_eq!(shelves.step(6, Action::Right, WIDTH, false), 6);
 }
 
 #[test]
@@ -57,12 +57,12 @@ fn down_moves_from_continue_playing_to_all_games() {
     let (recent, games) = (entries(2), entries(5));
     let shelves = shelves(&recent, &games);
 
-    assert_eq!(shelves.step(0, Action::Down, WIDTH), 2);
-    assert_eq!(shelves.step(1, Action::Down, WIDTH), 3);
-    assert_eq!(shelves.step(2, Action::Down, WIDTH), 5);
+    assert_eq!(shelves.step(0, Action::Down, WIDTH, false), 2);
+    assert_eq!(shelves.step(1, Action::Down, WIDTH, false), 3);
+    assert_eq!(shelves.step(2, Action::Down, WIDTH, false), 5);
     // There is no card below 4, so down goes to the last card of the next row.
-    assert_eq!(shelves.step(4, Action::Down, WIDTH), 6);
-    assert_eq!(shelves.step(5, Action::Down, WIDTH), 5);
+    assert_eq!(shelves.step(4, Action::Down, WIDTH, false), 6);
+    assert_eq!(shelves.step(5, Action::Down, WIDTH, false), 5);
 }
 
 #[test]
@@ -70,10 +70,41 @@ fn up_moves_back_to_continue_playing() {
     let (recent, games) = (entries(2), entries(5));
     let shelves = shelves(&recent, &games);
 
-    assert_eq!(shelves.step(5, Action::Up, WIDTH), 2);
-    assert_eq!(shelves.step(2, Action::Up, WIDTH), 0);
-    assert_eq!(shelves.step(4, Action::Up, WIDTH), 1);
-    assert_eq!(shelves.step(0, Action::Up, WIDTH), 0);
+    assert_eq!(shelves.step(5, Action::Up, WIDTH, false), 2);
+    assert_eq!(shelves.step(2, Action::Up, WIDTH, false), 0);
+    assert_eq!(shelves.step(4, Action::Up, WIDTH, false), 1);
+    assert_eq!(shelves.step(0, Action::Up, WIDTH, false), 0);
+}
+
+#[test]
+fn a_fresh_press_wraps_around_the_ends() {
+    let (recent, games) = (entries(2), entries(5));
+    let shelves = shelves(&recent, &games);
+
+    assert_eq!(shelves.step(0, Action::Left, WIDTH, true), 6);
+    assert_eq!(shelves.step(6, Action::Right, WIDTH, true), 0);
+    // Up from the top row goes to the bottom row, in the same column.
+    assert_eq!(shelves.step(0, Action::Up, WIDTH, true), 5);
+    assert_eq!(shelves.step(1, Action::Up, WIDTH, true), 6);
+    // Down from the bottom row goes to the top row, in the same column.
+    assert_eq!(shelves.step(5, Action::Down, WIDTH, true), 0);
+    assert_eq!(shelves.step(6, Action::Down, WIDTH, true), 1);
+    // Away from the ends, wrapping changes nothing.
+    assert_eq!(shelves.step(4, Action::Up, WIDTH, true), 1);
+    assert_eq!(shelves.step(4, Action::Down, WIDTH, true), 6);
+}
+
+#[test]
+fn wrapping_without_continue_playing_finds_the_nearest_card() {
+    // 0 1 2
+    // 3 4
+    let games = entries(5);
+    let shelves = shelves(&[], &games);
+
+    // There is no card under 2 in the bottom row, so up goes to its last card.
+    assert_eq!(shelves.step(2, Action::Up, WIDTH, true), 4);
+    assert_eq!(shelves.step(4, Action::Down, WIDTH, true), 1);
+    assert_eq!(shelves.step(3, Action::Down, WIDTH, true), 0);
 }
 
 #[test]

@@ -706,10 +706,8 @@ impl App {
     }
 
     /// Moves through the pause menu: up and down move between its rows, A
-    /// or Start picks one, and B steps back. A fresh press of up on the
-    /// first row goes to the last and down on the last to the first, while
-    /// a `held` key repeating stops at either end, so holding it doesn't
-    /// go round and round.
+    /// or Start picks one, and B steps back. Up and down wrap around the
+    /// ends, unless the key is `held` (see `crate::selection`).
     pub(super) fn navigate_pause_menu(&mut self, action: Action, held: bool) -> Task<Message> {
         let Some(game) = &mut self.game else {
             return Task::none();

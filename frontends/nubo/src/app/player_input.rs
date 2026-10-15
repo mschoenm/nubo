@@ -197,20 +197,21 @@ impl App {
     /// Moves through the menu on screen (a dialog, the settings window, the
     /// pause menu or the library) with a direction, picks with A or Start, and steps
     /// back with B. These are the keys and controller buttons the player
-    /// bound to the Game Boy's D-pad, A, B, Start and Select. `held` says
-    /// the press is a held key repeating.
+    /// bound to the Game Boy's D-pad, A, B, Start and Select. A fresh press
+    /// past either end of a list wraps around to the other end, while
+    /// `held`, a held key repeating, stops there (see `crate::selection`).
     fn navigate(&mut self, action: Action, held: bool) -> Task<Message> {
         if self.dialog.is_some() {
-            return self.navigate_dialog(action);
+            return self.navigate_dialog(action, held);
         }
         if self.settings_tab.is_some() {
-            return self.navigate_settings(action);
+            return self.navigate_settings(action, held);
         }
 
         if self.game.is_some() {
             self.navigate_pause_menu(action, held)
         } else {
-            self.navigate_library(action)
+            self.navigate_library(action, held)
         }
     }
 

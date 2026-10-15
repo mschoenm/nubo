@@ -122,9 +122,21 @@ impl<'a> Shelves<'a> {
 
     /// The card the D-pad moves to from `index` in `direction`, in a
     /// window `window_width` wide. Up and down move between rows, and
-    /// between the two shelves at their edges.
-    pub fn step(&self, index: usize, direction: Action, window_width: f32) -> usize {
+    /// between the two shelves at their edges. At the ends, `wrap` goes
+    /// around (see [`Shelves::wrapped`]); without it, the selection stays.
+    pub fn step(&self, index: usize, direction: Action, window_width: f32, wrap: bool) -> usize {
         let columns = columns(window_width);
+        let target = self.step_within(index, direction, columns);
+        if wrap && target == index {
+            self.wrapped(index, direction, columns)
+        } else {
+            target
+        }
+    }
+
+    /// The card next to `index` in `direction` in a grid `columns` wide,
+    /// or `index` itself at the edge of the cards.
+    fn step_within(&self, index: usize, direction: Action, columns: usize) -> usize {
         let recent = self.recent.len();
         let last = self.len().saturating_sub(1);
 
@@ -160,6 +172,49 @@ impl<'a> Shelves<'a> {
         };
 
         target.min(last)
+    }
+
+    /// Where a press in `direction` goes from `index`, a card at the edge
+    /// of the cards in a grid `columns` wide: left from the first card to
+    /// the last and right from the last to the first, up from the top row
+    /// to the bottom row and down from the bottom row to the top row, in
+    /// the same column or the nearest card in it.
+    fn wrapped(&self, index: usize, direction: Action, columns: usize) -> usize {
+        if self.len() == 0 {
+            return 0;
+        }
+        let recent = self.recent.len();
+        let column = if index < recent {
+            index % columns
+        } else {
+            (index - recent) % columns
+        };
+        // The first and last shelves, as their first card and their length.
+        let first = if recent > 0 {
+            (0, recent)
+        } else {
+            (recent, self.games.len())
+        };
+        let last = if self.games.is_empty() {
+            (0, recent)
+        } else {
+            (recent, self.games.len())
+        };
+
+        match direction {
+            Action::Left => self.len().saturating_sub(1),
+            Action::Right => 0,
+            Action::Up => {
+                let (start, length) = last;
+                let bottom_row = start + (length - 1) / columns * columns;
+                (bottom_row + column).min(start + length - 1)
+            }
+            Action::Down => {
+                let (start, length) = first;
+                (start + column).min(start + length - 1)
+            }
+            _ => index,
+        }
     }
 
     /// The top and bottom of the card at `index` in the scrolling page,
