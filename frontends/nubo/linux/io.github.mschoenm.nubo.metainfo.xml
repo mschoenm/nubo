@@ -59,6 +59,16 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.9.1" date="2026-10-15">
+      <description>
+        <p>Nubo's command line is easier to use: on Linux it explains itself, and everywhere it takes any file name.</p>
+        <ul>
+          <li>On Linux, --help lists the command line options and --version prints the version</li>
+          <li>Games whose path isn't valid UTF-8 now open from the command line</li>
+          <li>Save states made by Nubo 0.4.0 to 0.9.0 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.9.0" date="2026-10-15">
       <description>
         <p>Nubo is friendlier for players who just want to play: rewind, a library with real game names and menus, undo for loads and restarts, and an emulator that needs about a third less work for the same, exact result.</p>
