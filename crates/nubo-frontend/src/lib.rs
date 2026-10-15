@@ -7,6 +7,7 @@
 //!   games ([`palettes`]), the Super Game Boy menu's choices ([`sgb_menu`])
 //!   and the rule that picks the hardware a game starts on ([`model`]);
 //! - neutral building blocks: clocks that work in the browser too ([`time`]),
+//!   opening web pages and folders ([`links`]),
 //!   pictures as plain RGBA pixels ([`picture`]), slow work on a thread of its
 //!   own ([`background`]) and problems for the app to show ([`notices`]);
 //! - what an app keeps between runs, through [`storage`]: the settings
@@ -48,6 +49,7 @@ pub mod controls;
 #[cfg(feature = "gamepads")]
 pub mod gamepads;
 pub mod library;
+pub mod links;
 pub mod model;
 pub mod notices;
 pub mod palettes;

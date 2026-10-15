@@ -9,7 +9,7 @@
 use nubo_core::{Emulator, Model, NoSaves};
 
 /// The moments (in frames, about 60 a second) at which a frame is looked
-/// at: 2.5, 5, 7.5 and 10 seconds in.
+/// at: 2.5, 5, 7.5 and 10 seconds after the boot ROM hands over to the game.
 const SAMPLE_FRAMES: [u32; 4] = [150, 300, 450, 600];
 /// Gives up on games that stop drawing frames, such as ones that crash.
 const MAX_STEPS: u32 = 40_000_000;
@@ -40,9 +40,15 @@ pub fn capture(rom: &[u8]) -> Option<Vec<u8>> {
     for _ in 0..MAX_STEPS {
         emulator.step();
 
+        // The boot ROM's logo is the same for every game, so the moments
+        // count from when the game itself starts.
+        let booting = emulator.is_running_boot_rom();
         let Some(pixels) = emulator.take_frame() else {
             continue;
         };
+        if booting {
+            continue;
+        }
         frames += 1;
 
         if SAMPLE_FRAMES.contains(&frames) {

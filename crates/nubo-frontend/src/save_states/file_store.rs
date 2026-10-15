@@ -89,6 +89,22 @@ pub fn load_in(directory: &Path, rom_path: &Path, slot: Slot) -> Result<Option<S
     }))
 }
 
+pub fn delete(rom_path: &Path, slot: Slot) -> Result<(), String> {
+    delete_in(&states_directory()?, rom_path, slot)
+}
+
+/// Deletes a slot's state and picture in `directory` (the folder for every
+/// game's states). An empty slot is fine.
+pub fn delete_in(directory: &Path, rom_path: &Path, slot: Slot) -> Result<(), String> {
+    for extension in ["state", "png"] {
+        match fs::remove_file(slot_path(directory, rom_path, slot, extension)) {
+            Err(error) if error.kind() != ErrorKind::NotFound => return Err(error.to_string()),
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 pub fn keep_aside(rom_path: &Path, slot: Slot) -> Result<PathBuf, String> {
     keep_aside_in(&states_directory()?, rom_path, slot)
 }

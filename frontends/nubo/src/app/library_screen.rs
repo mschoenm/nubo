@@ -3,17 +3,22 @@
 
 use super::playing::read_rom;
 use super::{App, Message};
+use crate::dialog::{DialogKind, GameMenuPage};
 use crate::rom_picker;
+use crate::settings::{LibraryFilter, LibrarySort};
 use crate::views;
 use iced::Task;
 use iced::widget;
 use iced::widget::scrollable::AbsoluteOffset;
+use nubo_core::Model;
 use nubo_frontend::background;
 use nubo_frontend::controls::Action;
 use nubo_frontend::library::box_art::{self, GameList};
 use nubo_frontend::library::{
     self, DownloadedArt, FileCheck, LoadedPicture, ScanResult, WatchEvent,
 };
+use nubo_frontend::links;
+use nubo_frontend::save_states::{self, Slot};
 use nubo_frontend::settings::LibraryFolder;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -39,6 +44,22 @@ pub enum LibraryMessage {
     Rescan,
     /// The player took this game off "Continue playing".
     RemoveRecent(PathBuf),
+    /// Opens the menu of this game (a right click, the "⋯" button or
+    /// Select on its card).
+    OpenGameMenu(PathBuf),
+    /// Opens the menu that sorts and filters the games.
+    OpenSortMenu,
+    SortPicked(LibrarySort),
+    FilterPicked(LibraryFilter),
+    /// Opens the folder this game is in.
+    ShowInFolder(PathBuf),
+    /// The player picked a model for this game in its menu, or `None` to
+    /// follow the settings again.
+    GameModelPicked(PathBuf, Option<Model>),
+    /// Asks whether to delete this game's save states.
+    AskDeleteSaveStates(PathBuf),
+    /// Deletes this game's save states, as the player confirmed.
+    DeleteSaveStates(PathBuf),
     Scanned(ScanResult),
     /// The quick startup look at whether the games' files still exist is
     /// done.
@@ -128,6 +149,41 @@ impl App {
                 // before, so its file may be gone already.
                 return self.check_files();
             }
+            LibraryMessage::OpenGameMenu(path) => {
+                self.show_game_menu(path, GameMenuPage::Main);
+            }
+            LibraryMessage::OpenSortMenu => self.open_dialog(DialogKind::SortMenu),
+            LibraryMessage::SortPicked(sort) => {
+                self.change_settings(|settings| settings.library_sort = sort);
+                self.library_selection = None;
+            }
+            LibraryMessage::FilterPicked(filter) => {
+                self.change_settings(|settings| settings.library_filter = filter);
+                self.library_selection = None;
+            }
+            LibraryMessage::ShowInFolder(path) => {
+                if let Err(error) = links::show_folder(&path) {
+                    self.toasts.error(error);
+                }
+            }
+            LibraryMessage::GameModelPicked(path, model) => {
+                if let Err(error) = self.library.set_model(&path, model) {
+                    self.toasts.error(error);
+                }
+                self.show_game_menu(path, GameMenuPage::Main);
+            }
+            LibraryMessage::AskDeleteSaveStates(path) => {
+                self.open_dialog(DialogKind::DeleteSaveStates(path));
+            }
+            LibraryMessage::DeleteSaveStates(path) => {
+                let deleted = Slot::LOADABLE
+                    .iter()
+                    .try_for_each(|&slot| save_states::delete(&path, slot));
+                match deleted {
+                    Ok(()) => self.toasts.info("Save states deleted"),
+                    Err(error) => self.toasts.error(error),
+                }
+            }
             LibraryMessage::Watch(WatchEvent::Failed(error)) => self.toasts.error(format!(
                 "New games won't show up by themselves ({error}). Use Rescan in the settings' Library tab instead."
             )),
@@ -212,8 +268,8 @@ impl App {
     }
 
     /// Moves through the library's cards with a direction, scrolling the
-    /// selected card into view, and starts the selected game with A or
-    /// Start.
+    /// selected card into view, starts the selected game with A or Start,
+    /// and opens its menu with Select.
     pub(super) fn navigate_library(&mut self, action: Action) -> Task<Message> {
         let shelves = views::library::Shelves::new(&self.library, &self.settings, &self.search);
         let count = shelves.len();
@@ -227,6 +283,14 @@ impl App {
                 Some(entry) => read_rom(entry.path.clone()),
                 None => Task::none(),
             };
+        }
+
+        if action == Action::Select {
+            if let Some(entry) = current.and_then(|index| shelves.entry(index)) {
+                let path = entry.path.clone();
+                self.show_game_menu(path, GameMenuPage::Main);
+            }
+            return Task::none();
         }
 
         if !action.is_direction() {

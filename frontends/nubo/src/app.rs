@@ -26,12 +26,13 @@ use nubo_core::{CartridgeHeader, ControllerState, Model};
 use nubo_frontend::background;
 use nubo_frontend::controls::{Action, Device};
 use nubo_frontend::gamepads::{ControllerEvent, Controllers};
-use nubo_frontend::library::Library;
 use nubo_frontend::library::box_art::GameList;
+use nubo_frontend::library::{Library, LibraryEntry};
 use nubo_frontend::notices::Notices;
 use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states;
 use nubo_frontend::settings::FastForwardSpeed;
+use std::path::Path;
 use std::sync::Arc;
 
 pub use dialogs::DialogMessage;
@@ -321,7 +322,7 @@ impl App {
         if let Some((dialog, content)) = self.dialog.as_ref().zip(self.dialog_content()) {
             let dismiss = content
                 .click_outside_dismisses
-                .then(|| DialogMessage::Closed(Box::new(content.dismiss.clone())).into());
+                .then(|| content.dismiss.clone().into_message());
             layers.push(views::modal(views::dialog::view(dialog, content), dismiss));
         }
 
@@ -386,18 +387,21 @@ impl App {
         Subscription::batch(subscriptions)
     }
 
-    /// The model to start the game with this header on.
-    fn model_for(&self, header: &CartridgeHeader) -> Model {
+    /// The model to start the game at `path` with this header on: the one
+    /// picked on the command line, else the one picked for the game in its
+    /// menu, else the one the settings pick.
+    fn model_for(&self, path: &Path, header: &CartridgeHeader) -> Model {
         self.model_override
+            .or_else(|| self.library.entry(path).and_then(LibraryEntry::model))
             .unwrap_or_else(|| self.settings.shared.model.model_for(header))
     }
 
     /// Whether the running game uses another model than the settings pick,
     /// so the settings offer to restart it.
     fn restart_needed(&self) -> bool {
-        self.game
-            .as_ref()
-            .is_some_and(|game| game.session.model() != self.model_for(game.session.header()))
+        self.game.as_ref().is_some_and(|game| {
+            game.session.model() != self.model_for(&game.session.rom().path, game.session.header())
+        })
     }
 
     /// What the settings pages show besides the settings themselves.

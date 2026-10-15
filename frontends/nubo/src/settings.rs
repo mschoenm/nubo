@@ -1,7 +1,8 @@
 //! The player's preferences: the ones every app shares
-//! (`nubo_frontend::settings`) and two only this app has, its appearance
-//! and integer scaling. They are kept together in one `settings.toml` (in
-//! localStorage in the browser build), and saved as soon as they change.
+//! (`nubo_frontend::settings`) and the ones only this app has, such as its
+//! appearance, integer scaling and how the library is sorted. They are kept
+//! together in one `settings.toml` (in localStorage in the browser build),
+//! and saved as soon as they change.
 
 use nubo_frontend::storage;
 use serde::{Deserialize, Serialize};
@@ -23,6 +24,75 @@ impl Appearance {
     pub const ALL: [Appearance; 3] = [Appearance::System, Appearance::Light, Appearance::Dark];
 }
 
+/// The order the library lists all its games in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LibrarySort {
+    /// By name, from A to Z.
+    #[default]
+    Name,
+    /// The games played last first, then the others by name.
+    RecentlyPlayed,
+    /// The games added to the library last first.
+    RecentlyAdded,
+}
+
+impl LibrarySort {
+    /// Every order, as the sort menu lists them.
+    pub const ALL: [LibrarySort; 3] = [
+        LibrarySort::Name,
+        LibrarySort::RecentlyPlayed,
+        LibrarySort::RecentlyAdded,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            LibrarySort::Name => "Name",
+            LibrarySort::RecentlyPlayed => "Recently played",
+            LibrarySort::RecentlyAdded => "Recently added",
+        }
+    }
+}
+
+/// Which of its games the library lists.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LibraryFilter {
+    #[default]
+    All,
+    /// Only games for the original Game Boy.
+    GameBoy,
+    /// Only games that run in color on a Game Boy Color.
+    Color,
+}
+
+impl LibraryFilter {
+    /// Every filter, as the sort menu lists them.
+    pub const ALL: [LibraryFilter; 3] = [
+        LibraryFilter::All,
+        LibraryFilter::GameBoy,
+        LibraryFilter::Color,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            LibraryFilter::All => "All games",
+            LibraryFilter::GameBoy => "Game Boy games",
+            LibraryFilter::Color => "Game Boy Color games",
+        }
+    }
+
+    /// Whether the filter lets a game through that does or doesn't run in
+    /// color.
+    pub fn allows(self, supports_cgb: bool) -> bool {
+        match self {
+            LibraryFilter::All => true,
+            LibraryFilter::GameBoy => !supports_cgb,
+            LibraryFilter::Color => supports_cgb,
+        }
+    }
+}
+
 impl fmt::Display for Appearance {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
@@ -38,8 +108,9 @@ impl fmt::Display for Appearance {
 ///
 /// The fields are in the order earlier versions wrote them, which keeps
 /// `settings.toml` the same: `appearance` first, then the shared settings,
-/// then `integer_scaling`. TOML puts plain values before tables, so the
-/// shared tables (the library folders and the controls) still come last.
+/// then `integer_scaling`. Later fields are only saved once they differ
+/// from their default. TOML puts plain values before tables, so the shared
+/// tables (the library folders and the controls) still come last.
 /// Reading goes through [`Settings::from_toml`].
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct Settings {
@@ -50,6 +121,17 @@ pub struct Settings {
     /// Whether the screen only grows in whole steps (2×, 3×, …), which keeps
     /// every pixel the same size.
     pub integer_scaling: bool,
+    /// The order the library lists all games in.
+    #[serde(skip_serializing_if = "is_default")]
+    pub library_sort: LibrarySort,
+    /// Which games the library lists.
+    #[serde(skip_serializing_if = "is_default")]
+    pub library_filter: LibraryFilter,
+}
+
+/// Whether `value` is its type's default, which isn't saved.
+fn is_default<T: Default + PartialEq>(value: &T) -> bool {
+    *value == T::default()
 }
 
 /// This app's own settings, read from the same text as the shared ones.
@@ -58,6 +140,8 @@ pub struct Settings {
 struct OwnSettings {
     appearance: Appearance,
     integer_scaling: bool,
+    library_sort: LibrarySort,
+    library_filter: LibraryFilter,
 }
 
 impl Settings {
@@ -79,6 +163,8 @@ impl Settings {
             appearance: own.appearance,
             shared: toml::from_str(contents)?,
             integer_scaling: own.integer_scaling,
+            library_sort: own.library_sort,
+            library_filter: own.library_filter,
         })
     }
 

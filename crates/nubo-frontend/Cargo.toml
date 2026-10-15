@@ -18,6 +18,7 @@ desktop = [
     "dep:directories",
     "dep:image",
     "dep:notify-debouncer-mini",
+    "dep:opener",
     "dep:ureq",
 ]
 # Game controllers, read with gilrs (src/gamepads.rs). On the desktop a
@@ -41,6 +42,8 @@ directories = { version = "6", optional = true }
 image = { version = "0.25", default-features = false, features = ["png"], optional = true }
 # The library's folder watcher (src/library/watcher.rs).
 notify-debouncer-mini = { version = "0.7", optional = true }
+# Opening web pages and folders in the system's own apps (src/links.rs).
+opener = { version = "0.9", default-features = false, optional = true }
 # Box art downloads (src/library/box_art/download.rs).
 ureq = { workspace = true, optional = true }
 # The sound of a running game (src/session/audio.rs).

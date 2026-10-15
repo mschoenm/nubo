@@ -14,13 +14,14 @@
 //! watcher (`watch`) is desktop only too.
 
 use crate::background;
+use crate::model::ModelPreference;
 use crate::palettes::DmgPalette;
 use crate::picture::{Picture, SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::settings::LibraryFolder;
 use crate::time::SystemTime;
 use box_art::GameList;
 use jobs::Jobs;
-use nubo_core::CartridgeHeader;
+use nubo_core::{CartridgeHeader, Model};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -61,6 +62,21 @@ pub struct LibraryEntry {
     /// collection has none), so it isn't looked up again.
     #[serde(default)]
     pub box_art_checked: bool,
+    /// Whether the game uses the Super Game Boy's colors and border (the
+    /// cartridge header says so). `None` for a game read by a version that
+    /// didn't keep it, until the game is played or its file changes: scans
+    /// don't read unchanged files again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub supports_sgb: Option<bool>,
+    /// The model the player picked for this game in its menu, which it
+    /// starts on instead of the one in the settings. Always a fixed model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<ModelPreference>,
+    /// When the library first found the game, in seconds since 1970, for
+    /// listing the games added last first. `None` for a game found by a
+    /// version that didn't keep it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub added: Option<u64>,
     /// The file's size and modification time (in seconds since 1970) when
     /// its header was read, so a scan can tell whether to read it again.
     size: u64,
@@ -68,14 +84,40 @@ pub struct LibraryEntry {
 }
 
 impl LibraryEntry {
-    /// The game's name, taken from its file name, such as "Tetris" for
-    /// `Tetris.gb`.
+    /// The game's name, made from its file name (see
+    /// [`crate::rom::game_name`]), such as "Tetris" for
+    /// `Tetris (World) (Rev 1).gb`.
     pub fn name(&self) -> String {
-        self.path
-            .file_stem()
-            .unwrap_or(self.path.as_os_str())
-            .to_string_lossy()
-            .into_owned()
+        crate::rom::display_name(&self.path)
+    }
+
+    /// The model the player picked for this game, if they picked one.
+    pub fn model(&self) -> Option<Model> {
+        match self.model {
+            Some(ModelPreference::Fixed(model)) => Some(model),
+            Some(ModelPreference::Automatic) | None => None,
+        }
+    }
+
+    /// When the game was added to the library, for sorting: when the library
+    /// found it, or for a game found before that was kept, when its file
+    /// last changed.
+    pub fn added(&self) -> u64 {
+        self.added.unwrap_or(self.modified)
+    }
+
+    /// Keeps what the player did with `previous`, the same game as an
+    /// earlier scan knew it: when they played it, the model they picked and
+    /// when it was added. With `unchanged`, the file is the same too, so its
+    /// pictures were already looked for.
+    fn keep_from(&mut self, previous: &LibraryEntry, unchanged: bool) {
+        self.last_played = previous.last_played;
+        self.model = previous.model;
+        self.added = previous.added;
+        if unchanged {
+            self.title_screen_checked = previous.title_screen_checked;
+            self.box_art_checked = previous.box_art_checked;
+        }
     }
 
     /// A game at `path` in a library folder that nothing is known about
@@ -89,16 +131,22 @@ impl LibraryEntry {
             last_played: None,
             title_screen_checked: false,
             box_art_checked: false,
+            supports_sgb: Some(false),
+            model: None,
+            added: None,
             size: 0,
             modified: 0,
         }
     }
 
-    /// Whether the search text matches the game's name or header title,
-    /// ignoring case.
+    /// Whether the search text matches the game's name, its file name or
+    /// its header title, ignoring case.
     pub fn matches(&self, search: &str) -> bool {
         let search = search.to_lowercase();
-        self.name().to_lowercase().contains(&search) || self.title.to_lowercase().contains(&search)
+        let file_name = self.path.file_stem().unwrap_or_default().to_string_lossy();
+        self.name().to_lowercase().contains(&search)
+            || file_name.to_lowercase().contains(&search)
+            || self.title.to_lowercase().contains(&search)
     }
 }
 
@@ -563,15 +611,33 @@ impl Library {
 
         if let Some(entry) = self.entries.iter_mut().find(|entry| entry.path == path) {
             entry.last_played = Some(now);
+            entry.supports_sgb = Some(header.supports_sgb);
         } else {
             let mut entry = scan::entry_for(path, header);
             entry.last_played = Some(now);
+            entry.added = Some(now);
             let mut entries = std::mem::take(&mut self.entries);
             entries.push(entry);
             self.replace_entries(entries);
         }
 
         self.save()
+    }
+
+    /// Starts the game at `path` on `model` from now on, or on the model in
+    /// the settings again with `None`.
+    pub fn set_model(&mut self, path: &Path, model: Option<Model>) -> Result<(), String> {
+        let Some(entry) = self.entries.iter_mut().find(|entry| entry.path == path) else {
+            return Ok(());
+        };
+
+        entry.model = model.map(ModelPreference::Fixed);
+        self.save()
+    }
+
+    /// The game at `path`, if the library knows it.
+    pub fn entry(&self, path: &Path) -> Option<&LibraryEntry> {
+        self.entries.iter().find(|entry| entry.path == path)
     }
 
     /// Takes the game at `path` off the recently played games, for a player

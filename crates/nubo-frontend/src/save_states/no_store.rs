@@ -19,6 +19,10 @@ pub fn load(_rom_path: &Path, _slot: Slot) -> Result<Option<SaveState>, String> 
     Ok(None)
 }
 
+pub fn delete(_rom_path: &Path, _slot: Slot) -> Result<(), String> {
+    Err(String::from("save states aren't available in the browser"))
+}
+
 pub fn keep_aside(_rom_path: &Path, _slot: Slot) -> Result<PathBuf, String> {
     Err(String::from("save states aren't available in the browser"))
 }

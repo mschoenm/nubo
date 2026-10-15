@@ -105,6 +105,20 @@ pub fn load(rom_path: &Path, slot: Slot) -> Result<Option<SaveState>, String> {
     store::load(rom_path, slot).map_err(|error| format!("Couldn't read the save state: {error}"))
 }
 
+/// Deletes the state in `slot` of the game at `rom_path` and its picture,
+/// leaving the slot empty.
+pub fn delete(rom_path: &Path, slot: Slot) -> Result<(), String> {
+    store::delete(rom_path, slot)
+        .map_err(|error| format!("Couldn't delete the save state: {error}"))
+}
+
+/// Whether any of the game at `rom_path`'s slots holds a state.
+pub fn any_saved(rom_path: &Path) -> bool {
+    Slot::LOADABLE
+        .iter()
+        .any(|&slot| store::slot_info(rom_path, slot).saved_at.is_some())
+}
+
 /// Moves the state in `slot` of the game at `rom_path`, and its picture, to a
 /// name of its own, so a state that couldn't be loaded isn't overwritten by
 /// the next save to the slot. A newer Nubo, or the one it was made with, may

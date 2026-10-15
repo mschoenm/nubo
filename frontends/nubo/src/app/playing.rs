@@ -260,7 +260,7 @@ impl App {
 
         let model = resume_state
             .as_ref()
-            .map_or_else(|| self.model_for(&header), |state| state.model);
+            .map_or_else(|| self.model_for(&rom.path, &header), |state| state.model);
         let path = rom.path.clone();
 
         match self.start_session(rom, header, model, true) {
@@ -286,6 +286,8 @@ impl App {
 
                 self.game = Some(game);
                 self.settings_tab = None;
+                self.search.clear();
+                self.library_selection = None;
             }
             Err(error) => self.toasts.error(format!(
                 "Couldn't start {}: {error}",

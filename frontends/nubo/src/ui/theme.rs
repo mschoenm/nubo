@@ -240,6 +240,16 @@ pub fn primary_button(theme: &Theme, status: button::Status) -> button::Style {
     }
 }
 
+/// A red button for an action that deletes something for good.
+pub fn danger_button(theme: &Theme, status: button::Status) -> button::Style {
+    let style = button::danger(theme, status);
+
+    button::Style {
+        border: style.border.rounded(CORNER_RADIUS),
+        ..style
+    }
+}
+
 /// A quieter button with an outline, for secondary actions.
 pub fn secondary_button(theme: &Theme, status: button::Status) -> button::Style {
     let palette = theme.extended_palette();
@@ -278,6 +288,18 @@ pub fn segment(selected: bool) -> impl Fn(&Theme, button::Status) -> button::Sty
                 .width(1)
                 .color(palette.primary.base.color),
             ..button::Style::default()
+        }
+    }
+}
+
+/// One of a row of chips: the picked one tinted with the accent color like
+/// a selected segment, the others outlined like secondary buttons.
+pub fn chip(selected: bool) -> impl Fn(&Theme, button::Status) -> button::Style {
+    move |theme, status| {
+        if selected {
+            segment(true)(theme, status)
+        } else {
+            secondary_button(theme, status)
         }
     }
 }
@@ -365,18 +387,30 @@ pub fn thumbnail_placeholder(theme: &Theme) -> container::Style {
     }
 }
 
-/// The small "GB" or "GBC" label on a game card. Color games get the accent
-/// color.
-pub fn badge(color_game: bool) -> impl Fn(&Theme) -> container::Style {
+/// Which badge a game's card shows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Badge {
+    /// A game for the original Game Boy.
+    GameBoy,
+    /// A game that runs in color on a Game Boy Color.
+    Color,
+    /// A game that shows its colors and border on a Super Game Boy.
+    SuperGameBoy,
+}
+
+/// The small label on a game's card saying which console it is for, in the
+/// accent color for Game Boy Color games and in green for Super Game Boy
+/// games.
+pub fn badge(badge: Badge) -> impl Fn(&Theme) -> container::Style {
     move |theme| {
         let palette = theme.extended_palette();
-        let (background, text) = if color_game {
-            (palette.primary.base.color, palette.primary.base.text)
-        } else {
-            (
+        let (background, text) = match badge {
+            Badge::Color => (palette.primary.base.color, palette.primary.base.text),
+            Badge::SuperGameBoy => (palette.success.base.color, palette.success.base.text),
+            Badge::GameBoy => (
                 palette.background.strong.color,
                 palette.background.strong.text,
-            )
+            ),
         };
 
         container::Style {
@@ -533,6 +567,13 @@ pub fn notice_row(focused: bool) -> impl Fn(&Theme) -> container::Style {
     move |theme| container::Style {
         background: Some(theme.palette().warning.scale_alpha(0.12).into()),
         ..focus_ring(focused)(theme)
+    }
+}
+
+/// Text in the danger color, for choices that delete something.
+pub fn danger_text(theme: &Theme) -> text::Style {
+    text::Style {
+        color: Some(theme.palette().danger),
     }
 }
 

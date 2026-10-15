@@ -20,6 +20,7 @@ fn earlier_settings() -> Settings {
         appearance: Appearance::Dark,
         shared: toml::from_str(WRITTEN_BY_EARLIER_VERSION).unwrap(),
         integer_scaling: true,
+        ..Settings::default()
     }
 }
 

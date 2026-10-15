@@ -29,17 +29,65 @@ impl Rom {
         }
     }
 
-    /// The file name without its extension, such as "Tetris" for
-    /// `roms/Tetris.gb`, used as the game's name in the window.
+    /// The game's name, made from its file name (see [`game_name`]), such
+    /// as "Tetris" for `roms/Tetris (World) (Rev 1).gb`, used in the window.
     pub fn name(&self) -> String {
         display_name(&self.path)
     }
 }
 
-/// The file name of `path` without its extension.
-fn display_name(path: &Path) -> String {
-    path.file_stem()
-        .unwrap_or(path.as_os_str())
-        .to_string_lossy()
-        .into_owned()
+/// The game's name for the ROM at `path`, made from its file name.
+pub fn display_name(path: &Path) -> String {
+    game_name(
+        &path
+            .file_stem()
+            .unwrap_or(path.as_os_str())
+            .to_string_lossy(),
+    )
 }
+
+/// The name to show for a game whose file is called `file_stem` (without its
+/// extension). Files are often named the No-Intro way, such as
+/// "Legend of Zelda, The - Link's Awakening DX (USA, Europe) (Rev 2)", so
+/// this drops the bracketed tags, puts an article moved to the end back in
+/// front ("The Legend of Zelda - Link's Awakening DX") and turns underscores
+/// into spaces. A name that would come out empty stays as it was.
+pub fn game_name(file_stem: &str) -> String {
+    let mut name = String::new();
+    let mut depth = 0_usize;
+    for character in file_stem.chars() {
+        match character {
+            '(' | '[' => depth += 1,
+            ')' | ']' => depth = depth.saturating_sub(1),
+            '_' if depth == 0 => name.push(' '),
+            _ if depth == 0 => name.push(character),
+            _ => {}
+        }
+    }
+    let name = name.split_whitespace().collect::<Vec<_>>().join(" ");
+    let name = name.trim_end_matches([' ', '-', ',']).to_owned();
+    if name.is_empty() {
+        return file_stem.to_owned();
+    }
+
+    let (title, rest) = match name.split_once(" - ") {
+        Some((title, rest)) => (title, Some(rest)),
+        None => (name.as_str(), None),
+    };
+    let title = ["The", "A", "An"]
+        .iter()
+        .find_map(|article| {
+            title
+                .strip_suffix(&format!(", {article}"))
+                .map(|start| format!("{article} {start}"))
+        })
+        .unwrap_or_else(|| title.to_owned());
+
+    match rest {
+        Some(rest) => format!("{title} - {rest}"),
+        None => title,
+    }
+}
+
+#[cfg(test)]
+mod tests;
