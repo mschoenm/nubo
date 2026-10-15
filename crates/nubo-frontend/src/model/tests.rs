@@ -63,3 +63,24 @@ fn preferences_are_named_auto_or_after_the_model() {
     );
     assert!(ModelPreference::try_from(String::from("N64")).is_err());
 }
+
+#[test]
+fn every_model_belongs_to_exactly_one_console() {
+    for model in Model::ALL {
+        let consoles: Vec<Console> = Console::ALL
+            .into_iter()
+            .filter(|console| console.revisions().contains(&model))
+            .collect();
+        assert_eq!(consoles, [Console::of(model)], "{model}");
+    }
+}
+
+#[test]
+fn each_console_recommends_one_of_its_own_revisions() {
+    for console in Console::ALL {
+        assert!(
+            console.revisions().contains(&console.recommended()),
+            "{console:?}"
+        );
+    }
+}

@@ -10,20 +10,19 @@ use crate::settings::{Appearance, Settings};
 use crate::ui::icons::{Icon, icon};
 use crate::ui::logo::logo;
 use crate::ui::theme;
-use crate::ui::widgets::{icon_button, segmented};
+use crate::ui::widgets::{chips, icon_button, segmented};
 use iced::widget::text::Wrapping;
 use iced::widget::{
-    Column, button, column, container, pick_list, row, scrollable, slider, space, text, toggler,
+    Column, button, column, container, row, scrollable, slider, space, text, toggler,
 };
 use iced::{Alignment, Color, Element, Fill, Padding, Theme, widget};
 use nubo_core::Model;
 use nubo_frontend::controls::{Action, Device};
 use nubo_frontend::library::{self, Library, box_art};
-use nubo_frontend::model::ModelPreference;
+use nubo_frontend::model::{self, Console, ModelPreference};
 use nubo_frontend::palettes::DmgPalette;
 use nubo_frontend::save_states;
 use nubo_frontend::settings::{FastForwardSpeed, LibraryFolder};
-use std::fmt;
 
 const WIDTH: f32 = 700.0;
 /// The tallest the window gets. Below that it fills the app's window, less
@@ -108,17 +107,62 @@ impl SettingsTab {
     }
 }
 
-/// A model preference as the model picker lists it. Automatic is explained
-/// by the row's description, so the picker keeps it short.
+/// A choice on the model row: Automatic, or one of the consoles, whose
+/// revision the row under it picks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ModelChoice(ModelPreference);
+pub enum ModelOption {
+    Automatic,
+    Console(Console),
+}
 
-impl fmt::Display for ModelChoice {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0 {
-            ModelPreference::Automatic => formatter.write_str("Automatic"),
-            ModelPreference::Fixed(model) => formatter.write_str(model.description()),
+impl ModelOption {
+    /// Every choice, in the order the row shows them.
+    pub const ALL: [ModelOption; 6] = [
+        ModelOption::Automatic,
+        ModelOption::Console(Console::GameBoy),
+        ModelOption::Console(Console::Pocket),
+        ModelOption::Console(Console::SuperGameBoy),
+        ModelOption::Console(Console::Color),
+        ModelOption::Console(Console::Advance),
+    ];
+
+    /// The choice `preference` falls under.
+    pub fn of(preference: ModelPreference) -> ModelOption {
+        match preference {
+            ModelPreference::Automatic => ModelOption::Automatic,
+            ModelPreference::Fixed(model) => ModelOption::Console(Console::of(model)),
         }
+    }
+
+    fn label(self) -> String {
+        String::from(match self {
+            ModelOption::Automatic => "Automatic",
+            ModelOption::Console(console) => console.short_label(),
+        })
+    }
+
+    /// The preference picking this choice gives: the revision `current`
+    /// uses if it is of the same console, else the console's recommended
+    /// one.
+    pub fn preference(self, current: ModelPreference) -> ModelPreference {
+        match self {
+            ModelOption::Automatic => ModelPreference::Automatic,
+            ModelOption::Console(console) => match current {
+                ModelPreference::Fixed(model) if Console::of(model) == console => current,
+                _ => ModelPreference::Fixed(console.recommended()),
+            },
+        }
+    }
+}
+
+/// The revisions the revision row offers for `preference`: none for
+/// Automatic or a console with only one.
+pub fn revisions(preference: ModelPreference) -> &'static [Model] {
+    match preference {
+        ModelPreference::Fixed(model) if Console::of(model).revisions().len() > 1 => {
+            Console::of(model).revisions()
+        }
+        _ => &[],
     }
 }
 
@@ -138,6 +182,8 @@ pub enum SettingsRow {
     SharpPixels,
     SgbBorder,
     Model,
+    /// The revision of the console picked on the model row.
+    ModelRevision,
     RestartNow,
     ResumeGames,
     FastForwardSpeed,
@@ -170,6 +216,9 @@ pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec
         ]),
         SettingsTab::Playing => {
             rows.push(SettingsRow::Model);
+            if !revisions(settings.shared.model).is_empty() {
+                rows.push(SettingsRow::ModelRevision);
+            }
             if state.restart_needed {
                 rows.push(SettingsRow::RestartNow);
             }
@@ -204,13 +253,6 @@ pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec
     }
 
     rows
-}
-
-/// The model choices in the order the picker lists them.
-pub fn model_choices() -> Vec<ModelPreference> {
-    std::iter::once(ModelPreference::Automatic)
-        .chain(Model::ALL.map(ModelPreference::Fixed))
-        .collect()
 }
 
 /// The shortcuts listed for `device`.
@@ -602,28 +644,59 @@ fn playing<'a>(
     restart_needed: bool,
     rings: &Rings,
 ) -> Element<'a, Message> {
-    let choices: Vec<ModelChoice> = model_choices().into_iter().map(ModelChoice).collect();
-    let model_description = match settings.shared.model {
-        ModelPreference::Automatic => "Each game starts on the Game Boy it was made for.",
-        ModelPreference::Fixed(_) => "Every game starts on this model.",
+    let preference = settings.shared.model;
+    let model_description = match preference {
+        ModelPreference::Automatic => String::from(
+            "Each game starts on the Game Boy it was made for. A game's menu in the library \
+             can pick another for that game.",
+        ),
+        ModelPreference::Fixed(model) if revisions(preference).is_empty() => {
+            format!("Every game starts on this model. {}", model::about(model))
+        }
+        ModelPreference::Fixed(model) => format!(
+            "Every game starts on the {}, in the revision below.",
+            Console::of(model).label()
+        ),
     };
 
     let mut console = vec![
         rings.row(
             column![
-                label("Game Boy model", Some(String::from(model_description))),
-                pick_list(
-                    choices,
-                    Some(ModelChoice(settings.shared.model)),
-                    |choice| Message::Settings(SettingsMessage::ModelSelected(choice.0)),
-                )
-                .text_size(13)
-                .width(Fill),
+                label("Game Boy model", Some(model_description)),
+                chips(
+                    &ModelOption::ALL,
+                    ModelOption::of(preference),
+                    ModelOption::label,
+                    move |option| Message::Settings(SettingsMessage::ModelSelected(
+                        option.preference(preference)
+                    )),
+                ),
             ]
             .spacing(10),
             SettingsRow::Model,
         ),
     ];
+    if let ModelPreference::Fixed(current) = preference
+        && !revisions(preference).is_empty()
+    {
+        console.push(
+            rings.row(
+                column![
+                    label("Revision", Some(String::from(model::about(current)))),
+                    chips(
+                        revisions(preference),
+                        current,
+                        |model| String::from(model.name()),
+                        |model| Message::Settings(SettingsMessage::ModelSelected(
+                            ModelPreference::Fixed(model)
+                        )),
+                    ),
+                ]
+                .spacing(10),
+                SettingsRow::ModelRevision,
+            ),
+        );
+    }
     if restart_needed {
         console.push(restart_notice(rings.is_focused(SettingsRow::RestartNow)));
     }

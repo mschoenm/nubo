@@ -201,6 +201,29 @@ where
         .into()
 }
 
+/// Buttons of which exactly one is picked, in rows that wrap when the
+/// space runs out, for choices too many or too long for [`segmented`].
+pub fn chips<'a, T, Message>(
+    options: &[T],
+    selected: T,
+    label: impl Fn(T) -> String,
+    on_select: impl Fn(T) -> Message,
+) -> Element<'a, Message>
+where
+    T: Copy + PartialEq,
+    Message: Clone + 'a,
+{
+    let buttons = options.iter().map(|&option| {
+        button(text(label(option)).size(13))
+            .padding([6, 12])
+            .style(theme::chip(option == selected))
+            .on_press(on_select(option))
+            .into()
+    });
+
+    row(buttons).spacing(6).wrap().into()
+}
+
 /// The bar along the top of a screen, with a thin line under it.
 pub fn top_bar<'a, Message: 'a>(content: iced::widget::Row<'a, Message>) -> Element<'a, Message> {
     column![bar_body(content), divider()].into()

@@ -4,6 +4,7 @@
 use super::{App, GameMessage, LibraryMessage, Message, cycle};
 use crate::settings::Appearance;
 use crate::views;
+use crate::views::settings::ModelOption;
 use crate::views::settings::{SettingsFocus, SettingsRow, SettingsTab};
 use iced::Task;
 use iced::widget;
@@ -242,12 +243,26 @@ impl App {
                 step,
                 wrap,
             )),
-            SettingsRow::Model => SettingsMessage::ModelSelected(cycle(
-                &views::settings::model_choices(),
-                settings.shared.model,
-                step,
-                wrap,
-            )),
+            SettingsRow::Model => SettingsMessage::ModelSelected(
+                cycle(
+                    &ModelOption::ALL,
+                    ModelOption::of(settings.shared.model),
+                    step,
+                    wrap,
+                )
+                .preference(settings.shared.model),
+            ),
+            SettingsRow::ModelRevision => {
+                let ModelPreference::Fixed(current) = settings.shared.model else {
+                    return None;
+                };
+                SettingsMessage::ModelSelected(ModelPreference::Fixed(cycle(
+                    views::settings::revisions(settings.shared.model),
+                    current,
+                    step,
+                    wrap,
+                )))
+            }
             SettingsRow::FastForwardSpeed => SettingsMessage::FastForwardSpeedSelected(cycle(
                 &FastForwardSpeed::ALL,
                 settings.shared.fast_forward_speed,

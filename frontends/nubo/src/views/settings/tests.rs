@@ -127,3 +127,47 @@ fn every_tab_but_about_has_rows() {
         assert_eq!(tab_rows.is_empty(), tab == SettingsTab::About, "{tab:?}");
     }
 }
+
+#[test]
+fn the_revision_row_shows_for_consoles_with_several_revisions() {
+    let mut settings = Settings::default();
+    let state = state(false, Device::Keyboard, false);
+
+    for (model, shown) in [
+        (ModelPreference::Automatic, false),
+        (ModelPreference::Fixed(Model::Mgb), false),
+        (ModelPreference::Fixed(Model::CgbC), true),
+        (ModelPreference::Fixed(Model::Sgb2), true),
+    ] {
+        settings.shared.model = model;
+        let rows = rows(SettingsTab::Playing, &settings, &state);
+        assert_eq!(
+            rows.contains(&SettingsRow::ModelRevision),
+            shown,
+            "{model:?}"
+        );
+        assert_eq!(
+            drawn_rows(SettingsTab::Playing, &settings, &state),
+            rows,
+            "{model:?}"
+        );
+    }
+}
+
+#[test]
+fn picking_a_console_keeps_its_revision_or_picks_the_recommended_one() {
+    let color_c = ModelPreference::Fixed(Model::CgbC);
+
+    assert_eq!(
+        ModelOption::Console(Console::Color).preference(color_c),
+        color_c
+    );
+    assert_eq!(
+        ModelOption::Console(Console::GameBoy).preference(color_c),
+        ModelPreference::Fixed(Model::Dmg)
+    );
+    assert_eq!(
+        ModelOption::Automatic.preference(color_c),
+        ModelPreference::Automatic
+    );
+}
