@@ -1,6 +1,7 @@
 //! Starting, playing and stopping games: the game's top bar, the pause menu
 //! with its save states and cheats, and opening ROMs.
 
+use super::window_events::leave_fullscreen_for_game;
 use super::{App, Message};
 use crate::game::{Game, PauseMenu, SgbBorderChoice};
 use crate::rom_picker;
@@ -43,7 +44,8 @@ pub enum GameMessage {
     /// A pause menu row that leaves the menu behind (going fullscreen, the
     /// settings) was picked: closes the menu, then handles the row's message.
     PickedFromMenu(Box<Message>),
-    /// Stops the game and goes back to the library.
+    /// Stops the game and goes back to the library, in a window again if
+    /// the game went fullscreen.
     CloseGame,
     ShowPauseMenu(PauseMenu),
     SaveState(Slot),
@@ -162,7 +164,10 @@ impl App {
                 }
                 return self.update(*message);
             }
-            GameMessage::CloseGame => self.stop_game(),
+            GameMessage::CloseGame => {
+                self.stop_game();
+                return leave_fullscreen_for_game(self);
+            }
             GameMessage::ShowPauseMenu(page) => {
                 if let Some(game) = &mut self.game {
                     game.show_menu(Some(page));

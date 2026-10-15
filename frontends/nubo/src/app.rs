@@ -84,6 +84,9 @@ pub struct App {
     /// Whether the window fills the screen. The game's top bar then hides
     /// until the mouse moves.
     fullscreen: bool,
+    /// Whether the window went fullscreen while a game was open, so it goes
+    /// back to a window when the game closes.
+    fullscreen_for_game: bool,
     /// Whether the window is the one in front, which the game only runs in
     /// if the settings say to pause in the background.
     focused: bool,
@@ -199,6 +202,7 @@ impl App {
             settings_tab: None,
             file_hovered: false,
             fullscreen: false,
+            fullscreen_for_game: false,
             focused: true,
             window_width: 0.0,
             window_height: 0.0,
@@ -355,7 +359,10 @@ impl App {
                 self.library_selection,
                 &self.controllers,
                 self.remembered.as_ref(),
-                self.newer_version.as_deref(),
+                views::library::TopBar {
+                    newer_version: self.newer_version.as_deref(),
+                    fullscreen: self.fullscreen,
+                },
             ),
         }];
 
