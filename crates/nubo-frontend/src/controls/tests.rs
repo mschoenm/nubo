@@ -27,12 +27,27 @@ fn clearing_a_binding_leaves_the_action_without_a_key() {
 fn controls_survive_a_round_trip_through_toml() {
     let mut controls = Controls::default();
     controls.keyboard.bind(Action::A, Some(KeyCode::Numpad5));
-    controls.controller.bind(Action::QuickSave, None);
+    controls.controller.bind(
+        Action::QuickSave,
+        Some(PadButton(ControllerButton::RightTrigger)),
+    );
 
     let contents = toml::to_string(&controls).unwrap();
 
     assert!(contents.contains("a = \"Numpad5\""));
     assert_eq!(toml::from_str::<Controls>(&contents).unwrap(), controls);
+}
+
+#[test]
+fn the_triggers_do_nothing_by_default() {
+    let controller = default_controller();
+
+    for trigger in [
+        ControllerButton::LeftTrigger,
+        ControllerButton::RightTrigger,
+    ] {
+        assert_eq!(controller.action(PadButton(trigger)), None);
+    }
 }
 
 #[test]

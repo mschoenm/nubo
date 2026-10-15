@@ -302,7 +302,10 @@ pub fn default_keyboard() -> Bindings<KeyCode> {
 }
 
 /// The controller buttons a new user gets. A and B sit where they are on a
-/// Game Boy: A on the right, B below it.
+/// Game Boy: A on the right, B below it. Quick save and quick load get no
+/// button: the triggers are too easy to press by accident, and a stray quick
+/// load throws away everything since the last save. The pause menu (L1) has
+/// both.
 pub fn default_controller() -> Bindings<PadButton> {
     Bindings::from_pairs(&[
         (Action::Up, PadButton(ControllerButton::DPadUp)),
@@ -318,8 +321,6 @@ pub fn default_controller() -> Bindings<PadButton> {
             Action::FastForward,
             PadButton(ControllerButton::RightShoulder),
         ),
-        (Action::QuickLoad, PadButton(ControllerButton::LeftTrigger)),
-        (Action::QuickSave, PadButton(ControllerButton::RightTrigger)),
         (Action::Rewind, PadButton(ControllerButton::West)),
     ])
 }
