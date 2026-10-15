@@ -36,10 +36,10 @@ pub enum SettingsMessage {
     AppearanceSelected(Appearance),
     PaletteSelected(DmgPalette),
     IntegerScalingToggled(bool),
-    ColorCorrectionToggled(bool),
+    /// The player turned the original screen look on or off.
+    OriginalScreenToggled(bool),
     /// The player turned looking for newer versions on or off.
     CheckForUpdatesToggled(bool),
-    FrameBlendingToggled(bool),
     SgbBorderToggled(bool),
     ModelSelected(ModelPreference),
     ResumeGamesToggled(bool),
@@ -110,12 +110,8 @@ impl App {
                 self.change_settings(|settings| settings.shared.check_for_updates = Some(check));
                 return self.look_for_updates();
             }
-            SettingsMessage::ColorCorrectionToggled(enabled) => {
-                self.change_settings(|settings| settings.shared.color_correction = enabled);
-                self.apply_screen_look();
-            }
-            SettingsMessage::FrameBlendingToggled(enabled) => {
-                self.change_settings(|settings| settings.shared.frame_blending = enabled);
+            SettingsMessage::OriginalScreenToggled(enabled) => {
+                self.change_settings(|settings| settings.shared.original_screen = enabled);
                 self.apply_screen_look();
             }
             SettingsMessage::IntegerScalingToggled(enabled) => {
@@ -514,11 +510,8 @@ impl App {
             SettingsRow::SharpPixels => {
                 SettingsMessage::IntegerScalingToggled(!settings.integer_scaling).into()
             }
-            SettingsRow::ColorCorrection => {
-                SettingsMessage::ColorCorrectionToggled(!settings.shared.color_correction).into()
-            }
-            SettingsRow::FrameBlending => {
-                SettingsMessage::FrameBlendingToggled(!settings.shared.frame_blending).into()
+            SettingsRow::OriginalScreen => {
+                SettingsMessage::OriginalScreenToggled(!settings.shared.original_screen).into()
             }
             SettingsRow::SgbBorder => {
                 SettingsMessage::SgbBorderToggled(!settings.shared.sgb_border).into()

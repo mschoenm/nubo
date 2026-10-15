@@ -25,8 +25,7 @@ fn settings_survive_a_round_trip() {
         sgb_own_palette: [0x001F, 0x03E0, 0x7C00, 0x0000],
         sgb_colors: SgbColors::Preset(DmgPalette::Green),
         sgb_nubo_border: true,
-        color_correction: false,
-        frame_blending: true,
+        original_screen: false,
     };
 
     let contents = toml::to_string(&settings).unwrap();
@@ -215,8 +214,7 @@ fn earlier_settings() -> Settings {
         sgb_own_palette: DEFAULT_OWN_PALETTE,
         sgb_colors: SgbColors::Game,
         sgb_nubo_border: false,
-        color_correction: true,
-        frame_blending: false,
+        original_screen: true,
     }
 }
 
@@ -245,8 +243,7 @@ fn settings_written_by_an_earlier_version_write_back_byte_for_byte() {
 fn the_raw_screen_is_the_look_with_every_effect_off() {
     let plain = Settings {
         dmg_palette: DmgPalette::Gray,
-        color_correction: false,
-        frame_blending: false,
+        original_screen: false,
         ..Settings::default()
     };
     assert_eq!(plain.screen_look(), ScreenLook::RAW);
