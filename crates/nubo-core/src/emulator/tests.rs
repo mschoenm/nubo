@@ -327,8 +327,9 @@ fn cpu_and_bus_fields(emulator: &mut Emulator) -> Vec<(String, String)> {
 /// The buttons the player holds and the sample rate are left out on purpose
 /// too (they belong to the player and the sound card, not the console), but
 /// both emulators here have the same ones, so they aren't listed.
-const FIELDS_NOT_IN_SAVE_STATES: [&str; 6] = [
+const FIELDS_NOT_IN_SAVE_STATES: [&str; 7] = [
     "address_bus.ppu_quiet_dots",
+    "address_bus.ppu_quiet_dots_hold_no_interrupt",
     "address_bus.cartridge.rumble",
     "address_bus.deferral_budget",
     "address_bus.gpu.frame_ready",

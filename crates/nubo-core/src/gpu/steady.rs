@@ -73,7 +73,7 @@ impl Gpu {
     /// enabled, as STAT is now, as it was when the line started, or as a CGB STAT write keeps a
     /// disabled source going for a few dots, and no delayed LY=LYC interrupt is due. Only a write
     /// to STAT can change that.
-    fn stat_line_stays_low(&self) -> bool {
+    pub(crate) fn stat_line_stays_low(&self) -> bool {
         (self.stat | self.late_cleared_stat_sources | self.stat_at_line_start) & STAT_WRITABLE_BITS
             == 0
             && self.countdowns.lyc_interrupt == 0

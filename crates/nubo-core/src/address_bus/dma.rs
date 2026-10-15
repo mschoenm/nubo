@@ -273,7 +273,7 @@ impl AddressBus {
     fn cpu_read_byte_elsewhere(&mut self, address: u16) -> u8 {
         if !reads_plain_memory(address) {
             self.run_deferred_cycles();
-            if reaches_ppu(address) {
+            if reaches_ppu(address) && !self.ppu_read_can_wait(address) {
                 self.catch_up_ppu();
             }
             if Apu::reads_channel_state(address) {
