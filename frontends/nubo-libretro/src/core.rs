@@ -550,11 +550,6 @@ impl Core {
         }
     }
 
-    /// The pixel format of [`Core::video`].
-    pub fn pixel_format(&self) -> PixelFormat {
-        self.pixel_format
-    }
-
     /// The latest frame's sound: left and right samples in turn.
     pub fn audio(&self) -> &[i16] {
         &self.audio
