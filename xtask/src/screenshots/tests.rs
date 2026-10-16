@@ -74,6 +74,8 @@ fn options_that_dont_fit_the_frame_are_mistakes() {
         "file = \"a.png\"\nscene = \"s\"\nscale = 2",
         "file = \"a.png\"\nscene = \"s\"\nframe = \"game\"\nsize = [10, 10]",
         "file = \"a.png\"\nscene = \"s\"\nframe = \"game\"\nscale = 9",
+        "file = \"a.png\"\nscene = \"s\"\nframe = \"fullscreen\"\nsize = [0, 0]",
+        "file = \"a.png\"\nscene = \"s\"\nsize = [800, 0]",
         "file = \"a.png\"\nscene = \"s\"\ncolumns = 2",
         "file = \"a.png\"\nscene = \"s\"\nbackground = \"black\"",
         "file = \"a.jpg\"\nscene = \"s\"",
