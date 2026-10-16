@@ -49,6 +49,10 @@ pub use window_events::{WindowMessage, screen_only_size};
 /// fullscreen bar to hide, while there are any.
 #[cfg(not(target_arch = "wasm32"))]
 const QUICK_CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
+/// How long picking a key or button waits for one before it gives up, so
+/// a controller can't get stuck waiting: every one of its buttons can be
+/// picked, so none can cancel.
+const CAPTURE_TIMEOUT: iced::time::Duration = iced::time::Duration::from_secs(5);
 /// How often the desktop build otherwise checks for problems the running
 /// game reported, which would wait for the next new frame on a still screen.
 #[cfg(not(target_arch = "wasm32"))]
@@ -131,6 +135,9 @@ pub struct App {
     controls_device: Device,
     /// The action waiting for the player to press a key or button for it.
     capture: Option<(Device, Action)>,
+    /// When the wait for `capture` started; it ends after
+    /// [`CAPTURE_TIMEOUT`].
+    capture_started: iced::time::Instant,
     /// Where the D-pad is in the settings window, once the player has used
     /// it there.
     settings_focus: Option<SettingsFocus>,
@@ -251,6 +258,7 @@ impl App {
             menu_presses: MenuPresses::default(),
             controls_device: Device::Keyboard,
             capture: None,
+            capture_started: iced::time::Instant::now(),
             settings_focus: None,
             game_list: None,
             loading_game_list: false,
@@ -280,6 +288,19 @@ impl App {
             app.change_settings(|settings| {
                 controls::add_new_actions(&mut settings.shared.controls);
                 settings.shared.controls_revision = controls::REVISION;
+            });
+        }
+        if app.settings_read
+            && app
+                .settings
+                .shared
+                .controls
+                .controller
+                .input(Action::PauseMenu)
+                .is_none()
+        {
+            app.change_settings(|settings| {
+                settings.shared.controls.give_pause_menu_a_button();
             });
         }
 
@@ -339,7 +360,11 @@ impl App {
                     game.session.run_due_frames();
                     game.session.refresh_screen();
                 }
-                self.toasts.remove_expired(iced::time::Instant::now());
+                let now = iced::time::Instant::now();
+                self.toasts.remove_expired(now);
+                if now.saturating_duration_since(self.capture_started) >= CAPTURE_TIMEOUT {
+                    self.capture = None;
+                }
                 Task::none()
             }
             Message::LatestVersion(Ok(version)) => {
@@ -491,7 +516,7 @@ impl App {
         // The browser build emulates on these ticks (see
         // `nubo_frontend::session`).
         #[cfg(target_arch = "wasm32")]
-        if self.is_running() || !self.toasts.is_empty() {
+        if self.is_running() || !self.toasts.is_empty() || self.capture.is_some() {
             subscriptions.push(window::frames().map(|_| Message::Tick));
         }
 
@@ -562,7 +587,7 @@ impl App {
     fn check_interval(&self) -> Option<std::time::Duration> {
         let bar_hides_later =
             self.fullscreen && self.game.as_ref().is_some_and(Game::controls_hide_later);
-        if bar_hides_later || !self.toasts.is_empty() {
+        if bar_hides_later || !self.toasts.is_empty() || self.capture.is_some() {
             Some(QUICK_CHECK_INTERVAL)
         } else if self.is_running() {
             Some(NOTICE_CHECK_INTERVAL)

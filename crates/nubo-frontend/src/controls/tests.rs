@@ -39,15 +39,93 @@ fn controls_survive_a_round_trip_through_toml() {
 }
 
 #[test]
-fn the_triggers_do_nothing_by_default() {
+fn the_face_buttons_other_than_a_and_b_are_left_for_the_player() {
     let controller = default_controller();
 
-    for trigger in [
-        ControllerButton::LeftTrigger,
-        ControllerButton::RightTrigger,
-    ] {
-        assert_eq!(controller.action(PadButton(trigger)), None);
+    for button in [ControllerButton::West, ControllerButton::North] {
+        assert_eq!(controller.action(PadButton(button)), None);
     }
+    assert_eq!(
+        controller.input(Action::Rewind),
+        Some(PadButton(ControllerButton::RightShoulder))
+    );
+    assert_eq!(
+        controller.input(Action::FastForward),
+        Some(PadButton(ControllerButton::RightTrigger))
+    );
+}
+
+#[test]
+fn the_menu_buttons_follow_an_xbox_controller_whatever_is_bound() {
+    assert_eq!(
+        Action::for_menu_button(ControllerButton::South),
+        Some(Action::A)
+    );
+    assert_eq!(
+        Action::for_menu_button(ControllerButton::East),
+        Some(Action::B)
+    );
+    assert_eq!(
+        Action::for_menu_button(ControllerButton::DPadLeft),
+        Some(Action::Left)
+    );
+    assert_eq!(Action::for_menu_button(ControllerButton::West), None);
+    assert_eq!(
+        Action::for_menu_button(ControllerButton::LeftShoulder),
+        None
+    );
+}
+
+#[test]
+fn the_pause_menu_keeps_its_controller_button() {
+    let mut controls = Controls::default();
+
+    controls.clear(Device::Controller, Action::PauseMenu);
+    assert!(controls.controller.input(Action::PauseMenu).is_some());
+
+    controls.clear(Device::Keyboard, Action::Rewind);
+    assert_eq!(controls.keyboard.input(Action::Rewind), None);
+}
+
+#[test]
+fn taking_the_pause_menu_s_button_swaps_the_two() {
+    let mut controls = Controls::default();
+    let l1 = PadButton(ControllerButton::LeftShoulder);
+
+    controls.bind_button(Action::Rewind, l1);
+
+    assert_eq!(controls.controller.input(Action::Rewind), Some(l1));
+    assert_eq!(
+        controls.controller.input(Action::PauseMenu),
+        Some(PadButton(ControllerButton::RightShoulder))
+    );
+}
+
+#[test]
+fn taking_the_pause_menu_s_button_for_an_unset_action_moves_it_to_a_free_one() {
+    let mut controls = Controls::default();
+    let l1 = PadButton(ControllerButton::LeftShoulder);
+
+    controls.bind_button(Action::QuickSave, l1);
+
+    assert_eq!(controls.controller.input(Action::QuickSave), Some(l1));
+    assert_eq!(
+        controls.controller.input(Action::PauseMenu),
+        Some(PadButton(ControllerButton::LeftTrigger))
+    );
+}
+
+#[test]
+fn controls_saved_without_a_pause_menu_button_get_a_free_one() {
+    let mut controls: Controls =
+        toml::from_str("[controller]\nrewind = \"left_shoulder\"\n").unwrap();
+
+    assert!(controls.give_pause_menu_a_button());
+    assert_eq!(
+        controls.controller.input(Action::PauseMenu),
+        Some(PadButton(ControllerButton::RightShoulder))
+    );
+    assert!(!controls.give_pause_menu_a_button());
 }
 
 #[test]

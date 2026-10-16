@@ -1,5 +1,7 @@
 //! Keys and controller buttons: picking one for an action in the settings,
-//! the app's shortcuts, moving through the menus, and playing.
+//! the app's shortcuts, moving through the menus, and playing. The menus
+//! take fixed keys and buttons, whatever the player bound (see
+//! `input::menu_action` and `Action::for_menu_button`).
 
 use super::window_events::toggle_fullscreen;
 use super::{App, GameMessage, Message};
@@ -32,8 +34,9 @@ impl App {
 
     /// Handles a key going down or up: picking a key in the settings, the
     /// fixed shortcuts (pausing and restarting the game wait while the
-    /// settings or a dialog cover it), and then the player's controls. A
-    /// window that shows only the game (`--scale`) has no shortcuts.
+    /// settings or a dialog cover it), the fixed keys that move through the
+    /// menus, and then the player's controls. A window that shows only the
+    /// game (`--scale`) has no shortcuts.
     pub(super) fn handle_key(&mut self, input: &KeyInput) -> Task<Message> {
         if input.pressed && !input.repeat && self.screen_scale.is_none() {
             if let Some((device, action)) = self.capture {
@@ -81,20 +84,24 @@ impl App {
             return Task::none();
         }
 
-        let Some(action) = input
-            .code
-            .and_then(|key| self.settings.shared.controls.keyboard.action(key))
-        else {
-            return Task::none();
-        };
-
-        if input.pressed && action.navigates() && self.in_menus() {
+        if input.pressed
+            && self.screen_scale.is_none()
+            && self.in_menus()
+            && let Some(action) = input::menu_action(&input.key, input.modifiers)
+        {
             // Holding a direction keeps moving, like in other apps.
             if input.repeat && !action.is_direction() {
                 return Task::none();
             }
             return self.navigate(action, input.repeat);
         }
+
+        let Some(action) = input
+            .code
+            .and_then(|key| self.settings.shared.controls.keyboard.action(key))
+        else {
+            return Task::none();
+        };
 
         if input.repeat {
             return Task::none();
@@ -147,20 +154,19 @@ impl App {
                     let pressed = changed
                         .iter()
                         .find(|&&(_, pressed)| pressed)
-                        .map(|&(button, _)| PadButton(button));
+                        .map(|&(button, _)| button);
 
                     match (device, pressed) {
                         (Device::Controller, Some(button)) => {
                             self.capture = None;
                             self.change_controls(|controls| {
-                                controls.controller.bind(action, Some(button));
+                                controls.bind_button(action, PadButton(button));
                             });
                         }
-                        // Waiting for a keyboard key: the controller's B
-                        // cancels, and its other buttons are ignored.
+                        // Waiting for a keyboard key: the controller's back
+                        // button cancels, and its other buttons are ignored.
                         (Device::Keyboard, Some(button))
-                            if self.settings.shared.controls.controller.action(button)
-                                == Some(Action::B) =>
+                            if Action::for_menu_button(button) == Some(Action::B) =>
                         {
                             self.capture = None;
                         }
@@ -171,23 +177,19 @@ impl App {
 
                 let mut tasks = Vec::new();
 
-                if self.in_menus() {
+                // In the menus the fixed menu buttons only move through them,
+                // whatever else they are bound to.
+                let in_menus = self.in_menus();
+                if in_menus {
                     let held_before: Vec<Key> = previous.stick_directions().collect();
                     let stick = state
                         .stick_directions()
                         .filter(|key| !held_before.contains(key))
                         .filter_map(Action::for_direction);
-                    let buttons = changed.iter().filter(|&&(_, pressed)| pressed).filter_map(
-                        |&(button, _)| {
-                            let action = self
-                                .settings
-                                .shared
-                                .controls
-                                .controller
-                                .action(PadButton(button))?;
-                            action.navigates().then_some(action)
-                        },
-                    );
+                    let buttons = changed
+                        .iter()
+                        .filter(|&&(_, pressed)| pressed)
+                        .filter_map(|&(button, _)| Action::for_menu_button(button));
                     let steps: Vec<Action> = stick.chain(buttons).collect();
 
                     for action in steps {
@@ -197,6 +199,9 @@ impl App {
 
                 let shortcuts: Vec<(Action, bool)> = changed
                     .into_iter()
+                    .filter(|&(button, pressed)| {
+                        !(pressed && in_menus && Action::for_menu_button(button).is_some())
+                    })
                     .filter_map(|(button, pressed)| {
                         let action = self
                             .settings
@@ -218,8 +223,9 @@ impl App {
 
     /// Moves through the menu on screen (a dialog, the settings window, the
     /// pause menu or the library) with a direction, picks with A or Start, and steps
-    /// back with B. These are the keys and controller buttons the player
-    /// bound to the Game Boy's D-pad, A, B, Start and Select. A fresh press
+    /// back with B. These come from the fixed menu keys and buttons, never
+    /// from the player's bindings (see `input::menu_action` and
+    /// `Action::for_menu_button`). A fresh press
     /// past either end of a list wraps around to the other end, while
     /// `held`, a held key repeating, stops there (see `crate::selection`).
     fn navigate(&mut self, action: Action, held: bool) -> Task<Message> {

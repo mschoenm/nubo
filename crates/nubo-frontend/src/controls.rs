@@ -3,6 +3,13 @@
 //! has at most one key and one controller button, and each key or button
 //! does at most one thing. The controls are saved with the other settings
 //! in `settings.toml` (see [`crate::settings`]).
+//!
+//! The menus don't follow these bindings: they always take the same keys
+//! and buttons ([`Action::for_menu_button`] on a controller), so no
+//! remapping can leave the app impossible to control. To get into the
+//! menus while a game runs, the keyboard has Esc, which can't be bound, and
+//! the controller has the pause menu's button, which can be moved but never
+//! cleared (see [`Controls::bind_button`]).
 
 use nubo_core::{ControllerButton, ControllerMapping, Key};
 use serde::{Deserialize, Serialize};
@@ -52,7 +59,8 @@ pub enum Action {
     Start,
     /// The Game Boy's Select button.
     Select,
-    /// Opens or closes the pause menu. On the keyboard Esc always does this.
+    /// Opens or closes the pause menu. On the keyboard Esc always does this;
+    /// on a controller it always has a button.
     PauseMenu,
     /// Runs the game faster while held.
     FastForward,
@@ -124,20 +132,23 @@ impl Action {
         }
     }
 
-    /// Whether this action also moves through menus: the D-pad moves, A and
-    /// Start pick, B steps back, and Select clears a setting.
-    pub fn navigates(self) -> bool {
-        matches!(
-            self,
-            Action::Up
-                | Action::Down
-                | Action::Left
-                | Action::Right
-                | Action::A
-                | Action::B
-                | Action::Start
-                | Action::Select
-        )
+    /// What a controller button does in the menus, which is fixed whatever
+    /// the bindings say: the D-pad moves, the bottom button (A on an Xbox
+    /// controller) and Start pick, the right button (B on an Xbox
+    /// controller) steps back, and Select opens a game's menu or clears a
+    /// setting. The left stick moves too (see [`Action::for_direction`]).
+    pub fn for_menu_button(button: ControllerButton) -> Option<Action> {
+        match button {
+            ControllerButton::DPadUp => Some(Action::Up),
+            ControllerButton::DPadDown => Some(Action::Down),
+            ControllerButton::DPadLeft => Some(Action::Left),
+            ControllerButton::DPadRight => Some(Action::Right),
+            ControllerButton::South => Some(Action::A),
+            ControllerButton::East => Some(Action::B),
+            ControllerButton::Start => Some(Action::Start),
+            ControllerButton::Select => Some(Action::Select),
+            _ => None,
+        }
     }
 
     /// Whether this is one of the D-pad's four directions.
@@ -248,12 +259,67 @@ impl Controls {
         }
     }
 
-    /// Leaves `action` on `device` without an input.
+    /// Whether `action` on `device` may be left without an input: anything
+    /// but the pause menu on a controller, which is the controller's only
+    /// way into the menus while a game runs.
+    pub fn can_clear(device: Device, action: Action) -> bool {
+        !(device == Device::Controller && action == Action::PauseMenu)
+    }
+
+    /// Leaves `action` on `device` without an input, unless it must keep
+    /// one (see [`Controls::can_clear`]).
     pub fn clear(&mut self, device: Device, action: Action) {
+        if !Controls::can_clear(device, action) {
+            return;
+        }
         match device {
             Device::Keyboard => self.keyboard.bind(action, None),
             Device::Controller => self.controller.bind(action, None),
         }
+    }
+
+    /// Makes the controller button `button` do `action`, taking it away
+    /// from the action it did before. When that was the pause menu, the
+    /// pause menu gets `action`'s old button instead, or a free one if it
+    /// had none, so the menu can always be opened.
+    pub fn bind_button(&mut self, action: Action, button: PadButton) {
+        let old = self.controller.input(action);
+        let takes_pause_menu = action != Action::PauseMenu
+            && self.controller.action(button) == Some(Action::PauseMenu);
+        self.controller.bind(action, Some(button));
+        if takes_pause_menu {
+            let moved = old.or_else(|| self.free_button());
+            self.controller.bind(Action::PauseMenu, moved);
+        }
+    }
+
+    /// Gives the pause menu a controller button if it has none, such as
+    /// in controls saved by a version that let the player clear it: the
+    /// first free one, shoulder buttons first. Returns whether it did.
+    pub fn give_pause_menu_a_button(&mut self) -> bool {
+        if self.controller.input(Action::PauseMenu).is_some() {
+            return false;
+        }
+        let button = self.free_button();
+        self.controller.bind(Action::PauseMenu, button);
+        button.is_some()
+    }
+
+    /// A controller button that does nothing yet, the shoulder buttons and
+    /// triggers first. There are more buttons than actions, so there always
+    /// is one.
+    fn free_button(&self) -> Option<PadButton> {
+        const PREFERRED: [ControllerButton; 4] = [
+            ControllerButton::LeftShoulder,
+            ControllerButton::RightShoulder,
+            ControllerButton::LeftTrigger,
+            ControllerButton::RightTrigger,
+        ];
+        PREFERRED
+            .into_iter()
+            .chain(ControllerButton::ALL)
+            .map(PadButton)
+            .find(|&button| self.controller.action(button).is_none())
     }
 
     /// Puts back the bindings a new user gets on `device`.
@@ -302,10 +368,11 @@ pub fn default_keyboard() -> Bindings<KeyCode> {
 }
 
 /// The controller buttons a new user gets. A and B sit where they are on a
-/// Game Boy: A on the right, B below it. Quick save and quick load get no
-/// button: the triggers are too easy to press by accident, and a stray quick
-/// load throws away everything since the last save. The pause menu (L1) has
-/// both.
+/// Game Boy: A on the right, B below it. The other face buttons are left for
+/// the player. Rewind (R1) and fast forward (R2) are held, side by side
+/// under the right hand. Quick save and quick load get no button: a stray
+/// quick load throws away everything since the last save, and the pause
+/// menu (L1) has both.
 pub fn default_controller() -> Bindings<PadButton> {
     Bindings::from_pairs(&[
         (Action::Up, PadButton(ControllerButton::DPadUp)),
@@ -317,11 +384,11 @@ pub fn default_controller() -> Bindings<PadButton> {
         (Action::Start, PadButton(ControllerButton::Start)),
         (Action::Select, PadButton(ControllerButton::Select)),
         (Action::PauseMenu, PadButton(ControllerButton::LeftShoulder)),
+        (Action::Rewind, PadButton(ControllerButton::RightShoulder)),
         (
             Action::FastForward,
-            PadButton(ControllerButton::RightShoulder),
+            PadButton(ControllerButton::RightTrigger),
         ),
-        (Action::Rewind, PadButton(ControllerButton::West)),
     ])
 }
 
@@ -329,23 +396,21 @@ pub fn default_controller() -> Bindings<PadButton> {
 /// `Settings::controls_revision` counts up to.
 pub const REVISION: u32 = 1;
 
-/// Gives each action added after the player's controls were saved, such as
-/// rewind, the input a new player gets, on the keyboard and the controller,
-/// if that input does nothing yet. Returns whether anything changed. An app calls it once, after which
-/// the player's own choice (even no input at all) stays.
+/// Gives rewind, which came after the player's controls were saved, the key
+/// and controller button it came with (R and the left face button, as the
+/// controller's defaults were then), if they do nothing yet. Returns whether
+/// anything changed. An app calls it once, after which the player's own
+/// choice (even no input at all) stays.
 pub fn add_new_actions(controls: &mut Controls) -> bool {
     let mut changed = false;
-    let keyboard = default_keyboard();
-    if controls.keyboard.input(Action::Rewind).is_none()
-        && let Some(key) = keyboard.input(Action::Rewind)
-        && controls.keyboard.action(key).is_none()
+    let key = KeyCode::KeyR;
+    if controls.keyboard.input(Action::Rewind).is_none() && controls.keyboard.action(key).is_none()
     {
         controls.keyboard.bind(Action::Rewind, Some(key));
         changed = true;
     }
-    let controller = default_controller();
+    let button = PadButton(ControllerButton::West);
     if controls.controller.input(Action::Rewind).is_none()
-        && let Some(button) = controller.input(Action::Rewind)
         && controls.controller.action(button).is_none()
     {
         controls.controller.bind(Action::Rewind, Some(button));

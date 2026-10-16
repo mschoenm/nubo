@@ -158,6 +158,7 @@ impl App {
             }
             SettingsMessage::CaptureBinding(device, action) => {
                 self.capture = Some((device, action));
+                self.capture_started = iced::time::Instant::now();
             }
             SettingsMessage::ClearBinding(device, action) => {
                 self.capture = None;

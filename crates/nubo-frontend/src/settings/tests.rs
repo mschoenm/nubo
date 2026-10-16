@@ -187,6 +187,7 @@ fn earlier_settings() -> Settings {
         Action::Screenshot,
         Some(PadButton(ControllerButton::LeftStick)),
     );
+    controller.bind(Action::Rewind, None);
 
     Settings {
         model: ModelPreference::Fixed(Model::CgbC),

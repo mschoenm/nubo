@@ -22,7 +22,7 @@ use iced::widget::{
 };
 use iced::{Alignment, Color, Element, Fill, Padding, Shrink, Theme, widget};
 use nubo_core::Model;
-use nubo_frontend::controls::{Action, Device};
+use nubo_frontend::controls::{Action, Controls, Device};
 use nubo_frontend::library::{self, Library, box_art};
 use nubo_frontend::model::{self, Console, ModelPreference};
 use nubo_frontend::palettes::DmgPalette;
@@ -1255,17 +1255,21 @@ fn controls<'a>(
     };
 
     let hint = match device {
-        Device::Keyboard => {
-            String::from("Click a key, then press the new one. Esc cancels and Backspace clears.")
-        }
+        Device::Keyboard => String::from(
+            "Click a key, then press the new one within 5 seconds. Esc cancels and \
+             Backspace clears. In the menus the arrow keys, Enter or Space and Backspace \
+             always work.",
+        ),
         Device::Controller if page.controllers.is_empty() => String::from(
             "No controller connected. Click a button, then press the new one on your \
-             controller; Backspace leaves it unset. The left stick always works as the \
-             D-pad.",
+             controller within 5 seconds; Backspace leaves it unset. The left stick always \
+             works as the D-pad. In the menus the D-pad, the bottom button (pick) and the \
+             right button (back) always work.",
         ),
         Device::Controller => format!(
-            "Connected: {}. Click a button, then press the new one; Backspace clears. \
-             The left stick is always the D-pad.",
+            "Connected: {}. Click a button, then press the new one within 5 seconds; \
+             Backspace clears. The left stick is always the D-pad. In the menus the D-pad, \
+             the bottom button (pick) and the right button (back) always work.",
             page.controllers.join(", ")
         ),
     };
@@ -1323,7 +1327,8 @@ fn pause_menu_key<'a>() -> Element<'a, Message> {
 }
 
 /// An action with the key or button that does it. Clicking the key waits
-/// for a new one, or for Backspace, which leaves the action unset.
+/// for a new one, or for Backspace, which leaves the action unset unless it
+/// must keep one (the pause menu on a controller).
 fn binding_row(
     settings: &Settings,
     device: Device,
@@ -1332,22 +1337,29 @@ fn binding_row(
 ) -> Element<'_, Message> {
     let bound = settings.shared.controls.input_label(device, action);
 
-    let label = match (&bound, capturing, device) {
+    let chip_text = match (&bound, capturing, device) {
         (_, true, Device::Keyboard) => String::from("Press a key…"),
         (_, true, Device::Controller) => String::from("Press a button…"),
         (Some(name), false, _) => name.clone(),
         (None, false, _) => String::from("Not set"),
     };
 
-    let chip = button(text(label).size(13).align_x(Alignment::Center).width(Fill))
-        .padding([5, 12])
-        .width(CHIP_WIDTH)
-        .style(theme::binding_chip(capturing, bound.is_none()))
-        .on_press(Message::Settings(SettingsMessage::CaptureBinding(
-            device, action,
-        )));
+    let chip = button(
+        text(chip_text)
+            .size(13)
+            .align_x(Alignment::Center)
+            .width(Fill),
+    )
+    .padding([5, 12])
+    .width(CHIP_WIDTH)
+    .style(theme::binding_chip(capturing, bound.is_none()))
+    .on_press(Message::Settings(SettingsMessage::CaptureBinding(
+        device, action,
+    )));
 
-    row![text(action.label()).size(14).width(Fill), chip]
+    let description = (!Controls::can_clear(device, action))
+        .then(|| String::from("Always has a button, so the menu can always be opened"));
+    row![label(action.label(), description), chip]
         .spacing(8)
         .align_y(Alignment::Center)
         .into()
