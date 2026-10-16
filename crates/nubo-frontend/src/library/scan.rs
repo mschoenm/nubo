@@ -52,7 +52,7 @@ impl ScanResult {
 #[derive(Debug, Clone, Default)]
 pub struct FileCheck {
     /// Games whose file was deleted: their folder is there, the file isn't.
-    pub deleted: Vec<PathBuf>,
+    pub deleted: HashSet<PathBuf>,
     /// Games whose folder is gone, such as an unplugged drive.
     pub unavailable: Vec<PathBuf>,
     /// How many scans the library had taken in when the check started; see
@@ -170,7 +170,7 @@ pub fn check(entries: &[LibraryEntry], folders: &[LibraryFolder]) -> FileCheck {
         if is_unreachable(&entry.path, folders) {
             check.unavailable.push(entry.path.clone());
         } else {
-            check.deleted.push(entry.path.clone());
+            check.deleted.insert(entry.path.clone());
         }
     }
 

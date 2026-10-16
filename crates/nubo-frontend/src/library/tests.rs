@@ -266,7 +266,10 @@ fn the_quick_check_tells_deleted_games_from_unreachable_ones() {
 
     let check = scan::check(&entries, &folders);
 
-    assert_eq!(check.deleted, [library_folder.join("Deleted.gb")]);
+    assert_eq!(
+        check.deleted,
+        HashSet::from([library_folder.join("Deleted.gb")])
+    );
     assert_eq!(check.unavailable, [drive.join("Unplugged.gb")]);
 }
 
