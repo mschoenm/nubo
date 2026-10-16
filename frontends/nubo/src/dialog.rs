@@ -71,7 +71,7 @@ impl Default for ResetChoices {
 /// A page of a library game's menu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameMenuPage {
-    /// Play, Play on…, Show in folder and the like.
+    /// Play, Which Game Boy…, Show in folder and the like.
     Main,
     /// The consoles the game can start on.
     Consoles,
