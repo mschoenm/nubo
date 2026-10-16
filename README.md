@@ -134,7 +134,7 @@ While a game runs, the Library button at the top left takes you back to your gam
 
 On a controller, the D-pad or left stick moves, and A and B sit where they are on a Game Boy: the right face button (B on Xbox, ○ on PlayStation) is A, and the bottom one (A on Xbox, ✕ on PlayStation) is B. L1 opens the pause menu (where you save and load states), holding R1 rewinds and holding R2 fast forwards. The other two face buttons and L2 do nothing until you give them an action in the settings. The pause menu can move to another button but always keeps one.
 
-The menus always work the same, whatever you change: the arrow keys, D-pad or left stick move, Enter, Space or the bottom face button (A on Xbox) picks, and Esc, Backspace or the right face button (B on Xbox) goes back. On a game in the library, Select, the context menu key or Shift+F10 opens its menu.
+The menus always work the same, whatever you bind: the arrow keys, D-pad or left stick move, Enter, Space or the right face button (B on Xbox, ○ on PlayStation) picks, and Esc, Backspace or the bottom face button (A on Xbox, ✕ on PlayStation) goes back, as on Nintendo's consoles. If you'd rather pick with the bottom button and go back with the right one, as on Xbox and PlayStation, choose Xbox under Menus in the controller's settings. On a game in the library, Select, the context menu key or Shift+F10 opens its menu.
 
 <p align="center">
   <img src="images/screenshots/pause-menu.png" width="600" alt="Nubo's pause menu over Tobu Tobu Girl Deluxe: resume; save state, load state and cheats; screenshot, fullscreen and settings; restart game and back to library"><br>

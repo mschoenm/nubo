@@ -56,24 +56,52 @@ fn the_face_buttons_other_than_a_and_b_are_left_for_the_player() {
 }
 
 #[test]
-fn the_menu_buttons_follow_an_xbox_controller_whatever_is_bound() {
-    assert_eq!(
-        Action::for_menu_button(ControllerButton::South),
-        Some(Action::A)
-    );
-    assert_eq!(
-        Action::for_menu_button(ControllerButton::East),
-        Some(Action::B)
-    );
-    assert_eq!(
-        Action::for_menu_button(ControllerButton::DPadLeft),
-        Some(Action::Left)
-    );
-    assert_eq!(Action::for_menu_button(ControllerButton::West), None);
-    assert_eq!(
-        Action::for_menu_button(ControllerButton::LeftShoulder),
-        None
-    );
+fn the_menu_buttons_follow_nintendo_unless_the_player_picks_xbox() {
+    let nintendo = Controls::default().menu_buttons;
+    assert_eq!(nintendo, MenuButtons::Nintendo);
+    assert_eq!(nintendo.action(ControllerButton::East), Some(Action::A));
+    assert_eq!(nintendo.action(ControllerButton::South), Some(Action::B));
+
+    let xbox = MenuButtons::Xbox;
+    assert_eq!(xbox.action(ControllerButton::South), Some(Action::A));
+    assert_eq!(xbox.action(ControllerButton::East), Some(Action::B));
+
+    for buttons in MenuButtons::ALL {
+        assert_eq!(buttons.action(ControllerButton::Start), Some(Action::Start));
+        assert_eq!(
+            buttons.action(ControllerButton::DPadLeft),
+            Some(Action::Left)
+        );
+        assert_eq!(buttons.action(ControllerButton::West), None);
+        assert_eq!(buttons.action(ControllerButton::LeftShoulder), None);
+    }
+}
+
+#[test]
+fn resetting_the_controller_puts_back_the_menu_buttons() {
+    let mut controls = Controls {
+        menu_buttons: MenuButtons::Xbox,
+        ..Controls::default()
+    };
+
+    controls.reset(Device::Keyboard);
+    assert_eq!(controls.menu_buttons, MenuButtons::Xbox);
+    controls.reset(Device::Controller);
+    assert_eq!(controls.menu_buttons, MenuButtons::Nintendo);
+}
+
+#[test]
+fn the_menu_buttons_are_saved_only_once_changed() {
+    let saved = toml::to_string(&Controls::default()).unwrap();
+    assert!(!saved.contains("menu_buttons"), "{saved}");
+
+    let controls = Controls {
+        menu_buttons: MenuButtons::Xbox,
+        ..Controls::default()
+    };
+    let saved = toml::to_string(&controls).unwrap();
+    assert!(saved.contains("menu_buttons = \"xbox\""), "{saved}");
+    assert_eq!(toml::from_str::<Controls>(&saved).unwrap(), controls);
 }
 
 #[test]

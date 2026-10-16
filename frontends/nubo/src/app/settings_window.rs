@@ -14,7 +14,7 @@ use iced::widget::operation;
 use iced::widget::scrollable::RelativeOffset;
 use nubo_frontend::background;
 use nubo_frontend::battery;
-use nubo_frontend::controls::{Action, Controls, Device};
+use nubo_frontend::controls::{Action, Controls, Device, MenuButtons};
 use nubo_frontend::library::{self, LibrarySnapshot};
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::palettes::DmgPalette;
@@ -56,6 +56,9 @@ pub enum SettingsMessage {
     CaptureBinding(Device, Action),
     ClearBinding(Device, Action),
     ResetControls(Device),
+    /// The player picked which controller buttons pick and go back in the
+    /// menus.
+    MenuButtonsSelected(MenuButtons),
     /// Asks whether to reset every setting, and what else.
     AskReset,
     /// Resets every setting and what else the player ticked, as they
@@ -169,6 +172,9 @@ impl App {
             SettingsMessage::ResetControls(device) => {
                 self.capture = None;
                 self.change_controls(|controls| controls.reset(device));
+            }
+            SettingsMessage::MenuButtonsSelected(buttons) => {
+                self.change_controls(|controls| controls.menu_buttons = buttons);
             }
             SettingsMessage::AskReset => {
                 self.capture = None;
@@ -486,6 +492,12 @@ impl App {
             SettingsRow::Device => SettingsMessage::ControlsDeviceSelected(cycle(
                 &Device::ALL,
                 self.controls_device,
+                step,
+                wrap,
+            )),
+            SettingsRow::MenuButtons => SettingsMessage::MenuButtonsSelected(cycle(
+                &MenuButtons::ALL,
+                settings.shared.controls.menu_buttons,
                 step,
                 wrap,
             )),
