@@ -467,6 +467,7 @@ Other dependencies
 
 The Rust crates that Nubo is built from are distributed under their own
 licenses (mostly MIT, Apache-2.0, BSD, ISC and Zlib). THIRD_PARTY_LICENSES.txt,
-which comes with the macOS app, the web version and the RetroArch core, lists
-every crate with its license and contains their license texts. `cargo xtask licenses <folder>`
+which comes with every package (the macOS app, the Windows installer and zip,
+the Flatpak, the web version and the RetroArch core), lists every crate with
+its license and contains their license texts. `cargo xtask licenses <folder>`
 writes it for the desktop app.
