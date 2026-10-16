@@ -186,6 +186,8 @@ impl<'a> Shelves<'a> {
             Action::Down if index < recent => {
                 if index + columns < recent {
                     index + columns
+                } else if self.games.is_empty() {
+                    index
                 } else {
                     recent + index % columns
                 }
