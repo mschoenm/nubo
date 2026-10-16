@@ -1,8 +1,8 @@
-//! Project tasks run with `cargo xtask <command>`: building the Iced
-//! frontend for the browser and serving it locally, building the macOS app
-//! bundle, the Flatpak, the Windows installer and the RetroArch core, writing the logo and the
-//! license files that go with them, checking a release's version and notes,
-//! timing Nubo next to other emulators, the nightly review's tooling,
+//! Project tasks run with `cargo xtask <command>`: building the Iced frontend
+//! for the browser and serving it locally, building the macOS app bundle, the
+//! Flatpak, the Windows installer and the RetroArch core, writing the logo
+//! and the license files that go with them, checking a release's version and
+//! notes, timing Nubo next to other emulators, the nightly review's tooling,
 //! reading the GB Emulator Shootout's published table, and making the
 //! documentation's screenshots from recorded scenes.
 //!
@@ -139,6 +139,7 @@ enum Task {
 /// Every task reports failures as a message for the user.
 type Result<T = ()> = std::result::Result<T, String>;
 
+/// The workspace's root folder, the one above xtask's.
 fn workspace_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -146,6 +147,8 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
+/// Cargo's target folder: `CARGO_TARGET_DIR` when set, otherwise `target/`
+/// in the workspace root.
 fn target_dir() -> PathBuf {
     env::var_os("CARGO_TARGET_DIR").map_or_else(|| workspace_root().join("target"), PathBuf::from)
 }
@@ -435,10 +438,23 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::build_commit;
+    use super::{build_commit, workspace_root};
+    use std::env;
+    use std::process::Command;
 
+    /// Checks the commit git gives. `NUBO_COMMIT` is passed on as it is, and
+    /// outside a git checkout, such as a source archive, there is no commit
+    /// to read, so the test has nothing to check then.
     #[test]
     fn the_build_commit_is_a_commit_hash() {
+        let in_git = Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .current_dir(workspace_root())
+            .output()
+            .is_ok_and(|output| output.status.success());
+        if env::var_os("NUBO_COMMIT").is_some() || !in_git {
+            return;
+        }
         let commit = build_commit();
         let hash = commit.strip_suffix("-dirty").unwrap_or(&commit);
         assert_eq!(hash.len(), 40, "{commit}");

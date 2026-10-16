@@ -1602,6 +1602,8 @@ fn folder_row(index: usize, folder: &LibraryFolder, missing: bool) -> Element<'_
     .into()
 }
 
+/// The icon on each choice of the Appearance setting: a monitor for
+/// following the system, a sun for light and a moon for dark.
 fn appearance_icon(appearance: Appearance) -> Icon {
     match appearance {
         Appearance::System => Icon::Monitor,

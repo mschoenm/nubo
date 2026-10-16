@@ -16,8 +16,8 @@ class Nubo(Emulator):
         self.speed = 4.0
 
     def setup(self):
-        # The release also has the MSI and the RetroArch core's zip, which a looser filter
-        # would pick.
+        # The release also has the MSI and the RetroArch core's zip, which a looser
+        # filter would pick.
         downloadGithubRelease("mschoenm/nubo", "downloads/nubo.zip",
                               filter=lambda name: name == "Nubo-windows-x64.zip", require_asset=True)
         extract("downloads/nubo.zip", "emu/nubo")

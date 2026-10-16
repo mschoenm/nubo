@@ -4,13 +4,16 @@
 use super::lists::{Frame, GameList, Layout, ScreenshotList, Style};
 use super::*;
 use image::{Rgba, RgbaImage};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-/// Reads `text` as `images/screenshots.toml`.
+/// Reads `text` as `images/screenshots.toml`, from a folder of its own, so
+/// tests running at the same time never share one.
 fn list(text: &str) -> std::result::Result<ScreenshotList, String> {
+    static LISTS: AtomicUsize = AtomicUsize::new(0);
     let folder = std::env::temp_dir().join(format!(
         "nubo-screenshot-list-{}-{}",
         std::process::id(),
-        text.len()
+        LISTS.fetch_add(1, Ordering::Relaxed)
     ));
     fs::create_dir_all(&folder).unwrap();
     let path = folder.join("screenshots.toml");
@@ -71,6 +74,8 @@ fn options_that_dont_fit_the_frame_are_mistakes() {
         "file = \"a.png\"\nscene = \"s\"\nscale = 2",
         "file = \"a.png\"\nscene = \"s\"\nframe = \"game\"\nsize = [10, 10]",
         "file = \"a.png\"\nscene = \"s\"\nframe = \"game\"\nscale = 9",
+        "file = \"a.png\"\nscene = \"s\"\nframe = \"fullscreen\"\nsize = [0, 0]",
+        "file = \"a.png\"\nscene = \"s\"\nsize = [800, 0]",
         "file = \"a.png\"\nscene = \"s\"\ncolumns = 2",
         "file = \"a.png\"\nscene = \"s\"\nbackground = \"black\"",
         "file = \"a.jpg\"\nscene = \"s\"",
@@ -243,4 +248,13 @@ fn a_game_missing_from_the_credits_is_named() {
     let error = check_credits(&root, &list, &games).unwrap_err();
     assert!(error.contains("Unknown Game by Someone (MIT)"), "{error}");
     fs::remove_dir_all(&root).unwrap();
+}
+
+#[test]
+fn the_screen_fits_the_games_picture_at_every_scale() {
+    assert_eq!(game_monitor(4), (1920, 1200));
+    for scale in 1..=8 {
+        let (width, height) = game_monitor(scale);
+        assert!(width >= SGB_FRAME_WIDTH * scale && height >= SGB_FRAME_HEIGHT * scale);
+    }
 }

@@ -2,9 +2,9 @@ name: Nightly build
 
 # Once a scheduled (or hand-started) nightly run has passed every check,
 # publishes its Flatpaks, Windows files and RetroArch cores as the "nightly"
-# pre-release, replacing the one before. Skipped when main hasn't changed since the last nightly build.
-# Pre-releases don't count as GitHub's latest release, so the stable version
-# stays the default download.
+# pre-release, replacing the one before. Skipped when main hasn't changed
+# since the last nightly build. Pre-releases don't count as GitHub's latest
+# release, so the stable version stays the default download.
 on:
   workflow_run:
     workflows: [Nightly]

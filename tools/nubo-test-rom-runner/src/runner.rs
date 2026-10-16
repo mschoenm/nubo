@@ -166,6 +166,7 @@ struct WorkerStatus {
 }
 
 impl WorkerStatus {
+    /// Records which test the worker runs now, `None` between tests.
     fn set_test(&self, test: Option<usize>) {
         if let Ok(mut current) = self.test.lock() {
             *current = test;
@@ -499,8 +500,10 @@ fn run_grayscale_screen_test(
     let fewest_differing = references
         .iter()
         .map(|reference| screen::differing_pixels_in_grayscale(&actual, reference))
-        .min()
-        .unwrap_or(0);
+        .min();
+    let Some(fewest_differing) = fewest_differing else {
+        return Err(Failure::new("the test has no reference screenshot"));
+    };
     if fewest_differing == 0 {
         return Ok(());
     }
@@ -638,6 +641,9 @@ fn run_gambatte_test(
 
     let actual = gambatte::normalize(emulator.frame_buffer(), test.model);
     let reason = match &test.check {
+        Check::Number(number) if number.is_empty() => {
+            "the ROM's name gives no number to expect".to_string()
+        }
         Check::Number(number) if !gambatte::shows_number(&actual, number) => {
             let shown = gambatte::shown_number(&actual, number.len());
             if shown.is_empty() {

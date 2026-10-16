@@ -255,11 +255,14 @@ pub fn run_session(plan_path: &Path) -> Result {
 
 /// A headless GNOME Shell and what its apps need to reach it.
 struct Session {
+    /// The running `gnome-shell`.
     shell: Child,
     /// The variables that point at this session's folders, display and
     /// screen.
     environment: Vec<(String, String)>,
+    /// The width and height of its virtual screen, in pixels.
     monitor: (u32, u32),
+    /// The file GNOME Shell's output goes to, to say why it failed.
     log: PathBuf,
 }
 

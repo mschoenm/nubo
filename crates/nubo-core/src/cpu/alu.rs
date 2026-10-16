@@ -76,6 +76,7 @@ impl Cpu {
         self.set_flag_c((u16::from(value) + u16::from(carry_value)) > u16::from(byte));
     }
 
+    /// AND: ANDs `value` into `register`; sets H and clears N and C.
     pub(super) fn logical_and_with_register(&mut self, register: Register, value: u8) {
         let byte = self.read_from_register(register);
         let result = byte & value;
@@ -88,6 +89,7 @@ impl Cpu {
         self.set_flag_c(false);
     }
 
+    /// OR: ORs `value` into `register`; clears N, H and C.
     pub(super) fn logical_or_with_register(&mut self, register: Register, value: u8) {
         let byte = self.read_from_register(register);
         let result = byte | value;
@@ -100,6 +102,7 @@ impl Cpu {
         self.set_flag_c(false);
     }
 
+    /// XOR: XORs `value` into `register`; clears N, H and C.
     pub(super) fn logical_xor_with_register(&mut self, register: Register, value: u8) {
         let byte = self.read_from_register(register);
         let result = byte ^ value;

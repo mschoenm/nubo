@@ -12,6 +12,7 @@
 //! moved without changes keeps its date under its new path, so moving
 //! folders doesn't send their files to the front or back of the rotation.
 
+use crate::shootout_scoreboard::parse_commit;
 use crate::{Result, workspace_root};
 use clap::{Args, Subcommand};
 use serde_json::{Map, Value, json};
@@ -99,15 +100,15 @@ pub fn run(command: Command) -> Result {
 /// The state is `{"last_commit": "<sha>", "files": {"<path>": "<date>"}}`.
 /// A missing state file starts the rotation from the beginning.
 fn next_part(options: &NextOptions) -> Result<String> {
-    let mut state = match fs::read_to_string(&options.state) {
+    let state = match fs::read_to_string(&options.state) {
         Ok(text) => serde_json::from_str::<Value>(&text)
             .map_err(|error| format!("{} is not valid JSON: {error}", options.state.display()))?,
         Err(_) => json!({}),
     };
-    let last_commit = state
-        .get("last_commit")
-        .and_then(Value::as_str)
-        .map(String::from);
+    let Value::Object(mut state) = state else {
+        return Err(format!("{} is not a JSON object", options.state.display()));
+    };
+    let last_commit = last_commit(&state, &options.state);
     let mut reviewed = state
         .get("files")
         .and_then(Value::as_object)
@@ -136,8 +137,11 @@ fn next_part(options: &NextOptions) -> Result<String> {
         reviewed.insert(file.clone(), Value::from(options.date.as_str()));
     }
 
-    state["last_commit"] = Value::from(options.commit.as_str());
-    state["files"] = Value::Object(reviewed);
+    state.insert(
+        String::from("last_commit"),
+        Value::from(options.commit.as_str()),
+    );
+    state.insert(String::from("files"), Value::Object(reviewed));
     let text = serde_json::to_string_pretty(&state).map_err(|error| error.to_string())?;
     fs::write(&options.state, text + "\n")
         .map_err(|error| format!("failed to write {}: {error}", options.state.display()))?;
@@ -150,6 +154,24 @@ fn next_part(options: &NextOptions) -> Result<String> {
         "part": {"name": part.name, "lines": part.lines, "files": part.files},
     });
     serde_json::to_string_pretty(&tonight).map_err(|error| error.to_string())
+}
+
+/// The commit the state says the last night's review read, when it is a
+/// full commit hash. The state lives in the wiki, which isn't checked like
+/// the code, so anything else is left out with a warning rather than passed
+/// on to git and to the review.
+fn last_commit(state: &Map<String, Value>, path: &Path) -> Option<String> {
+    let commit = state.get("last_commit")?.as_str()?;
+    match parse_commit(commit) {
+        Ok(commit) => Some(commit),
+        Err(error) => {
+            eprintln!(
+                "Ignoring last_commit {commit:?} in {}: {error}",
+                path.display()
+            );
+            None
+        }
+    }
 }
 
 /// When the least recently reviewed file of `part` was reviewed, or `None`
@@ -183,6 +205,7 @@ fn rust_changes(from: &str, to: &str) -> Result<Vec<Change>> {
             "diff",
             "--name-status",
             "-M",
+            "--end-of-options",
             &format!("{from}..{to}"),
             "--",
             "*.rs",
@@ -387,6 +410,7 @@ fn sorted_entries(folder: &Path) -> Result<Vec<PathBuf>> {
     Ok(entries)
 }
 
+/// How many lines `file` has.
 fn count_lines(file: &Path) -> Result<usize> {
     let text = fs::read_to_string(file)
         .map_err(|error| format!("failed to read {}: {error}", file.display()))?;

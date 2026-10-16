@@ -1180,7 +1180,7 @@ fn jumps_to_current_address_plus_n() {
 }
 
 #[test]
-fn ignores_jumping_to_curent_address_plus_n_if_z_flag_is_set() {
+fn ignores_jumping_to_current_address_plus_n_if_z_flag_is_set() {
     let mut cpu = init_cpu_with_test_instructions(&[0x20, 0x05]);
     cpu.registers.f = 0x80;
     let clock_cycles = step_counting_clock_cycles(&mut cpu);
@@ -1223,7 +1223,7 @@ fn jumps_to_current_address_plus_n_if_c_flag_is_reset() {
 }
 
 #[test]
-fn jumps_to_curent_address_plus_n_if_c_flag_is_set() {
+fn jumps_to_current_address_plus_n_if_c_flag_is_set() {
     let mut cpu = init_cpu_with_test_instructions(&[0x38, 0x05]);
     cpu.registers.f = 0x80;
     let clock_cycles = step_counting_clock_cycles(&mut cpu);

@@ -116,7 +116,7 @@ pub fn build_windows_downloads(options: &Options) -> Result<(PathBuf, PathBuf)> 
     let naming = Naming::new(options, arch)?;
     let wix = wix()?;
 
-    run(cargo().args(["build", "--release", "--package", EXECUTABLE]))?;
+    run(cargo().args(["build", "--release", "--locked", "--package", EXECUTABLE]))?;
 
     // The files both downloads hold, in a folder named after the app so the
     // zip unpacks into one.

@@ -92,6 +92,7 @@ impl Emulator {
         }
     }
 
+    /// The name the table and messages show.
     fn name(self) -> &'static str {
         match self {
             Emulator::Nubo => "Nubo",
@@ -185,6 +186,8 @@ enum Model {
 }
 
 impl Model {
+    /// The model's name on the harnesses' and the benchmark's command lines
+    /// and in screenshot file names.
     fn id(self) -> &'static str {
         match self {
             Model::Dmg => "dmg",
@@ -192,6 +195,7 @@ impl Model {
         }
     }
 
+    /// The name the table and progress lines show.
     fn label(self) -> &'static str {
         match self {
             Model::Dmg => "DMG",
@@ -430,6 +434,8 @@ fn find_roms(paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
     Ok(roms)
 }
 
+/// Adds the Game Boy ROMs (`.gb` and `.gbc`) in `folder` and its subfolders
+/// to `roms`, sorted by path.
 fn collect_roms(folder: &Path, roms: &mut Vec<PathBuf>) -> Result {
     for path in sorted_entries(folder)? {
         if path.is_dir() {
@@ -441,6 +447,8 @@ fn collect_roms(folder: &Path, roms: &mut Vec<PathBuf>) -> Result {
     Ok(())
 }
 
+/// The paths of what `folder` holds, sorted, so every run sees the same
+/// order.
 fn sorted_entries(folder: &Path) -> Result<Vec<PathBuf>> {
     let mut entries: Vec<PathBuf> = fs::read_dir(folder)
         .map_err(|error| format!("failed to read {}: {error}", folder.display()))?
@@ -450,6 +458,7 @@ fn sorted_entries(folder: &Path) -> Result<Vec<PathBuf>> {
     Ok(entries)
 }
 
+/// Whether `path` ends in one of `extensions`, ignoring case.
 fn has_extension(path: &Path, extensions: &[&str]) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
@@ -460,6 +469,7 @@ fn has_extension(path: &Path, extensions: &[&str]) -> bool {
         })
 }
 
+/// The ROM's file name without its extension.
 fn rom_name(rom: &Path) -> String {
     rom.file_stem()
         .map_or_else(String::new, |stem| stem.to_string_lossy().into_owned())
@@ -481,18 +491,22 @@ fn rom_labels(roms: &[PathBuf]) -> Vec<String> {
         .collect()
 }
 
+/// Where `emulator`'s source is fetched to, under `root`.
 fn source_folder(root: &Path, emulator: Emulator) -> PathBuf {
     root.join(emulator.id())
 }
 
+/// Where `emulator`'s harness is built to, in `root`'s `bin/`.
 fn executable(root: &Path, emulator: Emulator) -> PathBuf {
     root.join("bin").join(emulator.id())
 }
 
+/// Where SameBoy's build puts the boot ROMs (`build_boot_roms`).
 fn boot_rom_folder(root: &Path) -> PathBuf {
     source_folder(root, Emulator::SameBoy).join("build/bin/BootROMs")
 }
 
+/// How many jobs to run at once: the number of cores, or 1 when unknown.
 fn parallelism() -> usize {
     thread::available_parallelism().map_or(1, NonZero::get)
 }
@@ -563,6 +577,8 @@ struct Results {
 }
 
 impl Results {
+    /// Records one round of `run`. An error wins over measurements: once a
+    /// round failed, the run counts as failed and later rounds are ignored.
     fn add(&mut self, run: Run, measurement: Result<Measurement>) {
         let outcome = self
             .outcomes
@@ -575,6 +591,7 @@ impl Results {
         }
     }
 
+    /// Whether a round of `run` failed, so later rounds can skip it.
     fn failed(&self, run: Run) -> bool {
         matches!(
             self.outcomes.get(&(run.rom, run.model, run.emulator)),
