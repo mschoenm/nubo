@@ -93,10 +93,10 @@ use crate::address_bus::MemoryMapped;
 use crate::apu::blep::{BLEP_PHASES, BLEP_TABLE, BlepBuffer, MAX_PLAUSIBLE_LEVEL};
 use crate::apu::envelope::{Envelope, dac_enabled, envelope_period};
 use crate::apu::length::LengthCounter;
-use crate::clock::SYSTEM_COUNTER_TICKS_PER_M_CYCLE;
+use crate::clock::{SYSTEM_COUNTER_TICKS_PER_M_CYCLE, dots_per_m_cycle};
 use crate::model::Model;
 use crate::serializable::{FieldWriter, Serializable, array_encoding, read_fields};
-use crate::utils::{is_bit_set, t_cycles_per_m_cycle};
+use crate::utils::is_bit_set;
 use nubo_serializable_derive::Serializable;
 use std::io::{self, Read, Write};
 
@@ -1234,7 +1234,7 @@ impl Apu {
     /// How much `sample_clock` advances per M-cycle: `sample_rate` for each of
     /// its T-cycles. It is at most `T_CYCLES_PER_SECOND`, one output sample.
     fn sample_clock_per_cycle(&self) -> u32 {
-        u32::from(t_cycles_per_m_cycle(self.cgb_double_speed)) * self.sample_rate
+        u32::from(dots_per_m_cycle(self.cgb_double_speed)) * self.sample_rate
     }
 
     /// The analog level a channel sends to one side, between -0.25 and 0.25.
