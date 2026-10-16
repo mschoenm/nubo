@@ -3,19 +3,15 @@
 //!
 //! A `.state` file is exactly the core's save state (`Emulator::save_state`),
 //! whose header names the model it was made on, so there is one format to
-//! keep loading in other versions of Nubo, the same on every platform.
+//! keep loading in other versions of Nubo, the same on every platform (see
+//! `super::parse`).
 
-use super::{SaveState, Slot, SlotInfo};
-use crate::picture::{Picture, SCREEN_HEIGHT, SCREEN_WIDTH};
-use crate::storage::files::{data_folder, decode_png, encode_png, write_atomically};
-use nubo_core::{SaveStateError, SaveStateHeader};
+use super::{SaveState, Slot, SlotInfo, file_stem};
+use crate::picture::{Picture, SCREEN_HEIGHT, SCREEN_WIDTH, decode_png, encode_png};
+use crate::storage::files::{data_folder, write_atomically};
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-
-/// What `.state` files of Nubo 0.3.0 and earlier started with, before the
-/// core's save states had a format that later versions keep loading.
-const EARLY_STATE_PREFIX: &[u8] = b"Nubo state ";
 
 pub fn save(
     rom_path: &Path,
@@ -73,20 +69,7 @@ pub fn load_in(directory: &Path, rom_path: &Path, slot: Slot) -> Result<Option<S
         Err(error) => return Err(error.to_string()),
     };
 
-    if contents.starts_with(EARLY_STATE_PREFIX) {
-        return Err(String::from(
-            "the state was made by Nubo 0.3.0 or earlier, whose save states later versions \
-             can't read",
-        ));
-    }
-    let header = SaveStateHeader::read(&contents).map_err(|error| match error {
-        SaveStateError::InvalidFormat => String::from("the file isn't a Nubo save state"),
-        error => error.to_string(),
-    })?;
-    Ok(Some(SaveState {
-        model: header.model,
-        data: contents,
-    }))
+    super::parse(contents).map(Some)
 }
 
 pub fn delete(rom_path: &Path, slot: Slot) -> Result<(), String> {
@@ -178,15 +161,6 @@ fn slot_path(directory: &Path, rom_path: &Path, slot: Slot, extension: &str) -> 
         .join(rom_path.file_name().unwrap_or_default())
         .join(file_stem(slot))
         .with_extension(extension)
-}
-
-/// The name of a slot's files, without extension.
-fn file_stem(slot: Slot) -> String {
-    match slot {
-        Slot::Resume => String::from("resume"),
-        Slot::Quick => String::from("quick"),
-        Slot::Numbered(number) => format!("slot-{number}"),
-    }
 }
 
 fn states_directory() -> Result<PathBuf, String> {

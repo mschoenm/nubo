@@ -1,15 +1,16 @@
 //! Cheat codes: GameShark codes, which change a byte of RAM, and Game Genie
 //! codes, which change a byte of the ROM. Each game keeps its own list, in
-//! `cheats/<rom file name>.toml` in the user's data folder (see
-//! [`Entry::Cheats`]). The browser build has no cheats yet.
+//! `cheats/<rom file name>.toml` in the user's data folder on the desktop and
+//! under `nubo:cheats/<rom file name>.toml` in the browser's localStorage (see
+//! [`Entry::Cheats`]).
 
 use crate::storage::{self, Entry, Storage};
 use nubo_core::{Emulator, validate_gamegenie_code, validate_gameshark_code};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-/// Whether this build can keep cheats: only the desktop build can.
-pub const AVAILABLE: bool = cfg!(feature = "desktop");
+/// Whether this build can keep cheats: the desktop and browser builds can.
+pub const AVAILABLE: bool = cfg!(any(feature = "desktop", feature = "web"));
 
 /// Which kind of device a code is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

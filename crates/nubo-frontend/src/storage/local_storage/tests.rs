@@ -28,10 +28,12 @@ fn battery_saves_are_keyed_by_the_rom_name() {
 }
 
 #[test]
-fn cheats_are_not_kept() {
-    let error = LocalStorage::key(Entry::Cheats(Path::new("game.gb"))).unwrap_err();
-
-    assert_eq!(error, "cheats aren't available in the browser");
+fn cheats_are_keyed_by_the_rom_file_name() {
+    assert_eq!(
+        LocalStorage::key(Entry::Cheats(Path::new("Pocket Game.gbc"))).unwrap(),
+        "nubo:cheats/Pocket Game.gbc.toml"
+    );
+    assert!(!is_battery_save_key("nubo:cheats/Pocket Game.gbc.toml"));
 }
 
 #[test]
