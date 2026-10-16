@@ -2,6 +2,7 @@
 //! says and offers, picking a choice, and moving between the choices with
 //! the D-pad.
 
+use super::playing::ResumeAnswer;
 use super::{App, GameMessage, LibraryMessage, Message, SettingsMessage, scroll_in_proportion};
 use crate::dialog::{
     Choice, ChoiceStyle, Dialog, DialogAction, DialogContent, DialogKind, GameMenuPage, Layout,
@@ -12,6 +13,7 @@ use crate::settings::{LibraryFilter, LibrarySort, Settings};
 use crate::ui::icons::Icon;
 use crate::views;
 use iced::Task;
+use nubo_core::Model;
 use nubo_frontend::controls::Action;
 use nubo_frontend::library::{self, LibraryEntry, box_art};
 use nubo_frontend::links;
@@ -176,6 +178,9 @@ impl App {
             DialogKind::RemoveGame(path) => Some(remove_question(path, self.library.entry(path))),
             DialogKind::ResetSettings(choices) => {
                 Some(reset_question(*choices, self.reset_offers()))
+            }
+            DialogKind::OtherModel { saved, configured } => {
+                Some(other_model_question(*saved, *configured))
             }
         }
     }
@@ -813,6 +818,48 @@ fn delete_question(path: &Path, entry: Option<&LibraryEntry>) -> DialogContent {
             ),
         ],
         dismiss: DialogAction::Close,
+        click_outside_dismisses: true,
+    }
+}
+
+/// The question whether to continue a game on `saved`, the model its
+/// automatic save was made on, or start it from the title screen on
+/// `configured`, the model it is now set to start on. The models are named
+/// by their console, or by their revision when both are the same console.
+fn other_model_question(saved: Model, configured: Model) -> DialogContent {
+    let name = |model: Model| {
+        if Console::of(saved) == Console::of(configured) {
+            model.name()
+        } else {
+            Console::of(model).label()
+        }
+    };
+    let (saved, configured) = (name(saved), name(configured));
+    let answer = |answer| DialogAction::CloseThen(GameMessage::ResumeAnswered(answer).into());
+    DialogContent {
+        title: format!("Continue on the {saved}?"),
+        text: Some(format!(
+            "You last played on the {saved}. Starting on the {configured} begins at the title \
+             screen and replaces the automatic save from when you stopped. Your in-game saves \
+             stay."
+        )),
+        notice: None,
+        layout: Layout::Buttons,
+        choices: vec![
+            Choice::new(
+                Icon::Play,
+                "Continue",
+                ChoiceStyle::Primary,
+                answer(ResumeAnswer::Continue),
+            ),
+            Choice::new(
+                Icon::RotateCcw,
+                format!("Start on the {configured}"),
+                ChoiceStyle::Secondary,
+                answer(ResumeAnswer::StartOver),
+            ),
+        ],
+        dismiss: answer(ResumeAnswer::Cancel),
         click_outside_dismisses: true,
     }
 }

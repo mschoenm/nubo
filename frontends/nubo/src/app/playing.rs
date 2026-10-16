@@ -3,7 +3,7 @@
 
 use super::window_events::leave_fullscreen_for_game;
 use super::{App, Message};
-use crate::dialog::DialogKind;
+use crate::dialog::{Dialog, DialogKind};
 use crate::game::{Game, PauseMenu, SgbBorderChoice};
 use crate::rom_picker;
 use crate::settings::Settings;
@@ -13,8 +13,7 @@ use iced::widget::{self, scrollable::RelativeOffset};
 use nubo_core::{CartridgeHeader, Emulator, Model, SgbBorder};
 use nubo_frontend::cheats;
 use nubo_frontend::controls::Action;
-use nubo_frontend::library::{LibraryEntry, LibrarySnapshot};
-use nubo_frontend::model::Console;
+use nubo_frontend::library::LibrarySnapshot;
 use nubo_frontend::picture::Picture;
 use nubo_frontend::rom::{self, Rom};
 use nubo_frontend::save_states::{self, SaveState, Slot};
@@ -78,6 +77,30 @@ pub enum GameMessage {
     /// Undoes the last load, restart or save that offered it (see
     /// `UndoPoint`).
     Undo,
+    /// The player answered whether to continue the game that waits in
+    /// `App::pending_start` on the model its automatic save was made on.
+    ResumeAnswered(ResumeAnswer),
+}
+
+/// How the player answered `DialogKind::OtherModel`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResumeAnswer {
+    /// Continue from the automatic save, on the model it was made on.
+    Continue,
+    /// Start from the title screen on the model the game is set to start
+    /// on; the automatic save is replaced when the player stops.
+    StartOver,
+    /// Start nothing.
+    Cancel,
+}
+
+/// A game whose automatic save was made on another model than the one it is
+/// set to start on, waiting while `DialogKind::OtherModel` asks which one it
+/// starts on.
+pub struct PendingStart {
+    pub(super) rom: Rom,
+    pub(super) header: CartridgeHeader,
+    pub(super) state: SaveState,
 }
 
 /// What the Undo button of the newest toast puts back.
@@ -144,6 +167,7 @@ impl App {
                 }
             }
             GameMessage::Undo => return self.undo(),
+            GameMessage::ResumeAnswered(answer) => self.answer_resume(answer),
             GameMessage::TogglePause => {
                 if let Some(game) = &mut self.game {
                     let page = if game.is_paused() {
@@ -294,9 +318,11 @@ impl App {
 
     /// Starts `rom` on the model the settings pick for it. With `resume` and
     /// the "resume games" setting on, it continues from where the player
-    /// left it, on the model it ran on then (never with `--fresh`), unless
-    /// the player has since picked another model for the game: then it
-    /// starts on that one, and Undo goes back to where they left off.
+    /// left it (never with `--fresh`). If that automatic save was made on
+    /// another model than the game is set to start on now, a dialog asks
+    /// first whether to continue on the save's model or start over on the
+    /// new one (`DialogKind::OtherModel`), and the game waits in
+    /// `App::pending_start`.
     ///
     /// While a reset deletes saves, the game waits until they are gone (see
     /// `App::deletions_running`), and a reset can't be undone once a game
@@ -343,15 +369,45 @@ impl App {
             None
         };
 
-        let picked = self.library.entry(&rom.path).and_then(LibraryEntry::model);
-        let (resume_state, set_aside) = match resume_state {
-            Some(state) if picked.is_some_and(|model| model != state.model) => (None, Some(state)),
-            state => (state, None),
-        };
+        let model = self.model_for(&rom.path, &header);
+        match resume_state {
+            Some(state) if state.model != model && !self.held_for_scene() => {
+                self.dialog = Some(Dialog::new(DialogKind::OtherModel {
+                    saved: state.model,
+                    configured: model,
+                }));
+                self.pending_start = Some(PendingStart { rom, header, state });
+            }
+            Some(state) => self.launch(rom, header, state.model, Some(state)),
+            None => self.launch(rom, header, model, None),
+        }
+    }
 
-        let model = resume_state
-            .as_ref()
-            .map_or_else(|| self.model_for(&rom.path, &header), |state| state.model);
+    /// Starts the game waiting in `App::pending_start` as the player
+    /// answered, or drops it.
+    fn answer_resume(&mut self, answer: ResumeAnswer) {
+        let Some(PendingStart { rom, header, state }) = self.pending_start.take() else {
+            return;
+        };
+        match answer {
+            ResumeAnswer::Continue => self.launch(rom, header, state.model, Some(state)),
+            ResumeAnswer::StartOver => {
+                let model = self.model_for(&rom.path, &header);
+                self.launch(rom, header, model, None);
+            }
+            ResumeAnswer::Cancel => {}
+        }
+    }
+
+    /// Starts `rom` on `model`, loading `resume_state` (where the player
+    /// left off, made on `model`) if there is one, and shows the game.
+    fn launch(
+        &mut self,
+        rom: Rom,
+        header: CartridgeHeader,
+        model: Model,
+        resume_state: Option<SaveState>,
+    ) {
         let path = rom.path.clone();
 
         let running = !self.held_for_scene();
@@ -378,27 +434,19 @@ impl App {
                 self.game = Some(game);
                 self.settings_tab = None;
                 // The reset question belongs to the settings, so it closes
-                // with them.
-                if self
-                    .dialog
-                    .as_ref()
-                    .is_some_and(|dialog| matches!(dialog.kind, DialogKind::ResetSettings(_)))
-                {
+                // with them, and a game waiting to be asked about is
+                // replaced by this one.
+                if self.dialog.as_ref().is_some_and(|dialog| {
+                    matches!(
+                        dialog.kind,
+                        DialogKind::ResetSettings(_) | DialogKind::OtherModel { .. }
+                    )
+                }) {
                     self.dialog = None;
                 }
+                self.pending_start = None;
                 self.search.clear();
                 self.library_selection = None;
-
-                if let Some(state) = set_aside {
-                    self.undo = Some(UndoPoint::Game {
-                        rom_path: path,
-                        state,
-                    });
-                    self.toasts.info_with_undo(format!(
-                        "Started on the {}, not where you left off",
-                        Console::of(model).label()
-                    ));
-                }
             }
             Err(error) => self.toasts.error(format!(
                 "Couldn't start {}: {error}",

@@ -161,6 +161,9 @@ pub struct App {
     /// The game to start once the saves are deleted, and whether it
     /// continues where the player left off, if one was asked for meanwhile.
     start_after_deleting: Option<(Rom, bool)>,
+    /// The game waiting for the player to say which model it continues on,
+    /// while `DialogKind::OtherModel` asks.
+    pending_start: Option<playing::PendingStart>,
     /// Whether the browser's storage was opened (see
     /// `nubo_frontend::storage::indexed_db`), which the library is read from;
     /// always on the desktop.
@@ -280,6 +283,7 @@ impl App {
             undo: None,
             deletions_running: 0,
             start_after_deleting: None,
+            pending_start: None,
             newer_version: None,
             #[cfg(not(target_arch = "wasm32"))]
             scene_recorder: options.record_scenes.clone(),
