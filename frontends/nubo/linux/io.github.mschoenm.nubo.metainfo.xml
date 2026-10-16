@@ -71,6 +71,19 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.11.1" date="2026-10-16">
+      <description>
+        <p>The controller's menu buttons work like a Nintendo console's, and a game played on another Game Boy than it is set to start on asks before switching.</p>
+        <ul>
+          <li>In the menus, the controller's right face button now picks and the bottom one goes back, as on Nintendo's consoles; Menu buttons, on the Controls tab's controller page, switches back to the Xbox and PlayStation layout</li>
+          <li>A game whose automatic save was made on another Game Boy than it is now set to start on asks first: stay on that Game Boy and continue where you left off, or switch and start from the title screen</li>
+          <li>Staying keeps the game on that Game Boy, so the question doesn't come back at every start</li>
+          <li>A game's Which Game Boy… menu has Automatic, which picks by the cartridge even when the settings start every game on one Game Boy</li>
+          <li>Reset on the Controls tab fits in a narrow settings window and is as tall as the Keyboard/Controller switch</li>
+          <li>Save states made by Nubo 0.4.0 to 0.11.0 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.11.0" date="2026-10-16">
       <description>
         <p>Nubo in the browser now has everything the desktop app has, the menus always answer the same keys and buttons, and Game Boy games with an MBC2 cartridge keep their saves.</p>
