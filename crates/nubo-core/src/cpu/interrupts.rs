@@ -140,9 +140,9 @@ impl Cpu {
         } else {
             self.address_bus.sync_except_last_dots(half_cycle_dots);
         }
-        interrupt.inspect(|&interrupt| {
+        if let Some(interrupt) = interrupt {
             self.address_bus.clear_interrupt_request(interrupt.bit());
-        });
+        }
         if dmg {
             self.address_bus.finish_mid_cycle_sync();
         } else {

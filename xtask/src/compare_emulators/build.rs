@@ -2,10 +2,10 @@
 //! each with its harness, into `target/emulator-comparison/bin`.
 
 use super::{
-    Emulator, Source, executable, has_extension, has_tool, in_parallel, parallelism,
-    sorted_entries, source_folder,
+    Emulator, Source, executable, has_extension, in_parallel, parallelism, sorted_entries,
+    source_folder,
 };
-use crate::{Result, cargo, run, target_dir, workspace_root};
+use crate::{Result, cargo, on_path, run, target_dir, workspace_root};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -109,7 +109,7 @@ pub(super) fn prepare(
             .tools()
             .iter()
             .copied()
-            .filter(|tool| !has_tool(tool))
+            .filter(|tool| !on_path(tool))
             .collect();
         if !missing.is_empty() {
             let missing: Vec<&str> = missing.into_iter().map(describe_tool).collect();
@@ -270,7 +270,7 @@ fn fetch(source: Source, folder: &Path) -> Result {
 
 /// The C compiler SameBoy's Makefile picks: clang when there is one.
 fn sameboy_compiler() -> &'static str {
-    if has_tool("clang") { "clang" } else { "cc" }
+    if on_path("clang") { "clang" } else { "cc" }
 }
 
 /// Fetches SameBoy and builds its boot ROMs, for the emulators that run them

@@ -6,6 +6,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+/// The file extensions of ROMs and zipped ROMs: what the library scans its
+/// folders for, what its folder watcher reacts to and what an app's file
+/// picker offers.
+pub const EXTENSIONS: [&str; 3] = ["gb", "gbc", "zip"];
+
 /// A ROM file's contents and the path it came from. The path names the
 /// battery save files.
 #[derive(Debug, Clone)]

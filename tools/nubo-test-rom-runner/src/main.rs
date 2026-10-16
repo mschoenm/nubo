@@ -65,7 +65,7 @@ fn run(args: &Args) -> Result<bool, String> {
     let failures_dir = download::work_dir().join("failures");
     let _ = fs::remove_dir_all(&failures_dir);
 
-    let tests: Vec<_> = suites::discover(&rom_dirs)
+    let tests: Vec<_> = suites::discover(&rom_dirs)?
         .into_iter()
         .filter(|test| {
             args.filter

@@ -207,6 +207,12 @@ fn run(command: &mut Command) -> Result {
     }
 }
 
+/// Whether `program` is on the `PATH`.
+fn on_path(program: &str) -> bool {
+    env::var_os("PATH")
+        .is_some_and(|path| env::split_paths(&path).any(|folder| folder.join(program).is_file()))
+}
+
 /// Installs the WebAssembly target with rustup if it is missing.
 fn ensure_wasm_target() -> Result {
     let output = Command::new("rustup")

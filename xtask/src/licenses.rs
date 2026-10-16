@@ -134,13 +134,21 @@ impl Crate {
     }
 }
 
+/// One license text and the crates that use it.
+struct LicenseText {
+    text: String,
+    /// Whether it is a standard text, given to crates that ship none.
+    standard: bool,
+    /// The crates that use it, in the order first seen.
+    users: Vec<String>,
+}
+
 /// The license texts of the crates, each listed once with the crates that
 /// use it.
 #[derive(Default)]
 struct LicenseTexts {
-    /// Each text, whether it is a standard text given to crates that ship
-    /// none, and the crates that use it, in the order first seen.
-    texts: Vec<(String, bool, Vec<String>)>,
+    /// Each text, in the order first seen.
+    texts: Vec<LicenseText>,
     /// Where each text is in `texts`, keyed by the text with its whitespace
     /// collapsed (copies often differ only in line breaks) and whether it is
     /// a standard text.
@@ -157,11 +165,14 @@ impl LicenseTexts {
             standard,
         );
         let position = *self.index.entry(key).or_insert_with(|| {
-            self.texts
-                .push((text.trim().to_owned(), standard, Vec::new()));
+            self.texts.push(LicenseText {
+                text: text.trim().to_owned(),
+                standard,
+                users: Vec::new(),
+            });
             self.texts.len() - 1
         });
-        let users = &mut self.texts[position].2;
+        let users = &mut self.texts[position].users;
         if !users.contains(&user) {
             users.push(user);
         }
@@ -415,7 +426,12 @@ fn third_party_licenses(crates: &[Crate]) -> Result<String> {
     output.push_str("\nLicense texts\n-------------\n");
 
     let rule = "=".repeat(80);
-    for (text, standard, users) in &texts.texts {
+    for LicenseText {
+        text,
+        standard,
+        users,
+    } in &texts.texts
+    {
         let heading = if *standard {
             "Standard text for crates that ship none"
         } else {

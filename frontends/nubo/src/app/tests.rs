@@ -33,6 +33,12 @@ fn cycling_starts_over_with_wrapping() {
 }
 
 #[test]
+fn cycling_through_no_options_stays_put() {
+    assert_eq!(cycle(&[], 2, 1, false), 2);
+    assert_eq!(cycle(&[], 2, -1, true), 2);
+}
+
+#[test]
 fn a_reset_asks_first_puts_the_settings_back_and_can_be_undone() {
     let (mut app, _) = App::new(
         None,

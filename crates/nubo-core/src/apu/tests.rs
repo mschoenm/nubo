@@ -850,7 +850,7 @@ fn samples_in_one_second(apu: &mut Apu, double_speed: bool) -> usize {
     apu.set_cgb_double_speed(double_speed);
     apu.clear_audio_buffers();
     let m_cycles_per_second =
-        T_CYCLES_PER_SECOND as usize / usize::from(t_cycles_per_m_cycle(double_speed));
+        T_CYCLES_PER_SECOND as usize / usize::from(dots_per_m_cycle(double_speed));
     let mut samples = 0;
     for _ in 0..m_cycles_per_second {
         clock.run(apu, 1);

@@ -24,12 +24,12 @@
 //! are missing is left out with a note saying what to install. It runs on
 //! Linux and macOS; `--instructions` needs Valgrind, which runs on Linux.
 
-use crate::{Result, benchmark_roms, build_commit, target_dir};
+use crate::{Result, benchmark_roms, build_commit, on_path, target_dir};
 use clap::builder::PossibleValue;
 use clap::{Args, ValueEnum};
 use image::RgbImage;
 use std::collections::BTreeMap;
-use std::env;
+use std::fmt::Write;
 use std::fs;
 use std::num::NonZero;
 use std::path::{Path, PathBuf};
@@ -318,7 +318,7 @@ pub fn run_comparison(arguments: Arguments) -> Result {
         ));
     }
     let options = Options::from(arguments);
-    if options.instructions && !has_tool("valgrind") {
+    if options.instructions && !on_path("valgrind") {
         return Err(String::from(
             "--instructions counts instructions with Valgrind, which wasn't found (it runs on Linux)",
         ));
@@ -489,12 +489,6 @@ fn rom_labels(roms: &[PathBuf]) -> Vec<String> {
             }
         })
         .collect()
-}
-
-/// Whether a program is on the `PATH`.
-fn has_tool(name: &str) -> bool {
-    env::var_os("PATH")
-        .is_some_and(|paths| env::split_paths(&paths).any(|folder| folder.join(name).is_file()))
 }
 
 /// Where `emulator`'s source is fetched to, under `root`.
@@ -887,7 +881,7 @@ fn table(
     for row in &rows {
         let mut line = format!("{:<width$}", row[0], width = widths[0]);
         for (cell, width) in row.iter().zip(&widths).skip(1) {
-            line.push_str(&format!("  {cell:>width$}"));
+            let _ = write!(line, "  {cell:>width$}");
         }
         text.push_str(line.trim_end());
         text.push('\n');

@@ -531,8 +531,9 @@ const BLARGG_TESTS: [BlarggTest; 9] = [
     },
 ];
 
-/// Lists every test case, sorted by ID.
-pub(crate) fn discover(dirs: &RomDirs) -> Vec<TestCase> {
+/// Lists every test case, sorted by ID. Fails if two cases share an ID, since the run's results
+/// and `passing.txt` are kept by ID: a passing case would hide a failing one with its ID.
+pub(crate) fn discover(dirs: &RomDirs) -> Result<Vec<TestCase>, String> {
     let root = dirs.root(Source::Collection);
     let mut tests = blargg();
     tests.extend(register_suite(
@@ -571,7 +572,10 @@ pub(crate) fn discover(dirs: &RomDirs) -> Vec<TestCase> {
     tests.extend(super_game_boy(root));
     tests.extend(shootout::test_cases());
     tests.sort_by_key(TestCase::id);
-    tests
+    if let Some(pair) = tests.windows(2).find(|pair| pair[0].id() == pair[1].id()) {
+        return Err(format!("two tests share the ID {}", pair[0].id()));
+    }
+    Ok(tests)
 }
 
 /// Blargg's tests, checked against reference screenshots on DMG and CGB.

@@ -45,6 +45,8 @@ pub use game::{GameSession, StartOptions};
 const REWIND_SPEED: f64 = 2.0;
 /// How many samples of silence a buffer holds while rewinding.
 const REWIND_BUFFER_SAMPLES: usize = 512;
+/// The buffer of silence played while rewinding.
+const REWIND_SILENCE: [f32; REWIND_BUFFER_SAMPLES] = [0.0; REWIND_BUFFER_SAMPLES];
 #[cfg(target_arch = "wasm32")]
 pub use screen_refresh::Session;
 #[cfg(not(target_arch = "wasm32"))]
@@ -338,8 +340,7 @@ impl Machine {
     /// silence takes to play, and whether there is a new frame to show; at
     /// the oldest state kept the picture stays.
     fn rewind_buffer(&mut self) -> (Duration, bool) {
-        let silence = vec![0.0; REWIND_BUFFER_SAMPLES];
-        let playing_time = self.audio.queue(&silence, &silence);
+        let playing_time = self.audio.queue(&REWIND_SILENCE, &REWIND_SILENCE);
         self.rewind_time += playing_time;
 
         let step = FRAME_DURATION.mul_f64(f64::from(history::FRAMES_PER_STATE) / REWIND_SPEED);

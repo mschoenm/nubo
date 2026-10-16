@@ -766,13 +766,17 @@ impl App {
 }
 
 /// Moves `step` places from `current` in `options`, stopping at the ends,
-/// or starting over at the other end with `wrap`.
+/// or starting over at the other end with `wrap`. With no options, stays on
+/// `current`.
 fn cycle<T: Copy + PartialEq>(options: &[T], current: T, step: isize, wrap: bool) -> T {
     let index = options
         .iter()
         .position(|&option| option == current)
         .unwrap_or(0);
-    options[selection::moved(index, step, options.len(), wrap)]
+    options
+        .get(selection::moved(index, step, options.len(), wrap))
+        .copied()
+        .unwrap_or(current)
 }
 
 /// Scrolls the scrollable with `id` so item `index` of `count` is roughly in

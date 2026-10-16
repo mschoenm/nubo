@@ -953,8 +953,9 @@ fn merge_scan(
         }
     }
 
+    let scanned_paths: HashSet<PathBuf> = scanned.iter().map(|entry| entry.path.clone()).collect();
     for entry in current {
-        if !checked.contains(&entry.path) && !scanned.iter().any(|new| new.path == entry.path) {
+        if !checked.contains(&entry.path) && !scanned_paths.contains(&entry.path) {
             scanned.push(entry.clone());
         }
     }

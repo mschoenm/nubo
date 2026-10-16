@@ -2,6 +2,7 @@
 //! `Emulator::read_rom_header`.
 
 use super::{LibraryEntry, seconds_since_epoch};
+use crate::rom::EXTENSIONS;
 use crate::settings::LibraryFolder;
 use crate::time::SystemTime;
 use nubo_core::{CartridgeHeader, Emulator};
@@ -10,8 +11,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-/// The file extensions of ROMs and zipped ROMs.
-const EXTENSIONS: [&str; 3] = ["gb", "gbc", "zip"];
 /// The largest Game Boy ROMs are 8 MiB; bigger files are something else.
 const MAX_FILE_SIZE: u64 = 16 * 1024 * 1024;
 
@@ -52,7 +51,7 @@ impl ScanResult {
 #[derive(Debug, Clone, Default)]
 pub struct FileCheck {
     /// Games whose file was deleted: their folder is there, the file isn't.
-    pub deleted: Vec<PathBuf>,
+    pub deleted: HashSet<PathBuf>,
     /// Games whose folder is gone, such as an unplugged drive.
     pub unavailable: Vec<PathBuf>,
     /// How many scans the library had taken in when the check started; see
@@ -170,7 +169,7 @@ pub fn check(entries: &[LibraryEntry], folders: &[LibraryFolder]) -> FileCheck {
         if is_unreachable(&entry.path, folders) {
             check.unavailable.push(entry.path.clone());
         } else {
-            check.deleted.push(entry.path.clone());
+            check.deleted.insert(entry.path.clone());
         }
     }
 

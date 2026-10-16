@@ -148,7 +148,7 @@ impl Emulator {
     /// the hardware model before starting one. It fails like
     /// [`Emulator::load_rom`] would.
     pub fn read_rom_header(rom: &[u8]) -> Result<CartridgeHeader, LoadRomError> {
-        read_header(&rom_archive::extract_rom(rom)?)
+        read_header(&rom_archive::extract_rom_borrowed(rom)?)
     }
 
     /// Replaces the contents of the cartridge RAM, for example with a save file.

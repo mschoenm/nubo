@@ -169,7 +169,7 @@ impl Exploration {
     fn start(start: &str, model: Option<Model>) -> Result<Exploration> {
         let games = GameList::read(&workspace_root().join(GAMES_FILE))?;
         let scene_folder = Path::new(start);
-        let (game, state) = if scene_folder.join(scenes::SCENE_FILE).is_file() {
+        let (game, state, rom) = if scene_folder.join(scenes::SCENE_FILE).is_file() {
             let scene = Scene::read(scene_folder)?;
             let game = scene
                 .game
@@ -181,7 +181,14 @@ impl Exploration {
             }
             let state = fs::read(scene_folder.join(scenes::STATE_FILE))
                 .map_err(|error| format!("couldn't read the scene's state: {error}"))?;
-            (game, Some(state))
+            let rom = fs::read(download(&games, &game.file)?).map_err(|error| error.to_string())?;
+            if nubo_download::sha256_hex(&rom) != game.sha256 {
+                return Err(format!(
+                    "{GAMES_FILE} downloads another {} than the scene was made with",
+                    game.file
+                ));
+            }
+            (game, Some(state), rom)
         } else {
             let entry = games.game(start).ok_or_else(|| {
                 format!("{start} is neither a scene's folder nor a game in {GAMES_FILE}")
@@ -196,16 +203,9 @@ impl Exploration {
                 model: model.name().to_owned(),
                 frames: scenes::RECORDED_FRAMES,
             };
-            (game, None)
+            (game, None, rom)
         };
 
-        let rom = fs::read(download(&games, &game.file)?).map_err(|error| error.to_string())?;
-        if nubo_download::sha256_hex(&rom) != game.sha256 {
-            return Err(format!(
-                "{GAMES_FILE} downloads another {} than the scene was made with",
-                game.file
-            ));
-        }
         let emulator = new_emulator(&rom, game.model()?, state.as_deref())?;
         let folder = free_folder(&target_dir().join("scenes"), &game.file);
         fs::create_dir_all(&folder)

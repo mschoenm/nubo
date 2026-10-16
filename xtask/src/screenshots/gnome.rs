@@ -29,7 +29,7 @@
 //! by the app itself (`capture --output`), or by GNOME once the app says
 //! the scene is ready (`ScreenshotWindow`, with the border and shadow).
 
-use crate::{Result, run};
+use crate::{Result, on_path, run};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::env;
@@ -554,12 +554,6 @@ fn wait_for(app: &mut Child, limit: Duration) -> Result {
             Err(error) => return Err(error.to_string()),
         }
     }
-}
-
-/// Whether `program` is on the `PATH`.
-fn on_path(program: &str) -> bool {
-    env::var_os("PATH")
-        .is_some_and(|path| env::split_paths(&path).any(|folder| folder.join(program).is_file()))
 }
 
 /// Whether xtask runs as root, as in a container.

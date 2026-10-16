@@ -637,10 +637,12 @@ impl Gpu {
         self.pipeline.add_visible_object(index as u8, oam_x, oam_y);
     }
 
-    /// `scan_oam_entry` for each entry in `entries`. While nothing keeps the scan from reading
-    /// OAM, what decides whether an object is found is the same for all of them, so it is worked
-    /// out once.
+    /// `scan_oam_entry` for each entry in `entries`, which must lie within OAM's 40 entries (the
+    /// callers only scan entries up to `OAM_SCAN_END_DOT`). While nothing keeps the scan from
+    /// reading OAM, what decides whether an object is found is the same for all of them, so it is
+    /// worked out once.
     pub(super) fn scan_oam_entries(&mut self, entries: std::ops::Range<u16>) {
+        debug_assert!(entries.end <= OAM_ENTRY_COUNT, "OAM scan within OAM");
         if self.stop_blocks.oam || !matches!(self.oam_dma_access, OamDmaAccess::Free) {
             for index in entries {
                 self.scan_oam_entry(index);
@@ -659,9 +661,7 @@ impl Gpu {
         if usize::from(pipeline.visible_object_count) < MAX_VISIBLE_OBJECTS {
             let objects = self.object_attribute_memory.as_chunks::<4>().0;
             let first = usize::from(entries.start);
-            let scanned = objects
-                .get(first..usize::from(entries.end))
-                .unwrap_or_default();
+            let scanned = &objects[first..usize::from(entries.end)];
             for (index, &[oam_y, oam_x, ..]) in (first..).zip(scanned) {
                 if line_plus_16.wrapping_sub(u16::from(oam_y)) < height {
                     pipeline.add_visible_object(index as u8, oam_x, oam_y);
@@ -771,7 +771,10 @@ impl Gpu {
     }
 
     /// Fills the rest of the line by repeating the last pixel written, for lines where the
-    /// renderer ended before writing all 160 pixels.
+    /// renderer ended before writing all 160 pixels. A guard: the LCD's pixel count (`lcd_x`)
+    /// moves on screen together with `position_in_line`, and a line only ends at position 160, so
+    /// in a real run `lcd_x` is already 160 here and nothing is filled. A damaged save state can
+    /// still leave the two apart.
     fn fill_rest_of_desynced_line(&mut self) {
         let line_start = usize::from(self.ly) * GB_SCREEN_WIDTH as usize;
         if line_start >= self.frame_buffer.len() {

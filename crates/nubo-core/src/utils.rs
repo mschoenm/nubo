@@ -1,8 +1,5 @@
 //! Small bit and byte helpers shared by the whole emulator core.
 
-/// The APU's name for `clock::dots_per_m_cycle`, until the APU uses that.
-pub(super) use crate::clock::dots_per_m_cycle as t_cycles_per_m_cycle;
-
 /// How many times the bit `mask` of a 16-bit counter falls from 1 to 0 while the counter counts up
 /// `steps` times by `step` from `start`, wrapping around. `step` must be at most `mask`, so no step
 /// skips a whole period of the bit.

@@ -5,7 +5,7 @@
 //! step is skipped when its result is already on disk.
 
 use crate::suites::Source;
-use nubo_download::{download_all, has_checksum, sha256_hex};
+use nubo_download::{download, download_all, has_checksum, sha256_hex};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -72,7 +72,7 @@ fn ensure_collection() -> Result<PathBuf, String> {
     let archive = work_dir().join(format!("game-boy-test-roms-{VERSION}.zip"));
     if !has_checksum(&archive, ARCHIVE_SHA256) {
         println!("Downloading {ARCHIVE_URL}");
-        download_all(&[(archive.clone(), ARCHIVE_URL.to_string())])?;
+        download(ARCHIVE_URL, &archive)?;
         if !has_checksum(&archive, ARCHIVE_SHA256) {
             let _ = fs::remove_file(&archive);
             return Err(format!(

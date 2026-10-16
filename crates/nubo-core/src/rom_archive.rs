@@ -5,6 +5,7 @@
 //! core still builds for WebAssembly (wasm32) without C dependencies.
 
 use crate::error::LoadRomError;
+use std::borrow::Cow;
 use std::fmt::Display;
 use std::io::{Cursor, Read};
 use zip::ZipArchive;
@@ -31,8 +32,14 @@ fn is_rom_name(name: &str) -> bool {
 /// zip archive, the first `.gb` or `.gbc` file in it is unpacked. Frontends
 /// use it to look at the ROM itself, for example to take its checksum.
 pub fn extract_rom(data: &[u8]) -> Result<Vec<u8>, LoadRomError> {
+    extract_rom_borrowed(data).map(Cow::into_owned)
+}
+
+/// Like [`extract_rom`], but a plain ROM is borrowed from `data` instead of
+/// copied, for callers that only look at it (such as reading the header).
+pub(crate) fn extract_rom_borrowed(data: &[u8]) -> Result<Cow<'_, [u8]>, LoadRomError> {
     if !data.starts_with(ZIP_SIGNATURE) {
-        return Ok(data.to_vec());
+        return Ok(Cow::Borrowed(data));
     }
 
     let mut archive = ZipArchive::new(Cursor::new(data)).map_err(invalid_archive)?;
@@ -53,7 +60,7 @@ pub fn extract_rom(data: &[u8]) -> Result<Vec<u8>, LoadRomError> {
         return Err(invalid_archive("the ROM in it is larger than 8 MiB"));
     }
 
-    Ok(rom)
+    Ok(Cow::Owned(rom))
 }
 
 #[cfg(test)]
@@ -81,6 +88,9 @@ mod tests {
     fn returns_plain_rom_unchanged() {
         let rom = vec![0x00, 0xC3, 0x50, 0x01];
         assert_eq!(extract_rom(&rom).unwrap(), rom);
+        assert!(
+            matches!(extract_rom_borrowed(&rom), Ok(Cow::Borrowed(borrowed)) if borrowed == rom)
+        );
     }
 
     #[test]

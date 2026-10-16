@@ -26,7 +26,7 @@ const FADE_IN_FRAMES: u16 = 50;
 const FADE_OUT_FRAMES: u16 = 40;
 
 /// The intro's logo, drawn once.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub(super) struct Intro {
     /// The logo as RGBA pixels, `LOGO_SIZE` on each side.
     logo: Vec<u8>,
