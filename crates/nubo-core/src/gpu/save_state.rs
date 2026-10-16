@@ -63,8 +63,9 @@ impl_serializable_with_check!(Gpu {
 
 impl Gpu {
     /// Rejects a loaded save state with values the PPU never has, which could otherwise make it
-    /// index out of bounds or overflow: a position outside the frame, a line state or LY that
-    /// doesn't fit the line, a mode STAT can't show, timing of another model, a frame buffer of
+    /// index out of bounds or overflow, or keep it from ever leaving them: a position outside the
+    /// frame, a line state or LY that doesn't fit the line, a line outside the frame for LYC to be
+    /// compared with, a mode STAT can't show, timing of another model, a frame buffer of
     /// the wrong size, an OAM DMA write outside OAM, a renderer state that doesn't fit
     /// (`Pipeline::is_consistent`), or a Super Game Boy on a model without one, or none on a
     /// model with one.
@@ -82,6 +83,7 @@ impl Gpu {
             && self.idle_dots < DOTS_PER_FRAME
             && line_state_fits
             && (self.ly == self.line || (self.line == LAST_LINE && self.ly == 0))
+            && self.lyc_source_line.is_none_or(|line| line <= LAST_LINE)
             && self.visible_mode <= VRAM_MODE
             && (self.timing == TimingVariant::Dmg) != self.model.is_cgb()
             && self.frame_buffer.len() == (GB_SCREEN_WIDTH * GB_SCREEN_HEIGHT) as usize

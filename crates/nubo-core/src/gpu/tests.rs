@@ -309,6 +309,18 @@ fn should_reject_a_save_state_with_a_dot_outside_the_line() {
     assert!(Gpu::new().deserialize(&mut bytes.as_slice()).is_err());
 }
 
+#[test]
+fn should_reject_a_save_state_comparing_lyc_with_a_line_outside_the_frame() {
+    let mut gpu = gpu_at(20, 100);
+    gpu.lyc_source_line = Some(153);
+    let bytes = serialize(&gpu);
+    assert!(Gpu::new().deserialize(&mut bytes.as_slice()).is_ok());
+
+    gpu.lyc_source_line = Some(154);
+    let bytes = serialize(&gpu);
+    assert!(Gpu::new().deserialize(&mut bytes.as_slice()).is_err());
+}
+
 /// Ticks `gpu` to the end of the current line and returns the dots of the line at which a STAT
 /// interrupt was requested, and the dot at which STAT first showed mode 0.
 fn stat_requests_until_line_end(gpu: &mut Gpu) -> (Vec<u16>, Option<u16>) {
