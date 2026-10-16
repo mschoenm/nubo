@@ -196,10 +196,10 @@ fn the_other_model_question_names_the_consoles_and_stays_first() {
     assert_eq!(
         content.text.as_deref(),
         Some(
-            "You last played this game on the Super Game Boy, but it's now set to the Game Boy. \
-             Switching starts the game at the title screen and replaces the automatic save from \
-             when you stopped. Your in-game saves stay.\n\nStaying keeps this game on the Super \
-             Game Boy from now on."
+            "You last played this game on the Super Game Boy, but it's now set to the Game \
+             Boy.\n\nSwitching starts the game at the title screen and replaces your automatic \
+             save. Your in-game saves stay.\n\nStaying continues where you left off and keeps \
+             the game on the Super Game Boy."
         )
     );
     let (_, buttons) = labels(&content);
@@ -223,5 +223,10 @@ fn the_other_model_question_names_revisions_of_one_console() {
 fn the_other_model_question_says_nothing_about_keeping_a_model_from_the_command_line() {
     let content = other_model_question(Model::Sgb, Model::Dmg, false);
 
-    assert!(!content.text.unwrap().contains("from now on"));
+    assert!(
+        content
+            .text
+            .unwrap()
+            .ends_with("Staying continues where you left off.")
+    );
 }

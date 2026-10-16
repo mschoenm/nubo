@@ -861,11 +861,11 @@ fn other_model_question(saved: Model, configured: Model, remembers: bool) -> Dia
     DialogContent {
         title: format!("Switch to the {configured}?"),
         text: Some(format!(
-            "You last played this game on the {saved}, but it's now set to the {configured}. \
-             Switching starts the game at the title screen and replaces the automatic save from \
-             when you stopped. Your in-game saves stay.{}",
+            "You last played this game on the {saved}, but it's now set to the {configured}.\n\n\
+             Switching starts the game at the title screen and replaces your automatic save. Your \
+             in-game saves stay.\n\nStaying continues where you left off{}.",
             if remembers {
-                format!("\n\nStaying keeps this game on the {saved} from now on.")
+                format!(" and keeps the game on the {saved}")
             } else {
                 String::new()
             }
