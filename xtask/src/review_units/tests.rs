@@ -93,3 +93,19 @@ fn deleted_files_leave_the_state() {
         ["crates/nubo-core/src/apu.rs"]
     );
 }
+
+#[test]
+fn a_state_that_is_not_an_object_is_an_error() {
+    let state = std::env::temp_dir().join(format!(
+        "nubo-review-units-state-{}.json",
+        std::process::id()
+    ));
+    fs::write(&state, "[]").unwrap();
+    let result = next_part(&NextOptions {
+        state: state.clone(),
+        date: String::from("2026-10-16"),
+        commit: String::from("0000000000000000000000000000000000000000"),
+    });
+    fs::remove_file(&state).unwrap();
+    assert!(result.unwrap_err().contains("is not a JSON object"));
+}

@@ -99,10 +99,13 @@ pub fn run(command: Command) -> Result {
 /// The state is `{"last_commit": "<sha>", "files": {"<path>": "<date>"}}`.
 /// A missing state file starts the rotation from the beginning.
 fn next_part(options: &NextOptions) -> Result<String> {
-    let mut state = match fs::read_to_string(&options.state) {
+    let state = match fs::read_to_string(&options.state) {
         Ok(text) => serde_json::from_str::<Value>(&text)
             .map_err(|error| format!("{} is not valid JSON: {error}", options.state.display()))?,
         Err(_) => json!({}),
+    };
+    let Value::Object(mut state) = state else {
+        return Err(format!("{} is not a JSON object", options.state.display()));
     };
     let last_commit = state
         .get("last_commit")
@@ -136,8 +139,11 @@ fn next_part(options: &NextOptions) -> Result<String> {
         reviewed.insert(file.clone(), Value::from(options.date.as_str()));
     }
 
-    state["last_commit"] = Value::from(options.commit.as_str());
-    state["files"] = Value::Object(reviewed);
+    state.insert(
+        String::from("last_commit"),
+        Value::from(options.commit.as_str()),
+    );
+    state.insert(String::from("files"), Value::Object(reviewed));
     let text = serde_json::to_string_pretty(&state).map_err(|error| error.to_string())?;
     fs::write(&options.state, text + "\n")
         .map_err(|error| format!("failed to write {}: {error}", options.state.display()))?;
