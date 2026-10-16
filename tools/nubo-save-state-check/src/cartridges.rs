@@ -46,7 +46,8 @@ const DMG_AND_CGB: &[Model] = &[Model::Dmg, Model::CgbE];
 const DMG: &[Model] = &[Model::Dmg];
 const CGB: &[Model] = &[Model::CgbE];
 
-/// No RAM, 8 KiB of RAM and the controller's own RAM (MBC2).
+/// The header's RAM size byte: no RAM (also used by MBC2, whose RAM is inside
+/// the controller), and 8 KiB of RAM.
 const NO_RAM: u8 = 0x00;
 const RAM_8_KIB: u8 = 0x02;
 
