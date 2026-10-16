@@ -283,6 +283,7 @@ fn every_game_boy_button_has_its_own_libretro_button() {
     keys.dedup();
     assert_eq!(keys.len(), 8);
     let mut ids: Vec<_> = BUTTONS.iter().map(|(id, _, _)| *id).collect();
+    ids.sort_unstable();
     ids.dedup();
     assert_eq!(ids.len(), 8);
 }
