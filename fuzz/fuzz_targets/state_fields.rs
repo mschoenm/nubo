@@ -94,11 +94,15 @@ fn walk(state: &[u8], start: usize, values: &mut Vec<(usize, usize)>) -> Option<
 /// The values in the bytes from `start` to the end of `state` when they are
 /// one or more lists of fields in a row, such as a struct or an array of
 /// structs (the PPU's object FIFO stores its eight entries that way), or
-/// `None` when they aren't.
+/// `None` when they aren't. Each list must hold a field: a zero byte alone
+/// would read as an empty list, so zeros, such as cleared RAM, are a value.
 fn fields_in_a_row(state: &[u8], start: usize) -> Option<Vec<(usize, usize)>> {
     let mut values = Vec::new();
     let mut position = start;
     while position < state.len() {
+        if state[position] == 0 {
+            return None;
+        }
         position = walk(state, position, &mut values)?;
     }
     Some(values)

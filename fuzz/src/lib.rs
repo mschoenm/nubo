@@ -112,6 +112,9 @@ pub fn start_on(model: Model, rom: &[u8], clock: RtcClock) -> Option<Emulator> {
         return boot(model, rom, clock);
     }
     if !header_boots(rom) {
+        // A real console hangs on this cartridge, so only loading it is
+        // checked: the boot and the run are skipped.
+        let _ = Emulator::new(model).load_rom(rom, effects_on(clock));
         return None;
     }
     let input = rom.get(Emulator::boot_rom_input(model))?.to_vec();
