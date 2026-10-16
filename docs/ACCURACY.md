@@ -3,7 +3,7 @@
 Nubo is checked against thousands of test ROMs: small programs that each test one detail of the hardware against what real consoles do. Every pull request runs them all, and fails if a test that passed stops passing. What still has to happen before Nubo can claim to be the most accurate Game Boy emulator is planned in [ACCURACY_PLAN.md](ACCURACY_PLAN.md).
 
 - **The processor:** Nubo passes all [JSON CPU tests](https://github.com/adtennant/GameboyCPUTests), which check every instruction cycle by cycle.
-- **Speed:** being exact costs speed, but on one core of a shared 2.1 GHz cloud server Nubo still runs games about 50 to 125 times as fast as a real Game Boy, and 3 to 6 times as fast as SameBoy, which also draws the screen dot by dot ([the comparison](EMULATOR_COMPARISON.md)).
+- **Speed:** being exact costs speed, but on one core of a shared 2.1 GHz cloud server Nubo still runs games about 50 to 155 times as fast as a real Game Boy, and 3 to 8 times as fast as SameBoy, which also draws the screen dot by dot ([the comparison](EMULATOR_COMPARISON.md)).
 
 ## Test ROMs
 
