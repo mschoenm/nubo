@@ -98,3 +98,41 @@ scene = "tobu-tobu-hills"
 frame = "gnome"
 size = [900, 620]
 settings = { appearance = "light" }
+
+[[screenshot]]
+file = "images/screenshots/froggy-kong.png"
+scene = "froggy-kong-tower"
+size = [1000, 780]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "images/screenshots/ucity.png"
+scene = "ucity-rock-river"
+size = [1000, 780]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "images/screenshots/nubo-border.png"
+scene = "el-dueloroso-nubo-border"
+size = [1000, 800]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "images/screenshots/super-game-boy-menu.png"
+scene = "tobu-tobu-super-game-boy"
+size = [1000, 800]
+settings = { appearance = "dark" }
+pause_menu = "super-game-boy"
+
+[[screenshot]]
+file = "images/screenshots/settings.png"
+scene = "moki-bedroom"
+size = [1000, 780]
+settings = { appearance = "light" }
+settings_tab = "display"
+
+[[screenshot]]
+file = "images/screenshots/game-boy-color-boot.png"
+scene = "game-boy-color-boot"
+size = [1000, 780]
+settings = { appearance = "dark" }

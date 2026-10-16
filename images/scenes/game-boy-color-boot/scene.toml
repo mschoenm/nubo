@@ -1,0 +1,10 @@
+[game]
+file = "Big2Small.gb"
+sha256 = "59c096333f93c12c8eb25a5fcffa2be15001abcd5d20b9a82c2bc2dae7e625b2"
+model = "CGB-E"
+frames = 2
+
+[view]
+screen = "game"
+
+[settings]

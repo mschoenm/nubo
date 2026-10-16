@@ -147,5 +147,5 @@ night before, so nothing changed while staying green.
    anything that broke fixed.
 
 Then a new session collects screenshots with the skill, the maintainer picks from its gallery, and the README
-and Flathub images are replaced (done for the README's and Flathub's existing pictures; more candidates wait for
-the maintainer's pick).
+and Flathub images are replaced (done: the README's and Flathub's pictures were made again from scenes, and six
+new ones added from the first gallery).
