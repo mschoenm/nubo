@@ -1172,7 +1172,7 @@ fn about<'a>(
             ),
             SettingsRow::ResetSettings,
         )],
-        Some("Only the keys or buttons: Controls › Reset to defaults."),
+        Some("Only the keys or buttons: Controls › Reset."),
     ))
     .push(group(
         "Made with AI",
@@ -1264,8 +1264,9 @@ fn palette_button<'a>(palette: DmgPalette, selected: bool) -> Element<'a, Messag
     .into()
 }
 
-/// The keyboard or controller switch with a button beside it (under it in
-/// a narrow window) that resets that device's bindings, then on a
+/// The keyboard or controller switch with a Reset button as big as it
+/// beside it (under it in a narrow window) that resets that device's
+/// bindings, then on a
 /// controller which buttons pick and go back in the menus, and the bindings
 /// of the Game Boy's buttons and the shortcuts.
 fn controls<'a>(
@@ -1289,12 +1290,20 @@ fn controls<'a>(
         ),
         SettingsRow::Device,
     );
+    // As tall as the switch beside it: its padding is the switch's own
+    // plus the frame around the switch's buttons.
     let reset = rings.around(
-        small_button(
-            Icon::RotateCcw,
-            "Reset to defaults",
-            Message::Settings(SettingsMessage::ResetControls(device)),
-        ),
+        button(
+            row![
+                icon(Icon::RotateCcw),
+                text("Reset").wrapping(Wrapping::None)
+            ]
+            .spacing(8)
+            .align_y(Alignment::Center),
+        )
+        .padding([9, 14])
+        .style(theme::secondary_button)
+        .on_press(Message::Settings(SettingsMessage::ResetControls(device))),
         SettingsRow::ResetControls,
     );
     let header: Element<'a, Message> = if page.layout.stacks_wide_controls() {
