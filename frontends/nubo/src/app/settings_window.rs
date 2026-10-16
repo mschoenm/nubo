@@ -331,7 +331,6 @@ impl App {
         ])
     }
 
-    /// Changes the controls, saves them and hands them to the running game.
     /// Looks for a newer version in the background, if the player wants
     /// that and this run hasn't yet.
     pub(super) fn look_for_updates(&mut self) -> Task<Message> {
@@ -356,6 +355,7 @@ impl App {
         }
     }
 
+    /// Changes the controls, saves them and hands them to the running game.
     pub(super) fn change_controls(&mut self, change: impl FnOnce(&mut Controls)) {
         self.change_settings(|settings| change(&mut settings.shared.controls));
         if let Some(game) = &mut self.game {

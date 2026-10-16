@@ -39,7 +39,7 @@ impl Cheat {
     /// Checks the code (or codes) the player typed and makes a cheat of
     /// it, named `name` (or after the code if the name is empty), or says
     /// what is wrong with a code. Several codes can be typed with `+`, a
-    /// comma, a new line or a space between them.
+    /// comma, a semicolon, a new line or a space between them.
     pub fn new(name: &str, code: &str) -> Result<Cheat, String> {
         let code = split_codes(code)?.join("+");
 
@@ -90,8 +90,8 @@ impl Cheat {
 
 /// The codes in what the player typed, each in the form the emulator
 /// expects, or why one isn't a code. Codes are apart where there is a `+`,
-/// a comma or a new line, and where there is a space unless the space is
-/// inside one code (`CED 56A`).
+/// a comma, a semicolon or a new line, and where there is a space unless
+/// the space is inside one code (`CED 56A`).
 fn split_codes(input: &str) -> Result<Vec<String>, String> {
     let pieces: Vec<&str> = input
         .split(['+', ',', ';', '\n'])

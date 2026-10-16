@@ -121,8 +121,8 @@ impl Apu {
 
     /// Applies an NRx4 write's length enable bit (6), after the trigger it
     /// may hold. A write that enables the counter while the next frame
-    /// sequencer step won't clock it clocks it once more at once (always on
-    /// CGB-B and older, see `nrx4_clocks_length`). When that runs a
+    /// sequencer step won't clock it clocks it once more at once (on CGB-0 to
+    /// CGB-B any NRx4 write does, see `nrx4_clocks_length`). When that runs a
     /// triggered channel's length out, it restarts one step short of the full
     /// length; otherwise the channel turns off. On CGB-B the wave channel only
     /// turns off on the next such write, with its counter still at 0.
@@ -153,7 +153,7 @@ impl Apu {
     }
 
     /// Whether an NRx4 write can clock the length counter: when it enables the
-    /// length counter, or always on CGB-B and older.
+    /// length counter, or always on CGB-0 to CGB-B.
     fn nrx4_clocks_length(&self, nrx4: u8) -> bool {
         nrx4 & 0x40 != 0 || (self.cgb_mode && self.model <= Model::CgbB)
     }

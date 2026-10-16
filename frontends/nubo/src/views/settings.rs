@@ -82,11 +82,13 @@ const CHIP_WIDTH: f32 = 140.0;
 pub enum SettingsTab {
     /// How the window and the game screen look.
     Display,
-    /// The hardware games run on, continuing games, fast forward and sound.
+    /// The hardware games run on, continuing games, pausing in the
+    /// background, fast forward and sound.
     Playing,
     Controls,
     Library,
-    /// The version, the license and where to get the source code.
+    /// The version and new ones, starting over, how Nubo was made, the
+    /// license and where to get the source code.
     About,
 }
 
@@ -719,8 +721,8 @@ fn divider<'a>() -> Element<'a, Message> {
         .into()
 }
 
-/// The theme, the colors of Game Boy games, sharp pixels and the Super
-/// Game Boy border.
+/// The theme, the colors of Game Boy games, the original screen look, sharp
+/// pixels and the Super Game Boy border.
 fn display<'a>(settings: &'a Settings, rings: &Rings) -> Element<'a, Message> {
     let appearance = segmented(
         &Appearance::ALL,
@@ -825,7 +827,8 @@ fn display<'a>(settings: &'a Settings, rings: &Rings) -> Element<'a, Message> {
 }
 
 /// The model games start on (with a restart while the running game uses
-/// another one), continuing games, the fast forward speed and the volume.
+/// another one), continuing games, pausing in the background, the fast
+/// forward speed and the volume.
 /// With `stack_wide_controls` the fast forward speeds go under their name.
 fn playing<'a>(
     settings: &'a Settings,
@@ -1010,9 +1013,10 @@ fn volume<'a>(settings: &Settings) -> Element<'a, Message> {
     .into()
 }
 
-/// The version, the copyright, the license, where to read it and where to get
-/// the source code, which the GPL asks every copy to show, and the button
-/// that starts over, between the new versions and the license.
+/// The version, new versions and what's new in this one, the button that
+/// starts over, the note that Nubo is made almost entirely by AI, and the
+/// copyright, the license, where to read it and where to get the source
+/// code, which the GPL asks every copy to show.
 fn about<'a>(
     settings: &'a Settings,
     newer_version: Option<&'a str>,

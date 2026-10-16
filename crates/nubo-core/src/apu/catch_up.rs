@@ -284,9 +284,9 @@ impl Apu {
     /// The number of M-cycles up to and including the first one in which a
     /// run changes a channel's output, which only happens when a square or
     /// wave channel moves to its next step or the noise channel's LFSR steps
-    /// (outside the states `cycles_until_timing_dependent_run` covers). It may also be an
-    /// earlier M-cycle: cutting a batch where nothing changes costs time, but
-    /// changes nothing.
+    /// (outside the states `cycles_until_timing_dependent_run` covers). It
+    /// may also be an earlier M-cycle: cutting a batch where nothing changes
+    /// costs time, but changes nothing.
     ///
     /// Each channel's next change stays known until a run reaches it or
     /// something outside the channels' own timing changes them, so after a cut

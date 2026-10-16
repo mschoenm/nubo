@@ -89,8 +89,8 @@ impl Toasts {
         self.push(ToastKind::Error, message.into(), false);
     }
 
-    /// Takes the Undo button off the toast that has it, once the undo is
-    /// done or no longer possible.
+    /// Removes the toast with the Undo button, once the undo is done or no
+    /// longer possible.
     pub fn forget_undo(&mut self) {
         self.toasts.retain(|toast| !toast.undo);
     }
