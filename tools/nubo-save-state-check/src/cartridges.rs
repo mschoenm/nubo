@@ -14,11 +14,11 @@
 use nubo_core::Model;
 
 /// A test cartridge, and the models its states are made on.
-pub struct TestCartridge {
+pub(crate) struct TestCartridge {
     /// The file name its states are named after, such as `mbc1.gb`.
-    pub file: &'static str,
+    pub(crate) file: &'static str,
     /// The models its states are made on.
-    pub models: &'static [Model],
+    pub(crate) models: &'static [Model],
     title: &'static str,
     /// The cartridge type byte of the header (0x0147), which picks the
     /// controller.
@@ -51,7 +51,7 @@ const CGB: &[Model] = &[Model::CgbE];
 const NO_RAM: u8 = 0x00;
 const RAM_8_KIB: u8 = 0x02;
 
-pub const CARTRIDGES: [TestCartridge; 6] = [
+pub(crate) const CARTRIDGES: [TestCartridge; 6] = [
     TestCartridge {
         file: "rom-only.gb",
         models: DMG_AND_CGB,
@@ -128,7 +128,7 @@ const RET: u8 = 0xC9;
 
 impl TestCartridge {
     /// The cartridge's ROM.
-    pub fn rom(&self) -> Vec<u8> {
+    pub(crate) fn rom(&self) -> Vec<u8> {
         let mut rom = vec![0; ROM_SIZE];
         for (bank, bytes) in rom.chunks_mut(0x4000).enumerate().skip(1) {
             for (offset, byte) in bytes.iter_mut().enumerate() {
