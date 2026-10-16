@@ -73,7 +73,7 @@ The root `Cargo.toml` is a virtual workspace whose default members are `nubo-cor
 - `frontends/nubo-libretro/` (`AGENTS.md`): the RetroArch (libretro) core, a dynamic library; `cargo xtask libretro` packages it.
 - `tools/nubo-test-rom-runner/` (`AGENTS.md`): `cargo test-roms`.
 - `tools/nubo-json-test-runner/`: `cargo cpu-tests`.
-- `tools/nubo-save-state-check/` (`AGENTS.md`): `cargo save-states`, and the kept sets in `save-states/`.
+- `tools/nubo-save-state-check/` (`AGENTS.md`): `cargo save-states`; the kept sets are in the repository's top-level `save-states/`.
 - `tools/nubo-benchmark/` (`AGENTS.md`): `cargo benchmark`.
 - `tools/nubo-headless/`: `cargo screenshot`.
 - `xtask/` (`AGENTS.md`): the web build, packaging, licenses, the emulator comparison, the nightly review's tools and the screenshots.
