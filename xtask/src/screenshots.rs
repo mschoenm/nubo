@@ -29,6 +29,7 @@
 
 use crate::{Result, cargo, run, target_dir, workspace_root};
 use lists::{Frame, Game, GameList, ScreenshotList, Tile};
+use nubo_core::{SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH};
 use nubo_frontend::scenes::Scene;
 use std::collections::BTreeMap;
 use std::fs;
@@ -206,9 +207,10 @@ fn capture_of(
                 .map_or(FULLSCREEN_SIZE, |[width, height]| (width, height))
         }
         Frame::Game => {
+            let scale = tile.scale.unwrap_or(GAME_SCALE);
             arguments.push(String::from("--scale"));
-            arguments.push(tile.scale.unwrap_or(GAME_SCALE).to_string());
-            (1920, 1200)
+            arguments.push(scale.to_string());
+            game_monitor(scale)
         }
         Frame::None | Frame::Gnome => {
             if let Some((width, height)) = tile.size.map(|[width, height]| (width, height)) {
@@ -232,6 +234,16 @@ fn capture_of(
         dark,
         monitor,
     })
+}
+
+/// The screen a picture of the game alone, `scale` times its size, is taken
+/// on: 1920×1200, or bigger when the largest picture, a Super Game Boy's with
+/// its border, wouldn't fit on it.
+fn game_monitor(scale: u32) -> (u32, u32) {
+    (
+        (SGB_FRAME_WIDTH * scale).max(1920),
+        (SGB_FRAME_HEIGHT * scale).max(1200),
+    )
 }
 
 /// Downloads every game the screenshots' scenes use into `folder`, under

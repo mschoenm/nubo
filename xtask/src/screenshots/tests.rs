@@ -249,3 +249,12 @@ fn a_game_missing_from_the_credits_is_named() {
     assert!(error.contains("Unknown Game by Someone (MIT)"), "{error}");
     fs::remove_dir_all(&root).unwrap();
 }
+
+#[test]
+fn the_screen_fits_the_games_picture_at_every_scale() {
+    assert_eq!(game_monitor(4), (1920, 1200));
+    for scale in 1..=8 {
+        let (width, height) = game_monitor(scale);
+        assert!(width >= SGB_FRAME_WIDTH * scale && height >= SGB_FRAME_HEIGHT * scale);
+    }
+}
