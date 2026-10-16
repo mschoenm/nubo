@@ -141,7 +141,8 @@ pub(crate) struct TestCase {
     /// The part of the ROM this case runs, for ROMs that hold several tests.
     pub(crate) subtest: Option<&'static str>,
     /// Buttons pressed one after another after the boot ROM, such as the
-    /// menu choices that start a subtest.
+    /// menu choices that start a subtest. Only `Check::Screen` tests press
+    /// them.
     pub(crate) input: &'static [Key],
     /// The test's name in the GB Emulator Shootout, for its tests, which
     /// makes their ID `shootout/<name>`.
@@ -241,7 +242,8 @@ struct ScreenshotTest {
     seconds: u32,
     /// Whether every frame must match instead of any one.
     every_frame: bool,
-    /// Buttons to press after the boot ROM.
+    /// Buttons to press after the boot ROM, only for a test that is neither
+    /// `every_frame` nor `grayscale`, since only screen tests press them.
     input: &'static [Key],
     /// Whether to compare in grayscale, for a reference made with other
     /// colors than Nubo's.
@@ -896,6 +898,11 @@ fn screenshot_tests() -> Vec<TestCase> {
         .flat_map(|test| {
             test.screens.iter().map(|(model, screen)| {
                 let screen = PathBuf::from(screen);
+                assert!(
+                    test.input.is_empty() || !(test.grayscale || test.every_frame),
+                    "{} has buttons to press, but only screen tests press them",
+                    test.rom
+                );
                 let check = if test.grayscale {
                     Check::GrayscaleScreen(vec![screen])
                 } else if test.every_frame {
@@ -1306,6 +1313,17 @@ mod tests {
         );
         assert_eq!(models("stat-mode-ncmBC.gb"), vec![Model::CgbB, Model::CgbC]);
         assert_eq!(models("lcd-align-ly-cgbE.gb"), vec![Model::CgbE]);
+    }
+
+    #[test]
+    fn only_screen_tests_have_buttons_to_press() {
+        for test in screenshot_tests() {
+            assert!(
+                test.input.is_empty() || matches!(test.check, Check::Screen(_)),
+                "{} has buttons to press, but only screen tests press them",
+                test.rom.display()
+            );
+        }
     }
 
     #[test]
