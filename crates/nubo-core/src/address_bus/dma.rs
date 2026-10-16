@@ -105,8 +105,9 @@ impl DmaState {
         }
     }
 
-    /// Whether no transfer is requested or running, from the write to the DMA
-    /// register until the M-cycle after the last byte is copied.
+    /// Whether no transfer is requested or running. It is false from the
+    /// write to the DMA register until the M-cycle after the last byte is
+    /// copied.
     pub(super) fn is_idle(&self) -> bool {
         self.start_delay == 0 && !self.in_progress
     }
