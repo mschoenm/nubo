@@ -98,4 +98,5 @@ Claude Code and Codex both read these `AGENTS.md` files; keep them the only inst
 - `docs/NIGHTLY_REVIEW.md`: what the nightly review does.
 - `docs/EMULATOR_COMPARISON.md`: speed next to other emulators.
 - `docs/SCREENSHOTS_PLAN.md`: the tools that make every screenshot in the README and the Flathub listing again from recorded scenes, and the order of the work; update it as parts get done.
+- `docs/CODE_REVIEW.md`: the code review of October 2026, what it fixed and the findings it left open with their issues; a record of that day, not kept up to date.
 - `docs/SPEED_PLAN.md`: making Nubo faster without changing any result, what was done and what is left; `docs/speed-research/` holds the clean-room reports on other emulators it draws on. Update it as parts get done.
