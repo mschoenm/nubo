@@ -330,8 +330,8 @@ fn divider<'a, Message: 'a>() -> Element<'a, Message> {
         .into()
 }
 
-/// A picture of the Game Boy screen, `size` pixels (width and height; the
-/// screen alone or a Super Game Boy's picture with its border), grown by the
+/// A picture of the Game Boy screen, `width` by `height` pixels (the screen
+/// alone or a Super Game Boy's picture with its border), grown by the
 /// largest whole factor that fits in the space it gets, so every Game Boy
 /// pixel is the same number of screen pixels.
 pub fn whole_step_screen<'a, Message: 'a>(
@@ -352,11 +352,11 @@ pub fn whole_step_screen<'a, Message: 'a>(
     .into()
 }
 
-/// A picture of the Game Boy screen, `size` pixels, in a frame `border`
-/// wide drawn with `style` that hugs it, in the middle of the space it
-/// gets, such as a library card's. The screen grows in whole steps like
-/// [`whole_step_screen`]; where even its own size doesn't fit, it shrinks
-/// to fit instead of being cut off.
+/// A picture of the Game Boy screen, `width` by `height` pixels, in a frame
+/// `border` wide drawn with `style` that hugs it, in the middle of the space
+/// it gets, such as a library card's. The screen grows in whole steps like
+/// [`whole_step_screen`]; where even its own size doesn't fit, it shrinks to
+/// fit instead of being cut off.
 pub fn framed_screen<'a, Message: 'a>(
     handle: image::Handle,
     (width, height): (u32, u32),
