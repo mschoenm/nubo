@@ -43,4 +43,6 @@ mod rom_archive;
 mod serial;
 mod serializable;
 mod sgb;
+#[cfg(test)]
+mod test_random;
 mod utils;

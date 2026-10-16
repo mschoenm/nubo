@@ -56,6 +56,9 @@ const KEY1_UNUSED_BITS: u8 = 0x7E;
 const UNITS_PER_M_CYCLE: u8 = 4;
 /// Units after STOP until a switch to double speed takes effect.
 const DOUBLE_SPEED_DELAY: u8 = 6;
+/// What is left of the delay in the M-cycle the switch to double speed
+/// happens in.
+const LAST_DOUBLE_SPEED_DELAY: u8 = DOUBLE_SPEED_DELAY - UNITS_PER_M_CYCLE;
 /// How long the CPU stays halted after a switch, in units.
 const SPEED_SWITCH_HALT_UNITS: u32 = 0x2_0008;
 /// Units the PPU and OAM DMA stand still after a switch to double speed that
@@ -90,21 +93,27 @@ impl SpeedSwitch {
     }
 
     /// Whether a loaded save state holds values a switch can reach, which the
-    /// emulator never saves otherwise: a delay, freeze and halt no longer than
-    /// a switch starts with, no switch at all on a console without double speed
-    /// (`cgb` is false), and no delay or freeze left once double speed has
-    /// begun, where a freeze of an odd number of units would leave half a dot.
+    /// emulator never saves otherwise: no switch at all on a console without
+    /// double speed (`cgb` is false), a halt no longer than a switch starts
+    /// with, and a delay, freeze and speed that a switch passes through. Any
+    /// other mix can split an M-cycle into an odd number of 8 MHz ticks, half a
+    /// dot, such as a delay of 1 at normal speed.
     pub(super) fn is_consistent(&self, cgb: bool) -> bool {
-        let within_limits = self.double_speed_delay <= DOUBLE_SPEED_DELAY
-            && self.freeze <= FREEZE_UNITS_TO_NORMAL_SPEED
-            && self.halt_units <= SPEED_SWITCH_HALT_UNITS;
         let switching = self.cgb_double_speed
             || self.double_speed_delay != 0
             || self.freeze != 0
             || self.halt_units != 0;
-        let settled_in_double_speed =
-            !self.cgb_double_speed || (self.double_speed_delay == 0 && self.freeze == 0);
-        within_limits && (cgb || !switching) && settled_in_double_speed
+        // Settled at either speed; just entering (the first M-cycle uses up the
+        // freeze and 4 units of the delay); the M-cycle the switch happens in;
+        // or just leaving double speed, which switches at once.
+        let reachable = matches!(
+            (self.double_speed_delay, self.freeze, self.cgb_double_speed),
+            (0, 0, _)
+                | (DOUBLE_SPEED_DELAY, FREEZE_UNITS_TO_DOUBLE_SPEED, false)
+                | (LAST_DOUBLE_SPEED_DELAY, 0, false)
+                | (0, FREEZE_UNITS_TO_NORMAL_SPEED, false)
+        );
+        (cgb || !switching) && self.halt_units <= SPEED_SWITCH_HALT_UNITS && reachable
     }
 
     /// Whether no switch is in progress, so M-cycles run as usual.
@@ -318,6 +327,48 @@ mod tests {
         };
         assert!(entering.is_consistent(true));
         assert!(!entering.is_consistent(false));
+    }
+
+    #[test]
+    fn every_m_cycle_of_a_real_switch_is_consistent() {
+        for (double_speed, interrupt_pending) in [(false, false), (false, true), (true, false)] {
+            let mut address_bus = cgb_address_bus();
+            address_bus.set_cgb_double_speed(double_speed);
+            address_bus.switch_speed(interrupt_pending);
+            for _ in 0..SPEED_SWITCH_HALT_UNITS / u32::from(UNITS_PER_M_CYCLE) + 2 {
+                assert!(
+                    address_bus.speed_switch.is_consistent(true),
+                    "{:?}",
+                    address_bus.speed_switch
+                );
+                address_bus.advance_speed_switch();
+            }
+        }
+    }
+
+    #[test]
+    fn no_consistent_switch_leaves_half_a_dot() {
+        for double_speed_delay in 0..=u8::MAX {
+            for freeze in 0..=u8::MAX {
+                for cgb_double_speed in [false, true] {
+                    let speed_switch = SpeedSwitch {
+                        cgb_double_speed,
+                        double_speed_delay,
+                        freeze,
+                        ..SpeedSwitch::default()
+                    };
+                    if !speed_switch.is_consistent(true) {
+                        continue;
+                    }
+                    let mut address_bus = cgb_address_bus();
+                    address_bus.speed_switch = speed_switch;
+                    // finish_speed_switch_cycle asserts that no M-cycle leaves half a dot.
+                    for _ in 0..4 {
+                        address_bus.advance_speed_switch();
+                    }
+                }
+            }
+        }
     }
 
     #[test]
