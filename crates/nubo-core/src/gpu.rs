@@ -389,6 +389,9 @@ const FETCHER_START_DELAY_DOTS: u8 = 2;
 /// other lines, so mode 3 ends two dots later too (AGE's stat-mode, oam and vram tests;
 /// Gambatte's enable_display tests; GBMicrotest's int_hblank tests).
 const LCD_ON_FETCHER_START_DELAY_DOTS: u8 = 4;
+// `Gpu::enter_mode_3` sets one of these delays and leaves starting the renderer to
+// `Gpu::tick_mode_3`, which only starts it as the delay runs out.
+const _: () = assert!(FETCHER_START_DELAY_DOTS > 0 && LCD_ON_FETCHER_START_DELAY_DOTS > 0);
 const MODE_0_INTERRUPT_DELAY_DOTS: u8 = 1;
 /// The PPU blocks CGB palette RAM from the first dot of mode 3 until these dots after drawing
 /// ends, fitted to Gambatte's cgbpal_m3 tests (SameBoy has the same blocking with slightly
@@ -783,9 +786,6 @@ impl Gpu {
         } else {
             FETCHER_START_DELAY_DOTS
         };
-        if self.fetcher_start_delay == 0 {
-            self.start_drawing();
-        }
     }
 
     /// Advances mode 3 by one dot and switches to hblank once the renderer finishes the line.
