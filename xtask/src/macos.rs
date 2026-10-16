@@ -29,8 +29,8 @@ const ICONSET: [(&str, u32); 10] = [
 ];
 
 /// Builds the app in release mode and puts it in `target/bundle/Nubo.app`
-/// with its icon and license files, returning where the bundle is. Needs macOS, for its
-/// `iconutil` tool.
+/// with its icon and license files, returning where the bundle is. Needs
+/// macOS, for its `iconutil` tool.
 pub fn build_macos_app() -> Result<PathBuf> {
     if !cfg!(target_os = "macos") {
         return Err(String::from("app bundles can only be built on macOS"));

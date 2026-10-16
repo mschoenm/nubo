@@ -643,10 +643,13 @@ impl AddressBus {
         self.cartridge.report_save_changes();
     }
 
+    /// The cartridge's RAM, which a battery keeps on some cartridges.
     pub(crate) fn cartridge_ram(&self) -> &[u8] {
         self.cartridge.ram()
     }
 
+    /// Replaces the cartridge's RAM, for example with a battery save. A buffer
+    /// of any size is accepted; reads and writes wrap around its length.
     pub(crate) fn set_cartridge_ram(&mut self, buffer: Vec<u8>) {
         self.cartridge.set_ram(buffer);
     }
@@ -995,30 +998,41 @@ impl AddressBus {
         palettes.set_obp1(power_on_value);
     }
 
+    /// Turns CGB mode (a Game Boy Color running a game made for it) on or
+    /// off, here and in the serial port, which only has its fast clock then.
     fn set_cgb_mode(&mut self, value: bool) {
         self.cgb_mode = value;
         self.serial.set_cgb_mode(value);
     }
 
+    /// The cartridge: its ROM, RAM, header and memory bank controller.
     pub(crate) fn cartridge(&self) -> &Cartridge {
         &self.cartridge
     }
 
+    /// Presses `key`, and tells a Super Game Boy whether any button is held
+    /// (its attraction mode waits for none).
     pub(crate) fn press_key(&mut self, key: Key) {
         self.joypad.press_key(key);
         self.show_sgb_buttons_held();
     }
 
+    /// Lets go of `key`, and tells a Super Game Boy whether any button is
+    /// still held.
     pub(crate) fn release_key(&mut self, key: Key) {
         self.joypad.release_key(key);
         self.show_sgb_buttons_held();
     }
 
+    /// Replaces the keys the game controllers hold with the ones `states` map
+    /// to, and tells a Super Game Boy whether any button is held.
     pub(crate) fn set_controller_states(&mut self, states: &[ControllerState]) {
         self.joypad.set_controller_states(states);
         self.show_sgb_buttons_held();
     }
 
+    /// Replaces the keys a frontend holds for `player` (2 to 4), and tells a
+    /// Super Game Boy whether any button is held.
     pub(crate) fn set_player_keys(&mut self, player: u8, keys: &[Key]) {
         self.joypad.set_player_keys(player, keys);
         self.show_sgb_buttons_held();
@@ -1053,6 +1067,7 @@ impl AddressBus {
         self.gpu.redraw_sgb_picture();
     }
 
+    /// Sets which game controller button presses which Game Boy button.
     pub(crate) fn set_controller_mapping(&mut self, mapping: ControllerMapping) {
         self.joypad.set_controller_mapping(mapping);
     }

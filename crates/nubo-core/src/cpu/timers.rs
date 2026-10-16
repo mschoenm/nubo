@@ -68,6 +68,8 @@ impl TimerRegisters {
             && self.system_counter & self.selected_counter_bit() != 0
     }
 
+    /// Counts TIMA up when the timer signal fell from `previous_signal` to
+    /// low; an overflow reloads TIMA from TMA on the next M-cycle.
     fn increment_counter_on_falling_edge(&mut self, previous_signal: bool) {
         if previous_signal && !self.timer_signal() {
             let (counter, overflowed) = self.counter.overflowing_add(1);
@@ -187,6 +189,8 @@ impl TimerRegisters {
         }
     }
 
+    /// Writes TAC. Turning the timer off or picking another counter bit can
+    /// make the timer signal fall, which counts TIMA up like a tick would.
     fn write_control(&mut self, value: u8) {
         let previous_signal = self.timer_signal();
         self.control = value & !UNUSED_CONTROL_BITS;

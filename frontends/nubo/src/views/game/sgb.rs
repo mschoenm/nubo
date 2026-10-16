@@ -1,8 +1,8 @@
 //! The pause menu's Super Game Boy page: the colors the game shows (its own,
 //! one of Nubo's palettes, or the player's own, with an editor for those
-//! that opens when asked) and the border around the screen. It stands in for the menu a real Super
-//! Game Boy opens with the Super Nintendo's L and R buttons (see
-//! `nubo_frontend::sgb_menu`).
+//! that opens when asked) and the border around the screen. It stands in for
+//! the menu a real Super Game Boy opens with the Super Nintendo's L and R
+//! buttons (see `nubo_frontend::sgb_menu`).
 
 use super::page_header;
 use crate::app::{GameMessage, Message};

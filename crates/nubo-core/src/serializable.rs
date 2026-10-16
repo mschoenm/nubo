@@ -58,6 +58,8 @@ pub struct FieldWriter<'a> {
 }
 
 impl<'a> FieldWriter<'a> {
+    /// Starts writing a struct's fields to `writer`; [`FieldWriter::finish`]
+    /// ends it.
     pub fn new(writer: &'a mut dyn Write) -> Self {
         FieldWriter {
             writer,

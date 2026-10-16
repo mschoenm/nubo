@@ -39,6 +39,9 @@ impl From<WindowMessage> for Message {
 }
 
 impl App {
+    /// Handles a message about the window: fullscreen, its size and scaling,
+    /// focus, the mouse and files dragged over it, the system's light or dark
+    /// theme, and closing it.
     pub(super) fn update_window(&mut self, message: WindowMessage) -> Task<Message> {
         match message {
             WindowMessage::ToggleFullscreen => return toggle_fullscreen(),

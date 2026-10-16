@@ -108,21 +108,21 @@ impl Cpu {
         self.step_one_machine_cycle();
 
         let program_counter = self.registers.program_counter;
-        let sp_initial = self.registers.stack_pointer;
-        self.check_oam_bug_write(sp_initial);
+        let stack_pointer = self.registers.stack_pointer;
+        self.check_oam_bug_write(stack_pointer);
 
-        let sp_high = sp_initial.wrapping_sub(1);
-        self.store_byte_in_memory(sp_high, (program_counter >> 8) as u8);
-        self.check_oam_bug_write(sp_high);
+        let high_byte_address = stack_pointer.wrapping_sub(1);
+        self.store_byte_in_memory(high_byte_address, (program_counter >> 8) as u8);
+        self.check_oam_bug_write(high_byte_address);
 
         let enabled = self.address_bus.interrupt_enable();
-        let sp_low = sp_high.wrapping_sub(1);
+        let low_byte_address = high_byte_address.wrapping_sub(1);
         let flags_before_low_push = self.address_bus.interrupt_flags();
-        self.store_byte_in_memory(sp_low, (program_counter & 0xFF) as u8);
-        self.check_oam_bug_write(sp_low);
-        self.registers.stack_pointer = sp_low;
+        self.store_byte_in_memory(low_byte_address, (program_counter & 0xFF) as u8);
+        self.check_oam_bug_write(low_byte_address);
+        self.registers.stack_pointer = low_byte_address;
 
-        let flags = if sp_low == INTERRUPT_FLAGS_ADDRESS {
+        let flags = if low_byte_address == INTERRUPT_FLAGS_ADDRESS {
             flags_before_low_push
         } else {
             self.address_bus.interrupt_flags()
@@ -154,6 +154,8 @@ impl Cpu {
         self.registers.program_counter = self.registers.program_counter.wrapping_add(1);
     }
 
+    /// Whether an interrupt can be handled now: IME is on and an enabled
+    /// interrupt is requested.
     fn can_dispatch_interrupt(&self) -> bool {
         self.ime == InterruptMasterEnable::On && self.has_pending_interrupt()
     }
@@ -230,6 +232,9 @@ impl Cpu {
         kept
     }
 
+    /// Leaves HALT: the CPU runs again, OAM DMA paused by the HALT goes on,
+    /// and `hdma_halt_ended` decides whether a pending HBlank DMA block is
+    /// kept.
     fn leave_halt(&mut self) {
         self.run_state = RunState::Running;
         self.address_bus.hdma_halt_ended();

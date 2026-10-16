@@ -93,7 +93,9 @@ pub enum Frame {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Style {
+    /// Light window borders and title bars.
     Light,
+    /// Dark window borders and title bars.
     Dark,
 }
 
@@ -129,15 +131,25 @@ pub struct Variant {
 /// one of its variants.
 #[derive(Debug, Clone)]
 pub struct Tile {
+    /// The scene's folder in `images/scenes/`: the variant's, or the
+    /// screenshot's.
     pub scene: String,
+    /// How much of the app the picture shows, as the screenshot says.
     pub frame: Frame,
+    /// The screenshot's `size`: the window's inside, or the screen's for
+    /// `fullscreen`.
     pub size: Option<[u32; 2]>,
+    /// The screenshot's `scale`, for `game`.
     pub scale: Option<u32>,
     /// The changes to the scene's settings, the screenshot's and the
     /// variant's together.
     pub settings: toml::Table,
+    /// The page of the pause menu to open: the variant's, or the
+    /// screenshot's.
     pub pause_menu: Option<String>,
+    /// The settings tab to open: the variant's, or the screenshot's.
     pub settings_tab: Option<String>,
+    /// GNOME's style, as the screenshot says.
     pub style: Option<Style>,
 }
 

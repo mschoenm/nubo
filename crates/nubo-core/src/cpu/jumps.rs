@@ -4,6 +4,7 @@
 use crate::cpu::Cpu;
 
 impl Cpu {
+    /// Jumps to `new_address` if `condition` holds, which takes one more M-cycle.
     fn jump_if(&mut self, new_address: u16, condition: bool) {
         if condition {
             self.registers.program_counter = new_address;

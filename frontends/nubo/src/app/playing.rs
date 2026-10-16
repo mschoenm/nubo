@@ -106,6 +106,8 @@ impl From<GameMessage> for Message {
 }
 
 impl App {
+    /// Handles a message about games: opening one, and controlling the one
+    /// that runs and its pause menu.
     pub(super) fn update_game(&mut self, message: GameMessage) -> Task<Message> {
         match message {
             GameMessage::OpenRom => {

@@ -300,6 +300,7 @@ impl Emulator {
         layout
     }
 
+    /// The emulator's stored values as bytes, without the save state's header.
     fn serialized_state(&self) -> Vec<u8> {
         let mut state = Vec::new();
         self.serialize(&mut state)

@@ -387,6 +387,7 @@ fn sorted_entries(folder: &Path) -> Result<Vec<PathBuf>> {
     Ok(entries)
 }
 
+/// How many lines `file` has.
 fn count_lines(file: &Path) -> Result<usize> {
     let text = fs::read_to_string(file)
         .map_err(|error| format!("failed to read {}: {error}", file.display()))?;

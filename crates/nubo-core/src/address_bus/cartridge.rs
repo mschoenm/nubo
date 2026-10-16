@@ -502,6 +502,8 @@ fn ram_bank_count(ram_size: usize) -> u8 {
     }
 }
 
+/// Whether the header's cartridge type byte names a cartridge with a battery,
+/// which keeps its RAM (and clock) while the console is off.
 fn is_battery_backed(cartridge_type: u8) -> bool {
     matches!(
         cartridge_type,
@@ -534,6 +536,8 @@ fn ram_size(kind: MapperKind, ram_size_index: u8) -> Option<usize> {
     }
 }
 
+/// Whether `byte` at `index` of the title is the CGB flag: 0x80 (works on
+/// both) or 0xC0 (Game Boy Color only) in the title's last byte.
 fn is_cgb_compatibility_flag(index: usize, byte: u8) -> bool {
     index == CGB_COMPATIBILITY_INDEX && (byte == 0xC0 || byte == 0x80)
 }

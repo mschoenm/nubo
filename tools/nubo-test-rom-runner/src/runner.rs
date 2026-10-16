@@ -166,6 +166,7 @@ struct WorkerStatus {
 }
 
 impl WorkerStatus {
+    /// Records which test the worker runs now, `None` between tests.
     fn set_test(&self, test: Option<usize>) {
         if let Ok(mut current) = self.test.lock() {
             *current = test;

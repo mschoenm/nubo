@@ -217,10 +217,10 @@ impl Cpu {
                 self.store_in_register_pair(REGISTER_HL, address.wrapping_sub(1));
             }
             0x33 => {
-                let sp = self.registers.stack_pointer;
-                self.registers.stack_pointer = sp.wrapping_add(1);
+                let stack_pointer = self.registers.stack_pointer;
+                self.registers.stack_pointer = stack_pointer.wrapping_add(1);
                 self.step_one_machine_cycle();
-                self.check_oam_bug_write(sp);
+                self.check_oam_bug_write(stack_pointer);
             }
             0x34 => self.increment_memory_byte(),
             0x35 => self.decrement_memory_byte(),
@@ -238,10 +238,10 @@ impl Cpu {
                 self.store_in_register_pair(REGISTER_HL, address.wrapping_sub(1));
             }
             0x3B => {
-                let sp = self.registers.stack_pointer;
-                self.registers.stack_pointer = sp.wrapping_sub(1);
+                let stack_pointer = self.registers.stack_pointer;
+                self.registers.stack_pointer = stack_pointer.wrapping_sub(1);
                 self.step_one_machine_cycle();
-                self.check_oam_bug_write(sp);
+                self.check_oam_bug_write(stack_pointer);
             }
             0x3C => self.increment_register(Register::A),
             0x3D => self.decrement_register(Register::A),
