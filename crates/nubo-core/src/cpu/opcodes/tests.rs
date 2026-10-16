@@ -37,9 +37,10 @@ fn read(cpu: &mut Cpu, address: u16) -> u8 {
     cpu.address_bus.peek(address)
 }
 
-/// Writes `address` in the memory map, with the PPU caught up first.
+/// Writes `address` in the memory map, with the PPU caught up first and its
+/// quiet dots worked out again after the change, as the core's own changes do.
 fn write(cpu: &mut Cpu, address: u16, value: u8) {
-    cpu.address_bus.catch_up_ppu();
+    cpu.address_bus.catch_up_ppu_before_change();
     cpu.address_bus.poke(address, value);
 }
 
