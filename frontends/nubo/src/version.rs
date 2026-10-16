@@ -1,15 +1,16 @@
-//! Nubo's version as the app shows it, on the About tab and with
-//! `--version`: the version from `Cargo.toml`, followed for a build
-//! `cargo xtask` made (every release, nightly build and package) by the
-//! commit it was built from and that commit's date, the way `rustc` and
-//! `cargo` show theirs: `0.4.0 (7c44d39 2026-10-16)`. A commit followed by
-//! `-dirty`, as `git describe --dirty` writes it, was built with changes
-//! that weren't committed. A plain `cargo build` knows neither, and shows
-//! only `0.4.0`.
+//! Nubo's version as the app shows it: the version from `Cargo.toml`,
+//! and for a build `cargo xtask` made (every release, nightly build and
+//! package) the commit it was built from and that commit's date. The About
+//! tab shows them together, as `0.4.0 (7c44d39 2026-10-16)`; `--version`
+//! puts the commit on a line of its own under the version
+//! (`command_line`). A commit followed by `-dirty`, as `git describe
+//! --dirty` writes it, was built with changes that weren't committed. A
+//! plain `cargo build` knows neither, and shows only `0.4.0`.
 
 use std::sync::LazyLock;
 
-/// The version with the build's commit and date when they are known.
+/// The version with the build's commit and date when they are known, as
+/// the About tab shows it.
 pub static VERSION: LazyLock<String> = LazyLock::new(|| {
     let version = env!("CARGO_PKG_VERSION");
     match &*COMMIT {

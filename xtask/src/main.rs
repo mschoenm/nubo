@@ -160,7 +160,7 @@ fn target_dir() -> PathBuf {
 ///
 /// The core keeps the commit in `nubo_core::BUILD_COMMIT`, so the states of
 /// every release and nightly build say exactly which build made them, and
-/// the app shows both after its version, on the About tab and with
+/// the app shows both with its version, on the About tab and with
 /// `--version`. Every build xtask runs gets them, the Flatpak's included; a
 /// plain `cargo build` leaves them empty.
 fn cargo() -> Command {

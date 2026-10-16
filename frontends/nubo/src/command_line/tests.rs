@@ -1,6 +1,7 @@
 //! Tests for reading the command line.
 
 use super::*;
+use crate::version::Commit;
 use clap::error::ErrorKind;
 
 /// Reads `args` as the command line, after the program's name.
@@ -160,12 +161,42 @@ fn help_and_version() {
 }
 
 #[test]
-fn the_version_comes_first_and_the_license_after_it() {
+fn the_version_alone_comes_first_and_the_license_after_it() {
     let short = parse_args(&["-V"]).unwrap_err().to_string();
-    assert_eq!(short, format!("nubo {}\n", *crate::version::VERSION));
+    assert_eq!(short, concat!("nubo ", env!("CARGO_PKG_VERSION"), "\n"));
     let long = parse_args(&["--version"]).unwrap_err().to_string();
     assert!(long.starts_with(&short), "{long}");
+    assert_eq!(
+        long.lines()
+            .nth(1)
+            .unwrap()
+            .starts_with("Built from commit "),
+        crate::version::COMMIT.is_some(),
+        "{long}"
+    );
     assert!(long.contains("License GPLv3+"), "{long}");
+}
+
+#[test]
+fn the_build_line_names_the_commit() {
+    let commit = |date: &str, dirty| Commit {
+        hash: String::from("7c44d3955370fa02045672a5774f923007919876"),
+        date: date.to_owned(),
+        dirty,
+        page: String::new(),
+    };
+    assert_eq!(
+        parser::built_from(&commit("2026-10-16", false)),
+        "Built from commit 7c44d39 (2026-10-16)"
+    );
+    assert_eq!(
+        parser::built_from(&commit("2026-10-16", true)),
+        "Built from commit 7c44d39-dirty (2026-10-16)"
+    );
+    assert_eq!(
+        parser::built_from(&commit("", false)),
+        "Built from commit 7c44d39"
+    );
 }
 
 #[test]

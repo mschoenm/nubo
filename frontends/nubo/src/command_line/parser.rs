@@ -1,6 +1,7 @@
 //! Reading the command line with clap, which only the desktop build has.
 
 use super::{CaptureRequest, Options};
+use crate::version::Commit;
 use clap::error::ErrorKind;
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use nubo_core::Model;
@@ -12,21 +13,40 @@ use std::sync::LazyLock;
 /// The largest `--scale`.
 const MAX_SCALE: u32 = 8;
 
-/// What `--version` prints after `nubo`, as GNU programs do: the version
-/// with the build's commit on the first line, which scripts read, then the
-/// copyright, the license and that there is no warranty. `-V` prints only
-/// the first line.
+/// What `--version` prints after `nubo`, as the GNU coding standards ask:
+/// the version alone on the first line, its last word, for scripts to
+/// read; the commit a packaged build was made from on a line of its own
+/// ([`built_from`]); then the copyright, the license and that there is no
+/// warranty. `-V` prints only the first line.
 static LONG_VERSION: LazyLock<String> = LazyLock::new(|| {
+    let build = match &*crate::version::COMMIT {
+        Some(commit) => format!("{}\n", built_from(commit)),
+        None => String::new(),
+    };
     format!(
-        "{}\n\
+        "{}\n{build}\
          Copyright (C) 2026 Michel Schoenmakers\n\
          Based on RetroBoy, copyright (C) 2023-2026 Samuel Parsons\n\
          License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\n\
          This is free software: you are free to change and redistribute it.\n\
          There is NO WARRANTY, to the extent permitted by law.",
-        *crate::version::VERSION
+        env!("CARGO_PKG_VERSION")
     )
 });
+
+/// The line of `--version` that names the build's commit, such as
+/// `Built from commit 7c44d39 (2026-10-16)`, with `-dirty` after the hash
+/// for a build with changes that weren't committed.
+pub(super) fn built_from(commit: &Commit) -> String {
+    let mut line = format!("Built from commit {}", commit.short_hash());
+    if commit.dirty {
+        line.push_str("-dirty");
+    }
+    if !commit.date.is_empty() {
+        line.push_str(&format!(" ({})", commit.date));
+    }
+    line
+}
 
 /// What the command line asked for.
 #[derive(Debug, Clone, PartialEq)]
@@ -190,7 +210,7 @@ where
     T: Into<OsString> + Clone,
 {
     let matches = Arguments::command()
-        .version(crate::version::VERSION.as_str())
+        .version(env!("CARGO_PKG_VERSION"))
         .long_version(LONG_VERSION.as_str())
         .try_get_matches_from(args)?;
     let arguments = Arguments::from_arg_matches(&matches)?;

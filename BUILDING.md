@@ -28,7 +28,7 @@ cargo screenshot path/to/rom.gb --seconds 10  # Run headless for 10 emulated sec
 
 Each package goes into `target/bundle/`. Releases and the nightly build make these on GitHub, so you only need them to build a package yourself.
 
-Every build `cargo xtask` makes, the packages and the web version, knows the commit it was built from. The app shows it after its version on the About tab and with `nubo --version`, such as `nubo 0.10.0 (7c44d39 2026-10-16)`, with `-dirty` after the hash when the source had changes that weren't committed; the RetroArch core puts the short hash in its version. A plain `cargo build` or `cargo play` shows only the version.
+Every build `cargo xtask` makes, the packages and the web version, knows the commit it was built from. The app shows it after its version on the About tab, such as `0.10.0 (7c44d39 2026-10-16)`, and `nubo --version` on the line under the version, as `Built from commit 7c44d39 (2026-10-16)`, with `-dirty` after the hash when the source had changes that weren't committed; the RetroArch core puts the short hash in its version. A plain `cargo build` or `cargo play` shows only the version.
 
 ### macOS
 
