@@ -3,15 +3,16 @@
 //! are open, for dialogs whose content is gone, and for the fixed keys and
 //! buttons of the menus.
 
+use super::playing::{PendingStart, ResumeAnswer};
 use super::settings_window::reset_summary;
 use super::{App, CAPTURE_TIMEOUT, GameMessage, LibraryMessage, Message, SettingsMessage, cycle};
 use crate::command_line::Options;
-use crate::dialog::{DialogKind, ResetChoices};
+use crate::dialog::{Dialog, DialogKind, ResetChoices};
 use crate::input::KeyInput;
 use crate::settings::Appearance;
 use crate::views::settings::SettingsTab;
 use iced::keyboard::{self, Modifiers};
-use nubo_core::{ControllerButton, ControllerState};
+use nubo_core::{ControllerButton, ControllerState, Emulator, Model};
 use nubo_frontend::controls::{Action, Device, KeyCode, PadButton};
 use nubo_frontend::gamepads::{ControllerEvent, Controllers};
 use nubo_frontend::rom::Rom;
@@ -285,6 +286,65 @@ fn pausing_with_the_command_key_waits_while_the_settings_are_open() {
     let _ = app.update(SettingsMessage::Close.into());
     let _ = app.update(command_p);
     assert!(app.game.as_ref().unwrap().is_paused());
+}
+
+#[test]
+fn a_game_saved_on_another_model_starts_as_the_player_answers() {
+    for (answer, model) in [
+        (ResumeAnswer::Continue, Some(Model::Sgb)),
+        (ResumeAnswer::StartOver, Some(Model::Dmg)),
+        (ResumeAnswer::Cancel, None),
+    ] {
+        let mut app = waiting_app();
+        let _ = app.update(GameMessage::ResumeAnswered(answer).into());
+
+        assert_eq!(app.game.as_ref().map(|game| game.session.model()), model);
+        assert!(app.pending_start.is_none());
+    }
+}
+
+#[test]
+fn another_game_starting_replaces_the_one_waiting() {
+    let mut app = waiting_app();
+    let _ = app.update(
+        GameMessage::RomPicked(Some(Rom {
+            path: PathBuf::from("other.gb"),
+            bytes: Arc::from(vec![0; 0x8000]),
+        }))
+        .into(),
+    );
+
+    assert!(app.dialog.is_none());
+    assert!(app.pending_start.is_none());
+    let _ = app.update(GameMessage::ResumeAnswered(ResumeAnswer::Continue).into());
+    assert_eq!(
+        app.game.as_ref().unwrap().session.rom().path,
+        PathBuf::from("other.gb")
+    );
+}
+
+/// A `--fresh` app set to start games on the Game Boy, asking whether to
+/// continue an empty game from where it was left off on the Super Game Boy.
+fn waiting_app() -> App {
+    let mut app = playing_app();
+    app.model_override = Some(Model::Sgb);
+    let _ = app.update(GameMessage::Reset.into());
+    let game = app.game.as_mut().unwrap();
+    let state = game.session.snapshot().unwrap();
+    let rom = game.session.rom().clone();
+    app.game = None;
+    app.model_override = Some(Model::Dmg);
+
+    app.dialog = Some(Dialog::new(DialogKind::OtherModel {
+        saved: Model::Sgb,
+        configured: Model::Dmg,
+    }));
+    app.pending_start = Some(PendingStart {
+        header: Emulator::read_rom_header(&rom.bytes).unwrap(),
+        rom,
+        state,
+    });
+    app
 }
 
 /// A `--fresh` app playing an empty game.

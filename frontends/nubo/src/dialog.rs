@@ -10,6 +10,7 @@
 
 use crate::app::Message;
 use crate::ui::icons::Icon;
+use nubo_core::Model;
 use nubo_frontend::model::Console;
 use std::path::PathBuf;
 
@@ -35,6 +36,11 @@ pub enum DialogKind {
     /// Asks what to start over with, ticked as so far: the settings, the
     /// saves, the library's folders and "Continue playing".
     ResetSettings(ResetChoices),
+    /// Asks whether to continue a game on `saved`, the model its automatic
+    /// save (where the player left off) was made on, or start it from the
+    /// title screen on `configured`, the model it is now set to start on.
+    /// The game waits in `App::pending_start` meanwhile.
+    OtherModel { saved: Model, configured: Model },
 }
 
 /// What "Start over" resets, as the player ticks it in its dialog. Only
