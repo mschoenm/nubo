@@ -2,6 +2,8 @@
 # `emulators/nubo.py` (docs/SHOOTOUT_PLAN.md, Part 2), which the pull request
 # to the Shootout copies. `.github/workflows/shootout.yml` puts it in a
 # checkout of the Shootout and runs the Shootout's tests on the Windows zip.
+# Below this header it is the Shootout's copy byte for byte, comments included:
+# change it only together with that copy (.github/shootout/AGENTS.md).
 from util import *
 from emulator import Emulator
 from test import *
@@ -16,8 +18,8 @@ class Nubo(Emulator):
         self.speed = 4.0
 
     def setup(self):
-        # The release also has the MSI and the RetroArch core's zip, which a looser
-        # filter would pick.
+        # The release also has the MSI and the RetroArch core's zip, which a looser filter
+        # would pick.
         downloadGithubRelease("mschoenm/nubo", "downloads/nubo.zip",
                               filter=lambda name: name == "Nubo-windows-x64.zip", require_asset=True)
         extract("downloads/nubo.zip", "emu/nubo")
@@ -30,10 +32,10 @@ class Nubo(Emulator):
         return subprocess.Popen([
             # Windows doesn't find a relative program path once cwd is set.
             os.path.abspath("emu/nubo/Nubo/nubo.exe"), os.path.abspath(rom),
-            "--model", model, "--scale", "1", "--fresh", "--speed", "4",
-            # The emulator's own picture: plain grays, and no color correction or
-            # frame blending, which players get by default.
-            "--raw-screen",
+            # --scale 1 shows only the game screen at 1x, --fresh starts like a new install
+            # and leaves no files behind, and --raw-screen turns off color correction and
+            # frame blending.
+            "--model", model, "--scale", "1", "--fresh", "--speed", "4", "--raw-screen",
         ], cwd="emu/nubo/Nubo")
 
     def getScreenshot(self):
