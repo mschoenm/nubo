@@ -370,6 +370,8 @@ fn read_layout(set: &Path) -> Result<BTreeSet<String>, String> {
     Ok(list.lines().map(String::from).collect())
 }
 
+/// The last part of `path`, such as `ucity.gbc`, or an empty name if it has
+/// none.
 fn file_name(path: &Path) -> String {
     path.file_name()
         .unwrap_or_default()
@@ -455,6 +457,7 @@ fn scripted_keys(seconds: f64) -> Vec<Key> {
     keys
 }
 
+/// Every Game Boy button, to release the ones the script doesn't hold.
 const ALL_KEYS: [Key; 8] = [
     Key::Down,
     Key::Up,

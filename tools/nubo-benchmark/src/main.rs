@@ -145,6 +145,8 @@ struct Fingerprints {
 }
 
 impl Fingerprints {
+    /// The three fingerprints in hexadecimal, separated by spaces, as a
+    /// `--record` file stores them after a run's key and a tab.
     fn to_line(self) -> String {
         format!(
             "{:016x} {:016x} {:016x}",
@@ -152,6 +154,8 @@ impl Fingerprints {
         )
     }
 
+    /// Reads fingerprints written by [`Fingerprints::to_line`], or `None`
+    /// when the text isn't three hexadecimal numbers.
     fn from_line(line: &str) -> Option<Self> {
         let mut parts = line
             .split_whitespace()
@@ -172,10 +176,13 @@ struct Hasher {
 }
 
 impl Hasher {
+    /// Mixes one 64-bit word into the hash.
     fn add_word(&mut self, word: u64) {
         self.state = (self.state.rotate_left(5) ^ word).wrapping_mul(0x517c_c1b7_2722_0a95);
     }
 
+    /// Mixes `bytes` into the hash, eight at a time (little-endian), then the
+    /// bytes left over one by one.
     fn add_bytes(&mut self, bytes: &[u8]) {
         let (chunks, remainder) = bytes.as_chunks::<8>();
         for &chunk in chunks {
@@ -186,6 +193,7 @@ impl Hasher {
         }
     }
 
+    /// Mixes audio samples into the hash by their exact bits.
     fn add_samples(&mut self, samples: &[f32]) {
         for sample in samples {
             self.add_word(u64::from(sample.to_bits()));
@@ -220,6 +228,7 @@ fn scripted_keys(seconds: f64) -> Vec<Key> {
     keys
 }
 
+/// Every Game Boy button, to release the ones the script doesn't hold.
 const ALL_KEYS: [Key; 8] = [
     Key::Down,
     Key::Up,
@@ -406,6 +415,8 @@ fn run(
     })
 }
 
+/// Saves `frame` (the Game Boy screen, in RGBA) as a PNG in `folder`, named
+/// after `name` with slashes and spaces turned into underscores.
 fn save_screenshot(frame: &[u8], folder: &Path, name: &str) -> Result<(), String> {
     fs::create_dir_all(folder)
         .map_err(|error| format!("Failed to create {}: {error}", folder.display()))?;
@@ -454,6 +465,8 @@ fn find_roms(paths: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
     Ok(roms)
 }
 
+/// Whether `path` names a ROM the benchmark can run: a `.gb`, `.gbc` or
+/// `.zip` file, whatever its case.
 fn is_rom(path: &Path) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())

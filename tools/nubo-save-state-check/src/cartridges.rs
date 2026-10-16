@@ -17,6 +17,7 @@ use nubo_core::Model;
 pub struct TestCartridge {
     /// The file name its states are named after, such as `mbc1.gb`.
     pub file: &'static str,
+    /// The models its states are made on.
     pub models: &'static [Model],
     title: &'static str,
     /// The cartridge type byte of the header (0x0147), which picks the
