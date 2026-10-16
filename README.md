@@ -104,6 +104,7 @@ These are the default keys. All of them but Esc can be changed under Settings > 
 | -------- | ---- |
 | Esc | Pause menu |
 | Tab (hold) | Fast forward |
+| R (hold) | Rewind |
 | F5 / F8 | Quick save / quick load |
 | F11 | Fullscreen |
 | F12 | Screenshot |

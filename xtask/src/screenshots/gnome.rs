@@ -5,9 +5,9 @@
 //! [`run_plan`] starts xtask again as `cargo xtask gnome-session` (hidden)
 //! on a D-Bus session bus of its own (`dbus-run-session`). As root, as in a
 //! container, it does so in a mount namespace of its own (`unshare`), with
-//! a system bus of its own and empty `/run/systemd` and `/tmp/.X11-unix`
-//! folders: GNOME Shell then runs without logind, which a container lacks,
-//! and nothing of the container's is changed. As another user, as on a
+//! a system bus of its own and empty `/run/systemd`, `/run/dbus` and
+//! `/tmp/.X11-unix` folders: GNOME Shell then runs without logind, which a
+//! container lacks, and nothing of the container's is changed. As another user, as on a
 //! Linux desktop, the system's own system bus is used.
 //!
 //! [`run_session`] then starts GNOME Shell for each screen size and style

@@ -68,10 +68,10 @@ Scenes are made two ways:
 `images/screenshots.toml` lists what is published. Each entry names the output file, the scene, and:
 
 - `frame`: `none` (the window's contents), `gnome` (GNOME's real border, with rounded corners, shadow
-  and a see-through background) or `fullscreen` (the whole screen, 1920×1080 unless the entry says
-  otherwise);
+  and a see-through background), `fullscreen` (the whole screen, 1920×1080 unless the entry says
+  otherwise) or `game` (the game's picture alone, at the entry's `scale`);
 - `settings`: changes to the scene's settings, by the names `settings.toml` uses, so every setting works,
-  later ones included (`theme = "dark"` is dark mode);
+  later ones included (`appearance = "dark"` is dark mode);
 - `variants` with a `layout` (a row or a grid): the same scene with different settings side by side, such
   as the palettes, light and dark, or a setting on and off.
 
@@ -81,13 +81,14 @@ Images carry no text; the captions stay in the README.
 (where each game's address, license and credit are), starts the app in a hidden `capture` mode (it applies
 the settings, loads the state, runs the frames, opens the view and holds still) and takes the picture:
 
-- `frame = none`: the app saves its own window's contents, anywhere.
-- `frame = gnome` and `fullscreen`: the app runs through XWayland under a headless GNOME Shell, which
-  captures it, in a cloud session too (checked: GNOME Shell 46 from Ubuntu 24.04 runs with a private
-  system bus and draws its own border around an XWayland window). The border follows the screenshot's
-  light or dark theme. When GNOME Shell is missing, the task prints the `apt` line that installs it.
-  Under Wayland, Nubo's title bar is winit's own, which GNOME's window screenshot leaves out, so the
-  border is always GNOME's.
+- Every frame: the app runs through XWayland under a headless GNOME Shell, in a cloud session too
+  (checked: GNOME Shell 46 from Ubuntu 24.04 runs with a private system bus and draws its own border
+  around an XWayland window). When GNOME Shell is missing, the task prints the `apt` line that
+  installs it.
+- `frame = none`, `fullscreen` and `game`: the app saves its own picture (`--output`).
+- `frame = gnome`: GNOME captures the window with its border, which follows the screenshot's light or
+  dark theme. Under Wayland, Nubo's title bar is winit's own, which GNOME's window screenshot leaves
+  out, so the border is always GNOME's.
 
 Iced's software renderer is always used, so a scene gives the same pixels every time. A file whose pixels
 did not change is left as it is, so git only stores the images that really changed (15 to 70 KB each).
