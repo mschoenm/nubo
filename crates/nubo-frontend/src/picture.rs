@@ -210,5 +210,29 @@ impl AsRef<[u8]> for SharedPixels {
     }
 }
 
+/// Encodes a picture of `width` by `height` RGBA pixels, such as a frame of
+/// the Game Boy screen, as a PNG image, the format saved pictures are kept
+/// in on every platform.
+#[cfg(any(feature = "desktop", feature = "web", test))]
+pub fn encode_png(width: u32, height: u32, pixels: &[u8]) -> Result<Vec<u8>, String> {
+    use image::codecs::png::PngEncoder;
+    use image::{ExtendedColorType, ImageEncoder};
+
+    let mut png = Vec::new();
+    PngEncoder::new(&mut png)
+        .write_image(pixels, width, height, ExtendedColorType::Rgba8)
+        .map_err(|error| error.to_string())?;
+    Ok(png)
+}
+
+/// Decodes a PNG to its width, height and RGBA pixels.
+#[cfg(any(feature = "desktop", feature = "web", test))]
+pub fn decode_png(png: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
+    let picture = image::load_from_memory_with_format(png, image::ImageFormat::Png)
+        .ok()?
+        .to_rgba8();
+    Some((picture.width(), picture.height(), picture.into_raw()))
+}
+
 #[cfg(test)]
 mod tests;

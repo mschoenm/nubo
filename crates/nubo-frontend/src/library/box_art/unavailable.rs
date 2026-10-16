@@ -1,18 +1,17 @@
-//! Builds without the `desktop` feature, such as the browser build, download
-//! no box art.
+//! Builds without the `desktop` or `web` feature, such as the RetroArch
+//! core's, download no box art.
 
+use super::names::GameList;
 use std::path::Path;
 
-/// Without the `desktop` feature there are no game lists.
-#[derive(Debug, Default)]
-pub struct GameList;
-
-/// Fails: without the `desktop` feature there are no game lists to read.
+/// Fails: without the `desktop` or `web` feature there are no game lists to
+/// read.
 pub fn load_game_list() -> Result<GameList, String> {
-    Err(String::from("box art isn't available in the browser"))
+    Err(String::from("this build downloads no box art"))
 }
 
-/// Finds nothing: without the `desktop` feature no box art is downloaded.
+/// Finds nothing: without the `desktop` or `web` feature no box art is
+/// downloaded.
 pub fn find(
     _rom_path: &Path,
     _supports_cgb: bool,

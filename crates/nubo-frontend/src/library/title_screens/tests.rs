@@ -35,3 +35,15 @@ fn a_game_that_shows_nothing_gets_no_picture() {
 fn files_that_are_no_roms_get_no_picture() {
     assert!(capture(b"not a rom").is_none());
 }
+
+#[test]
+fn a_piece_of_a_capture_stays_short_without_frames_that_count() {
+    // The boot ROM's frames don't count, so the first piece ends at its
+    // limit on instructions rather than after ten frames.
+    let rom = vec![0; 0x8000];
+    let mut capture = Capture::start(&rom).unwrap();
+
+    assert!(capture.run(10).is_none());
+    assert!(capture.steps <= MAX_STEPS_AT_ONCE);
+    assert!(capture.steps > 0);
+}
