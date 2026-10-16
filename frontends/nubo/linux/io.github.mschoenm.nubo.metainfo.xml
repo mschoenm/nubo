@@ -71,6 +71,21 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.10.0" date="2026-10-16">
+      <description>
+        <p>Nubo looks more like the Game Boy you remember, with one Original screen look switch and a Super Game Boy border that follows the time of day, and its library and settings are tidier.</p>
+        <ul>
+          <li>Original screen look, on by default, replaces the two screen effects: it softens the Game Boy Color's colors and blurs moving things on the Game Boy and Pocket, as each screen did; if you had turned color correction off, turn the new switch off once</li>
+          <li>Nubo's own Super Game Boy border is new: the cloud buddy peeks over a panel under an open sky, starry at night and sunny from 7:00 to 19:00, and the screensaver's clouds now drift behind the panel</li>
+          <li>Shortcuts no longer act on the game behind the settings or a dialog, so trying out a new button on the Controls page doesn't save, load or rewind</li>
+          <li>The settings window is as tall as its tallest page allows, every tab opens at its top, and Reset to defaults is back beside the Keyboard/Controller switch</li>
+          <li>Library cards are shorter and lighter, Continue playing fills one row with up to five games, and the Pause button no longer moves the buttons beside it</li>
+          <li>The Game Boy model buttons sit in an even grid, and the darkest palette colors show on the dark theme</li>
+          <li>The About tab says that Nubo is made almost entirely by AI, as the README does</li>
+          <li>Save states made by Nubo 0.4.0 to 0.9.2 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.9.2" date="2026-10-15">
       <description>
         <p>Nubo can start over from its settings, its menus wrap around, and the controller's triggers no longer load or save by accident.</p>
