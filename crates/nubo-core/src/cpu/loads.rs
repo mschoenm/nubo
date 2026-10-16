@@ -49,18 +49,18 @@ impl Cpu {
     pub(super) fn push_word_to_stack(&mut self, word: u16) {
         self.step_one_machine_cycle();
 
-        let sp_initial = self.registers.stack_pointer;
-        self.check_oam_bug_write(sp_initial);
+        let stack_pointer = self.registers.stack_pointer;
+        self.check_oam_bug_write(stack_pointer);
 
-        let sp_high = sp_initial.wrapping_sub(1);
-        self.store_byte_in_memory(sp_high, (word >> 8) as u8);
-        self.check_oam_bug_write(sp_high);
+        let high_byte_address = stack_pointer.wrapping_sub(1);
+        self.store_byte_in_memory(high_byte_address, (word >> 8) as u8);
+        self.check_oam_bug_write(high_byte_address);
 
-        let sp_low = sp_high.wrapping_sub(1);
-        self.store_byte_in_memory(sp_low, (word & 0xFF) as u8);
-        self.check_oam_bug_write(sp_low);
+        let low_byte_address = high_byte_address.wrapping_sub(1);
+        self.store_byte_in_memory(low_byte_address, (word & 0xFF) as u8);
+        self.check_oam_bug_write(low_byte_address);
 
-        self.registers.stack_pointer = sp_low;
+        self.registers.stack_pointer = low_byte_address;
     }
 
     /// PUSH rr: pushes `register_pair` onto the stack.
@@ -71,16 +71,16 @@ impl Cpu {
 
     /// Pops a word off the stack, low byte first, which takes two M-cycles.
     pub(super) fn pop_word_from_stack(&mut self) -> u16 {
-        let sp_low = self.registers.stack_pointer;
-        let first_byte = u16::from(self.read_byte_from_memory(sp_low));
-        self.check_oam_bug_read(sp_low);
-        self.check_oam_bug_mixed(sp_low);
+        let low_byte_address = self.registers.stack_pointer;
+        let first_byte = u16::from(self.read_byte_from_memory(low_byte_address));
+        self.check_oam_bug_read(low_byte_address);
+        self.check_oam_bug_mixed(low_byte_address);
 
-        let sp_high = sp_low.wrapping_add(1);
-        let second_byte = u16::from(self.read_byte_from_memory(sp_high));
-        self.check_oam_bug_read(sp_high);
+        let high_byte_address = low_byte_address.wrapping_add(1);
+        let second_byte = u16::from(self.read_byte_from_memory(high_byte_address));
+        self.check_oam_bug_read(high_byte_address);
 
-        self.registers.stack_pointer = sp_high.wrapping_add(1);
+        self.registers.stack_pointer = high_byte_address.wrapping_add(1);
         (second_byte << 8) | first_byte
     }
 
