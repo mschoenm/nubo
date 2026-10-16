@@ -1137,6 +1137,43 @@ fn about<'a>(
         Some("Only the keys or buttons: Controls › Reset to defaults."),
     ))
     .push(group(
+        "Made with AI",
+        None,
+        vec![
+            group_row(
+                label(
+                    "Written almost entirely by AI",
+                    Some(String::from(
+                        "Nearly all of Nubo's code and documentation, and even its name, were \
+                         written by Claude, Anthropic's AI model, working in Claude Code. Its \
+                         developer decides what Nubo should do and chooses what goes in. It \
+                         started as an experiment: how good an emulator could be made using \
+                         only AI, and how well would the quality of the code hold up?",
+                    )),
+                ),
+                ROW_PADDING,
+                false,
+            ),
+            group_row(
+                label(
+                    "Built on the work of others",
+                    Some(String::from(
+                        "Nubo has very few original ideas. It rests on the clever ideas and \
+                         hard work of many others, from other emulators to the people who \
+                         wrote the test ROMs and documented the hardware, all credited in its \
+                         README.",
+                    )),
+                ),
+                ROW_PADDING,
+                false,
+            ),
+        ],
+        Some(
+            "If you'd rather not use software made this way, that's a fair choice, and it's \
+             why this is said up front.",
+        ),
+    ))
+    .push(group(
         "Source and license",
         None,
         rows,
