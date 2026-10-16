@@ -429,10 +429,23 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::build_commit;
+    use super::{build_commit, workspace_root};
+    use std::env;
+    use std::process::Command;
 
+    /// Checks the commit git gives. `NUBO_COMMIT` is passed on as it is, and
+    /// outside a git checkout, such as a source archive, there is no commit
+    /// to read, so the test has nothing to check then.
     #[test]
     fn the_build_commit_is_a_commit_hash() {
+        let in_git = Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .current_dir(workspace_root())
+            .output()
+            .is_ok_and(|output| output.status.success());
+        if env::var_os("NUBO_COMMIT").is_some() || !in_git {
+            return;
+        }
         let commit = build_commit();
         let hash = commit.strip_suffix("-dirty").unwrap_or(&commit);
         assert_eq!(hash.len(), 40, "{commit}");
