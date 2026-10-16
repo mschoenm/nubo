@@ -6,7 +6,7 @@ Nubo also runs in [RetroArch](https://www.retroarch.com/) and other frontends of
 
 The core is experimental and not in RetroArch's own core downloader yet, so it is installed by hand:
 
-1. Download the zip for your system (`Nubo-libretro-<system>.zip`) from a [release](https://github.com/mschoenm/nubo/releases/latest) or the [nightly build](https://github.com/mschoenm/nubo/releases/tag/nightly).
+1. Download the zip for your system: `Nubo-libretro-<system>.zip` from a [release](https://github.com/mschoenm/nubo/releases/latest), or `Nubo-nightly-<date>-libretro-<system>.zip` from the [nightly build](https://github.com/mschoenm/nubo/releases/tag/nightly).
 2. Copy `nubo_libretro.so` (Linux), `nubo_libretro.dll` (Windows) or `nubo_libretro.dylib` (macOS) into RetroArch's `cores` folder, and `nubo_libretro.info` into its `info` folder. Settings > Directory in RetroArch shows where they are. Without the info file RetroArch doesn't know which games the core runs, and turns off rewind and run-ahead for it.
 3. Load a `.gb` or `.gbc` game with Load Core > Nubo, or pick "Nintendo - Game Boy / Color (Nubo)" for a playlist.
 
