@@ -549,11 +549,19 @@ impl Emulator {
     }
 
     /// Writes a byte to memory in an emulator made with [`Emulator::for_cpu_tests`].
+    ///
+    /// # Panics
+    ///
+    /// If the emulator wasn't made with [`Emulator::for_cpu_tests`].
     pub fn write_test_memory(&mut self, address: u16, value: u8) {
         self.address_bus_mut().processor_test_ram_mut()[usize::from(address)] = value;
     }
 
     /// Reads a byte from memory in an emulator made with [`Emulator::for_cpu_tests`].
+    ///
+    /// # Panics
+    ///
+    /// If the emulator wasn't made with [`Emulator::for_cpu_tests`].
     pub fn read_test_memory(&self, address: u16) -> u8 {
         self.address_bus().processor_test_ram()[usize::from(address)]
     }
