@@ -202,7 +202,13 @@ fn build_stamp(emulator: Emulator, source: Source) -> Result<String> {
 fn build_nubo(emulator: Emulator, root: &Path) -> Result {
     let mut command = cargo();
     command
-        .args(["build", "--release", "--package", "nubo-benchmark"])
+        .args([
+            "build",
+            "--release",
+            "--locked",
+            "--package",
+            "nubo-benchmark",
+        ])
         .current_dir(workspace_root());
     if emulator == Emulator::NuboEager {
         command.args(["--features", "nubo-core/eager"]);

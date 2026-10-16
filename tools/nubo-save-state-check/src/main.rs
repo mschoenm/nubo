@@ -343,8 +343,25 @@ fn kept_sets(sets: &Path) -> Result<Vec<PathBuf>, String> {
         .map(|entry| entry.path())
         .filter(|path| path.is_dir())
         .collect();
-    kept.sort();
+    kept.sort_by_key(|path| set_order(&file_name(path)));
     Ok(kept)
+}
+
+/// The key that sorts the set named `name` among the others: its date, then
+/// its number that day (1 for a day's first set, which has no `-<number>`).
+/// Sorting the names as text would put `2026-10-14-10` before
+/// `2026-10-14-2`.
+fn set_order(name: &str) -> (String, u32) {
+    match name.split_at_checked(10) {
+        Some((date, "")) => (date.to_string(), 1),
+        Some((date, rest)) => (
+            date.to_string(),
+            rest.strip_prefix('-')
+                .and_then(|count| count.parse().ok())
+                .unwrap_or(0),
+        ),
+        None => (name.to_string(), 0),
+    }
 }
 
 /// The state files in `set`, sorted.
@@ -526,6 +543,30 @@ mod tests {
         assert_eq!(date_of_day(0), "1970-01-01");
         assert_eq!(date_of_day(11_016), "2000-02-29");
         assert_eq!(date_of_day(20_739), "2026-10-13");
+    }
+
+    #[test]
+    fn sets_sort_by_date_then_number() {
+        let mut names = [
+            "2026-10-14-10",
+            "2026-10-15",
+            "2026-10-14-2",
+            "2026-10-14",
+            "2026-10-13-2",
+            "2026-10-14-9",
+        ];
+        names.sort_by_key(|name| set_order(name));
+        assert_eq!(
+            names,
+            [
+                "2026-10-13-2",
+                "2026-10-14",
+                "2026-10-14-2",
+                "2026-10-14-9",
+                "2026-10-14-10",
+                "2026-10-15",
+            ]
+        );
     }
 }
 

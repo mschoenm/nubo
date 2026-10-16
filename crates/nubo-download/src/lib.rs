@@ -11,16 +11,25 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
+use std::time::Duration;
 
 /// How many files [`download_all`] downloads at the same time.
 const PARALLEL_DOWNLOADS: usize = 16;
 
+/// How long a connection may take to open before the download fails.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+/// How long a whole download may take before it fails, so a connection that
+/// stalls doesn't hang the tools (and CI) for good.
+const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(600);
+
 /// An HTTP client that finds a proxy and trusted certificates the way the
-/// system's own tools do.
+/// system's own tools do, and gives up on a download that takes too long.
 #[must_use]
 pub fn agent() -> ureq::Agent {
     ureq::Agent::new_with_config(
         ureq::Agent::config_builder()
+            .timeout_connect(Some(CONNECT_TIMEOUT))
+            .timeout_global(Some(DOWNLOAD_TIMEOUT))
             .tls_config(
                 ureq::tls::TlsConfig::builder()
                     .root_certs(ureq::tls::RootCerts::PlatformVerifier)
@@ -30,7 +39,10 @@ pub fn agent() -> ureq::Agent {
     )
 }
 
-/// Downloads `url` to `destination` with `agent`.
+/// Downloads `url` to `destination` with `agent`. The file is written next
+/// to `destination` with `.part` added to its name and renamed once it is
+/// complete, so a failed download never leaves part of a file at
+/// `destination`.
 ///
 /// # Errors
 ///
@@ -40,11 +52,34 @@ pub fn download_with(agent: &ureq::Agent, url: &str, destination: &Path) -> Resu
         .get(url)
         .call()
         .map_err(|error| format!("failed to download {url}: {error}"))?;
-    let mut file = fs::File::create(destination)
-        .map_err(|error| format!("failed to create {}: {error}", destination.display()))?;
-    io::copy(&mut response.into_body().into_reader(), &mut file)
-        .map_err(|error| format!("failed to download {url}: {error}"))?;
-    Ok(())
+    let part = part_file(destination);
+    let written = fs::File::create(&part)
+        .map_err(|error| format!("failed to create {}: {error}", part.display()))
+        .and_then(|mut file| {
+            io::copy(&mut response.into_body().into_reader(), &mut file)
+                .map_err(|error| format!("failed to download {url}: {error}"))
+        })
+        .and_then(|_| {
+            fs::rename(&part, destination).map_err(|error| {
+                format!(
+                    "failed to move {} to {}: {error}",
+                    part.display(),
+                    destination.display()
+                )
+            })
+        });
+    if written.is_err() {
+        let _ = fs::remove_file(&part);
+    }
+    written
+}
+
+/// Where a download to `destination` is written until it is complete:
+/// `destination` with `.part` added to its name.
+fn part_file(destination: &Path) -> PathBuf {
+    let mut name = destination.as_os_str().to_owned();
+    name.push(".part");
+    PathBuf::from(name)
 }
 
 /// Downloads `url` to `destination`.
@@ -115,6 +150,14 @@ mod tests {
     #[test]
     fn a_missing_file_has_no_checksum() {
         assert!(!has_checksum(Path::new("/no/such/file"), &sha256_hex(b"")));
+    }
+
+    #[test]
+    fn downloads_are_written_next_to_their_destination() {
+        assert_eq!(
+            part_file(Path::new("roms/game.zip")),
+            Path::new("roms/game.zip.part")
+        );
     }
 
     #[test]

@@ -183,6 +183,12 @@ impl Screenshot {
         if self.size.is_some() && self.frame == Frame::Game {
             return Err(String::from("frame = \"game\" takes a scale, not a size"));
         }
+        if self
+            .size
+            .is_some_and(|[width, height]| width == 0 || height == 0)
+        {
+            return Err(String::from("a size can't be 0 wide or high"));
+        }
         if self.scale.is_some_and(|scale| !(1..=8).contains(&scale)) {
             return Err(String::from("the scale goes from 1 to 8"));
         }

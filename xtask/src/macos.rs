@@ -36,7 +36,7 @@ pub fn build_macos_app() -> Result<PathBuf> {
         return Err(String::from("app bundles can only be built on macOS"));
     }
 
-    run(cargo().args(["build", "--release", "--package", EXECUTABLE]))?;
+    run(cargo().args(["build", "--release", "--locked", "--package", EXECUTABLE]))?;
 
     let bundle_dir = target_dir().join("bundle");
     let app = bundle_dir.join(format!("{APP_NAME}.app"));

@@ -46,7 +46,7 @@ struct Args {
     paths: Vec<PathBuf>,
 
     /// Seconds of emulated time to run each game for
-    #[arg(long, default_value_t = 30.0)]
+    #[arg(long, default_value_t = 30.0, value_parser = parse_seconds)]
     seconds: f64,
 
     /// Hardware models to run every game on, separated by commas
@@ -103,6 +103,15 @@ impl Shard {
     fn contains(self, position: usize) -> bool {
         position % self.count == self.number - 1
     }
+}
+
+/// Reads the number of seconds to run each game for, which must be more than
+/// 0 and finite: 0 would run nothing and infinity would run forever.
+fn parse_seconds(text: &str) -> Result<f64, String> {
+    text.parse::<f64>()
+        .ok()
+        .filter(|seconds| seconds.is_finite() && *seconds > 0.0)
+        .ok_or_else(|| String::from("expected a number of seconds, more than 0"))
 }
 
 /// Reads a part such as `2/4`.
