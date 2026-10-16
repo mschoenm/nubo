@@ -172,8 +172,8 @@ impl HdmaState {
 }
 
 impl AddressBus {
-    /// Copies one 16-byte block, two bytes per M-cycle (an M-cycle is four
-    /// clock ticks), and ends the transfer after its last block. With
+    /// Copies one 16-byte block, two bytes per M-cycle at normal speed and
+    /// one in double speed, and ends the transfer after its last block. With
     /// `trailer` the copy is followed by one more M-cycle in which the CPU
     /// still waits.
     ///

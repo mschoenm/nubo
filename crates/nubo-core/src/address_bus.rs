@@ -691,8 +691,8 @@ impl AddressBus {
         self.gpu.video_memory()
     }
 
-    /// Advances every component except the CPU by one M-cycle (four clock
-    /// ticks, or two in CGB double speed mode). While nothing can tell the
+    /// Advances every component except the CPU by one M-cycle (four PPU
+    /// dots, or two in CGB double speed mode). While nothing can tell the
     /// difference, the M-cycle only waits to run in one go with the ones
     /// around it (see `bulk_cycles.rs`).
     #[inline]
