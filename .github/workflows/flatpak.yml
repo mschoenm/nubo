@@ -10,6 +10,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/flatpak.yml
+      - Cargo.toml
       - Cargo.lock
       - xtask/src/flatpak.rs
       - xtask/src/licenses.rs
