@@ -1,4 +1,4 @@
-use super::{Shard, parse_shard};
+use super::{Shard, parse_seconds, parse_shard};
 
 #[test]
 fn parts_are_read_from_their_number_and_count() {
@@ -30,5 +30,14 @@ fn every_rom_is_in_exactly_one_part() {
                 .count();
             assert_eq!(parts, 1, "ROM {position} is in {parts} of {count} parts");
         }
+    }
+}
+
+#[test]
+fn seconds_must_be_a_finite_number_above_0() {
+    assert_eq!(parse_seconds("4"), Ok(4.0));
+    assert_eq!(parse_seconds("0.5"), Ok(0.5));
+    for invalid in ["0", "-1", "NaN", "inf", "-inf", "a", ""] {
+        assert!(parse_seconds(invalid).is_err(), "{invalid} was accepted");
     }
 }
