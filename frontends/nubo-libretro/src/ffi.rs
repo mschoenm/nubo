@@ -1087,13 +1087,14 @@ pub extern "C" fn retro_load_game_special(
 pub extern "C" fn retro_unload_game() {
     guard("retro_unload_game", (), || {
         *lock(&CORE) = None;
-        let mut frontend = lock(&FRONTEND);
+        let frontend = frontend();
         if frontend.rumble != 0
             && let Some(set_rumble_state) = frontend.set_rumble_state
         {
             // SAFETY: a plain call into RetroArch with numbers.
             unsafe { set_rumble_state(0, RETRO_RUMBLE_STRONG, 0) };
         }
+        let mut frontend = lock(&FRONTEND);
         frontend.rumble = 0;
         frontend.set_rumble_state = None;
     });
