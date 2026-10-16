@@ -1,7 +1,8 @@
 //! Checks that a copy of a booted emulator with another game inserted is in
 //! exactly the state that booting that game would have left it in, which
 //! test runners rely on to skip the boot ROM, that a loaded save state
-//! restores every field save states are meant to keep, that
+//! restores every field save states are meant to keep, that a damaged one
+//! never makes the emulator panic (`damaged_save_states`), that
 //! battery-backed RAM reaches the frontend once per call, that
 //! `run_frame` keeps to the frame boundaries and hands out every sample, and
 //! that what frontends such as the RetroArch core read and set besides
@@ -1173,3 +1174,5 @@ fn a_super_game_boy_state_loaded_into_the_running_emulator_goes_on_like_a_new_on
     }
     assert_eq!(emulator.save_state(), new.save_state());
 }
+
+mod damaged_save_states;
