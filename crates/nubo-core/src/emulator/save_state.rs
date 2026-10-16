@@ -242,9 +242,10 @@ impl Emulator {
     /// the values it couldn't read, such as `ppu.line_state` for a state a
     /// newer Nubo made in a PPU mode this one doesn't know. Such a value keeps
     /// its power-on value, or, when its bytes are longer than it needs, what
-    /// it read from their start. A state from this version has none, and neither has one
-    /// from an earlier version as long as later changes followed the rules in
-    /// `serializable.rs`, which `cargo save-states` checks.
+    /// it read from their start. A state from this version has none, and
+    /// neither has one from an earlier version as long as later changes
+    /// followed the rules in `serializable.rs`, which `cargo save-states`
+    /// checks.
     pub fn load_state_with_report(&mut self, data: &[u8]) -> Result<Vec<String>, SaveStateError> {
         let (header, mut state) = split(data)?;
         if header.model != self.model() {
