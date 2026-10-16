@@ -91,6 +91,7 @@ pub(super) struct BlepBuffer {
     buffer: [f32; BLEP_WIDTH * 2],
     /// The position of the current output sample, below `BLEP_WIDTH`.
     position: usize,
+    /// The output level: every step read so far, added up.
     accumulator: f32,
 }
 
@@ -115,7 +116,7 @@ impl BlepBuffer {
 
     /// Returns the output level for the current sample and moves to the next.
     pub(super) fn read(&mut self) -> f32 {
-        self.accumulator += self.buffer[self.position % BLEP_WIDTH];
+        self.accumulator += self.buffer[self.position];
         self.position += 1;
         if self.position == BLEP_WIDTH {
             self.buffer.copy_within(BLEP_WIDTH.., 0);
