@@ -4,7 +4,8 @@
 
 use super::lists::{Layout, Screenshot};
 use crate::Result;
-use image::RgbaImage;
+use image::codecs::png::{CompressionType, FilterType, PngEncoder};
+use image::{ExtendedColorType, ImageEncoder, RgbaImage};
 use std::path::{Path, PathBuf};
 
 /// Reads the PNG file at `path` as RGBA pixels.
@@ -14,15 +15,38 @@ pub fn read(path: &Path) -> Result<RgbaImage> {
         .into_rgba8())
 }
 
-/// Writes `picture` to `path` as a PNG file, creating its folder.
+/// Writes `picture` to `path` as a PNG file, creating its folder: without
+/// its alpha channel when every pixel is opaque, and compressed as tightly
+/// as the encoder can, since git keeps every version of the screenshots.
 pub fn write(path: &Path, picture: &RgbaImage) -> Result {
     if let Some(folder) = path.parent() {
         std::fs::create_dir_all(folder)
             .map_err(|error| format!("couldn't create {}: {error}", folder.display()))?;
     }
-    picture
-        .save(path)
-        .map_err(|error| format!("couldn't write {}: {error}", path.display()))
+    let file = std::fs::File::create(path)
+        .map_err(|error| format!("couldn't write {}: {error}", path.display()))?;
+    let encoder = PngEncoder::new_with_quality(
+        std::io::BufWriter::new(file),
+        CompressionType::Best,
+        FilterType::Adaptive,
+    );
+    let result = if picture.pixels().all(|pixel| pixel[3] == u8::MAX) {
+        let opaque = image::DynamicImage::ImageRgba8(picture.clone()).into_rgb8();
+        encoder.write_image(
+            &opaque,
+            picture.width(),
+            picture.height(),
+            ExtendedColorType::Rgb8,
+        )
+    } else {
+        encoder.write_image(
+            picture,
+            picture.width(),
+            picture.height(),
+            ExtendedColorType::Rgba8,
+        )
+    };
+    result.map_err(|error| format!("couldn't write {}: {error}", path.display()))
 }
 
 /// The picture of `screenshot` from the pictures the app took for it, one
