@@ -18,9 +18,8 @@
 //! [`config_folder`] and [`data_folder`], which follow it.
 
 use super::{Entry, Storage};
+pub use crate::picture::{decode_png, encode_png};
 use directories::ProjectDirs;
-use image::codecs::png::PngEncoder;
-use image::{ExtendedColorType, ImageEncoder};
 use std::fs;
 use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
@@ -190,22 +189,4 @@ pub fn write_atomically(path: &Path, contents: &[u8]) -> io::Result<()> {
     path.parent().map_or(Ok(()), fs::create_dir_all)?;
     fs::write(&temporary_path, contents)?;
     fs::rename(&temporary_path, path)
-}
-
-/// Encodes a picture of `width` by `height` RGBA pixels, such as a frame of
-/// the Game Boy screen, as a PNG image.
-pub fn encode_png(width: u32, height: u32, pixels: &[u8]) -> Result<Vec<u8>, String> {
-    let mut png = Vec::new();
-    PngEncoder::new(&mut png)
-        .write_image(pixels, width, height, ExtendedColorType::Rgba8)
-        .map_err(|error| error.to_string())?;
-    Ok(png)
-}
-
-/// Decodes a PNG to its width, height and RGBA pixels.
-pub fn decode_png(png: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
-    let picture = image::load_from_memory_with_format(png, image::ImageFormat::Png)
-        .ok()?
-        .to_rgba8();
-    Some((picture.width(), picture.height(), picture.into_raw()))
 }

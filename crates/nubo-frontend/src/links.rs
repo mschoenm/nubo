@@ -1,7 +1,8 @@
 //! Opening a web page in the player's browser, and a folder in their file
 //! manager. The desktop build asks the system to open them (with the
 //! `opener` crate); the browser build opens web pages in a new tab and has
-//! no folders to show.
+//! no folders to show, but hands files to the browser as downloads
+//! (`download`).
 
 use std::path::Path;
 
@@ -50,4 +51,42 @@ pub fn show_folder(path: &Path) -> Result<(), String> {
             folder.display()
         ))
     }
+}
+
+/// Hands `contents` to the browser as a download called `file_name`, of the
+/// media type `media_type` (such as `image/png`), as a link with a
+/// `download` attribute that the page clicks.
+#[cfg(all(feature = "web", not(feature = "desktop")))]
+pub fn download(file_name: &str, media_type: &str, contents: &[u8]) -> Result<(), String> {
+    use wasm_bindgen::JsCast;
+    use wasm_bindgen::closure::Closure;
+
+    let fail = |_| String::from("the browser didn't take the download");
+    let window = web_sys::window().ok_or("there is no window")?;
+    let document = window.document().ok_or("there is no page")?;
+
+    let parts = js_sys::Array::of1(&js_sys::Uint8Array::from(contents));
+    let options = web_sys::BlobPropertyBag::new();
+    options.set_type(media_type);
+    let blob =
+        web_sys::Blob::new_with_u8_array_sequence_and_options(&parts, &options).map_err(fail)?;
+    let url = web_sys::Url::create_object_url_with_blob(&blob).map_err(fail)?;
+
+    let link: web_sys::HtmlAnchorElement = document
+        .create_element("a")
+        .map_err(fail)?
+        .dyn_into()
+        .map_err(|_| String::from("the page made no link"))?;
+    link.set_href(&url);
+    link.set_download(file_name);
+    link.click();
+
+    // The browser reads the file after the click, so its address is freed a
+    // little later.
+    let revoke = Closure::once_into_js(move || {
+        let _ = web_sys::Url::revoke_object_url(&url);
+    });
+    let _ = window
+        .set_timeout_with_callback_and_timeout_and_arguments_0(revoke.unchecked_ref(), 10_000);
+    Ok(())
 }

@@ -7,18 +7,49 @@
 //! game lists from the libretro database give the official name of a file
 //! name or of the ROM's CRC32 checksum. The lists are downloaded once.
 //!
-//! Only the desktop build (the `desktop` feature) downloads anything, and
-//! only when the player turns box art on in the settings.
+//! The desktop build (the `desktop` feature) downloads with `ureq` from
+//! thumbnails.libretro.com. The browser build (the `web` feature) downloads
+//! with the browser's `fetch` from the collection's copy on GitHub, since
+//! browsers only let a page read pictures from servers that allow it. Both
+//! download only when the player turns box art on in the settings.
 
-/// Whether this build can download box art: only the desktop build can.
-pub const AVAILABLE: bool = cfg!(feature = "desktop");
+pub use names::GameList;
+/// Looks up the box art of a game and downloads it (see the store of this
+/// build): on the desktop it blocks, in the browser it is a future.
+pub use store::find;
 
+/// Whether this build can download box art: the desktop and browser builds
+/// can.
+pub const AVAILABLE: bool = cfg!(any(feature = "desktop", feature = "web"));
+
+/// Where this build downloads box art from, for the settings to tell the
+/// player.
+pub const SERVER: &str = if cfg!(feature = "desktop") {
+    "thumbnails.libretro.com"
+} else {
+    "GitHub"
+};
+
+/// Reads the No-Intro game lists, downloading the ones that aren't kept
+/// yet: on the desktop on a thread of its own, in the browser with its
+/// `fetch`.
+pub fn load_game_list() -> impl Future<Output = Result<GameList, String>> + use<> {
+    #[cfg(not(all(feature = "web", not(feature = "desktop"))))]
+    {
+        let work = crate::background::run(store::load_game_list);
+        async move { work.await.and_then(|result| result) }
+    }
+    #[cfg(all(feature = "web", not(feature = "desktop")))]
+    store::load_game_list()
+}
+
+mod names;
 #[cfg(feature = "desktop")]
-pub use download::{GameList, find, load_game_list};
-#[cfg(not(feature = "desktop"))]
-pub use unavailable::{GameList, find, load_game_list};
-
-#[cfg(feature = "desktop")]
-mod download;
-#[cfg(not(feature = "desktop"))]
-mod unavailable;
+#[path = "box_art/download.rs"]
+mod store;
+#[cfg(all(feature = "web", not(feature = "desktop")))]
+#[path = "box_art/fetch.rs"]
+mod store;
+#[cfg(not(any(feature = "desktop", feature = "web")))]
+#[path = "box_art/unavailable.rs"]
+mod store;

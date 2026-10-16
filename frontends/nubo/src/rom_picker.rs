@@ -26,6 +26,28 @@ pub async fn pick() -> Option<Rom> {
     })
 }
 
+/// Opens the file picker for several games at once, as the browser's
+/// library adds them, and reads the chosen ones; none if the user cancels.
+pub async fn pick_many() -> Vec<Rom> {
+    let Some(files) = rfd::AsyncFileDialog::new()
+        .add_filter("Game Boy games", &EXTENSIONS)
+        .set_title("Add Game Boy games")
+        .pick_files()
+        .await
+    else {
+        return Vec::new();
+    };
+
+    let mut roms = Vec::with_capacity(files.len());
+    for file in files {
+        roms.push(Rom {
+            path: picked_path(&file),
+            bytes: Arc::from(file.read().await),
+        });
+    }
+    roms
+}
+
 /// Opens the folder picker, returning the chosen folder or `None` if the
 /// user cancels.
 #[cfg(not(target_arch = "wasm32"))]

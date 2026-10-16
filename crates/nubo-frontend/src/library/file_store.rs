@@ -3,11 +3,12 @@
 //! game in `thumbnails`, a PNG of each title screen in `title_screens`, and
 //! downloaded box art in `box_art`.
 
-pub use crate::storage::files::decode_png;
+pub use crate::picture::decode_png;
 
 use super::{Cache, LibraryEntry, PictureKind};
+use crate::picture::encode_png;
 use crate::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
-use crate::storage::files::{encode_png, write_atomically};
+use crate::storage::files::write_atomically;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::ErrorKind;

@@ -1,5 +1,5 @@
-//! Builds without the `desktop` feature, such as the browser build, keep no
-//! save states yet.
+//! Builds without the `desktop` or `web` feature, such as the RetroArch
+//! core's, keep no save states.
 
 use super::{SaveState, Slot, SlotInfo};
 use crate::picture::Picture;
@@ -11,7 +11,7 @@ pub fn save(
     _state: &SaveState,
     _pixels: Option<&[u8]>,
 ) -> Result<(), String> {
-    Err(String::from("save states aren't available in the browser"))
+    Err(String::from("this build keeps no save states"))
 }
 
 #[expect(clippy::unnecessary_wraps, reason = "matches the file store")]
@@ -20,7 +20,7 @@ pub fn load(_rom_path: &Path, _slot: Slot) -> Result<Option<SaveState>, String> 
 }
 
 pub fn delete(_rom_path: &Path, _slot: Slot) -> Result<(), String> {
-    Err(String::from("save states aren't available in the browser"))
+    Err(String::from("this build keeps no save states"))
 }
 
 #[expect(clippy::unnecessary_wraps, reason = "matches the file store")]
@@ -29,7 +29,7 @@ pub fn delete_all() -> Result<(), String> {
 }
 
 pub fn keep_aside(_rom_path: &Path, _slot: Slot) -> Result<PathBuf, String> {
-    Err(String::from("save states aren't available in the browser"))
+    Err(String::from("this build keeps no save states"))
 }
 
 pub fn slot_info(_rom_path: &Path, slot: Slot) -> SlotInfo {
