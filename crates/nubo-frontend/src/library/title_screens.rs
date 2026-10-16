@@ -7,6 +7,7 @@
 //! are tried and the frame with the most detail is kept.
 
 use nubo_core::{Emulator, Model, NoSaves};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// The moments (in frames, about 60 a second) at which a frame is looked
 /// at: 2.5, 5, 7.5 and 10 seconds after the boot ROM hands over to the game.
@@ -18,6 +19,21 @@ const SAMPLE_RATE: u32 = 32_768;
 /// A frame needs at least this much detail to count as a title screen,
 /// so a blank or nearly blank screen is never kept.
 const MIN_DETAIL: usize = 200;
+
+/// Whether captures that run a few frames at a time wait (see [`hold`]).
+static HELD: AtomicBool = AtomicBool::new(false);
+
+/// Holds captures that run a few frames at a time (in the browser) back
+/// between their pieces while `held`, such as while a game runs on the same
+/// single thread, so it runs smoothly; they go on once it is let go.
+pub fn hold(held: bool) {
+    HELD.store(held, Ordering::Relaxed);
+}
+
+/// Whether captures are held back (see [`hold`]).
+pub fn is_held() -> bool {
+    HELD.load(Ordering::Relaxed)
+}
 
 /// Runs `rom` and returns the RGBA pixels of its title screen, or `None` if
 /// it never showed anything worth a picture. Color games run on a Game Boy

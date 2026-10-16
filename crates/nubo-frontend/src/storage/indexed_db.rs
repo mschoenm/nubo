@@ -141,10 +141,7 @@ pub fn rename(from: &str, to: &str) -> Result<bool, String> {
         return Ok(false);
     };
     #[cfg(target_arch = "wasm32")]
-    {
-        browser::put(to, &record);
-        browser::delete(FILES, from);
-    }
+    browser::rename(from, to, &record);
     FILES_IN_MEMORY.with_borrow_mut(|files| files.insert(to.to_owned(), record));
     Ok(true)
 }
@@ -323,6 +320,25 @@ mod browser {
 
     /// Writes `record` as `key` in `files`, in the background.
     pub fn put(key: &str, record: &Record) {
+        let value = value_of(record);
+        in_background(FILES, key, |store| {
+            store.put_with_key(&value, &JsValue::from_str(key))
+        });
+    }
+
+    /// Moves `record` from `from` to `to` in `files`, in the background, in
+    /// one transaction: if the database refuses the copy, the original
+    /// stays.
+    pub fn rename(from: &str, to: &str, record: &Record) {
+        let value = value_of(record);
+        in_background(FILES, to, |store| {
+            store.put_with_key(&value, &JsValue::from_str(to))?;
+            store.delete(&JsValue::from_str(from))
+        });
+    }
+
+    /// The value `record` is kept as in `files`.
+    fn value_of(record: &Record) -> Object {
         let value = Object::new();
         let milliseconds = record
             .modified
@@ -338,9 +354,7 @@ mod browser {
             &JsValue::from_str("modified"),
             &JsValue::from_f64(milliseconds),
         );
-        in_background(FILES, key, |store| {
-            store.put_with_key(&value, &JsValue::from_str(key))
-        });
+        value
     }
 
     /// Writes the ROM `bytes` as `name` in `roms`, in the background.

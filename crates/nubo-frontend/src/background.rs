@@ -51,15 +51,29 @@ where
 /// runs in pieces goes on, by waiting for a timer of zero milliseconds. On
 /// the desktop, where slow work has a thread of its own, it returns at once.
 pub async fn pause() {
+    pause_for(0).await;
+}
+
+/// Waits `milliseconds` in the browser, letting it do everything else
+/// meanwhile, such as before slow work that is held back looks again
+/// whether it may go on. On the desktop it returns at once.
+#[cfg_attr(
+    not(all(target_arch = "wasm32", feature = "web")),
+    expect(clippy::unused_async, reason = "the browser's version waits")
+)]
+pub async fn pause_for(milliseconds: i32) {
     #[cfg(all(target_arch = "wasm32", feature = "web"))]
     {
         let promise = js_sys::Promise::new(&mut |resolve, _reject| {
             if let Some(window) = web_sys::window() {
-                let _ = window.set_timeout_with_callback(&resolve);
+                let _ = window
+                    .set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, milliseconds);
             }
         });
         let _ = wasm_bindgen_futures::JsFuture::from(promise).await;
     }
+    #[cfg(not(all(target_arch = "wasm32", feature = "web")))]
+    let _ = milliseconds;
 }
 
 #[cfg(all(test, not(target_arch = "wasm32")))]

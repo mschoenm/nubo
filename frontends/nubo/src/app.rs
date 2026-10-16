@@ -458,6 +458,9 @@ impl App {
         };
 
         self.apply_to_game();
+        // The browser's title screen captures share the game's one thread.
+        #[cfg(target_arch = "wasm32")]
+        nubo_frontend::library::title_screens::hold(self.game.is_some());
         self.save_stepped_sgb_colors();
         self.show_notices();
         Task::batch([task, self.load_slot_thumbnails()])

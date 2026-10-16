@@ -237,6 +237,9 @@ impl Cache {
                     return pixels;
                 }
                 background::pause().await;
+                while title_screens::is_held() {
+                    background::pause_for(250).await;
+                }
             }
         }
     }
