@@ -137,6 +137,29 @@ fn every_tab_has_rows() {
 }
 
 #[test]
+fn the_focus_stays_on_the_last_row_when_the_row_under_it_goes_away() {
+    let settings = Settings::default();
+    let with_try_again = rows(
+        SettingsTab::Library,
+        &settings,
+        &state(false, Device::Keyboard, true),
+    );
+    let without = rows(
+        SettingsTab::Library,
+        &settings,
+        &state(false, Device::Keyboard, false),
+    );
+    let focus = with_try_again.len() - 1;
+    assert!(focus >= without.len());
+
+    assert_eq!(
+        focused_row(&without, focus),
+        Some((without.len() - 1, without[without.len() - 1]))
+    );
+    assert_eq!(focused_row(&[], 0), None);
+}
+
+#[test]
 fn the_revision_row_shows_for_consoles_with_several_revisions() {
     let mut settings = Settings::default();
     let state = state(false, Device::Keyboard, false);

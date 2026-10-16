@@ -392,11 +392,10 @@ impl App {
                 }
             }
             SettingsFocus::Row(index) => {
-                let Some(&row) = rows.get(index.min(rows.len().saturating_sub(1))) else {
+                let Some((index, row)) = views::settings::focused_row(&rows, index) else {
                     self.settings_focus = Some(SettingsFocus::Tabs);
                     return Task::none();
                 };
-                let index = index.min(rows.len() - 1);
 
                 match action {
                     Action::Up if index == 0 && layout.up_leaves_page() => {
