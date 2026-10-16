@@ -1,0 +1,5 @@
+# cargo-fuzz needs the nightly toolchain. This folder is the one place in Nubo
+# allowed to use it (AGENTS.md), and only during a full review.
+[toolchain]
+channel = "nightly"
+components = ["rustfmt", "clippy"]

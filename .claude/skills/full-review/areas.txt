@@ -1,0 +1,42 @@
+# The ten areas of a full review, as path prefixes. A file belongs to the first
+# area whose prefix it starts with, so the order matters. `review.py areas`
+# lists every tracked file that no area takes and fails if there is one; add
+# new folders here when the repository grows. Binary files (pictures, save
+# states, ROMs) are skipped.
+CORE-BUS      crates/nubo-core/src/address_bus.rs
+CORE-BUS      crates/nubo-core/src/address_bus/
+CORE-GPU      crates/nubo-core/src/gpu.rs
+CORE-GPU      crates/nubo-core/src/gpu/
+CORE-APU-SGB  crates/nubo-core/src/apu.rs
+CORE-APU-SGB  crates/nubo-core/src/apu/
+CORE-APU-SGB  crates/nubo-core/src/sgb.rs
+CORE-APU-SGB  crates/nubo-core/src/sgb/
+CORE-CPU      crates/nubo-core/
+CORE-CPU      crates/nubo-serializable-derive/
+FRONTEND      crates/nubo-frontend/
+APP           frontends/nubo/
+LIBRETRO      frontends/nubo-libretro/
+TOOLS         tools/
+TOOLS         crates/nubo-download/
+TOOLS         crates/nubo-logo/
+TOOLS         fuzz/
+XTASK         xtask/
+XTASK         .github/
+XTASK         .cargo/
+XTASK         .vscode/
+XTASK         Cargo.toml
+XTASK         Cargo.lock
+XTASK         deny.toml
+XTASK         rust-toolchain.toml
+XTASK         .gitattributes
+XTASK         .gitignore
+DOCS          docs/
+DOCS          .claude/
+DOCS          .agents/
+DOCS          images/
+DOCS          save-states/
+DOCS          AGENTS.md
+DOCS          BUILDING.md
+DOCS          README.md
+DOCS          NOTICE
+DOCS          LICENSE
