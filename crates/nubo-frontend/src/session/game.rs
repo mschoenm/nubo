@@ -414,7 +414,9 @@ impl GameSession {
         }
         // Only the frames run here are blended, so the picture never
         // depends on what was on screen before.
-        self.screen.previous = None;
+        if !frames.is_empty() {
+            self.screen.raw = None;
+        }
         for frame in frames {
             self.screen.show(frame);
         }
@@ -485,11 +487,9 @@ impl Screen {
     /// Shows a frame as the emulator drew it, in the chosen palette, mixed
     /// with the one before and with its colors corrected if the player wants.
     fn show(&mut self, frame: Frame) {
-        let mut shown = frame.clone();
-        self.effects.apply(&mut shown, self.previous.as_deref());
-        self.picture = Some(shown.shown(self.palette, self.border));
-        self.previous = Some(frame.pixels.clone());
+        self.previous = self.raw.take().map(|raw| raw.pixels);
         self.raw = Some(frame);
+        self.show_again();
     }
 
     /// Corrects the colors of a Game Boy Color frame, if the player wants.
@@ -526,10 +526,13 @@ impl Screen {
         }
     }
 
-    /// Shows the newest frame again, after a setting changed.
+    /// Shows the newest frame again, mixed with the one before it as when
+    /// it came, after a setting changed.
     fn show_again(&mut self) {
-        if let Some(raw) = self.raw.take() {
-            self.show(raw);
+        if let Some(raw) = &self.raw {
+            let mut shown = raw.clone();
+            self.effects.apply(&mut shown, self.previous.as_deref());
+            self.picture = Some(shown.shown(self.palette, self.border));
         }
     }
 }
