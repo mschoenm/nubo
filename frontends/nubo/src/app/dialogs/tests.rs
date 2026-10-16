@@ -189,28 +189,44 @@ fn a_ticked_box_no_longer_offered_deletes_nothing() {
 }
 
 #[test]
-fn the_other_model_question_names_the_consoles_and_continues_first() {
-    let content = other_model_question(Model::Sgb, Model::Dmg);
+fn the_other_model_question_names_the_consoles_and_stays_first() {
+    let content = other_model_question(Model::Sgb, Model::Dmg, true);
 
-    assert_eq!(content.title, "Continue on the Super Game Boy?");
+    assert_eq!(content.title, "Switch to the Game Boy?");
     assert_eq!(
         content.text.as_deref(),
         Some(
-            "You last played on the Super Game Boy. Starting on the Game Boy begins at the title \
-             screen and replaces the automatic save from when you stopped. Your in-game saves \
-             stay."
+            "You last played this game on the Super Game Boy, but it's now set to the Game \
+             Boy.\n\nSwitching starts the game at the title screen and replaces your automatic \
+             save. Your in-game saves stay.\n\nStaying continues where you left off and keeps \
+             the game on the Super Game Boy."
         )
     );
     let (_, buttons) = labels(&content);
-    assert_eq!(buttons, ["Continue", "Start on the Game Boy"]);
+    assert_eq!(
+        buttons,
+        ["Stay on the Super Game Boy", "Switch to the Game Boy"]
+    );
     assert_eq!(content.choices[0].style, ChoiceStyle::Primary);
 }
 
 #[test]
 fn the_other_model_question_names_revisions_of_one_console() {
-    let content = other_model_question(Model::CgbC, Model::CgbE);
+    let content = other_model_question(Model::CgbC, Model::CgbE, true);
 
-    assert_eq!(content.title, "Continue on the CGB-C?");
+    assert_eq!(content.title, "Switch to the CGB-E?");
     let (_, buttons) = labels(&content);
-    assert_eq!(buttons, ["Continue", "Start on the CGB-E"]);
+    assert_eq!(buttons, ["Stay on the CGB-C", "Switch to the CGB-E"]);
+}
+
+#[test]
+fn the_other_model_question_says_nothing_about_keeping_a_model_from_the_command_line() {
+    let content = other_model_question(Model::Sgb, Model::Dmg, false);
+
+    assert!(
+        content
+            .text
+            .unwrap()
+            .ends_with("Staying continues where you left off.")
+    );
 }

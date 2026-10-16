@@ -385,7 +385,10 @@ fn a_model_picked_during_a_scan_stays() {
 fn a_reset_forgets_the_picked_models_and_the_play_times_each_as_asked() {
     let mut library = library_with_two_played_games("reset-models");
     library
-        .set_model(Path::new("/games/Tetris.gb"), Some(Model::Sgb2))
+        .set_model(
+            Path::new("/games/Tetris.gb"),
+            Some(ModelPreference::Fixed(Model::Sgb2)),
+        )
         .unwrap();
 
     library.reset_games(false, true).unwrap();
@@ -430,7 +433,10 @@ fn a_game_on_a_drive_that_is_gone_still_counts_as_played() {
 fn a_restored_snapshot_brings_back_the_games_and_ignores_the_running_scan() {
     let mut library = library_with_two_played_games("restore");
     library
-        .set_model(Path::new("/games/Tetris.gb"), Some(Model::Sgb2))
+        .set_model(
+            Path::new("/games/Tetris.gb"),
+            Some(ModelPreference::Fixed(Model::Sgb2)),
+        )
         .unwrap();
     let snapshot = library.snapshot();
     library.reset_games(true, true).unwrap();
@@ -481,4 +487,18 @@ fn a_library_that_keeps_its_games_finds_those_whose_file_it_keeps() {
     assert!(result.checked.contains(Path::new("Tetris.gb")));
     assert!(result.checked.contains(Path::new("Refused.gb")));
     assert!(result.missing_folders.is_empty());
+}
+
+#[cfg(feature = "desktop")]
+#[test]
+fn a_game_set_to_automatic_keeps_automatic_rather_than_the_settings() {
+    let mut library = library_with_two_played_games("automatic");
+    let path = Path::new("/games/Tetris.gb");
+    library
+        .set_model(path, Some(ModelPreference::Automatic))
+        .unwrap();
+
+    let entry = library.entry(path).unwrap();
+    assert_eq!(entry.preference(), Some(ModelPreference::Automatic));
+    assert_eq!(entry.model(), None);
 }

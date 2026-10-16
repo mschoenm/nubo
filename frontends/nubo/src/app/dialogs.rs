@@ -179,9 +179,11 @@ impl App {
             DialogKind::ResetSettings(choices) => {
                 Some(reset_question(*choices, self.reset_offers()))
             }
-            DialogKind::OtherModel { saved, configured } => {
-                Some(other_model_question(*saved, *configured))
-            }
+            DialogKind::OtherModel {
+                saved,
+                configured,
+                remembers,
+            } => Some(other_model_question(*saved, *configured, *remembers)),
         }
     }
 
@@ -203,8 +205,9 @@ impl App {
                     DialogMessage::ShowGameMenu(path.clone(), GameMenuPage::Consoles).into(),
                 ),
             )
-            .hint(match entry.model() {
-                Some(model) => String::from(Console::of(model).label()),
+            .hint(match entry.preference() {
+                Some(ModelPreference::Fixed(model)) => String::from(Console::of(model).label()),
+                Some(ModelPreference::Automatic) => String::from("Automatic"),
                 None => format!("Default ({})", self.default_model_label()),
             }),
         ];
@@ -256,23 +259,37 @@ impl App {
     fn consoles_page(&self, entry: &LibraryEntry) -> DialogContent {
         let path = &entry.path;
         let picked = entry.model();
+        let pick = |preference| {
+            DialogAction::Stay(LibraryMessage::GameModelPicked(path.clone(), preference).into())
+        };
 
         let mut choices = vec![
             Choice::new(
                 Icon::Settings,
                 "Default",
                 ChoiceStyle::Secondary,
-                DialogAction::Stay(LibraryMessage::GameModelPicked(path.clone(), None).into()),
+                pick(None),
             )
             .hint(self.default_model_label())
-            .checked(picked.is_none()),
+            .checked(entry.preference().is_none()),
+            Choice::new(
+                Icon::Sparkles,
+                "Automatic",
+                ChoiceStyle::Secondary,
+                pick(Some(ModelPreference::Automatic)),
+            )
+            .checked(entry.preference() == Some(ModelPreference::Automatic)),
         ];
         choices.extend(Console::ALL.map(|console| {
             let in_use = picked.filter(|&model| Console::of(model) == console);
             let action = if console.revisions().len() > 1 {
                 DialogMessage::ShowGameMenu(path.clone(), GameMenuPage::Revisions(console)).into()
             } else {
-                LibraryMessage::GameModelPicked(path.clone(), Some(console.recommended())).into()
+                LibraryMessage::GameModelPicked(
+                    path.clone(),
+                    Some(ModelPreference::Fixed(console.recommended())),
+                )
+                .into()
             };
             let choice = Choice::new(
                 Icon::Gamepad2,
@@ -573,7 +590,11 @@ fn revisions_page(entry: &LibraryEntry, console: Console) -> DialogContent {
                 revision.name(),
                 ChoiceStyle::Secondary,
                 DialogAction::Stay(
-                    LibraryMessage::GameModelPicked(path.clone(), Some(revision)).into(),
+                    LibraryMessage::GameModelPicked(
+                        path.clone(),
+                        Some(ModelPreference::Fixed(revision)),
+                    )
+                    .into(),
                 ),
             )
             .checked(entry.model() == Some(revision));
@@ -822,11 +843,12 @@ fn delete_question(path: &Path, entry: Option<&LibraryEntry>) -> DialogContent {
     }
 }
 
-/// The question whether to continue a game on `saved`, the model its
-/// automatic save was made on, or start it from the title screen on
-/// `configured`, the model it is now set to start on. The models are named
-/// by their console, or by their revision when both are the same console.
-fn other_model_question(saved: Model, configured: Model) -> DialogContent {
+/// The question whether to switch a game to `configured`, the model it is
+/// now set to start on, starting it from the title screen, or stay on
+/// `saved`, the model its automatic save was made on, continuing from that
+/// save. With `remembers`, it says that staying keeps the game on `saved`. The models are named by
+/// their console, or by their revision when both are the same console.
+fn other_model_question(saved: Model, configured: Model, remembers: bool) -> DialogContent {
     let name = |model: Model| {
         if Console::of(saved) == Console::of(configured) {
             model.name()
@@ -837,24 +859,29 @@ fn other_model_question(saved: Model, configured: Model) -> DialogContent {
     let (saved, configured) = (name(saved), name(configured));
     let answer = |answer| DialogAction::CloseThen(GameMessage::ResumeAnswered(answer).into());
     DialogContent {
-        title: format!("Continue on the {saved}?"),
+        title: format!("Switch to the {configured}?"),
         text: Some(format!(
-            "You last played on the {saved}. Starting on the {configured} begins at the title \
-             screen and replaces the automatic save from when you stopped. Your in-game saves \
-             stay."
+            "You last played this game on the {saved}, but it's now set to the {configured}.\n\n\
+             Switching starts the game at the title screen and replaces your automatic save. Your \
+             in-game saves stay.\n\nStaying continues where you left off{}.",
+            if remembers {
+                format!(" and keeps the game on the {saved}")
+            } else {
+                String::new()
+            }
         )),
         notice: None,
         layout: Layout::Buttons,
         choices: vec![
             Choice::new(
                 Icon::Play,
-                "Continue",
+                format!("Stay on the {saved}"),
                 ChoiceStyle::Primary,
                 answer(ResumeAnswer::Continue),
             ),
             Choice::new(
                 Icon::RotateCcw,
-                format!("Start on the {configured}"),
+                format!("Switch to the {configured}"),
                 ChoiceStyle::Secondary,
                 answer(ResumeAnswer::StartOver),
             ),

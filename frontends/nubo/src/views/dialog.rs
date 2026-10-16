@@ -1,6 +1,8 @@
 //! A dialog over the current screen (see `crate::dialog`): its title, its
 //! text, and its choices, as buttons along the bottom for a question (under
-//! its checkboxes and notice, if it has them) or as rows for a menu, with
+//! its checkboxes and notice, if it has them; stacked, each as wide as the
+//! question, when their labels are too long for one line) or as rows for a
+//! menu, with
 //! the one the D-pad is on outlined. A question that doesn't fit the window
 //! scrolls.
 
@@ -14,6 +16,29 @@ use iced::{Alignment, Element, Fill, widget};
 
 const QUESTION_WIDTH: f32 = 440.0;
 const MENU_WIDTH: f32 = 420.0;
+
+/// The room a question's buttons have side by side: its width less its
+/// padding.
+const BUTTONS_WIDTH: f32 = QUESTION_WIDTH - 2.0 * 24.0;
+
+/// Whether `buttons` fit side by side on one line of a question, judged by
+/// the length of their labels: buttons whose labels would wrap stack instead,
+/// each as wide as the question.
+fn buttons_fit<'a>(buttons: impl Iterator<Item = &'a Choice>) -> bool {
+    // About the width of an average character of the body font at its usual
+    // size, and of a button around its label: focus ring, padding, icon and
+    // the space after it, and the space between buttons.
+    const CHARACTER: f32 = 8.5;
+    const AROUND_LABEL: f32 = 6.0 + 32.0 + 18.0 + 8.0 + 6.0;
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "labels are a few dozen characters long"
+    )]
+    let width: f32 = buttons
+        .map(|choice| choice.label.chars().count() as f32 * CHARACTER + AROUND_LABEL)
+        .sum();
+    width <= BUTTONS_WIDTH
+}
 
 /// The panel of `dialog`, showing `content`.
 pub fn view<'a>(dialog: &Dialog, content: DialogContent) -> Element<'a, Message> {
@@ -39,7 +64,8 @@ pub fn view<'a>(dialog: &Dialog, content: DialogContent) -> Element<'a, Message>
             if let Some(notice) = content.notice {
                 panel = panel.push(notice_row(notice));
             }
-            let choices = Row::with_children(buttons.into_iter().map(|(index, choice)| {
+            let stacked = !buttons_fit(buttons.iter().map(|(_, choice)| choice));
+            let choices = buttons.into_iter().map(|(index, choice)| {
                 let style = match choice.style {
                     ChoiceStyle::Primary => theme::primary_button,
                     ChoiceStyle::Secondary => theme::secondary_button,
@@ -53,14 +79,20 @@ pub fn view<'a>(dialog: &Dialog, content: DialogContent) -> Element<'a, Message>
                 .padding([8, 16])
                 .style(style)
                 .on_press_maybe(choice.enabled.then(|| choice.action.into_message()));
+                let button = if stacked { button.width(Fill) } else { button };
                 container(button)
                     .padding(3)
                     .style(theme::focus_ring(index == selection))
                     .into()
-            }))
-            .spacing(6)
-            .align_y(Alignment::Center);
-            panel = panel.push(row![space::horizontal(), choices].padding([6, 0]));
+            });
+            panel = if stacked {
+                panel.push(Column::with_children(choices).spacing(6).padding([6, 0]))
+            } else {
+                let choices = Row::with_children(choices)
+                    .spacing(6)
+                    .align_y(Alignment::Center);
+                panel.push(row![space::horizontal(), choices].padding([6, 0]))
+            };
             QUESTION_WIDTH
         }
         Layout::List => {
