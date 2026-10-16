@@ -459,8 +459,11 @@ impl AddressBus {
         self.apu.clear_audio_buffers();
     }
 
-    /// Sets how many audio samples per second the APU makes.
+    /// Sets how many audio samples per second the APU makes. That moves the
+    /// M-cycle that fills the audio buffer, so how many plain M-cycles may
+    /// wait is worked out again (see `deferrable_cycles`).
     pub(crate) fn set_sample_rate(&mut self, sample_rate: u32) {
+        self.run_deferred_cycles_before_change();
         self.apu.set_sample_rate(sample_rate);
     }
 
