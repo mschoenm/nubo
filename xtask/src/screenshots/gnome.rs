@@ -17,7 +17,12 @@
 //! runs as an X11 app through XWayland, since GNOME only draws its own
 //! border around X11 windows (a Wayland app draws its own, which for Nubo
 //! is winit's, and GNOME's window screenshot leaves that out). GTK draws
-//! that border, dark with `GTK_THEME=Adwaita:dark`. Before each picture
+//! that border, dark with `GTK_THEME=Adwaita:dark`. GNOME 46 draws it with
+//! plain GTK 4, whose title bar is beige with bare buttons, while GNOME's
+//! own apps and newer versions of GNOME draw libadwaita's: the window's
+//! color with round buttons. A stylesheet in the session's GTK settings
+//! folder ([`TITLE_BAR_STYLE`]) gives the border libadwaita's look, so the
+//! pictures look like GNOME on a desktop today. Before each picture
 //! the X pointer goes to the screen's bottom-right corner (with xdotool),
 //! so it hovers over nothing in the window: an X server starts with its
 //! pointer in the middle of the screen. Each picture is then either taken
@@ -48,6 +53,35 @@ const TOOLS: [(&str, &str); 6] = [
 /// What else GNOME's border needs to look as it does on a desktop: the
 /// title's font and the icons of its buttons.
 const LOOKS: [&str; 2] = ["fonts-cantarell", "adwaita-icon-theme"];
+/// The stylesheet that gives GNOME's border libadwaita's title bar (see
+/// the module's documentation): `{background}` and `{foreground}` are the
+/// light or dark colors of [`title_bar_style`]. GNOME draws the border of
+/// an X11 window with GTK 4 (`mutter-x11-frames`), which reads it from
+/// `gtk-4.0/gtk.css` in `XDG_CONFIG_HOME`.
+const TITLE_BAR_STYLE: &str = "\
+headerbar, headerbar:backdrop {
+  background: {background};
+  color: {foreground};
+  box-shadow: none;
+  border: none;
+}
+headerbar:backdrop .title { color: {foreground}; }
+windowcontrols button, windowcontrols button:hover, windowcontrols button:backdrop {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0 5px;
+  min-width: 24px;
+  min-height: 24px;
+  color: {foreground};
+}
+windowcontrols button > image {
+  border-radius: 100%;
+  padding: 4px;
+  background-color: alpha(currentColor, 0.1);
+}
+";
 /// How long GNOME Shell may take to start.
 const SHELL_START: Duration = Duration::from_secs(60);
 /// How long the app may take to show a scene and take its picture, which
@@ -258,6 +292,12 @@ impl Session {
         if dark {
             environment.push((String::from("GTK_THEME"), String::from("Adwaita:dark")));
         }
+        let gtk_settings = folder.join("config").join("gtk-4.0");
+        fs::create_dir_all(&gtk_settings)
+            .map_err(|error| format!("couldn't create {}: {error}", gtk_settings.display()))?;
+        let stylesheet = gtk_settings.join("gtk.css");
+        fs::write(&stylesheet, title_bar_style(dark))
+            .map_err(|error| format!("couldn't write {}: {error}", stylesheet.display()))?;
 
         let log = folder.join("gnome-shell.log");
         let output = File::create(&log)
@@ -448,6 +488,19 @@ impl Session {
         let _ = self.shell.kill();
         let _ = self.shell.wait();
     }
+}
+
+/// [`TITLE_BAR_STYLE`] in libadwaita's light or dark colors: a white or
+/// dark gray title bar, with nearly black or white text and buttons.
+fn title_bar_style(dark: bool) -> String {
+    let (background, foreground) = if dark {
+        ("#2e2e32", "#ffffff")
+    } else {
+        ("#ffffff", "rgba(0, 0, 6, 0.8)")
+    };
+    TITLE_BAR_STYLE
+        .replace("{background}", background)
+        .replace("{foreground}", foreground)
 }
 
 /// Runs `script` in the GNOME Shell on the session bus and returns what it

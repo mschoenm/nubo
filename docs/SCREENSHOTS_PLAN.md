@@ -29,8 +29,10 @@ Where the build differs from the plan below:
   renders.
 - **GNOME 46's border:** GNOME draws the border of an XWayland window with GTK 4, so on GNOME 46 (Ubuntu
   24.04, which cloud sessions and GitHub's runners have) it has the shadow and rounded top corners, square
-  bottom corners and plain window buttons, not libadwaita's round ones. A newer GNOME would draw a newer
-  border, and GNOME's version decides the pixels of those pictures.
+  bottom corners, and plain GTK 4's beige title bar with bare buttons. A stylesheet the task gives GTK
+  (`TITLE_BAR_STYLE` in `xtask/src/screenshots/gnome.rs`) draws libadwaita's title bar instead: the window's
+  color with round buttons, as GNOME's own apps and newer GNOME versions look. GNOME's version still decides
+  the pixels of those pictures.
 - **The recorder's preview** leaves out the toasts and isn't taken while a question is open, since scenes keep
   neither; nor while the player's own data shows (box art, a cheat that is on, or a pause menu page listing
   saved states or cheats), which a capture never has. A scene's game keeps no battery saves, with its cartridge
