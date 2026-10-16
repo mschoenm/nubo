@@ -527,7 +527,10 @@ mod browser {
             .as_f64()?;
         Some(Record {
             bytes: Arc::from(data.dyn_ref::<Uint8Array>()?.to_vec()),
-            modified: SystemTime::UNIX_EPOCH + Duration::from_secs_f64(modified.max(0.0) / 1000.0),
+            modified: Duration::try_from_secs_f64(modified.max(0.0) / 1000.0)
+                .ok()
+                .and_then(|since_epoch| SystemTime::UNIX_EPOCH.checked_add(since_epoch))
+                .unwrap_or(SystemTime::UNIX_EPOCH),
         })
     }
 
