@@ -154,6 +154,8 @@ impl Cpu {
         self.registers.program_counter = self.registers.program_counter.wrapping_add(1);
     }
 
+    /// Whether an interrupt can be handled now: IME is on and an enabled
+    /// interrupt is requested.
     fn can_dispatch_interrupt(&self) -> bool {
         self.ime == InterruptMasterEnable::On && self.has_pending_interrupt()
     }
@@ -230,6 +232,8 @@ impl Cpu {
         kept
     }
 
+    /// Leaves HALT: the CPU runs again, and OAM and HBlank DMA paused by the
+    /// HALT go on.
     fn leave_halt(&mut self) {
         self.run_state = RunState::Running;
         self.address_bus.hdma_halt_ended();

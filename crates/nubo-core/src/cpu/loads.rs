@@ -20,6 +20,8 @@ impl Cpu {
         self.store_in_register(destination, source_value);
     }
 
+    /// LD r, (HL) and the other loads from memory: reads the byte at `address`
+    /// into `destination`.
     pub(super) fn load_memory_byte_in_destination_register(
         &mut self,
         address: u16,
@@ -29,6 +31,7 @@ impl Cpu {
         self.store_in_register(destination, byte);
     }
 
+    /// LD (HL), r and the other stores to memory: writes `source` to `address`.
     pub(super) fn load_source_register_in_memory(&mut self, source: Register, address: u16) {
         let byte = self.read_from_register(source);
         self.store_byte_in_memory(address, byte);
@@ -60,6 +63,7 @@ impl Cpu {
         self.registers.stack_pointer = sp_low;
     }
 
+    /// PUSH rr: pushes `register_pair` onto the stack.
     pub(super) fn push_register_pair_to_stack(&mut self, register_pair: RegisterPair) {
         let word = self.read_from_register_pair(register_pair);
         self.push_word_to_stack(word);
@@ -80,6 +84,7 @@ impl Cpu {
         (second_byte << 8) | first_byte
     }
 
+    /// POP rr: pops a word off the stack into `register_pair`.
     pub(super) fn pop_word_into_register_pair_from_stack(&mut self, register_pair: RegisterPair) {
         let word = self.pop_word_from_stack();
         self.store_in_register_pair(register_pair, word);
