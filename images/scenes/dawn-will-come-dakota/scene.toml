@@ -1,0 +1,10 @@
+[game]
+file = "Dawn Will Come.gb"
+sha256 = "3a3b9881b5a3a3708e217efd73f443f6a97782d3b0d3a2086e1a00ac176e5e9f"
+model = "CGB-E"
+frames = 2
+
+[view]
+screen = "game"
+
+[settings]

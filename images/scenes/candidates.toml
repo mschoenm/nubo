@@ -1,0 +1,116 @@
+# Screenshot candidates waiting for the maintainer's pick (the `screenshots`
+# skill, "Collect new screenshots"). Not published: to render them, append
+# these entries to images/screenshots.toml and run
+# `cargo xtask screenshots gallery`. Once picked, the chosen ones move into
+# images/screenshots.toml with real file names, and this file and the
+# scenes nobody picked are deleted.
+
+[[screenshot]]
+file = "target/gallery/froggy-kong.png"
+scene = "froggy-kong-tower"
+size = [1000, 780]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "target/gallery/dawn-will-come.png"
+scene = "dawn-will-come-dakota"
+size = [1000, 780]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "target/gallery/geometrix.png"
+scene = "geometrix-board"
+size = [1000, 780]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "target/gallery/airaki.png"
+scene = "airaki-board"
+size = [1000, 780]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "target/gallery/europa-rescue.png"
+scene = "europa-rescue-news"
+size = [1000, 780]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "target/gallery/ucity.png"
+scene = "ucity-rock-river"
+size = [1000, 780]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "target/gallery/nubo-border.png"
+scene = "el-dueloroso-nubo-border"
+size = [1000, 800]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "target/gallery/library-dark.png"
+scene = "library"
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "target/gallery/super-game-boy-menu.png"
+scene = "tobu-tobu-super-game-boy"
+size = [1000, 800]
+settings = { appearance = "dark" }
+pause_menu = "super-game-boy"
+
+[[screenshot]]
+file = "target/gallery/settings-display.png"
+scene = "moki-bedroom"
+size = [1000, 780]
+settings = { appearance = "light" }
+settings_tab = "display"
+
+[[screenshot]]
+file = "target/gallery/light-and-dark.png"
+scene = "big2small-forest"
+size = [800, 640]
+layout = "row"
+gap = 32
+padding = 32
+background = "#0d0f14"
+[[screenshot.variant]]
+settings = { appearance = "light" }
+[[screenshot.variant]]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "target/gallery/fullscreen.png"
+scene = "tobu-tobu-super-game-boy"
+frame = "fullscreen"
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "target/gallery/flathub-moki-dark.png"
+scene = "moki-bedroom"
+frame = "gnome"
+size = [900, 620]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "target/gallery/games-grid.png"
+scene = "rebound-steps"
+frame = "game"
+scale = 3
+layout = "grid"
+columns = 3
+gap = 24
+padding = 24
+background = "#0d0f14"
+[[screenshot.variant]]
+scene = "rebound-steps"
+[[screenshot.variant]]
+scene = "moki-bedroom"
+[[screenshot.variant]]
+scene = "froggy-kong-tower"
+[[screenshot.variant]]
+scene = "ucity-rock-river"
+[[screenshot.variant]]
+scene = "airaki-board"
+[[screenshot.variant]]
+scene = "big2small-forest"

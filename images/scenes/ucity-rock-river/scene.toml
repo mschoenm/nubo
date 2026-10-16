@@ -1,0 +1,10 @@
+[game]
+file = "µCity.gbc"
+sha256 = "0d608db175dd8ba22780be5df5fc17bf135876f6964f58ee141e4f8d81c62947"
+model = "CGB-E"
+frames = 2
+
+[view]
+screen = "game"
+
+[settings]

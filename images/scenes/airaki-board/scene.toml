@@ -1,0 +1,10 @@
+[game]
+file = "Airaki.gb"
+sha256 = "fd8fe6e023d9969935e05e7469c0f687f34a430d1a71fdeb5bb30183ce1ea2dd"
+model = "CGB-E"
+frames = 2
+
+[view]
+screen = "game"
+
+[settings]
