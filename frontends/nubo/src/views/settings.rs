@@ -222,6 +222,7 @@ pub enum SettingsRow {
     Binding(Action),
     /// A library folder, by its place in the list.
     Folder(usize),
+    /// The row that adds a folder, or in the browser games.
     AddFolder,
     BoxArt,
     /// Tries to download box art again after it failed.
@@ -271,7 +272,9 @@ pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec
             );
         }
         SettingsTab::Library => {
-            rows.extend((0..settings.shared.library_folders.len()).map(SettingsRow::Folder));
+            if !library::KEEPS_GAMES {
+                rows.extend((0..settings.shared.library_folders.len()).map(SettingsRow::Folder));
+            }
             rows.push(SettingsRow::AddFolder);
             if box_art::AVAILABLE {
                 rows.push(SettingsRow::BoxArt);
@@ -1353,12 +1356,64 @@ fn binding_row(
         .into()
 }
 
-/// The library's folders, each with a menu, and a row that adds one, and
-/// the box art switch.
+/// The library's folders, each with a menu, and a row that adds one (in the
+/// browser, the games it keeps and a row that adds some), and the box art
+/// switch.
 fn library_page<'a>(
     settings: &'a Settings,
     library: &'a Library,
     box_art_problem: Option<&'a str>,
+    rings: &Rings,
+) -> Element<'a, Message> {
+    let mut page = column![if library::KEEPS_GAMES {
+        kept_games(library, rings)
+    } else {
+        game_folders(settings, library, rings)
+    }]
+    .spacing(20);
+
+    if box_art::AVAILABLE {
+        let mut rows = vec![rings.row(
+            setting(
+                "Download box art",
+                Some(String::from(
+                    "Games without box art show their title screen.",
+                )),
+                switch(settings.shared.download_box_art, |enabled| {
+                    Message::Library(LibraryMessage::DownloadBoxArtToggled(enabled))
+                }),
+            ),
+            SettingsRow::BoxArt,
+        )];
+        if let Some(problem) = box_art_problem {
+            rows.push(box_art_problem_row(
+                problem,
+                rings.is_focused(SettingsRow::RetryBoxArt),
+            ));
+        }
+        page = page.push(group(
+            "Box art",
+            None,
+            rows,
+            Some(if box_art::SERVER == "GitHub" {
+                "Pictures come from the libretro thumbnail collection on GitHub. While this is \
+                 on, the names of your games are sent to GitHub, where the game lists used to \
+                 find them come from too."
+            } else {
+                "Pictures come from the libretro thumbnail collection. While this is on, the \
+                 names of your games are sent to thumbnails.libretro.com, and the game lists \
+                 used to find them come from GitHub."
+            }),
+        ));
+    }
+
+    page.into()
+}
+
+/// The library's folders, each with a menu, and a row that adds one.
+fn game_folders<'a>(
+    settings: &'a Settings,
+    library: &'a Library,
     rings: &Rings,
 ) -> Element<'a, Message> {
     let mut folders: Vec<Element<'a, Message>> = settings
@@ -1396,49 +1451,67 @@ fn library_page<'a>(
         ),
     );
 
-    let mut page = column![group(
+    group(
         "Game folders",
         None,
         folders,
         Some(
             "Nubo looks for .gb, .gbc and .zip files in these folders, and sees new ones \
-             by itself. A folder's ⋯ menu has more."
+             by itself. A folder's ⋯ menu has more.",
         ),
-    )]
-    .spacing(20);
+    )
+}
 
-    if box_art::AVAILABLE {
-        let mut rows = vec![rings.row(
-            setting(
-                "Download box art",
-                Some(String::from(
-                    "Games without box art show their title screen.",
-                )),
-                switch(settings.shared.download_box_art, |enabled| {
-                    Message::Library(LibraryMessage::DownloadBoxArtToggled(enabled))
-                }),
-            ),
-            SettingsRow::BoxArt,
-        )];
-        if let Some(problem) = box_art_problem {
-            rows.push(box_art_problem_row(
-                problem,
-                rings.is_focused(SettingsRow::RetryBoxArt),
-            ));
-        }
-        page = page.push(group(
-            "Box art",
-            None,
-            rows,
-            Some(
-                "Pictures come from the libretro thumbnail collection. While this is on, the \
-                 names of your games are sent to thumbnails.libretro.com, and the game lists \
-                 used to find them come from GitHub.",
-            ),
-        ));
+/// In the browser, how many games the library keeps and how much room they
+/// take, and a row that adds games.
+fn kept_games<'a>(library: &'a Library, rings: &Rings) -> Element<'a, Message> {
+    #[cfg(target_arch = "wasm32")]
+    let (count, bytes) = library.kept_size();
+    #[cfg(not(target_arch = "wasm32"))]
+    let (count, bytes) = (library.games("").count(), 0_u64);
+    let summary = match count {
+        0 => String::from("No games yet. Add your games to keep them here."),
+        1 => format!("1 game, about {}", megabytes(bytes)),
+        _ => format!("{count} games, about {}", megabytes(bytes)),
+    };
+
+    let rows = vec![
+        group_row(
+            text(summary).size(14).style(theme::muted_text),
+            ROW_PADDING,
+            false,
+        ),
+        rings.row(
+            button(
+                row![icon(Icon::FilePlus), text("Add games…").size(14)]
+                    .spacing(12)
+                    .align_y(Alignment::Center),
+            )
+            .padding(0)
+            .style(theme::text_button)
+            .on_press(Message::Library(LibraryMessage::AddGames)),
+            SettingsRow::AddFolder,
+        ),
+    ];
+    group(
+        "Games in this browser",
+        None,
+        rows,
+        Some(
+            "Nubo keeps the games you add or open in this browser, with their saves. A game's \
+             ⋯ menu in the library removes it.",
+        ),
+    )
+}
+
+/// A number of bytes in megabytes, with one decimal under ten.
+fn megabytes(bytes: u64) -> String {
+    let megabytes = bytes as f64 / 1_000_000.0;
+    if megabytes < 10.0 {
+        format!("{megabytes:.1} MB")
+    } else {
+        format!("{megabytes:.0} MB")
     }
-
-    page.into()
 }
 
 /// The row that says box art couldn't be downloaded, with why in small

@@ -461,3 +461,16 @@ fn a_restored_snapshot_brings_back_the_games_and_ignores_the_running_scan() {
     );
     assert!(!library.is_scanning());
 }
+
+#[test]
+fn a_library_that_keeps_its_games_finds_the_games_it_knows() {
+    let mut known = LibraryEntry::example("Tetris.gb");
+    known.last_played = Some(1_000);
+
+    let result = scan::kept_games(7, vec![known.clone()]);
+
+    assert_eq!(result.generation, 7);
+    assert_eq!(result.entries, vec![known]);
+    assert!(result.checked.contains(Path::new("Tetris.gb")));
+    assert!(result.missing_folders.is_empty());
+}

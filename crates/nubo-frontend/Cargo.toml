@@ -26,10 +26,23 @@ desktop = [
 # Game controllers, read with gilrs (src/gamepads.rs). On the desktop a
 # thread reads them and waits on the app's channel (futures' executor).
 gamepads = ["dep:gilrs", "futures/executor"]
-# The browser's localStorage: settings and battery saves (see
-# src/storage/local_storage.rs); and the browser's sound for running a game
-# (cpal's WebAudio backend) and the clock that paces it (src/session/).
-web = ["dep:base64", "dep:cpal", "cpal/wasm-bindgen", "dep:web-sys"]
+# The browser's localStorage for settings, battery saves and cheats (see
+# src/storage/local_storage.rs) and its IndexedDB for save states, the game
+# library and the games' files (src/storage/indexed_db.rs), with PNG pictures;
+# screenshots as downloads and box art fetched by the browser; and the
+# browser's sound for running a game (cpal's WebAudio backend) and the clock
+# that paces it (src/session/).
+web = [
+    "dep:base64",
+    "dep:crc32fast",
+    "dep:cpal",
+    "cpal/wasm-bindgen",
+    "dep:image",
+    "dep:js-sys",
+    "dep:wasm-bindgen",
+    "dep:wasm-bindgen-futures",
+    "dep:web-sys",
+]
 
 [dependencies]
 nubo-core.workspace = true
@@ -41,7 +54,7 @@ web-time = "1.1"
 # The player's local hour, which picks the night or day look of Nubo's Super
 # Game Boy border (src/sgb_menu.rs); in the browser it asks JavaScript's Date.
 chrono = { version = "0.4", default-features = false, features = ["clock", "wasmbind"] }
-# The checksum box art is looked up by (src/library/box_art/download.rs).
+# The checksum box art is looked up by (src/library/box_art/).
 crc32fast = { version = "1.5", optional = true }
 directories = { version = "6", optional = true }
 image = { version = "0.25", default-features = false, features = ["png"], optional = true }
@@ -58,10 +71,38 @@ cpal = { version = "0.18", optional = true }
 # Game controllers (src/gamepads.rs).
 gilrs = { version = "0.11", optional = true }
 base64 = { version = "0.23", optional = true }
-web-sys = { version = "0.3", features = ["Window", "Storage"], optional = true }
+js-sys = { version = "0.3", optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+web-sys = { version = "0.3", features = [
+    "Blob",
+    "BlobPropertyBag",
+    "Document",
+    "DomException",
+    "DomStringList",
+    "Element",
+    "Event",
+    "HtmlAnchorElement",
+    "HtmlElement",
+    "IdbDatabase",
+    "IdbFactory",
+    "IdbObjectStore",
+    "IdbOpenDbRequest",
+    "IdbRequest",
+    "IdbTransaction",
+    "IdbTransactionMode",
+    "Request",
+    "RequestInit",
+    "Response",
+    "Storage",
+    "Url",
+    "Window",
+], optional = true }
 
 [dev-dependencies]
 futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
+# The pictures of the browser's save states and library, tested in every build.
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [lints]
 workspace = true

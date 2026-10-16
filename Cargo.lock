@@ -2914,6 +2914,7 @@ dependencies = [
  "futures",
  "gilrs",
  "image",
+ "js-sys",
  "notify-debouncer-mini",
  "nubo-core",
  "opener",
@@ -2921,6 +2922,8 @@ dependencies = [
  "sha2",
  "toml",
  "ureq",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
  "web-time",
 ]

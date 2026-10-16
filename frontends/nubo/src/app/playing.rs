@@ -33,9 +33,6 @@ pub enum GameMessage {
     RomRead(Result<Rom, String>),
     /// Starts the library game at this path.
     PlayGame(PathBuf),
-    /// Starts the last game played again, in the browser (see
-    /// `nubo_frontend::rom::remember`).
-    PlayRemembered,
     Reset,
     TogglePause,
     /// Opens the pause menu on its main page, from a right click on the
@@ -95,11 +92,10 @@ pub enum UndoPoint {
         picture: Option<Vec<u8>>,
     },
     /// The settings before a reset, with what the library knew then (on
-    /// builds that keep one) and the last game played (in the browser).
+    /// builds that keep one).
     Settings {
         settings: Box<Settings>,
         library: Option<LibrarySnapshot>,
-        remembered: Option<Rom>,
     },
 }
 
@@ -119,11 +115,6 @@ impl App {
             GameMessage::RomPicked(None) => {}
             GameMessage::RomRead(rom) => self.open(rom),
             GameMessage::PlayGame(path) => return read_rom(path),
-            GameMessage::PlayRemembered => {
-                if let Some(rom) = self.remembered.clone() {
-                    self.start_game(rom, true);
-                }
-            }
             GameMessage::Reset => {
                 if let Some(game) = &mut self.game {
                     let rom = game.session.rom().clone();
@@ -175,7 +166,11 @@ impl App {
             }
             GameMessage::CloseGame => {
                 self.stop_game();
-                return leave_fullscreen_for_game(self);
+                // The browser holds the title screens back while a game runs.
+                return Task::batch([
+                    leave_fullscreen_for_game(self),
+                    self.capture_title_screens(),
+                ]);
             }
             GameMessage::ShowPauseMenu(page) => {
                 if let Some(game) = &mut self.game {
@@ -367,18 +362,14 @@ impl App {
 
                 self.stop_game();
 
+                #[cfg(target_arch = "wasm32")]
+                if !self.fresh {
+                    self.keep_game(game.session.rom());
+                }
                 if !self.fresh
                     && let Err(error) = self.library.record_played(&path, game.session.header())
                 {
                     self.toasts.error(error);
-                }
-
-                if rom::REMEMBERS_LAST_GAME && !self.fresh {
-                    let rom = game.session.rom().clone();
-                    if let Err(error) = rom::remember(&rom) {
-                        self.toasts.error(error);
-                    }
-                    self.remembered = Some(rom);
                 }
                 self.game = Some(game);
                 self.settings_tab = None;
@@ -572,11 +563,9 @@ impl App {
                 Ok(()) => self.toasts.info(format!("Put the earlier {slot} back")),
                 Err(error) => self.toasts.error(format!("Couldn't undo: {error}")),
             },
-            Some(UndoPoint::Settings {
-                settings,
-                library,
-                remembered,
-            }) => return self.restore_settings(*settings, library, remembered),
+            Some(UndoPoint::Settings { settings, library }) => {
+                return self.restore_settings(*settings, library);
+            }
             None => {}
         }
         Task::none()
@@ -676,7 +665,12 @@ impl App {
 
         match screenshots::save(&game.session.name(), picture) {
             Ok(path) => self.toasts.info(format!(
-                "Screenshot saved as {}",
+                "Screenshot {} as {}",
+                if screenshots::DOWNLOADED {
+                    "downloaded"
+                } else {
+                    "saved"
+                },
                 path.file_name().unwrap_or_default().to_string_lossy()
             )),
             Err(error) => self.toasts.error(error),
@@ -798,9 +792,8 @@ fn scroll_pause_menu(index: usize, count: usize) -> Task<Message> {
     )
 }
 
-/// Reads the ROM at `path` in the background.
+/// Reads the ROM at `path` in the background: its file on the desktop, or
+/// the file the library keeps in the browser.
 pub(super) fn read_rom(path: PathBuf) -> Task<Message> {
-    Task::perform(async move { Rom::read(&path) }, |rom| {
-        GameMessage::RomRead(rom).into()
-    })
+    Task::perform(rom::load(path), |rom| GameMessage::RomRead(rom).into())
 }

@@ -95,12 +95,13 @@ fn a_game_waits_for_every_reset_deleting_saves() {
         },
     );
     app.deletions_running = 2;
-    app.remembered = Some(Rom {
-        path: PathBuf::from("game.gb"),
-        bytes: Arc::from(vec![0; 0x8000]),
-    });
-
-    let _ = app.update(GameMessage::PlayRemembered.into());
+    let _ = app.update(
+        GameMessage::RomPicked(Some(Rom {
+            path: PathBuf::from("game.gb"),
+            bytes: Arc::from(vec![0; 0x8000]),
+        }))
+        .into(),
+    );
     let _ = app.update(
         SettingsMessage::SavesDeleted {
             done: Vec::new(),
@@ -126,12 +127,13 @@ fn starting_a_game_takes_away_a_resets_undo() {
     );
     app.settings.appearance = Appearance::Dark;
     let _ = app.update(SettingsMessage::Reset(ResetChoices::default()).into());
-    app.remembered = Some(Rom {
-        path: PathBuf::from("game.gb"),
-        bytes: Arc::from(vec![0; 3]),
-    });
-
-    let _ = app.update(GameMessage::PlayRemembered.into());
+    let _ = app.update(
+        GameMessage::RomPicked(Some(Rom {
+            path: PathBuf::from("game.gb"),
+            bytes: Arc::from(vec![0; 3]),
+        }))
+        .into(),
+    );
     let _ = app.update(GameMessage::Undo.into());
 
     assert_eq!(app.settings.appearance, Appearance::System);
@@ -205,11 +207,13 @@ fn controller_shortcuts_wait_while_the_settings_are_open() {
             ..Options::default()
         },
     );
-    app.remembered = Some(Rom {
-        path: PathBuf::from("game.gb"),
-        bytes: Arc::from(vec![0; 0x8000]),
-    });
-    let _ = app.update(GameMessage::PlayRemembered.into());
+    let _ = app.update(
+        GameMessage::RomPicked(Some(Rom {
+            path: PathBuf::from("game.gb"),
+            bytes: Arc::from(vec![0; 0x8000]),
+        }))
+        .into(),
+    );
     let pad = |buttons: &[ControllerButton]| {
         let mut state = ControllerState::new();
         for &button in buttons {
@@ -243,11 +247,13 @@ fn pausing_with_the_command_key_waits_while_the_settings_are_open() {
             ..Options::default()
         },
     );
-    app.remembered = Some(Rom {
-        path: PathBuf::from("game.gb"),
-        bytes: Arc::from(vec![0; 0x8000]),
-    });
-    let _ = app.update(GameMessage::PlayRemembered.into());
+    let _ = app.update(
+        GameMessage::RomPicked(Some(Rom {
+            path: PathBuf::from("game.gb"),
+            bytes: Arc::from(vec![0; 0x8000]),
+        }))
+        .into(),
+    );
     let command_p = Message::Key(KeyInput {
         code: None,
         key: keyboard::Key::Character("p".into()),

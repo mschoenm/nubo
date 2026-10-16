@@ -11,13 +11,13 @@ use iced::Task;
 use iced::widget;
 use iced::widget::scrollable::AbsoluteOffset;
 use nubo_core::Model;
-use nubo_frontend::background;
 use nubo_frontend::controls::Action;
 use nubo_frontend::library::box_art::{self, GameList};
 use nubo_frontend::library::{
     self, DownloadedArt, FileCheck, LoadedPicture, ScanResult, WatchEvent,
 };
 use nubo_frontend::links;
+use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states::{self, Slot};
 use nubo_frontend::settings::LibraryFolder;
 use std::path::PathBuf;
@@ -39,6 +39,16 @@ pub enum LibraryMessage {
     Scrolled(f32, f32),
     AddFolder,
     FolderPicked(Option<PathBuf>),
+    /// Asks for games to keep in the browser's library, which has no
+    /// folders (see `nubo_frontend::library::KEEPS_GAMES`).
+    AddGames,
+    /// The player picked these games to keep.
+    GamesPicked(Vec<Rom>),
+    /// Asks whether to take this game out of the browser's library.
+    AskRemoveGame(PathBuf),
+    /// Takes this game out of the browser's library, as the player
+    /// confirmed.
+    RemoveGame(PathBuf),
     RemoveFolder(usize),
     IncludeSubfolders(usize, bool),
     Rescan,
@@ -123,6 +133,16 @@ impl App {
                 }
             }
             LibraryMessage::FolderPicked(None) => {}
+            LibraryMessage::AddGames => {
+                return Task::perform(rom_picker::pick_many(), |roms| {
+                    LibraryMessage::GamesPicked(roms).into()
+                });
+            }
+            LibraryMessage::GamesPicked(roms) => return self.add_games(&roms),
+            LibraryMessage::AskRemoveGame(path) => {
+                self.open_dialog(DialogKind::RemoveGame(path));
+            }
+            LibraryMessage::RemoveGame(path) => self.remove_game(&path),
             LibraryMessage::RemoveFolder(index) => {
                 if index < self.settings.shared.library_folders.len() {
                     self.change_settings(|settings| {
@@ -341,18 +361,93 @@ impl App {
     }
 
     /// Starts capturing the title screens of games that have none yet, a
-    /// few at a time in the background.
-    fn capture_title_screens(&mut self) -> Task<Message> {
+    /// few at a time in the background. The browser, which has a single
+    /// thread for the game and the captures alike, waits until no game is
+    /// open, so the game runs smoothly.
+    pub(super) fn capture_title_screens(&mut self) -> Task<Message> {
+        if cfg!(target_arch = "wasm32") && self.game.is_some() {
+            return Task::none();
+        }
         Task::batch(self.library.next_captures().into_iter().map(|path| {
-            let rom_path = path.clone();
-            let cache = self.library.cache().clone();
             Task::perform(
-                background::run(move || cache.title_screen(&rom_path)),
-                move |pixels| {
-                    LibraryMessage::TitleScreenCaptured(path, pixels.ok().flatten()).into()
-                },
+                self.library.cache().title_screen(path.clone()),
+                move |pixels| LibraryMessage::TitleScreenCaptured(path, pixels).into(),
             )
         }))
+    }
+
+    /// Keeps `roms` in the browser's library (see
+    /// `nubo_frontend::library::KEEPS_GAMES`), says which couldn't be kept,
+    /// and starts on their pictures.
+    fn add_games(&mut self, roms: &[Rom]) -> Task<Message> {
+        if roms.is_empty() {
+            return Task::none();
+        }
+        let mut added = 0;
+        for rom in roms {
+            match self.add_game(rom) {
+                Ok(()) => added += 1,
+                Err(error) => self.toasts.error(error),
+            }
+        }
+        match added {
+            0 => {}
+            1 => self.toasts.info("Added 1 game"),
+            _ => self.toasts.info(format!("Added {added} games")),
+        }
+        self.library_selection = None;
+        self.ask_about_box_art();
+        Task::batch([
+            self.load_pictures(true),
+            self.capture_title_screens(),
+            self.download_box_art(),
+        ])
+    }
+
+    /// Keeps `rom` in the browser's library.
+    #[cfg(target_arch = "wasm32")]
+    fn add_game(&mut self, rom: &Rom) -> Result<(), String> {
+        self.library.add_game(rom)
+    }
+
+    /// The desktop's library finds its games in folders instead.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[expect(
+        clippy::unused_self,
+        reason = "the browser build's version keeps the game in the library"
+    )]
+    fn add_game(&mut self, _rom: &Rom) -> Result<(), String> {
+        Err(String::from("Add a folder of games instead"))
+    }
+
+    /// Keeps the game just started in the browser's library, unless it
+    /// keeps that very file already (it was started from the library), so
+    /// it shows up there next time.
+    #[cfg(target_arch = "wasm32")]
+    pub(super) fn keep_game(&mut self, rom: &Rom) {
+        let kept = self.library.keeps_game(&rom.path)
+            && self
+                .library
+                .entry(&rom.path)
+                .is_some_and(|entry| entry.size() == rom.bytes.len() as u64);
+        if !kept && let Err(error) = self.library.add_game(rom) {
+            self.toasts.error(error);
+        }
+    }
+
+    /// Takes the game at `path` out of the browser's library.
+    fn remove_game(&mut self, path: &std::path::Path) {
+        #[cfg(target_arch = "wasm32")]
+        match self.library.remove_game(path) {
+            Ok(()) => self.toasts.info(format!(
+                "Removed {}",
+                nubo_frontend::rom::display_name(path)
+            )),
+            Err(error) => self.toasts.error(error),
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        let _ = path;
+        self.library_selection = None;
     }
 
     /// Looks up the box art of games that weren't looked up yet, a few at a
@@ -377,10 +472,9 @@ impl App {
                 return Task::none();
             }
             self.loading_game_list = true;
-            return Task::perform(
-                background::run(|| box_art::load_game_list().map(Arc::new)),
-                |result| LibraryMessage::GameListLoaded(result.flatten()).into(),
-            );
+            return Task::perform(box_art::load_game_list(), |result| {
+                LibraryMessage::GameListLoaded(result.map(Arc::new)).into()
+            });
         };
 
         Task::batch(
@@ -391,12 +485,9 @@ impl App {
                     let list = list.clone();
                     let rom_path = path.clone();
                     let cache = self.library.cache().clone();
-                    Task::perform(
-                        background::run(move || cache.box_art(&rom_path, supports_cgb, &list)),
-                        move |result| {
-                            LibraryMessage::BoxArtDownloaded(path, result.flatten()).into()
-                        },
-                    )
+                    Task::perform(cache.box_art(rom_path, supports_cgb, list), move |result| {
+                        LibraryMessage::BoxArtDownloaded(path, result).into()
+                    })
                 }),
         )
     }

@@ -136,6 +136,18 @@ pub fn scan(generation: u64, folders: &[LibraryFolder], known: Vec<LibraryEntry>
     }
 }
 
+/// The "scan" of a library that keeps its games' files itself, as the
+/// browser build's does (see `KEEPS_GAMES`): there are no folders, so it
+/// finds exactly the games the library knows.
+pub fn kept_games(generation: u64, known: Vec<LibraryEntry>) -> ScanResult {
+    ScanResult {
+        generation,
+        checked: known.iter().map(|entry| entry.path.clone()).collect(),
+        entries: known,
+        ..ScanResult::default()
+    }
+}
+
 /// Sorts the games in `entries` whose file is gone into deleted ones and
 /// ones on a folder that is gone, without scanning the folders. It only
 /// asks whether files and folders exist, so it is quick.

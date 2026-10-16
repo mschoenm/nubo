@@ -15,10 +15,10 @@ use iced::widget::scrollable::RelativeOffset;
 use nubo_frontend::background;
 use nubo_frontend::battery;
 use nubo_frontend::controls::{Action, Controls, Device};
-use nubo_frontend::library::LibrarySnapshot;
+use nubo_frontend::library::{self, LibrarySnapshot};
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::palettes::DmgPalette;
-use nubo_frontend::rom::{self, Rom};
+
 use nubo_frontend::save_states;
 use nubo_frontend::settings::FastForwardSpeed;
 use nubo_frontend::updates;
@@ -209,7 +209,6 @@ impl App {
         let before = UndoPoint::Settings {
             settings: Box::new(self.settings.clone()),
             library: self.keeps_library().then(|| self.library.snapshot()),
-            remembered: self.remembered.clone(),
         };
 
         let mut done = Vec::new();
@@ -225,20 +224,18 @@ impl App {
             self.toasts.error(error);
         }
         if choices.clear_recently_played {
-            if rom::REMEMBERS_LAST_GAME {
-                match rom::forget() {
-                    Ok(()) => {
-                        self.remembered = None;
-                        done.push("last game forgotten");
-                    }
-                    Err(error) => self.toasts.error(error),
-                }
-            } else {
-                done.push("Continue playing cleared");
-            }
+            done.push("Continue playing cleared");
         }
         if choices.remove_folders {
-            done.push("game folders removed");
+            #[cfg(target_arch = "wasm32")]
+            if let Err(error) = self.library.remove_all_games() {
+                self.toasts.error(error);
+            }
+            done.push(if library::KEEPS_GAMES {
+                "games removed"
+            } else {
+                "game folders removed"
+            });
         }
 
         if choices.reset_settings || choices.remove_folders {
@@ -291,25 +288,18 @@ impl App {
         Task::batch([deletion, self.settings_replaced()])
     }
 
-    /// Puts back the settings, the library's games and the last game played
-    /// as they were before a reset, for its Undo button.
+    /// Puts back the settings and the library's games as they were before a
+    /// reset, for its Undo button.
     pub(super) fn restore_settings(
         &mut self,
         settings: Settings,
         library: Option<LibrarySnapshot>,
-        remembered: Option<Rom>,
     ) -> Task<Message> {
         self.change_settings(|current| *current = settings);
         if let Some(snapshot) = library
             && let Err(error) = self.library.restore(snapshot)
         {
             self.toasts.error(error);
-        }
-        if let Some(rom) = remembered.filter(|_| self.remembered.is_none()) {
-            if let Err(error) = rom::remember(&rom) {
-                self.toasts.error(error);
-            }
-            self.remembered = Some(rom);
         }
         self.toasts.info("Put back as it was");
         self.settings_replaced()
@@ -527,6 +517,7 @@ impl App {
             SettingsRow::ResetControls => SettingsMessage::ResetControls(device).into(),
             SettingsRow::Binding(action) => SettingsMessage::CaptureBinding(device, action).into(),
             SettingsRow::Folder(index) => LibraryMessage::OpenFolderMenu(index).into(),
+            SettingsRow::AddFolder if library::KEEPS_GAMES => LibraryMessage::AddGames.into(),
             SettingsRow::AddFolder => LibraryMessage::AddFolder.into(),
             SettingsRow::BoxArt => {
                 LibraryMessage::DownloadBoxArtToggled(!settings.shared.download_box_art).into()

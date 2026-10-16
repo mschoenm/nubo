@@ -47,6 +47,21 @@ where
     Ok(work())
 }
 
+/// Lets the browser draw the page and handle input before slow work that
+/// runs in pieces goes on, by waiting for a timer of zero milliseconds. On
+/// the desktop, where slow work has a thread of its own, it returns at once.
+pub async fn pause() {
+    #[cfg(all(target_arch = "wasm32", feature = "web"))]
+    {
+        let promise = js_sys::Promise::new(&mut |resolve, _reject| {
+            if let Some(window) = web_sys::window() {
+                let _ = window.set_timeout_with_callback(&resolve);
+            }
+        });
+        let _ = wasm_bindgen_futures::JsFuture::from(promise).await;
+    }
+}
+
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::run;

@@ -9,9 +9,11 @@
 //! and, if the player wants it, box art (see [`box_art`]) in `box_art`.
 //! [`Cache`] says where those files are.
 //!
-//! Only the desktop build (the `desktop` feature) keeps a library: the
-//! browser has no folders to scan, so its library stays empty. The folder
-//! watcher (`watch`) is desktop only too.
+//! The desktop build (the `desktop` feature) finds its games in the player's
+//! folders. The browser build (the `web` feature) has no folders to scan, so
+//! the library keeps the file of every game the player adds or opens itself,
+//! with everything else, in the browser's IndexedDB ([`KEEPS_GAMES`], see
+//! `storage::indexed_db`). The folder watcher (`watch`) is desktop only.
 
 use crate::background;
 use crate::model::ModelPreference;
@@ -25,6 +27,7 @@ use nubo_core::{CartridgeHeader, Model};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 pub use scan::{FileCheck, ScanResult};
 #[cfg(feature = "desktop")]
@@ -35,9 +38,19 @@ const MAX_CAPTURES: usize = 2;
 /// How many games have their box art looked up at the same time.
 const MAX_DOWNLOADS: usize = 4;
 
-/// Whether this build keeps a library: only the desktop build, which can
-/// read folders, does.
-pub const AVAILABLE: bool = cfg!(feature = "desktop");
+/// Whether this build keeps a library: the desktop and browser builds do.
+pub const AVAILABLE: bool = cfg!(any(feature = "desktop", feature = "web"));
+
+/// Whether the library keeps the games' files itself, as the browser build
+/// does, which has no folders: the player adds games (`Library::add_game`)
+/// instead of folders, every game opened joins the library, and removing a
+/// game deletes its file (`Library::remove_game`).
+pub const KEEPS_GAMES: bool = cfg!(all(feature = "web", not(feature = "desktop")));
+
+/// How many of a game's frames a title screen capture runs before the
+/// browser gets to draw the page again (see [`Cache::title_screen`]).
+#[cfg(all(feature = "web", not(feature = "desktop")))]
+const CAPTURE_FRAMES_AT_ONCE: u32 = 10;
 
 /// A game the library knows about.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -89,6 +102,12 @@ impl LibraryEntry {
     /// `Tetris (World) (Rev 1).gb`.
     pub fn name(&self) -> String {
         crate::rom::display_name(&self.path)
+    }
+
+    /// The size of the game's file in bytes, as it was when its header was
+    /// read.
+    pub fn size(&self) -> u64 {
+        self.size
     }
 
     /// The model the player picked for this game, if they picked one.
@@ -186,33 +205,75 @@ impl Cache {
     /// saved for it if it was made after the ROM file last changed (for
     /// example when a folder is added back to the library), else one
     /// captured by running the game (see [`title_screens::capture`]).
-    /// `None` if the game showed nothing worth a picture. This is slow, so
-    /// run it with [`background::run`] and hand the result to
-    /// [`Library::finish_capture`].
-    pub fn title_screen(&self, rom_path: &Path) -> Option<Vec<u8>> {
-        if let Some(saved) = self.saved_title_screen(rom_path) {
-            return Some(saved);
+    /// `None` if the game showed nothing worth a picture. This is slow: on
+    /// the desktop it runs on a thread of its own ([`background::run`]),
+    /// and in the browser a few frames at a time, letting the page draw in
+    /// between. Hand the result to [`Library::finish_capture`].
+    #[cfg(not(all(feature = "web", not(feature = "desktop"))))]
+    pub fn title_screen(&self, rom_path: PathBuf) -> impl Future<Output = Option<Vec<u8>>> + use<> {
+        let cache = self.clone();
+        let capture = background::run(move || {
+            if let Some(saved) = cache.saved_title_screen(&rom_path) {
+                return Some(saved);
+            }
+            let rom = std::fs::read(&rom_path).ok()?;
+            title_screens::capture(&rom)
+        });
+        async move { capture.await.ok().flatten() }
+    }
+
+    /// See the desktop's version above.
+    #[cfg(all(feature = "web", not(feature = "desktop")))]
+    pub fn title_screen(&self, rom_path: PathBuf) -> impl Future<Output = Option<Vec<u8>>> + use<> {
+        let cache = self.clone();
+        async move {
+            if let Some(saved) = cache.saved_title_screen(&rom_path) {
+                return Some(saved);
+            }
+            let rom = crate::rom::load(rom_path).await.ok()?;
+            let mut capture = title_screens::Capture::start(&rom.bytes)?;
+            loop {
+                if let Some(pixels) = capture.run(CAPTURE_FRAMES_AT_ONCE) {
+                    return pixels;
+                }
+                background::pause().await;
+            }
         }
-        let rom = std::fs::read(rom_path).ok()?;
-        title_screens::capture(&rom)
     }
 
     /// The box art of the game at `rom_path`: the one saved for it if it
     /// was saved after the ROM file last changed, else the one looked up in
     /// `games` and downloaded (see [`box_art::find`]). `None` if the
-    /// collection has none. This is slow, so run it with
-    /// [`background::run`] and hand the result to
+    /// collection has none. This is slow: on the desktop it runs on a thread
+    /// of its own ([`background::run`]). Hand the result to
     /// [`Library::finish_download`].
     pub fn box_art(
         &self,
-        rom_path: &Path,
+        rom_path: PathBuf,
         supports_cgb: bool,
-        games: &GameList,
-    ) -> Result<Option<DownloadedArt>, String> {
-        if let Some(saved) = self.saved_box_art(rom_path) {
-            return Ok(Some(saved));
+        games: Arc<GameList>,
+    ) -> impl Future<Output = Result<Option<DownloadedArt>, String>> + use<> {
+        let cache = self.clone();
+        #[cfg(not(all(feature = "web", not(feature = "desktop"))))]
+        {
+            let work = background::run(move || {
+                if let Some(saved) = cache.saved_box_art(&rom_path) {
+                    return Ok(Some(saved));
+                }
+                box_art::find(&rom_path, supports_cgb, &games)
+                    .map(|png| png.and_then(DownloadedArt::decode))
+            });
+            async move { work.await.and_then(|result| result) }
         }
-        box_art::find(rom_path, supports_cgb, games).map(|png| png.and_then(DownloadedArt::decode))
+        #[cfg(all(feature = "web", not(feature = "desktop")))]
+        async move {
+            if let Some(saved) = cache.saved_box_art(&rom_path) {
+                return Ok(Some(saved));
+            }
+            box_art::find(&rom_path, supports_cgb, &games)
+                .await
+                .map(|png| png.and_then(DownloadedArt::decode))
+        }
     }
 
     /// The title screen saved for the game at `rom_path` as RGBA pixels, if
@@ -544,7 +605,13 @@ impl Library {
 
         let generation = self.scan_generation;
         let known = self.entries.clone();
-        let scan = background::run(move || scan::scan(generation, &folders, known));
+        let scan = background::run(move || {
+            if KEEPS_GAMES {
+                scan::kept_games(generation, known)
+            } else {
+                scan::scan(generation, &folders, known)
+            }
+        });
         Some(async move {
             scan.await
                 .unwrap_or_else(|error| ScanResult::failed(generation, error))
@@ -586,7 +653,11 @@ impl Library {
         &self,
         folders: Vec<LibraryFolder>,
     ) -> impl Future<Output = FileCheck> + use<> {
-        let entries = self.entries.clone();
+        let entries = if KEEPS_GAMES {
+            Vec::new()
+        } else {
+            self.entries.clone()
+        };
         let finished_scans = self.finished_scans;
         let check = background::run(move || scan::check(&entries, &folders));
         async move {
@@ -645,6 +716,7 @@ impl Library {
             entry.supports_sgb = Some(header.supports_sgb);
         } else {
             let mut entry = scan::entry_for(path, header);
+            entry.in_folder = KEEPS_GAMES;
             entry.last_played = Some(now);
             entry.added = Some(now);
             let mut entries = std::mem::take(&mut self.entries);
@@ -718,8 +790,104 @@ impl Library {
         self.save()
     }
 
+    /// Keeps the file of `rom` in the library, as the browser build does
+    /// for every game the player adds or opens (see [`KEEPS_GAMES`]), and
+    /// lists it among all games. A game kept before under the same file
+    /// name is replaced; its pictures go unless it is the same game, so they
+    /// are made again. Fails, keeping nothing, if `rom` isn't a game the
+    /// emulator can start.
+    #[cfg(all(feature = "web", not(feature = "desktop")))]
+    pub fn add_game(&mut self, rom: &crate::rom::Rom) -> Result<(), String> {
+        let header = nubo_core::Emulator::read_rom_header(&rom.bytes)
+            .map_err(|error| format!("{} isn't a game Nubo can play: {error}", rom.name()))?;
+        let keep_error = |error| format!("{} couldn't be kept in the browser: {error}", rom.name());
+        store::save_rom(&rom.path, &rom.bytes).map_err(keep_error)?;
+
+        let now = seconds_since_epoch(SystemTime::now());
+        let mut entry = scan::entry_for(&rom.path, &header);
+        entry.in_folder = true;
+        entry.size = rom.bytes.len() as u64;
+        entry.modified = now;
+        entry.added = Some(now);
+
+        let mut entries = std::mem::take(&mut self.entries);
+        if let Some(index) = entries.iter().position(|known| known.path == rom.path) {
+            let previous = entries.remove(index);
+            let unchanged = previous.size == entry.size && previous.title == entry.title;
+            entry.keep_from(&previous, unchanged);
+            if !unchanged {
+                store::delete_pictures(&rom.path).map_err(keep_error)?;
+                for pictures in [
+                    &mut self.box_art,
+                    &mut self.title_screens,
+                    &mut self.thumbnails,
+                ] {
+                    pictures.remove(&rom.path);
+                }
+            }
+        }
+        entries.push(entry);
+        self.replace_entries(entries);
+        self.save()
+    }
+
+    /// Whether the library keeps the file of the game at `path` (see
+    /// `Library::add_game`).
+    pub fn keeps_game(&self, path: &Path) -> bool {
+        KEEPS_GAMES && self.entry(path).is_some_and(|entry| entry.in_folder)
+    }
+
+    /// Takes the game at `path` out of the library, deleting its kept file
+    /// and pictures, as the browser build does when the player removes a
+    /// game. Its battery saves and save states stay, so adding the game
+    /// again brings them back.
+    #[cfg(all(feature = "web", not(feature = "desktop")))]
+    pub fn remove_game(&mut self, path: &Path) -> Result<(), String> {
+        let removed = store::delete_rom(path).and_then(|()| store::delete_pictures(path));
+        self.entries.retain(|entry| entry.path != path);
+        for pictures in [
+            &mut self.box_art,
+            &mut self.title_screens,
+            &mut self.thumbnails,
+        ] {
+            pictures.remove(path);
+        }
+        removed
+            .map_err(|error| format!("The game couldn't be removed: {error}"))
+            .and(self.save())
+    }
+
+    /// Takes every game out of the library, as [`Library::remove_game`]
+    /// does, for a player starting over in the browser.
+    #[cfg(all(feature = "web", not(feature = "desktop")))]
+    pub fn remove_all_games(&mut self) -> Result<(), String> {
+        let paths: Vec<PathBuf> = self
+            .entries
+            .iter()
+            .map(|entry| entry.path.clone())
+            .collect();
+        paths
+            .iter()
+            .map(|path| self.remove_game(path))
+            .fold(Ok(()), Result::and)
+    }
+
+    /// How many games the library keeps the files of, and about how many
+    /// bytes they and the library's pictures take, for the browser build's
+    /// settings.
+    #[cfg(all(feature = "web", not(feature = "desktop")))]
+    pub fn kept_size(&self) -> (usize, u64) {
+        let count = self.entries.iter().filter(|entry| entry.in_folder).count();
+        (count, store::size(&self.entries))
+    }
+
     /// Keeps `pixels`, the last frame of the game at `path`, as its thumbnail.
     pub fn set_thumbnail(&mut self, path: &Path, pixels: Vec<u8>) -> Result<(), String> {
+        // A game taken out of a library that keeps its games leaves nothing
+        // behind.
+        if KEEPS_GAMES && self.entry(path).is_none() {
+            return Ok(());
+        }
         let saved = store::save_thumbnail(&self.cache, path, &pixels);
         self.thumbnails
             .insert(path.to_path_buf(), screen_picture(pixels));
@@ -873,10 +1041,17 @@ fn seconds_since_epoch(time: SystemTime) -> u64 {
 }
 
 pub mod box_art;
+#[cfg(any(test, all(feature = "web", not(feature = "desktop"))))]
+mod browser_store;
 mod jobs;
 mod scan;
-#[cfg_attr(not(feature = "desktop"), path = "library/no_store.rs")]
-#[cfg_attr(feature = "desktop", path = "library/file_store.rs")]
+#[cfg(all(feature = "web", not(feature = "desktop")))]
+use browser_store as store;
+#[cfg(feature = "desktop")]
+#[path = "library/file_store.rs"]
+mod store;
+#[cfg(not(any(feature = "desktop", feature = "web")))]
+#[path = "library/no_store.rs"]
 mod store;
 #[cfg(test)]
 mod tests;

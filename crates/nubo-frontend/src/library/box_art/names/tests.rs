@@ -73,3 +73,21 @@ fn color_games_look_in_the_color_collection_first() {
     assert_eq!(systems(true), [GAME_BOY_COLOR, GAME_BOY]);
     assert_eq!(systems(false), [GAME_BOY, GAME_BOY_COLOR]);
 }
+
+#[test]
+fn the_browser_looks_in_the_collections_copy_on_github() {
+    assert_eq!(
+        github_box_art_url(GAME_BOY_COLOR, "Q*bert: The Game (USA)"),
+        "https://raw.githubusercontent.com/libretro-thumbnails/Nintendo_-_Game_Boy_Color/master/\
+         Named_Boxarts/Q_bert_%20The%20Game%20%28USA%29.png"
+    );
+}
+
+#[test]
+fn game_lists_come_from_the_libretro_database() {
+    assert_eq!(
+        list_url(GAME_BOY),
+        "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/no-intro/\
+         Nintendo%20-%20Game%20Boy.dat"
+    );
+}
