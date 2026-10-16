@@ -32,7 +32,7 @@ The work has five parts:
 - **In this repository, in the Iced app (`frontends/nubo`).** The Shootout downloads the Windows zip of
   Nubo's latest release and takes screenshots of the real `nubo.exe`, so the options it needs
   (`--scale`, `--fresh`, `--speed`, Part 1) must be in the app Nubo ships, not in a separate program.
-  - The options are parsed in `main.rs`.
+  - The options are parsed in `command_line.rs`.
   - The screen-only window is in the window settings and `views/game.rs`.
   - The steps of [RESTRUCTURE_PLAN.md](RESTRUCTURE_PLAN.md) leave the options in the Iced app. What
     `--fresh` turns off (storage, battery saves) moves to `nubo-frontend` in its step 4. Do Part 1
@@ -96,7 +96,7 @@ What already works:
   is `Nubo/nubo.exe` (`xtask/src/windows.rs`). The release also has `Nubo-windows-x64.msi`, which
   `downloadGithubRelease`'s default filter (`"win" in name`) would match too, so the harness class
   must filter on the zip's name.
-- `nubo.exe <rom> --model dmg|cgb` (`frontends/nubo/src/main.rs`, `parse_args`). `dmg` is `Model::Dmg`
+- `nubo.exe <rom> --model dmg|cgb` (`frontends/nubo/src/command_line.rs`). `dmg` is `Model::Dmg`
   and `cgb` is `Model::CgbE` (`crates/nubo-core/src/model.rs`).
 - While a game runs, the window title is `<game> — Nubo` (`App::title` in `frontends/nubo/src/app.rs`).
   The class's `title_check` has to be `title.endswith("Nubo")`.
