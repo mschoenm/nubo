@@ -48,7 +48,7 @@ It also writes `Nubo-<version>-linux-<architecture>.flatpak`, a single file to g
 
 `cargo xtask install` builds the package for the computer it runs on and installs it there: `Nubo.app` in `/Applications` on macOS, the Flatpak on Linux and the MSI on Windows, with no questions or windows. A running Nubo is closed first, the way closing its window does, so it saves where you left off. It needs what the package of that system needs.
 
-It first fetches from GitHub. When the working tree is the newest `origin/main` without changes it builds that; otherwise it asks whether to build the working tree as it is or the newest `origin/main`. `--build` decides without asking: `checkout`, `main`, a version (`0.12` is the newest 0.12.x release), or any tag, branch or commit. Anything but the working tree is built in a worktree under `target/install/`, leaving your files alone. Versions from before this command existed can't be installed with it.
+It first fetches from GitHub. When the working tree is the newest `origin/main` without changes (new files count as changes) it builds that; otherwise it asks whether to build the working tree as it is or the newest `origin/main`. `--build` decides without asking: `checkout`, `main`, a version (`0.12` is the newest 0.12.x release), or any tag, branch or commit. Anything but the working tree is built in a worktree under `target/install/`, leaving your files alone. Versions from before this command existed can't be installed with it.
 
 ### RetroArch
 

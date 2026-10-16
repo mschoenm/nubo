@@ -132,10 +132,11 @@ fn choose_source(options: &Options) -> Result<Option<Source>> {
     }
 }
 
-/// Whether the working tree is `commit` without changes to tracked files.
+/// Whether the working tree is `commit` without changes. New files that
+/// git doesn't ignore count too, since cargo may build them (such as a
+/// program in `src/bin/`).
 fn head_is(commit: &str) -> Result<bool> {
-    Ok(git(&["rev-parse", "HEAD"])? == commit
-        && git(&["status", "--porcelain", "--untracked-files=no"])?.is_empty())
+    Ok(git(&["rev-parse", "HEAD"])? == commit && git(&["status", "--porcelain"])?.is_empty())
 }
 
 /// What the player picked when asked.
@@ -322,16 +323,26 @@ fn close_running_nubo() -> Result {
             ));
         }
     }
+    // A process is still Nubo only while it is listed as Nubo: its id may
+    // go to another program once it ends.
+    let still_running = || -> Result<Vec<String>> {
+        let listed = running_nubo()?;
+        Ok(running
+            .iter()
+            .filter(|process| listed.contains(process))
+            .cloned()
+            .collect())
+    };
     let deadline = Instant::now() + CLOSE_TIMEOUT;
-    while running.iter().any(|process| is_running(process)) && Instant::now() < deadline {
+    while !still_running()?.is_empty() && Instant::now() < deadline {
         thread::sleep(Duration::from_millis(100));
     }
-    for process in running.iter().filter(|process| is_running(process)) {
+    for process in still_running()? {
         eprintln!(
             "warning: Nubo didn't close within {} seconds, so it was stopped",
             CLOSE_TIMEOUT.as_secs()
         );
-        let _ = Command::new("kill").args(["-KILL", process]).status();
+        let _ = Command::new("kill").args(["-KILL", &process]).status();
     }
     Ok(())
 }
@@ -369,14 +380,6 @@ fn running_nubo() -> Result<Vec<String>> {
             .map(|entry| entry.file_name().to_string_lossy().into_owned())
             .collect())
     }
-}
-
-/// Whether the process `id` is still running.
-fn is_running(id: &str) -> bool {
-    Command::new("kill")
-        .args(["-0", id])
-        .output()
-        .is_ok_and(|output| output.status.success())
 }
 
 /// Closes the installed Nubo on Windows with `WINDOWS_CLOSE_SCRIPT`.
