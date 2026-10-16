@@ -547,8 +547,9 @@ impl App {
         Stack::with_children(layers).into()
     }
 
-    /// Listens for keys, the mouse, dropped files, theme changes and close
-    /// requests, and for frame ticks while a game is running or toasts need
+    /// Listens for keys, the mouse, dropped files, theme changes, close
+    /// requests and, on macOS and Linux, signals asking the app to stop, and
+    /// for frame ticks while a game is running or toasts need
     /// to expire. On the desktop the window only redraws for new frames, not
     /// on every refresh of the screen.
     ///
@@ -571,6 +572,7 @@ impl App {
             )
             .map(|event| LibraryMessage::Watch(event).into()),
             window::close_requests().map(|_| WindowMessage::CloseRequested.into()),
+            subscriptions::stop_requests().map(|()| WindowMessage::CloseRequested.into()),
         ];
 
         #[cfg(not(target_arch = "wasm32"))]

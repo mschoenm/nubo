@@ -1,7 +1,8 @@
 //! Iced subscriptions for what the app's other parts and `nubo-frontend`
 //! report without knowing Iced: they send over `futures` channels, call
 //! back, or are asked once per frame in the browser, and these turn that
-//! into subscriptions for `App::subscription`.
+//! into subscriptions for `App::subscription`, as well as the Unix signals
+//! that ask the app to stop.
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::game::Game;
@@ -11,7 +12,11 @@ use iced::futures::{SinkExt, executor};
 use nubo_frontend::gamepads::{self, ControllerEvent};
 use nubo_frontend::library::WatchEvent;
 use nubo_frontend::settings::LibraryFolder;
+#[cfg(unix)]
+use signal_hook::{consts::TERM_SIGNALS, flag, iterator::Signals};
 use std::path::PathBuf;
+#[cfg(unix)]
+use std::sync::{Arc, atomic::AtomicBool};
 
 /// News about the controllers: from a thread of their own on the desktop,
 /// which sleeps until a controller has something to report.
@@ -65,6 +70,48 @@ pub fn library_changes(
     _folders: &[LibraryFolder],
     _games: Vec<PathBuf>,
 ) -> Subscription<WatchEvent> {
+    Subscription::none()
+}
+
+/// Produces an item when the system asks the app to stop with a Unix
+/// signal: SIGTERM (sent by `kill` and by logging out or shutting down),
+/// SIGINT (Ctrl+C in the terminal it was started from) or SIGQUIT. The app then closes as if its
+/// window were closed, which saves where the player left off. A second
+/// signal ends the process at once, in case closing gets stuck.
+#[cfg(unix)]
+pub fn stop_requests() -> Subscription<()> {
+    Subscription::run(|| {
+        iced::stream::channel(1, async |mut output| {
+            let asked_before = Arc::new(AtomicBool::new(false));
+            for &signal in TERM_SIGNALS {
+                // The shutdown goes first, so it only fires once the flag
+                // is set by an earlier signal.
+                let _ = flag::register_conditional_shutdown(signal, 1, Arc::clone(&asked_before));
+                let _ = flag::register(signal, Arc::clone(&asked_before));
+            }
+            let Ok(mut signals) = Signals::new(TERM_SIGNALS) else {
+                return;
+            };
+            let started = std::thread::Builder::new()
+                .name(String::from("signals"))
+                .spawn(move || {
+                    for _ in signals.forever() {
+                        if executor::block_on(output.send(())).is_err() {
+                            break;
+                        }
+                    }
+                });
+            if started.is_ok() {
+                std::future::pending::<()>().await;
+            }
+        })
+    })
+}
+
+/// Windows and the browser have no Unix signals: Windows asks a program to
+/// stop by closing its window.
+#[cfg(not(unix))]
+pub fn stop_requests() -> Subscription<()> {
     Subscription::none()
 }
 

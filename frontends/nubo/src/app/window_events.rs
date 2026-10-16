@@ -29,6 +29,8 @@ pub enum WindowMessage {
     /// The window became the one in front (`true`) or stopped being it.
     Focused(bool),
     SystemThemeChanged(Mode),
+    /// The window's close button was clicked, or on macOS and Linux a
+    /// signal asked the app to stop (`subscriptions::stop_requests`).
     CloseRequested,
 }
 

@@ -193,7 +193,9 @@ fn window_settings() -> iced::window::Settings {
         position: iced::window::Position::Centered,
         // Closing the window asks the app first (`Message::CloseRequested`),
         // so it can stop the game: that writes where the player left off,
-        // the game's thumbnail and the battery saves still waiting. On
+        // the game's thumbnail and the battery saves still waiting. SIGTERM
+        // and the other stop signals do the same on macOS and Linux
+        // (`subscriptions::stop_requests`). On
         // macOS, Quit in the app menu (⌘Q) or the Dock ends the process
         // without asking: winit's default menu calls `terminate:`, and
         // Iced 0.14 doesn't pass winit's `exiting` event on. The battery
