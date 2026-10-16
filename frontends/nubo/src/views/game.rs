@@ -64,7 +64,7 @@ pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Ele
             container(picture)
                 .center(Fill)
                 .padding(12)
-                .style(theme::screen_area),
+                .style(move |theme| theme::screen_area(theme, fullscreen)),
         )
         .on_double_click(Message::Window(WindowMessage::ToggleFullscreen))
         .on_right_press(Message::Game(GameMessage::OpenPauseMenu))

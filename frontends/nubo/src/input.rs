@@ -1,12 +1,12 @@
 //! Keyboard input: turns key events into messages, with Iced's key codes
-//! turned into Nubo's own ([`KeyCode`]), and finds the fixed app shortcuts.
-//! Which key presses which Game Boy button is up to the player (see
-//! `nubo_frontend::controls`).
+//! turned into Nubo's own ([`KeyCode`]), and finds the fixed app shortcuts
+//! and the fixed keys that move through the menus. Which key presses which
+//! Game Boy button is up to the player (see `nubo_frontend::controls`).
 
 use crate::app::{GameMessage, Message, SettingsMessage, WindowMessage};
 use iced::keyboard::key::{Code, Named, Physical};
 use iced::keyboard::{self, Event, Modifiers};
-use nubo_frontend::controls::KeyCode;
+use nubo_frontend::controls::{Action, KeyCode};
 
 /// A key going down or up.
 #[derive(Debug, Clone)]
@@ -118,6 +118,24 @@ pub fn fixed_shortcut(key: &keyboard::Key, modifiers: Modifiers) -> Option<Messa
         keyboard::Key::Character("r") if modifiers.command() => {
             Some(Message::Game(GameMessage::Reset))
         }
+        _ => None,
+    }
+}
+
+/// What a key does in the menus, which is fixed whatever the player bound:
+/// the arrow keys move, Enter and Space pick, Backspace steps back (Esc
+/// does too, as a fixed shortcut), and the context menu key or Shift+F10
+/// opens a game's menu or clears a setting, as Select does on a controller.
+pub fn menu_action(key: &keyboard::Key, modifiers: Modifiers) -> Option<Action> {
+    match key.as_ref() {
+        keyboard::Key::Named(Named::ArrowUp) => Some(Action::Up),
+        keyboard::Key::Named(Named::ArrowDown) => Some(Action::Down),
+        keyboard::Key::Named(Named::ArrowLeft) => Some(Action::Left),
+        keyboard::Key::Named(Named::ArrowRight) => Some(Action::Right),
+        keyboard::Key::Named(Named::Enter | Named::Space) => Some(Action::A),
+        keyboard::Key::Named(Named::Backspace) => Some(Action::B),
+        keyboard::Key::Named(Named::ContextMenu) => Some(Action::Select),
+        keyboard::Key::Named(Named::F10) if modifiers.shift() => Some(Action::Select),
         _ => None,
     }
 }

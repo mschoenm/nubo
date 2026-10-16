@@ -110,7 +110,9 @@ These are the default keys. All of them but Esc can be changed under Settings > 
 
 While a game runs, the Library button at the top left takes you back to your games, and Pause at the top right opens the pause menu. Ctrl+O opens a game, Ctrl+P pauses and resumes, Ctrl+R restarts the game and Ctrl+, opens the settings (⌘ instead of Ctrl on macOS). Double-clicking the game screen switches between fullscreen and a window (a game played fullscreen goes back to a window when you return to the library, which has its own Exit fullscreen button), and right-clicking it opens the pause menu, which a click on the game outside it closes again.
 
-On a controller, the D-pad or left stick moves, and A and B sit where they are on a Game Boy: the right face button (B on Xbox, ○ on PlayStation) is A, and the bottom one (A on Xbox, ✕ on PlayStation) is B. L1 opens the pause menu (where you save and load states), R1 fast forwards, and holding the left face button (X on Xbox, □ on PlayStation) rewinds. L2 and R2 do nothing until you give them an action in the settings.
+On a controller, the D-pad or left stick moves, and A and B sit where they are on a Game Boy: the right face button (B on Xbox, ○ on PlayStation) is A, and the bottom one (A on Xbox, ✕ on PlayStation) is B. L1 opens the pause menu (where you save and load states), holding R1 rewinds and holding R2 fast forwards. The other two face buttons and L2 do nothing until you give them an action in the settings. The pause menu can move to another button but always keeps one.
+
+The menus always work the same, whatever you change: the arrow keys, D-pad or left stick move, Enter, Space or the bottom face button (A on Xbox) picks, and Esc, Backspace or the right face button (B on Xbox) goes back. On a game in the library, Select, the context menu key or Shift+F10 opens its menu.
 
 <p align="center">
   <img src="images/screenshots/pause-menu.png" width="600" alt="Nubo's pause menu over Tobu Tobu Girl Deluxe: resume; save state, load state and cheats; screenshot, fullscreen and settings; restart game and back to library"><br>
