@@ -86,9 +86,12 @@ pub fn run_screenshots(arguments: &Arguments) -> Result {
     let app = build_app()?;
 
     let captures = work.join("captures");
-    if captures.exists() {
-        fs::remove_dir_all(&captures)
-            .map_err(|error| format!("couldn't clear {}: {error}", captures.display()))?;
+    let check_folder = work.join("check");
+    for folder in [&captures, &check_folder] {
+        if folder.exists() {
+            fs::remove_dir_all(folder)
+                .map_err(|error| format!("couldn't clear {}: {error}", folder.display()))?;
+        }
     }
     let mut plan = gnome::Plan::default();
     let mut tiles_of = Vec::new();
@@ -114,7 +117,6 @@ pub fn run_screenshots(arguments: &Arguments) -> Result {
     );
     gnome::run_plan(&plan, &work)?;
 
-    let check_folder = work.join("check");
     let mut differ = Vec::new();
     for (screenshot, outputs) in screenshots.iter().zip(&tiles_of) {
         let picture = pictures::compose(screenshot, outputs)?;
