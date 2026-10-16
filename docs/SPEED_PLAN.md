@@ -39,8 +39,8 @@ Each change is a shortcut that must give exactly what running every dot one at a
 | #95 | The seven dots that shift out a line's dummy pixels at once, and a run of plain tiles that may begin just before the screen (fine scrolling) | 1 to 2% more |
 | #98 | Plain CPU reads of ROM, work RAM and HRAM take a short inlined path (`AddressBus::cpu_read_plain_byte`), everything else out of line | 2 to 3% more |
 | #98 | The bulk OAM scan stops at ten objects, checks the y range with one comparison and sets its bus latches once | about 1.5% more |
-| next | The line renderer's first part: runs of plain tiles keep the next row's bitplanes in locals and draw whole rows unrolled, with branchless tile addresses | 1 to 2% more |
-| next | The same part: a line's first dots and HBlank's first dots, which every line ran one at a time for their timing events (about eleven dots a line), run in one go while the STAT line can't rise (`Gpu::run_line_start`, `Gpu::run_hblank_start`); the bulk OAM scan walks OAM as a slice | 3 to 8% more |
+| #106 | The line renderer's first part: runs of plain tiles keep the next row's bitplanes in locals and draw whole rows unrolled, with branchless tile addresses | 1 to 2% more |
+| #106 | The same part: a line's first dots and HBlank's first dots, which every line ran one at a time for their timing events (about eleven dots a line), run in one go while the STAT line can't rise (`Gpu::run_line_start`, `Gpu::run_hblank_start`); the bulk OAM scan walks OAM as a slice | 3 to 8% more |
 
 How it was checked, for each commit:
 
