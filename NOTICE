@@ -377,8 +377,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 Lucide icons
 --------------------------------------------------------------------------------
 
-The desktop app's icons come from Lucide (https://lucide.dev), bundled as a
-font by the lucide-icons crate.
+The app's icons, on the desktop and in the browser, come from Lucide
+(https://lucide.dev), bundled as a font by the lucide-icons crate.
 
 ISC License
 
