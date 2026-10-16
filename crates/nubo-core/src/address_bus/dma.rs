@@ -161,10 +161,8 @@ impl AddressBus {
             ECHO_RAM_START.. if self.model.is_cgb() => 0xFF,
             ECHO_RAM_START.. => self.peek(address - ECHO_RAM_OFFSET),
             // The PPU keeps the CPU from VRAM while it draws, but not OAM DMA, whose reads
-            // SameBoy lets past that block (`in_dma_read`).
-            VIDEO_RAM_START..CARTRIDGE_RAM_START => {
-                self.apply_cheats(address, self.gpu.read_byte(address))
-            }
+            // SameBoy lets past that block (`in_dma_read`). No cheat can target VRAM.
+            VIDEO_RAM_START..CARTRIDGE_RAM_START => self.gpu.read_byte(address),
             _ => self.peek(address),
         };
         self.gpu.write_oam_from_dma(offset, byte_to_transfer);
