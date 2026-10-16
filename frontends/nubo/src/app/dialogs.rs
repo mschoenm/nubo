@@ -16,7 +16,6 @@ use nubo_frontend::controls::Action;
 use nubo_frontend::library::{self, LibraryEntry, box_art};
 use nubo_frontend::links;
 use nubo_frontend::model::{self, Console, ModelPreference};
-use nubo_frontend::rom;
 use nubo_frontend::save_states;
 use nubo_frontend::settings::LibraryFolder;
 use nubo_frontend::updates;
@@ -119,14 +118,12 @@ impl App {
             delete_battery_saves: keeps_data,
             delete_save_states: keeps_data && save_states::AVAILABLE,
             remove_folders: keeps_data
-                && library::AVAILABLE
-                && !self.settings.shared.library_folders.is_empty(),
-            clear_recently_played: keeps_data
-                && if library::AVAILABLE {
-                    self.library.any_played()
+                && if library::KEEPS_GAMES {
+                    self.library.games("").next().is_some()
                 } else {
-                    rom::REMEMBERS_LAST_GAME && self.remembered.is_some()
+                    library::AVAILABLE && !self.settings.shared.library_folders.is_empty()
                 },
+            clear_recently_played: keeps_data && library::AVAILABLE && self.library.any_played(),
             game_open: self.game.is_some(),
         }
     }
@@ -174,6 +171,7 @@ impl App {
             DialogKind::DeleteSaveStates(path) => {
                 Some(delete_question(path, self.library.entry(path)))
             }
+            DialogKind::RemoveGame(path) => Some(remove_question(path, self.library.entry(path))),
             DialogKind::ResetSettings(choices) => {
                 Some(reset_question(*choices, self.reset_offers()))
             }
@@ -225,6 +223,14 @@ impl App {
                 "Delete save states…",
                 ChoiceStyle::Danger,
                 DialogAction::CloseThen(LibraryMessage::AskDeleteSaveStates(path.clone()).into()),
+            ));
+        }
+        if self.library.keeps_game(path) && !self.fresh {
+            choices.push(Choice::new(
+                Icon::Trash2,
+                "Remove from library…",
+                ChoiceStyle::Danger,
+                DialogAction::CloseThen(LibraryMessage::AskRemoveGame(path.clone()).into()),
             ));
         }
 
@@ -361,14 +367,15 @@ impl App {
         }
     }
 
-    /// Asks whether to download box art, once the library has a folder and
-    /// the player hasn't answered yet. Box art waits for the answer.
+    /// Asks whether to download box art, once the library has a folder (in
+    /// the browser, a game) and the player hasn't answered yet. Box art waits
+    /// for the answer.
     pub(super) fn ask_about_box_art(&mut self) {
         if box_art::AVAILABLE
             && !self.fresh
             && self.screen_scale.is_none()
             && !self.settings.shared.box_art_asked
-            && !self.settings.shared.library_folders.is_empty()
+            && views::library::has_games(&self.library, &self.settings)
         {
             self.open_dialog(DialogKind::BoxArt);
         }
@@ -408,10 +415,14 @@ fn updates_question() -> DialogContent {
 fn box_art_question() -> DialogContent {
     DialogContent {
         title: String::from("Show box art for your games?"),
-        text: Some(String::from(
+        text: Some(format!(
             "Nubo can download box art for the games in your library. To find it, Nubo \
-             sends their names to libretro's thumbnail server. You can change this later in \
-             Settings › Library.",
+             sends their names to {}. You can change this later in Settings › Library.",
+            if box_art::SERVER == "GitHub" {
+                "GitHub, which keeps a copy of libretro's thumbnails"
+            } else {
+                "libretro's thumbnail server"
+            }
         )),
         notice: None,
         layout: Layout::Buttons,
@@ -608,9 +619,12 @@ impl ResetChoices {
         }
     }
 
-    /// Whether the reset deletes saves, which can't be put back.
+    /// Whether the reset deletes saves, or in the browser the games its
+    /// library keeps, which can't be put back.
     pub fn deletes(self) -> bool {
-        self.delete_battery_saves || self.delete_save_states
+        self.delete_battery_saves
+            || self.delete_save_states
+            || (self.remove_folders && library::KEEPS_GAMES)
     }
 }
 
@@ -674,29 +688,29 @@ fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
         );
     }
     if offers.remove_folders {
-        boxes.push(Choice::checkbox(
-            "Remove game folders",
-            "The library forgets its folders. Your ROM files stay where they are.",
-            choices.remove_folders,
-            ChoiceStyle::Secondary,
-            toggle(|choices| choices.remove_folders = !choices.remove_folders),
-        ));
-    }
-    if offers.clear_recently_played {
-        let (label, description) = if library::AVAILABLE {
-            (
-                "Clear Continue playing",
-                "The library forgets which games you played last.",
+        boxes.push(if library::KEEPS_GAMES {
+            Choice::checkbox(
+                "Remove every game",
+                "The library deletes the games it keeps in this browser. Their saves stay \
+                 unless you delete them too.",
+                choices.remove_folders,
+                ChoiceStyle::Danger,
+                toggle(|choices| choices.remove_folders = !choices.remove_folders),
             )
         } else {
-            (
-                "Forget the last game played",
-                "The start screen stops offering to play it again.",
+            Choice::checkbox(
+                "Remove game folders",
+                "The library forgets its folders. Your ROM files stay where they are.",
+                choices.remove_folders,
+                ChoiceStyle::Secondary,
+                toggle(|choices| choices.remove_folders = !choices.remove_folders),
             )
-        };
+        });
+    }
+    if offers.clear_recently_played {
         boxes.push(Choice::checkbox(
-            label,
-            description,
+            "Clear Continue playing",
+            "The library forgets which games you played last.",
             choices.clear_recently_played,
             ChoiceStyle::Secondary,
             toggle(|choices| choices.clear_recently_played = !choices.clear_recently_played),
@@ -780,6 +794,40 @@ fn delete_question(path: &Path, entry: Option<&LibraryEntry>) -> DialogContent {
                 DialogAction::CloseThen(
                     LibraryMessage::DeleteSaveStates(path.to_path_buf()).into(),
                 ),
+            ),
+        ],
+        dismiss: DialogAction::Close,
+        click_outside_dismisses: true,
+    }
+}
+
+/// The question whether to take the game at `path` out of the browser's
+/// library.
+fn remove_question(path: &Path, entry: Option<&LibraryEntry>) -> DialogContent {
+    let name = entry.map_or_else(
+        || nubo_frontend::rom::display_name(path),
+        LibraryEntry::name,
+    );
+    DialogContent {
+        title: format!("Remove {name} from the library?"),
+        text: Some(String::from(
+            "This deletes the game from this browser. Its saves and save states stay, and come \
+             back if you add the game again.",
+        )),
+        notice: None,
+        layout: Layout::Buttons,
+        choices: vec![
+            Choice::new(
+                Icon::X,
+                "Cancel",
+                ChoiceStyle::Secondary,
+                DialogAction::Close,
+            ),
+            Choice::new(
+                Icon::Trash2,
+                "Remove",
+                ChoiceStyle::Danger,
+                DialogAction::CloseThen(LibraryMessage::RemoveGame(path.to_path_buf()).into()),
             ),
         ],
         dismiss: DialogAction::Close,
