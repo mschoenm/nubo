@@ -642,6 +642,17 @@ fn a_save_state_with_an_impossible_serial_bit_count_does_not_load() {
     }
 }
 
+#[test]
+fn a_save_state_with_an_impossible_speed_switch_does_not_load() {
+    let speed_switch: &[u8] = b"\x0cspeed_switch";
+    assert_state_with_field_does_not_load(&[speed_switch, b"\x12double_speed_delay"], &[7]);
+    assert_state_with_field_does_not_load(&[speed_switch, b"\x06freeze"], &[4]);
+    assert_state_with_field_does_not_load(
+        &[speed_switch, b"\x0ahalt_units"],
+        &0x2_0009_u32.to_le_bytes(),
+    );
+}
+
 /// Checks that a save state whose field at `path` (the names of the
 /// components it lies in and then its own, each with its length byte in
 /// front) holds `value` fails to load, leaves the emulator as it was, and

@@ -1356,7 +1356,15 @@ impl AddressBus {
                     ));
                 }
             }
-            "speed_switch" => self.speed_switch.deserialize(bytes)?,
+            "speed_switch" => {
+                self.speed_switch.deserialize(bytes)?;
+                if !self.speed_switch.is_consistent(self.cgb_mode) {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "speed switch state out of range",
+                    ));
+                }
+            }
             "joypad" => self.joypad.deserialize(bytes)?,
             _ => return Ok(false),
         }
