@@ -7,6 +7,8 @@ description: Review the whole Nubo repository for bugs, breaks of the AGENTS.md 
 
 A full review reads every file of the repository, fixes what is wrong and small, files what needs a decision as issues, and writes a report. It costs a lot of tokens, so **it runs only when the maintainer asks for one**: no routine, skill or agent starts it, the nightly review included. It always covers the whole repository; the nightly review covers each day's changes.
 
+Run it in Claude Code on the web: the second reviewer (step 6) is a separate cloud session started with Claude Code Remote's `create_session`, which Codex doesn't have. When the maintainer asks Codex for a full review, it says so and doesn't start one.
+
 The files next to this one:
 - `areas.txt`: the ten areas;
 - `review.py`: the checks for areas and the ledger;
@@ -84,7 +86,7 @@ How the fixes are made:
 - **Workers:** each branch gets its own worktree (`git worktree add`) and a fix worker in the background with `worker-brief.md`. The worker gets its findings, the work folder, the baseline, the files to leave alone and the commit trailers.
 - **The disk:** start at most two workers at a time, and check `df -h` between them. The disk filled up twice in the first review, with four workers building at once.
 - **Nightly issues:** a nightly issue a branch fixes is named with `Fixes #<number>` in that pull request's description.
-- **Outside the findings:** what a worker notices outside its findings is verified like a finding and gets its own ledger line, with the ID `EXTRA-<n>`.
+- **Outside the findings:** what a worker or the second reviewer notices outside the findings is written as a finding in `findings/EXTRA.md` (`### EXTRA-<n>: ...`), verified like the others and given its own ledger line.
 
 ## 6. The second reviewer
 

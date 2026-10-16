@@ -55,13 +55,17 @@ pub fn minimal_rom(cartridge_type: u8, rom_size: u8, ram_size: u8, color: bool) 
 
 /// An emulator of `model` that has run its boot ROM, made once per model
 /// and thread, so a target can skip the boot with
-/// [`Emulator::clone_with_rom`].
+/// [`Emulator::clone_with_rom`]. Every model has its own, since a save state
+/// can name any of them.
 pub fn booted(model: Model) -> &'static Emulator {
     thread_local! {
-        static BOOTED: [OnceCell<&'static Emulator>; MODELS.len()] =
-            const { [const { OnceCell::new() }; MODELS.len()] };
+        static BOOTED: [OnceCell<&'static Emulator>; Model::ALL.len()] =
+            const { [const { OnceCell::new() }; Model::ALL.len()] };
     }
-    let index = MODELS.iter().position(|&each| each == model).unwrap_or(0);
+    let index = Model::ALL
+        .iter()
+        .position(|&each| each == model)
+        .expect("Model::ALL has every model");
     BOOTED.with(|booted| {
         *booted[index].get_or_init(|| {
             let mut emulator = Emulator::new(model);
