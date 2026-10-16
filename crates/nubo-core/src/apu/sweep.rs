@@ -74,7 +74,7 @@ impl Apu {
         state.sweep_pace_counter = 7 - sweep_pace(nr10);
 
         // A sweep clock that comes in the last ticks after the trigger doesn't count towards the
-        // sweep's first period (measured against Gambatte's sweep unit; Gambatte's sound
+        // sweep's first period (measured against Gambatte's behavior; Gambatte's sound
         // ch1_init_reset_sweep_counter_timing tests).
         let missed_ticks = if self.cgb_mode {
             CGB_SWEEP_CLOCK_MISSED_TICKS

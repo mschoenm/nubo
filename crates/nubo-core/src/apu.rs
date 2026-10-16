@@ -749,7 +749,7 @@ impl Apu {
 
     /// Whether a trigger is too close to the next frame sequencer step to let it count towards the
     /// envelope's first period, when that step clocks the envelopes and the envelope has a period
-    /// (measured against Gambatte's envelope unit; Gambatte's sound
+    /// (measured against Gambatte's behavior; Gambatte's sound
     /// ch2_init_reset_env_counter_timing tests).
     fn envelope_step_missed(&self, nrx2: u8) -> bool {
         envelope_period(nrx2) != 0 && self.next_step_is_imminent(7, ENVELOPE_STEP_MISSED_TICKS)
