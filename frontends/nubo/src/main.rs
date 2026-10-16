@@ -228,6 +228,7 @@ mod subscriptions;
 #[cfg(not(target_arch = "wasm32"))]
 mod ticks;
 mod ui;
+mod version;
 mod views;
 
 #[cfg(test)]

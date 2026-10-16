@@ -2,14 +2,31 @@
 
 use super::{CaptureRequest, Options};
 use clap::error::ErrorKind;
-use clap::{CommandFactory, Parser, Subcommand};
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use nubo_core::Model;
 use nubo_frontend::settings::FastForwardSpeed;
 use std::ffi::OsString;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
 /// The largest `--scale`.
 const MAX_SCALE: u32 = 8;
+
+/// What `--version` prints after `nubo`, as GNU programs do: the version
+/// with the build's commit on the first line, which scripts read, then the
+/// copyright, the license and that there is no warranty. `-V` prints only
+/// the first line.
+static LONG_VERSION: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "{}\n\
+         Copyright (C) 2026 Michel Schoenmakers\n\
+         Based on RetroBoy, copyright (C) 2023-2026 Samuel Parsons\n\
+         License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\n\
+         This is free software: you are free to change and redistribute it.\n\
+         There is NO WARRANTY, to the extent permitted by law.",
+        *crate::version::VERSION
+    )
+});
 
 /// What the command line asked for.
 #[derive(Debug, Clone, PartialEq)]
@@ -30,11 +47,10 @@ pub enum Request {
 }
 
 /// The command line as clap reads it. The doc comments on its fields
-/// are the help that `--help` prints.
+/// are the help that `--help` prints; [`parse`] adds the version.
 #[derive(Parser, Debug)]
 #[command(
     name = "nubo",
-    version,
     about = "Nubo, a Game Boy and Game Boy Color emulator",
     long_about = None,
     disable_help_subcommand = true,
@@ -173,7 +189,11 @@ pub fn parse<T>(args: impl IntoIterator<Item = T>) -> Result<Request, clap::Erro
 where
     T: Into<OsString> + Clone,
 {
-    let arguments = Arguments::try_parse_from(args)?;
+    let matches = Arguments::command()
+        .version(crate::version::VERSION.as_str())
+        .long_version(LONG_VERSION.as_str())
+        .try_get_matches_from(args)?;
+    let arguments = Arguments::from_arg_matches(&matches)?;
     // clap's `args_conflicts_with_subcommands` would catch this too, but
     // it calls a second ROM a subcommand.
     if arguments.command.is_some() && arguments.opens_the_window() {

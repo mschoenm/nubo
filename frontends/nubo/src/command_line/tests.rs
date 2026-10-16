@@ -160,6 +160,15 @@ fn help_and_version() {
 }
 
 #[test]
+fn the_version_comes_first_and_the_license_after_it() {
+    let short = parse_args(&["-V"]).unwrap_err().to_string();
+    assert_eq!(short, format!("nubo {}\n", *crate::version::VERSION));
+    let long = parse_args(&["--version"]).unwrap_err().to_string();
+    assert!(long.starts_with(&short), "{long}");
+    assert!(long.contains("License GPLv3+"), "{long}");
+}
+
+#[test]
 fn measuring_efficiency_needs_a_rom_and_runs_on_dmg() {
     assert_eq!(
         parse_args(&["measure-efficiency", "game.gb"]).unwrap(),

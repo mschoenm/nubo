@@ -16,6 +16,7 @@ use crate::ui::logo::logo;
 use crate::ui::tallest::tallest;
 use crate::ui::theme;
 use crate::ui::widgets::{chip_grid, chips, icon_button, segmented, with_tooltip};
+use crate::version;
 use iced::widget::text::Wrapping;
 use iced::widget::{
     Column, Row, button, column, container, row, scrollable, slider, space, text, toggler, tooltip,
@@ -1027,10 +1028,11 @@ fn volume<'a>(settings: &Settings) -> Element<'a, Message> {
     .into()
 }
 
-/// The version, new versions and what's new in this one, the button that
-/// starts over, the note that Nubo is made almost entirely by AI, and the
-/// copyright, the license, where to read it and where to get the source
-/// code, which the GPL asks every copy to show.
+/// The version (with the commit a packaged build was made from), new
+/// versions and what's new in this one, the button that starts over, the
+/// note that Nubo is made almost entirely by AI, and the copyright, the
+/// license, where to read it and where to get the source code (and this
+/// build's commit on GitHub), which the GPL asks every copy to show.
 fn about<'a>(
     settings: &'a Settings,
     newer_version: Option<&'a str>,
@@ -1039,7 +1041,7 @@ fn about<'a>(
     let title = row![
         logo(48.0),
         column![
-            text(concat!("Nubo ", env!("CARGO_PKG_VERSION")))
+            text(format!("Nubo {}", *version::VERSION))
                 .size(20)
                 .font(theme::HEADING_FONT),
             note_text("A Game Boy and Game Boy Color emulator").size(13),
@@ -1080,7 +1082,7 @@ fn about<'a>(
         }
     }
 
-    let rows = vec![
+    let mut rows = vec![
         group_row(
             setting(
                 "What's new",
@@ -1107,6 +1109,19 @@ fn about<'a>(
             ROW_PADDING,
             false,
         ),
+    ];
+    if let Some(commit) = &*version::COMMIT {
+        rows.push(group_row(
+            setting(
+                "This build's source code",
+                Some(build_description(commit)),
+                small_button(Icon::ExternalLink, "Open", Message::OpenLink(&commit.page)),
+            ),
+            ROW_PADDING,
+            false,
+        ));
+    }
+    rows.extend([
         group_row(
             label(
                 "License: GNU General Public License, version 3 or later",
@@ -1128,7 +1143,7 @@ fn about<'a>(
             ROW_PADDING,
             false,
         ),
-    ];
+    ]);
 
     let mut page = column![container(title).padding([4, 2])].spacing(20);
     if !versions.is_empty() {
@@ -1203,6 +1218,18 @@ fn about<'a>(
         ),
     ))
     .into()
+}
+
+/// Which commit this build was made from, for the About tab.
+fn build_description(commit: &version::Commit) -> String {
+    let mut description = format!("Commit {}", commit.short_hash());
+    if !commit.date.is_empty() {
+        description.push_str(&format!(" from {}", commit.date));
+    }
+    if commit.dirty {
+        description.push_str(", with changes that weren't committed");
+    }
+    description + ", on GitHub."
 }
 
 /// A palette choice: its four colors as swatches, with its name.

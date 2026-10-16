@@ -53,7 +53,8 @@ const UNNAMED_FORMAT_MAGIC: &[u8] = b"HEADER";
 /// source had changes that weren't committed. `cargo xtask` sets it through
 /// `NUBO_COMMIT` for everything it builds (every release and nightly build);
 /// it is empty for a plain `cargo build`. Save states store it so a state
-/// tells exactly which build made it.
+/// tells exactly which build made it, and the app shows it after its
+/// version.
 pub const BUILD_COMMIT: &str = match option_env!("NUBO_COMMIT") {
     Some(commit) => commit,
     None => "",

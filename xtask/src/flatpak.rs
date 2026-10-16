@@ -12,7 +12,10 @@
 //! icon and the license files are written to `target/flatpak/`; the menu entry
 //! and the AppStream description come from the repository.
 
-use super::{APP_ID, LINUX_FILES, Result, build_commit, licenses, run, target_dir, workspace_root};
+use super::{
+    APP_ID, LINUX_FILES, Result, build_commit, build_commit_date, licenses, run, target_dir,
+    workspace_root,
+};
 use serde_json::{Value, json};
 use std::env;
 use std::fs;
@@ -245,6 +248,7 @@ fn manifest_contents(rust_version: &str) -> Value {
                     "CARGO_HOME": format!("/run/build/{EXECUTABLE}/cargo"),
                     "CARGO_NET_OFFLINE": "true",
                     "NUBO_COMMIT": build_commit(),
+                    "NUBO_COMMIT_DATE": build_commit_date(),
                 },
             },
             "build-commands": [
