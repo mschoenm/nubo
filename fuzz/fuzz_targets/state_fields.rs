@@ -81,14 +81,27 @@ fn walk(state: &[u8], start: usize, values: &mut Vec<(usize, usize)>) -> Option<
         let end = position
             .checked_add(length)
             .filter(|&end| end <= state.len())?;
-        let mut inner = Vec::new();
-        if length > 1 && walk(&state[..end], position, &mut inner) == Some(end) {
-            values.append(&mut inner);
-        } else {
-            values.push((position, length));
+        match fields_in_a_row(&state[..end], position) {
+            Some(mut inner) if length > 1 => values.append(&mut inner),
+            // An empty value, such as an empty list, has nothing to change.
+            _ if length == 0 => {}
+            _ => values.push((position, length)),
         }
         position = end;
     }
+}
+
+/// The values in the bytes from `start` to the end of `state` when they are
+/// one or more lists of fields in a row, such as a struct or an array of
+/// structs (the PPU's object FIFO stores its eight entries that way), or
+/// `None` when they aren't.
+fn fields_in_a_row(state: &[u8], start: usize) -> Option<Vec<(usize, usize)>> {
+    let mut values = Vec::new();
+    let mut position = start;
+    while position < state.len() {
+        position = walk(state, position, &mut values)?;
+    }
+    Some(values)
 }
 
 /// Changes the value at `start`, `length` bytes long: to zeros, to all ones,

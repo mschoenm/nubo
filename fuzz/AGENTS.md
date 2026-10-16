@@ -21,11 +21,13 @@ From the repository root, once: `cargo install cargo-fuzz --locked`, `rustup too
 ```bash
 mkdir -p corpus/state corpus/rom && cp ../save-states/<newest set>/tobudx.gb-*.state corpus/state/
 for game in ../target/benchmark-roms/*; do (printf '\0'; cat "$game") > corpus/rom/"${game##*/}"; done
+python3 -c 'import sys, zipfile; [zipfile.ZipFile(f"/tmp/{name}.zip", "w", method).write(sys.argv[1], "game.gb") for name, method in (("stored", zipfile.ZIP_STORED), ("deflated", zipfile.ZIP_DEFLATED))]' ../target/benchmark-roms/tobudx.gb
+for zip in stored deflated; do (printf '\0'; cat /tmp/$zip.zip) > corpus/rom/tobudx-$zip.zip; done
 cargo fuzz build
 cargo fuzz run state_fields -- -max_total_time=900    # 15 minutes; the same for state, rom, cheats and battery
 ```
 
-Seed `state` with the game's kept states, or it starts from nothing and rarely gets past the header; `state_fields` reads them itself. Seed `rom` with real games too, each after one byte that picks the model: a header the boot ROM rejects is skipped, and every new header costs a boot (`start` in `src/lib.rs`), so changes inside a game are what run fast. `corpus/`, `artifacts/` and `target/` are not committed.
+Seed `state` with the game's kept states, or it starts from nothing and rarely gets past the header; `state_fields` reads them itself. Seed `rom` with real games too, plain and zipped (stored and compressed), each after one byte that picks the model: a header the boot ROM rejects is skipped, and every new header costs a boot (`start` in `src/lib.rs`), so changes inside a game are what run fast. `corpus/`, `artifacts/` and `target/` are not committed.
 
 ## When one crashes
 
