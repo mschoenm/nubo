@@ -182,6 +182,8 @@ pub fn secondary_button<'a, Message: Clone + 'a>(
         .into()
 }
 
+/// A button showing `icon` before `label`, without a style or an action
+/// yet.
 fn labelled_button<'a, Message: 'a>(
     icon: Icon,
     label: impl text::IntoFragment<'a>,

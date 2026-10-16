@@ -255,8 +255,8 @@ pub struct Library {
     /// finishes late is ignored.
     scan_generation: u64,
     scanning: bool,
-    /// Whether another scan was asked for (with the Rescan button, by the
-    /// folder watcher or by changing the folders) while one was running.
+    /// Whether another scan was asked for (with "Look for new games now", by
+    /// the folder watcher or by changing the folders) while one was running.
     /// Only one scan runs at a time; this one starts when it is done.
     rescan_wanted: bool,
     /// Counts the scans whose result was taken in, so a quick file check
