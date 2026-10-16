@@ -5,13 +5,11 @@
 
 use libfuzzer_sys::fuzz_target;
 use nubo_core::{validate_gamegenie_code, validate_gameshark_code};
-use nubo_fuzz::{booted, effects, game, model_from_byte, run_frames};
+use nubo_fuzz::{game, model_from_byte, run_frames, start};
 
 fuzz_target!(|data: &[u8]| {
     let text = String::from_utf8_lossy(data);
-    let mut emulator = booted(model_from_byte(0))
-        .clone_with_rom(game(), effects())
-        .expect("the benchmark game loads");
+    let mut emulator = start(model_from_byte(0), game()).expect("the benchmark game loads");
     for (index, line) in text.lines().enumerate() {
         let _ = validate_gameshark_code(line);
         let _ = validate_gamegenie_code(line);

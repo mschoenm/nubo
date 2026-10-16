@@ -4,20 +4,30 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use nubo_core::{RtcClock, RtcState};
-use nubo_fuzz::{booted, effects, minimal_rom, model_from_byte, run_frames};
+use nubo_core::{Emulator, Model, RtcClock, RtcState};
+use nubo_fuzz::{effects, minimal_rom, model_from_byte, run_frames, start};
+use std::sync::OnceLock;
 
-/// ROM only, MBC1, MBC2, MBC3, MBC5, MBC7, HuC1 and the rest, with and
-/// without RAM, a battery or a clock, and one code no cartridge uses.
-const CARTRIDGE_TYPES: [u8; 14] = [
-    0x00, 0x01, 0x03, 0x05, 0x06, 0x0F, 0x10, 0x11, 0x13, 0x19, 0x1B, 0x1E, 0x22, 0xFF,
-];
+/// Every cartridge type code Nubo loads, found by trying them all, so the
+/// list follows the cartridges Nubo supports.
+fn cartridge_types() -> &'static [u8] {
+    static TYPES: OnceLock<Vec<u8>> = OnceLock::new();
+    TYPES.get_or_init(|| {
+        (0..=u8::MAX)
+            .filter(|&code| {
+                Emulator::new(Model::Dmg)
+                    .load_rom(&minimal_rom(code, 1, 0, true), effects())
+                    .is_ok()
+            })
+            .collect()
+    })
+}
 
 fuzz_target!(|data: &[u8]| {
     if data.len() < 4 + RtcState::BYTES {
         return;
     }
-    let cartridge_type = CARTRIDGE_TYPES[usize::from(data[0]) % CARTRIDGE_TYPES.len()];
+    let cartridge_type = cartridge_types()[usize::from(data[0]) % cartridge_types().len()];
     let ram_size = data[1] % 6;
     let model = model_from_byte(data[2]);
     let clock = if data[3] & 1 == 0 {
@@ -28,7 +38,7 @@ fuzz_target!(|data: &[u8]| {
     let rtc = RtcState::from_bytes(&data[4..4 + RtcState::BYTES]);
     let ram = &data[4 + RtcState::BYTES..];
     let rom = minimal_rom(cartridge_type, 1, ram_size, true);
-    let Ok(mut emulator) = booted(model).clone_with_rom(&rom, effects()) else {
+    let Some(mut emulator) = start(model, &rom) else {
         return;
     };
     emulator.set_cartridge_ram(ram);

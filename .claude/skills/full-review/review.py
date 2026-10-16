@@ -53,7 +53,9 @@ def ledger(folder: str) -> int:
         if match:
             outcomes.setdefault(match.group(1), []).append(match.group(2))
     problems = []
-    for finding in ids:
+    for finding in sorted({finding for finding in ids if ids.count(finding) > 1}):
+        problems.append(f"{finding}: {ids.count(finding)} findings with this ID")
+    for finding in dict.fromkeys(ids):
         found = outcomes.get(finding, [])
         if len(found) != 1:
             problems.append(f"{finding}: {len(found)} outcomes {found}")

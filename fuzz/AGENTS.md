@@ -19,12 +19,13 @@ Each one runs what it loaded for a couple of frames, saves a state and loads it 
 From the repository root, once: `cargo install cargo-fuzz --locked`, `rustup toolchain install nightly` and `cargo xtask benchmark-roms` (the `state` and `cheats` targets load the game from `target/benchmark-roms/`). Then from this folder:
 
 ```bash
-mkdir -p corpus/state && cp ../save-states/<newest set>/tobudx.gb-*.state corpus/state/
+mkdir -p corpus/state corpus/rom && cp ../save-states/<newest set>/tobudx.gb-*.state corpus/state/
+for game in ../target/benchmark-roms/*; do (printf '\0'; cat "$game") > corpus/rom/"${game##*/}"; done
 cargo fuzz build
 cargo fuzz run state_fields -- -max_total_time=900    # 15 minutes; the same for state, rom, cheats and battery
 ```
 
-Seed `state` with the game's kept states, or it starts from nothing and rarely gets past the header; `state_fields` reads them itself. `corpus/`, `artifacts/` and `target/` are not committed.
+Seed `state` with the game's kept states, or it starts from nothing and rarely gets past the header; `state_fields` reads them itself. Seed `rom` with real games too, each after one byte that picks the model: a header the boot ROM rejects is skipped, and every new header costs a boot (`start` in `src/lib.rs`), so changes inside a game are what run fast. `corpus/`, `artifacts/` and `target/` are not committed.
 
 ## When one crashes
 

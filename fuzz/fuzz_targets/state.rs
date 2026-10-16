@@ -5,15 +5,13 @@
 
 use libfuzzer_sys::fuzz_target;
 use nubo_core::SaveStateHeader;
-use nubo_fuzz::{booted, effects, game, run_frames};
+use nubo_fuzz::{game, run_frames, start};
 
 fuzz_target!(|data: &[u8]| {
     let Ok(header) = SaveStateHeader::read(data) else {
         return;
     };
-    let mut emulator = booted(header.model)
-        .clone_with_rom(game(), effects())
-        .expect("the benchmark game loads");
+    let mut emulator = start(header.model, game()).expect("the benchmark game loads");
     if emulator.load_state(data).is_err() {
         return;
     }

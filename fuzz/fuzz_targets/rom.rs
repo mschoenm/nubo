@@ -4,14 +4,14 @@
 
 use libfuzzer_sys::fuzz_target;
 use nubo_core::{Emulator, Key};
-use nubo_fuzz::{booted, effects, model_from_byte, run_frames};
+use nubo_fuzz::{model_from_byte, run_frames, start};
 
 fuzz_target!(|data: &[u8]| {
     let Some((&selector, rom)) = data.split_first() else {
         return;
     };
     let _ = Emulator::read_rom_header(rom);
-    let Ok(mut emulator) = booted(model_from_byte(selector)).clone_with_rom(rom, effects()) else {
+    let Some(mut emulator) = start(model_from_byte(selector), rom) else {
         return;
     };
     emulator.press_key(Key::Start);
