@@ -285,8 +285,9 @@ jobs:
   # the part of the latest night, and the rotation counts the changes since
   # the last night, so a run started by hand would hide the day's changes
   # from the review. Pushing to the wiki needs the WIKI_TOKEN secret, a token
-  # that can write to this repository; runs that don't push keep the files as
-  # their artifact. Releases run the other jobs only.
+  # that can write to this repository, so only the step that pushes gets it;
+  # runs that don't push keep the files as their artifact. Releases run the
+  # other jobs only.
   metrics:
     name: Metrics
     if: always() && github.workflow == 'Nightly'
@@ -405,23 +406,24 @@ jobs:
               size_bytes: {desktop: $desktop, wasm: $wasm}}' > "$RUNNER_TEMP/night.json"
           cat "$RUNNER_TEMP/night.json"
 
-      - name: Update the wiki
-        env:
-          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
-          SCHEDULED: ${{ github.event_name == 'schedule' }}
+      # The wiki is public, so it is cloned without the token, and only the
+      # push gets WIKI_TOKEN: no code that cargo builds or runs can read it.
+      - name: Write tonight's wiki files
         run: |
           wiki="$RUNNER_TEMP/wiki"
-          if [ -n "$WIKI_TOKEN" ]; then
-            remote="https://x-access-token:$WIKI_TOKEN@github.com/${{ github.repository }}.wiki.git"
-          else
-            remote="https://github.com/${{ github.repository }}.wiki.git"
-          fi
-          git clone --depth 1 "$remote" "$wiki" || mkdir -p "$wiki"
+          git clone --depth 1 "https://github.com/${{ github.repository }}.wiki.git" "$wiki" || mkdir -p "$wiki"
           cargo xtask metrics append "$wiki/metrics.jsonl" "$RUNNER_TEMP/night.json"
           cargo xtask review-units next --state "$wiki/rotation.json" \
             --date "$(TZ=Europe/Amsterdam date +%F)" --commit "$(git rev-parse HEAD)" > "$wiki/tonight.json"
           cargo xtask metrics report "$wiki/metrics.jsonl" > "$wiki/Nightly-metrics.md"
           cat "$wiki/tonight.json"
+
+      - name: Push the wiki
+        env:
+          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
+          SCHEDULED: ${{ github.event_name == 'schedule' }}
+        run: |
+          wiki="$RUNNER_TEMP/wiki"
           if [ "$SCHEDULED" != true ]; then
             echo "::notice::Only scheduled runs update the wiki; this run's files are kept as its artifact."
           elif [ -n "$WIKI_TOKEN" ] && [ -d "$wiki/.git" ]; then
@@ -430,7 +432,7 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add metrics.jsonl rotation.json tonight.json Nightly-metrics.md
             git commit -m "Nightly metrics $(TZ=Europe/Amsterdam date +%F)"
-            git push
+            git push "https://x-access-token:$WIKI_TOKEN@github.com/${{ github.repository }}.wiki.git" HEAD
           else
             echo "::warning::The wiki wasn't updated: it needs the WIKI_TOKEN secret and a first page."
           fi
