@@ -80,6 +80,7 @@ fn a_games_file_is_kept_under_its_file_name() {
     let rom = Path::new("Tetris.gb");
 
     save_rom(rom, b"rom").unwrap();
+    assert!(has_rom(rom));
     assert!(
         futures::executor::block_on(indexed_db::read_rom("Tetris.gb"))
             .unwrap()
@@ -87,6 +88,7 @@ fn a_games_file_is_kept_under_its_file_name() {
     );
 
     delete_rom(rom).unwrap();
+    assert!(!has_rom(rom));
     assert!(
         futures::executor::block_on(indexed_db::read_rom("Tetris.gb"))
             .unwrap()

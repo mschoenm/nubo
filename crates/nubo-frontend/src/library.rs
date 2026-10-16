@@ -610,7 +610,7 @@ impl Library {
         let known = self.entries.clone();
         let scan = background::run(move || {
             if KEEPS_GAMES {
-                scan::kept_games(generation, known)
+                scan::kept_games(generation, known, keeps_file)
             } else {
                 scan::scan(generation, &folders, known)
             }
@@ -1030,6 +1030,19 @@ fn best_picture(
 
     store::read_picture(cache, PictureKind::LastScreen, &entry.path)
         .map(|picture| loaded(PictureKind::LastScreen, picture))
+}
+
+/// Whether the library keeps the file of the game at `path` (see
+/// [`KEEPS_GAMES`]).
+#[cfg(all(feature = "web", not(feature = "desktop")))]
+fn keeps_file(path: &Path) -> bool {
+    store::has_rom(path)
+}
+
+/// Libraries that find their games in folders keep no files.
+#[cfg(not(all(feature = "web", not(feature = "desktop"))))]
+fn keeps_file(_path: &Path) -> bool {
+    true
 }
 
 /// A picture of a frame of the Game Boy screen.

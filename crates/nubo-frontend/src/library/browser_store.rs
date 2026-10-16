@@ -106,6 +106,12 @@ pub fn save_rom(rom_path: &Path, bytes: &[u8]) -> Result<(), String> {
     indexed_db::write_rom(&rom_key(rom_path), bytes)
 }
 
+/// Whether the file of the game at `rom_path` is kept: saved, and not
+/// refused by the browser.
+pub fn has_rom(rom_path: &Path) -> bool {
+    indexed_db::has_rom(&rom_key(rom_path))
+}
+
 /// Deletes the kept file of the game at `rom_path`.
 pub fn delete_rom(rom_path: &Path) -> Result<(), String> {
     indexed_db::remove_rom(&rom_key(rom_path))
