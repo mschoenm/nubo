@@ -327,7 +327,7 @@ pub fn segmented_control(theme: &Theme) -> container::Style {
 
 /// A game card in the library: raised slightly, with an accent outline
 /// when hovered.
-pub fn card(theme: &Theme, status: button::Status) -> button::Style {
+fn card(theme: &Theme, status: button::Status) -> button::Style {
     let palette = theme.extended_palette();
     let (background, border) = match status {
         button::Status::Hovered => (palette.background.weak.color, palette.primary.base.color),
