@@ -743,7 +743,9 @@ fn text_after<'a>(name: &'a str, marker: &str) -> Option<&'a str> {
 
 /// How a Gambatte test with this expected result is checked: `audio0` and
 /// `audio1` are about sound, anything else is a number up to the first
-/// character that isn't a hexadecimal digit.
+/// character that isn't a hexadecimal digit. A result that starts with no
+/// such digit gives an empty number, which the runner fails rather than
+/// passing on any screen.
 fn gambatte_check(result: &str) -> Check {
     match result {
         _ if result.starts_with("audio0") => Check::Sound(false),
