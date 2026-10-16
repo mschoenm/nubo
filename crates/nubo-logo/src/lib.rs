@@ -1,8 +1,11 @@
 //! The Nubo logo: a friendly pixel puffed up into a little cloud ("nubo" is
 //! Esperanto for cloud), with two eyes and a sparkle, on a purple rounded
-//! square. It is defined once here as a few rounded rectangles, so the app's
-//! own top bar, its window icon and the macOS app icon all come from the same
-//! shapes and always match.
+//! square. It is defined once here as a few rounded rectangles, so everything
+//! that shows it comes from the same shapes and always matches: in the app,
+//! its top bar, the empty library's welcome, the About tab, its window,
+//! Windows, macOS and Flatpak icons and the Windows installer's banner, and
+//! in `nubo-core`, the Super Game Boy's intro, attraction mode and Nubo
+//! border.
 
 /// The logo is designed on a square this many units wide.
 pub const DESIGN_SIZE: f32 = 64.0;
