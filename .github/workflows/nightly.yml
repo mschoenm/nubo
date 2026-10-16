@@ -284,16 +284,17 @@ jobs:
   # measured alike. Only scheduled runs write to the wiki: the review reads
   # the part of the latest night, and the rotation counts the changes since
   # the last night, so a run started by hand would hide the day's changes
-  # from the review. Pushing to the wiki needs the WIKI_TOKEN secret, a token
-  # that can write to this repository; runs that don't push keep the files as
-  # their artifact. Releases run the other jobs only.
+  # from the review. This job only writes the files; the `wiki` job pushes
+  # them, so the WIKI_TOKEN secret never reaches a machine that runs cargo.
+  # Runs that don't push keep the files as their artifact. Releases run the
+  # other jobs only.
   metrics:
     name: Metrics
     if: always() && github.workflow == 'Nightly'
     needs: [ci, advisories, tests, verify-boot, save-states, eager, random-scenes, flatpak, windows, libretro, shootout]
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # Two runs at once would both push to the wiki.
+    # Two runs at once would both write tonight's files from the same wiki.
     concurrency:
       group: nightly-metrics
       cancel-in-progress: false
@@ -405,18 +406,16 @@ jobs:
               size_bytes: {desktop: $desktop, wasm: $wasm}}' > "$RUNNER_TEMP/night.json"
           cat "$RUNNER_TEMP/night.json"
 
-      - name: Update the wiki
+      - name: Write tonight's wiki files
         env:
-          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
           SCHEDULED: ${{ github.event_name == 'schedule' }}
         run: |
           wiki="$RUNNER_TEMP/wiki"
-          if [ -n "$WIKI_TOKEN" ]; then
-            remote="https://x-access-token:$WIKI_TOKEN@github.com/${{ github.repository }}.wiki.git"
+          if git clone --depth 1 "https://github.com/${{ github.repository }}.wiki.git" "$wiki"; then
+            git -C "$wiki" rev-parse HEAD > "$RUNNER_TEMP/wiki-base"
           else
-            remote="https://github.com/${{ github.repository }}.wiki.git"
+            mkdir -p "$wiki"
           fi
-          git clone --depth 1 "$remote" "$wiki" || mkdir -p "$wiki"
           cargo xtask metrics append "$wiki/metrics.jsonl" "$RUNNER_TEMP/night.json"
           cargo xtask review-units next --state "$wiki/rotation.json" \
             --date "$(TZ=Europe/Amsterdam date +%F)" --commit "$(git rev-parse HEAD)" > "$wiki/tonight.json"
@@ -424,15 +423,6 @@ jobs:
           cat "$wiki/tonight.json"
           if [ "$SCHEDULED" != true ]; then
             echo "::notice::Only scheduled runs update the wiki; this run's files are kept as its artifact."
-          elif [ -n "$WIKI_TOKEN" ] && [ -d "$wiki/.git" ]; then
-            cd "$wiki"
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add metrics.jsonl rotation.json tonight.json Nightly-metrics.md
-            git commit -m "Nightly metrics $(TZ=Europe/Amsterdam date +%F)"
-            git push
-          else
-            echo "::warning::The wiki wasn't updated: it needs the WIKI_TOKEN secret and a first page."
           fi
 
       - name: Keep tonight's metrics
@@ -442,8 +432,54 @@ jobs:
           name: nightly-metrics
           path: |
             ${{ runner.temp }}/night.json
+            ${{ runner.temp }}/wiki-base
             ${{ runner.temp }}/wiki/metrics.jsonl
             ${{ runner.temp }}/wiki/rotation.json
             ${{ runner.temp }}/wiki/tonight.json
             ${{ runner.temp }}/wiki/Nightly-metrics.md
           if-no-files-found: ignore
+
+  # Pushes the metrics job's wiki files to the wiki, on scheduled runs only.
+  # It is the only job that gets WIKI_TOKEN, and it runs on a machine of its
+  # own: the metrics job runs code that cargo builds, and whatever that code
+  # leaves behind there (a git hook, a changed PATH) could read the token if
+  # the push ran on the same machine. It takes only the four files from the
+  # metrics job's artifact, and pushes only if the wiki hasn't changed since
+  # the metrics job read it.
+  wiki:
+    name: Push the wiki
+    if: github.event_name == 'schedule'
+    needs: metrics
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions: {}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nightly-metrics
+          path: ${{ runner.temp }}/metrics
+
+      - name: Push the wiki
+        env:
+          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
+        run: |
+          files="$RUNNER_TEMP/metrics"
+          wiki="$RUNNER_TEMP/wiki"
+          if [ -z "$WIKI_TOKEN" ] || [ ! -f "$files/wiki-base" ]; then
+            echo "::warning::The wiki wasn't updated: it needs the WIKI_TOKEN secret and a first page."
+            exit 0
+          fi
+          git clone --depth 1 "https://github.com/${{ github.repository }}.wiki.git" "$wiki"
+          if [ "$(git -C "$wiki" rev-parse HEAD)" != "$(cat "$files/wiki-base")" ]; then
+            echo "::error::The wiki changed after the metrics job read it, so tonight's files would undo that change."
+            exit 1
+          fi
+          for file in metrics.jsonl rotation.json tonight.json Nightly-metrics.md; do
+            cp "$files/wiki/$file" "$wiki/$file"
+          done
+          cd "$wiki"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add metrics.jsonl rotation.json tonight.json Nightly-metrics.md
+          git commit -m "Nightly metrics $(TZ=Europe/Amsterdam date +%F)"
+          git push "https://x-access-token:$WIKI_TOKEN@github.com/${{ github.repository }}.wiki.git" HEAD
