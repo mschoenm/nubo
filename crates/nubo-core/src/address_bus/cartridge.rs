@@ -39,7 +39,8 @@ pub struct CartridgeHeader {
     /// controller and extra hardware (RAM, battery, clock, rumble) the
     /// cartridge has.
     pub cartridge_type: u8,
-    /// The number of 16 KiB ROM banks the header announces.
+    /// The number of 16 KiB ROM banks the header announces, or 0 for a size
+    /// code (header byte 0x148) that names no ROM size.
     pub rom_bank_count: u16,
     /// The number of 8 KiB RAM banks the header announces. A 2 KiB RAM counts
     /// as one bank. MBC2's built-in 512 half-byte RAM counts as zero.
@@ -487,9 +488,17 @@ pub(super) fn empty_cartridge() -> Cartridge {
     }
 }
 
-/// Converts the ROM size byte from the header into a number of 16 KiB banks.
+/// Converts the ROM size byte from the header into a number of 16 KiB banks:
+/// 2 to 512 for codes 0x00-0x08, the 1.1, 1.2 and 1.5 MiB sizes Pan Docs lists
+/// for codes 0x52-0x54, and 0 for codes that name no size.
 pub(super) fn rom_bank_count(rom_size_index: u8) -> u16 {
-    2_u16.saturating_pow(u32::from(rom_size_index) + 1)
+    match rom_size_index {
+        0x00..=0x08 => 2 << rom_size_index,
+        0x52 => 72,
+        0x53 => 80,
+        0x54 => 96,
+        _ => 0,
+    }
 }
 
 /// Converts a RAM size in bytes into a number of 8 KiB banks. A 2 KiB RAM
@@ -734,6 +743,12 @@ mod tests {
     fn rejects_a_rom_that_is_too_small_for_a_header() {
         let result = load_cartridge(vec![0; 0x120], empty_cartridge_effects());
         assert_eq!(result.err(), Some(LoadRomError::TooSmall));
+    }
+
+    #[test]
+    fn the_rom_bank_count_follows_the_header_size_codes() {
+        let counts = [0x00, 0x01, 0x08, 0x09, 0x0F, 0x52, 0x53, 0x54, 0xFF].map(rom_bank_count);
+        assert_eq!(counts, [2, 4, 512, 0, 0, 72, 80, 96, 0]);
     }
 
     #[test]
