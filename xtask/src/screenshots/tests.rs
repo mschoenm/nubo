@@ -4,13 +4,16 @@
 use super::lists::{Frame, GameList, Layout, ScreenshotList, Style};
 use super::*;
 use image::{Rgba, RgbaImage};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-/// Reads `text` as `images/screenshots.toml`.
+/// Reads `text` as `images/screenshots.toml`, from a folder of its own, so
+/// tests running at the same time never share one.
 fn list(text: &str) -> std::result::Result<ScreenshotList, String> {
+    static LISTS: AtomicUsize = AtomicUsize::new(0);
     let folder = std::env::temp_dir().join(format!(
         "nubo-screenshot-list-{}-{}",
         std::process::id(),
-        text.len()
+        LISTS.fetch_add(1, Ordering::Relaxed)
     ));
     fs::create_dir_all(&folder).unwrap();
     let path = folder.join("screenshots.toml");
