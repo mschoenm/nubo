@@ -182,8 +182,9 @@ impl Cheat {
     }
 }
 
-/// A cheat code, as RetroArch sent it, that is neither a Game Genie nor a
-/// GameShark code.
+/// A cheat code, as RetroArch sent it, that the emulator rejected: it is
+/// neither a Game Genie nor a GameShark code, it changes an address its kind
+/// of code can't change, or too many cheats are already on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InvalidCheat(pub String);
 

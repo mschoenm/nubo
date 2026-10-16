@@ -1014,7 +1014,7 @@ pub unsafe extern "C" fn retro_cheat_set(index: c_uint, enabled: bool, code: *co
             for invalid in core.cheat_set(index, enabled, &code) {
                 log(
                     RETRO_LOG_WARN,
-                    &format!("{} is neither a Game Genie nor a GameShark code", invalid.0),
+                    &format!("The cheat code {} can't be used", invalid.0),
                 );
             }
         }
