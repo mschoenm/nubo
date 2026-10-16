@@ -60,8 +60,8 @@ fn parse_hex_byte(code: &str, range: Range<usize>, field: &'static str) -> Resul
     })
 }
 
-/// Parses an eight digit GameShark code such as `01FF56D3`, which writes a
-/// value to cartridge or work RAM.
+/// Parses an eight digit GameShark code such as `01FF56D3`, which makes a
+/// byte of cartridge or work RAM read as another value.
 ///
 /// The first byte selects the RAM bank, like SameBoy reads it: `01`, which
 /// almost every code uses, applies to any bank, and otherwise the low digit
