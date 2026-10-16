@@ -64,11 +64,14 @@ fn scene_count_and_seed() -> (usize, u64) {
     (count, seed)
 }
 
-/// The three timing variants (DMG, CGB, CGB in double speed), as a model and a speed.
-const TIMINGS: [(Model, bool); 3] = [
+/// The three timing variants (DMG, CGB, CGB in double speed), as a model and a speed, and a CGB
+/// from before CGB-D, whose fetcher reads the tile map's y again for each read
+/// (`caches_fetcher_y`).
+const TIMINGS: [(Model, bool); 4] = [
     (Model::Dmg, false),
     (Model::CgbE, false),
     (Model::CgbE, true),
+    (Model::CgbC, false),
 ];
 
 /// A PPU with random VRAM, OAM, palettes and registers that has just switched the LCD on.
