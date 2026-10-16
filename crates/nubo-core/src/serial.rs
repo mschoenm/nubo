@@ -33,6 +33,8 @@ pub struct Serial {
     uses_internal_clock: bool,
     /// SC bit 7: a transfer is in progress.
     transfer_enabled: bool,
+    /// How many bits of the current transfer have been shifted, 0 to 7: the
+    /// eighth ends the transfer and starts the count again.
     bits_transferred: u8,
     /// Whether the console is a CGB, where SC's clock speed bit exists. A copy
     /// of the address bus's, which only `AddressBus::set_model` changes.
@@ -67,6 +69,13 @@ fn exchange_bit_with_disconnected_cable(_outgoing_bit: bool) -> bool {
 impl Serial {
     pub(super) fn set_cgb_mode(&mut self, cgb_mode: bool) {
         self.cgb_mode = cgb_mode;
+    }
+
+    /// Whether a loaded save state holds a bit count the transfer can reach,
+    /// which the emulator never saves otherwise. A larger count would
+    /// overflow before the transfer ends.
+    pub(super) fn is_consistent(&self) -> bool {
+        self.bits_transferred < 8
     }
 
     fn clock_counter_bit(&self) -> u16 {

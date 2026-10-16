@@ -635,6 +635,13 @@ fn a_save_state_with_an_impossible_oam_dma_does_not_load() {
     assert_state_with_field_does_not_load(&[b"\x07oam_dma", b"\x0bstart_delay"], &[3]);
 }
 
+#[test]
+fn a_save_state_with_an_impossible_serial_bit_count_does_not_load() {
+    for bits in [8, u8::MAX] {
+        assert_state_with_field_does_not_load(&[b"\x06serial", b"\x10bits_transferred"], &[bits]);
+    }
+}
+
 /// Checks that a save state whose field at `path` (the names of the
 /// components it lies in and then its own, each with its length byte in
 /// front) holds `value` fails to load, leaves the emulator as it was, and

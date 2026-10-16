@@ -1347,7 +1347,15 @@ impl AddressBus {
                 }
             }
             "vram_dma" => self.hdma.deserialize(bytes)?,
-            "serial" => self.serial.deserialize(bytes)?,
+            "serial" => {
+                self.serial.deserialize(bytes)?;
+                if !self.serial.is_consistent() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "serial transfer state out of range",
+                    ));
+                }
+            }
             "speed_switch" => self.speed_switch.deserialize(bytes)?,
             "joypad" => self.joypad.deserialize(bytes)?,
             _ => return Ok(false),
