@@ -67,7 +67,7 @@ The root `Cargo.toml` is a virtual workspace whose default members are `nubo-cor
 - `crates/nubo-core/` (`AGENTS.md`): the emulator, a plain library with no platform dependencies. `Emulator` in `emulator.rs` is its API.
 - `crates/nubo-frontend/` (`AGENTS.md`): everything an app needs that isn't drawing, without a UI toolkit: what it keeps between runs (settings, controls, battery saves, save states, cheats, screenshots), the game library, running a game with its sound (`session`, paced by the sound card on the desktop and by the screen's refreshes in the browser), game controllers (`gamepads`), and the palettes, model rule, picture (with the Super Game Boy border) and Super Game Boy menu choices the RetroArch core shares. Its features `desktop`, `web` and `gamepads` bring each platform's storage, sound and controllers.
 - `crates/nubo-serializable-derive/`: the derive macro behind save states.
-- `crates/nubo-logo/`: the logo, drawn from rounded rectangles, for the app's icons.
+- `crates/nubo-logo/`: the logo, drawn from rounded rectangles: the app's top bar and its window, Windows, macOS and Flatpak icons, and in `nubo-core` the Super Game Boy's intro, attraction mode and Nubo border.
 - `crates/nubo-download/`: downloading test data over HTTPS and checking its SHA-256 checksums, shared by the test ROM runner, the CPU test runner and xtask.
 - `frontends/nubo/` (`AGENTS.md`): the app, desktop and browser.
 - `frontends/nubo-libretro/` (`AGENTS.md`): the RetroArch (libretro) core, a dynamic library; `cargo xtask libretro` packages it.
