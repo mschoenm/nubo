@@ -90,6 +90,17 @@ impl RtcState {
         })
     }
 
+    /// The state with each register cut to the bits it has, as a game's
+    /// writes are, so a damaged or hand-edited `.rtc` file can't make a
+    /// register hold a value the hardware can't, such as 255 hours.
+    fn within_register_widths(mut self) -> Self {
+        self.seconds &= SECONDS_REGISTER_MAX;
+        self.minutes &= MINUTES_REGISTER_MAX;
+        self.hours &= HOURS_REGISTER_MAX;
+        self.days &= DAYS_REGISTER_MAX;
+        self
+    }
+
     /// Moves the clock forward by `elapsed_ms` milliseconds. A register that
     /// holds an invalid value (such as 61 seconds) doesn't carry into the next
     /// one; it keeps counting until it overflows its bits and wraps to 0.
@@ -233,6 +244,9 @@ const SECONDS_REGISTER_MAX: u8 = 63;
 const MINUTES_REGISTER_MAX: u8 = 63;
 /// The hours register has five bits, so it can hold values up to 31.
 const HOURS_REGISTER_MAX: u8 = 31;
+/// The day counter has nine bits (DL and bit 0 of DH), so it can hold values
+/// up to 511.
+const DAYS_REGISTER_MAX: u16 = 0x1FF;
 
 const RTC_SECONDS: u8 = 0x08;
 const RTC_MINUTES: u8 = 0x09;
@@ -275,7 +289,7 @@ impl Mbc3CartridgeMapper {
         rtc_clock: RtcClock,
         saved_rtc: Option<RtcState>,
     ) -> Self {
-        let rtc = saved_rtc.unwrap_or_default();
+        let rtc = saved_rtc.map_or_else(RtcState::default, RtcState::within_register_widths);
         Mbc3CartridgeMapper {
             rom_bank_number: 1,
             ram_rtc_enabled: false,
@@ -350,6 +364,7 @@ impl Mbc3CartridgeMapper {
     /// on a cartridge without the clock.
     pub(super) fn set_rtc(&mut self, state: RtcState) {
         if self.has_timer {
+            let state = state.within_register_widths();
             self.latched_rtc = LatchedRtc::of(&state);
             self.rtc = state;
         }
@@ -611,6 +626,35 @@ mod tests {
             ]
         );
         assert_eq!(RtcState::from_bytes(&bytes), Some(state));
+    }
+
+    #[test]
+    fn a_loaded_clock_holds_only_what_its_registers_can() {
+        let damaged = RtcState {
+            seconds: 0xFF,
+            minutes: 0xFF,
+            hours: 0xFF,
+            days: 0xFFFF,
+            ..RtcState::default()
+        };
+        let registers = |mapper: &Mbc3CartridgeMapper| {
+            (0..5)
+                .map(|index| mapper.latched_rtc.register(index))
+                .collect::<Vec<_>>()
+        };
+        let mut mapper = Mbc3CartridgeMapper::new(
+            CARTRIDGE_TYPE_MBC3_TIMER_BATTERY,
+            0x1_0000,
+            0,
+            RtcClock::WallClock,
+            Some(damaged.clone()),
+        );
+        assert_eq!(registers(&mapper), [63, 63, 31, 0xFF, 0x01]);
+
+        mapper.set_rtc(RtcState::default());
+        mapper.set_rtc(damaged);
+        assert_eq!(registers(&mapper), [63, 63, 31, 0xFF, 0x01]);
+        assert_eq!(mapper.rtc.days, 511);
     }
 
     #[test]
