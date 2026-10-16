@@ -861,7 +861,7 @@ fn other_model_question(saved: Model, configured: Model, remembers: bool) -> Dia
     DialogContent {
         title: format!("Switch to the {configured}?"),
         text: Some(format!(
-            "This game is set to the {configured}, but you last played it on the {saved}. \
+            "You last played this game on the {saved}, but it's now set to the {configured}. \
              Switching starts at the title screen and replaces the automatic save from when you \
              stopped. Your in-game saves stay.{}",
             if remembers {
