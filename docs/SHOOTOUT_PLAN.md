@@ -1,6 +1,6 @@
 # Plan: adding Nubo to the GB Emulator Shootout
 
-The [GB Emulator Shootout](https://gbdev.io/GBEmulatorShootout/) runs about 265 test ROMs on 17 Game Boy
+The [GB Emulator Shootout](https://gbdev.io/GBEmulatorShootout/) runs about 265 test ROMs on 18 Game Boy
 emulators and publishes a table of their results. Getting Nubo into it is step 2 of Phase 6 in
 [ACCURACY_PLAN.md](ACCURACY_PLAN.md), and running its harness locally on all emulators also covers much
 of Phase 1 (measuring other emulators on the same tests).
