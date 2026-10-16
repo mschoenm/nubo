@@ -1,0 +1,55 @@
+# The fuzz targets of the full review (.claude/skills/full-review/SKILL.md).
+# Outside the Cargo workspace on purpose: cargo-fuzz needs the nightly
+# toolchain (rust-toolchain.toml here), and nothing else in Nubo may use it, so
+# `cargo build`, `cargo test` and CI never see this folder. See AGENTS.md.
+[package]
+name = "nubo-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+nubo-core = { path = "../crates/nubo-core" }
+
+# Its own workspace, so Cargo doesn't take it for a member of the root one.
+[workspace]
+
+# Overflow checks and debug assertions on, as in tests: an overflow or a broken
+# assertion from a loaded file is a crash too.
+[profile.release]
+debug = 1
+overflow-checks = true
+debug-assertions = true
+
+[[bin]]
+name = "rom"
+path = "fuzz_targets/rom.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "state"
+path = "fuzz_targets/state.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "cheats"
+path = "fuzz_targets/cheats.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "battery"
+path = "fuzz_targets/battery.rs"
+test = false
+doc = false
+bench = false

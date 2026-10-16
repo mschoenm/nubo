@@ -1,0 +1,34 @@
+# Fuzz targets
+
+Fuzzing feeds Nubo huge numbers of generated inputs, changing them toward the ones that reach code no input reached before, to find any that make it panic. It tests the first rule of the root `AGENTS.md`: user input never panics the core. A full review (`.claude/skills/full-review/SKILL.md`) runs these targets; nothing else does, CI included.
+
+This folder is its own Cargo workspace, outside Nubo's, because `cargo-fuzz` needs the nightly toolchain (`rust-toolchain.toml` here). It is the one exception to the rule that Nubo uses only stable Rust: no code that ships or that CI builds may depend on it. `cargo build`, `cargo test`, `cargo fmt --all` and clippy at the root never see it.
+
+## The targets
+
+- `rom`: any ROM or zip file, on a model picked by the first byte.
+- `state`: any save state of Tobu Tobu Girl Deluxe, one of the benchmark games.
+- `cheats`: any text of GameShark and Game Genie codes, registered while the game runs.
+- `battery`: any battery save (cartridge RAM of any length and any cartridge clock) on every cartridge type.
+
+Each one runs what it loaded for a couple of frames, saves a state and loads it again. `src/lib.rs` holds what they share.
+
+## Running them
+
+From the repository root, once: `cargo install cargo-fuzz --locked`, `rustup toolchain install nightly` and `cargo xtask benchmark-roms` (the `state` and `cheats` targets load the game from `target/benchmark-roms/`). Then from this folder:
+
+```bash
+mkdir -p corpus/state && cp ../save-states/<newest set>/tobudx.gb-*.state corpus/state/
+cargo fuzz build
+cargo fuzz run state -- -max_total_time=900    # 15 minutes; the same for rom, cheats and battery
+```
+
+Seed `state` with the game's kept states, or it starts from nothing and rarely gets past the header. `corpus/`, `artifacts/` and `target/` are not committed.
+
+## When one crashes
+
+`cargo fuzz` saves the input in `artifacts/<target>/`. `cargo fuzz tmin <target> <file>` makes it as small as it can. A crash in Nubo's own code is a bug against the first rule: it gets a regression test in `nubo-core` that loads the same input, written like the corrupted save-state tests, and then a fix.
+
+## Upkeep
+
+The full review runs `cargo update` here at its start, so the targets follow their newest dependencies like the rest of Nubo. When `nubo-core`'s API changes, the review fixes the targets in the same pull request as its other changes.
