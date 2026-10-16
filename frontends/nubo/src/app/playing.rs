@@ -85,7 +85,8 @@ pub enum GameMessage {
 /// How the player answered `DialogKind::OtherModel`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResumeAnswer {
-    /// Continue from the automatic save, on the model it was made on.
+    /// Continue from the automatic save, on the model it was made on, and
+    /// keep the game on that model from now on.
     Continue,
     /// Start from the title screen on the model the game is set to start
     /// on; the automatic save is replaced when the player stops.
@@ -375,6 +376,7 @@ impl App {
                 self.dialog = Some(Dialog::new(DialogKind::OtherModel {
                     saved: state.model,
                     configured: model,
+                    remembers: self.model_override.is_none(),
                 }));
                 self.pending_start = Some(PendingStart { rom, header, state });
             }
@@ -384,13 +386,24 @@ impl App {
     }
 
     /// Starts the game waiting in `App::pending_start` as the player
-    /// answered, or drops it.
+    /// answered, or drops it. Continuing also sets the game to start on the
+    /// save's model from now on (see `App::preference_starting_on`), so the
+    /// question doesn't come back, unless a model was picked on the command
+    /// line.
     fn answer_resume(&mut self, answer: ResumeAnswer) {
         let Some(PendingStart { rom, header, state }) = self.pending_start.take() else {
             return;
         };
         match answer {
-            ResumeAnswer::Continue => self.launch(rom, header, state.model, Some(state)),
+            ResumeAnswer::Continue => {
+                if self.model_override.is_none() {
+                    let preference = self.preference_starting_on(&header, state.model);
+                    if let Err(error) = self.library.set_model(&rom.path, preference) {
+                        self.toasts.error(error);
+                    }
+                }
+                self.launch(rom, header, state.model, Some(state));
+            }
             ResumeAnswer::StartOver => {
                 let model = self.model_for(&rom.path, &header);
                 self.launch(rom, header, model, None);

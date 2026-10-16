@@ -10,13 +10,13 @@ use crate::views;
 use iced::Task;
 use iced::widget;
 use iced::widget::scrollable::AbsoluteOffset;
-use nubo_core::Model;
 use nubo_frontend::controls::Action;
 use nubo_frontend::library::box_art::{self, GameList};
 use nubo_frontend::library::{
     self, DownloadedArt, FileCheck, LoadedPicture, ScanResult, WatchEvent,
 };
 use nubo_frontend::links;
+use nubo_frontend::model::ModelPreference;
 use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states::{self, Slot};
 use nubo_frontend::settings::LibraryFolder;
@@ -65,9 +65,9 @@ pub enum LibraryMessage {
     FilterPicked(LibraryFilter),
     /// Opens the folder this game is in.
     ShowInFolder(PathBuf),
-    /// The player picked a model for this game in its menu, or `None` to
-    /// follow the settings again.
-    GameModelPicked(PathBuf, Option<Model>),
+    /// The player picked Automatic or a model for this game in its menu, or
+    /// `None` to follow the settings again.
+    GameModelPicked(PathBuf, Option<ModelPreference>),
     /// Asks whether to delete this game's save states.
     AskDeleteSaveStates(PathBuf),
     /// Deletes this game's save states, as the player confirmed.

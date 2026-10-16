@@ -179,9 +179,11 @@ impl App {
             DialogKind::ResetSettings(choices) => {
                 Some(reset_question(*choices, self.reset_offers()))
             }
-            DialogKind::OtherModel { saved, configured } => {
-                Some(other_model_question(*saved, *configured))
-            }
+            DialogKind::OtherModel {
+                saved,
+                configured,
+                remembers,
+            } => Some(other_model_question(*saved, *configured, *remembers)),
         }
     }
 
@@ -203,8 +205,9 @@ impl App {
                     DialogMessage::ShowGameMenu(path.clone(), GameMenuPage::Consoles).into(),
                 ),
             )
-            .hint(match entry.model() {
-                Some(model) => String::from(Console::of(model).label()),
+            .hint(match entry.preference() {
+                Some(ModelPreference::Fixed(model)) => String::from(Console::of(model).label()),
+                Some(ModelPreference::Automatic) => String::from("Automatic"),
                 None => format!("Default ({})", self.default_model_label()),
             }),
         ];
@@ -256,23 +259,37 @@ impl App {
     fn consoles_page(&self, entry: &LibraryEntry) -> DialogContent {
         let path = &entry.path;
         let picked = entry.model();
+        let pick = |preference| {
+            DialogAction::Stay(LibraryMessage::GameModelPicked(path.clone(), preference).into())
+        };
 
         let mut choices = vec![
             Choice::new(
                 Icon::Settings,
                 "Default",
                 ChoiceStyle::Secondary,
-                DialogAction::Stay(LibraryMessage::GameModelPicked(path.clone(), None).into()),
+                pick(None),
             )
             .hint(self.default_model_label())
-            .checked(picked.is_none()),
+            .checked(entry.preference().is_none()),
+            Choice::new(
+                Icon::Sparkles,
+                "Automatic",
+                ChoiceStyle::Secondary,
+                pick(Some(ModelPreference::Automatic)),
+            )
+            .checked(entry.preference() == Some(ModelPreference::Automatic)),
         ];
         choices.extend(Console::ALL.map(|console| {
             let in_use = picked.filter(|&model| Console::of(model) == console);
             let action = if console.revisions().len() > 1 {
                 DialogMessage::ShowGameMenu(path.clone(), GameMenuPage::Revisions(console)).into()
             } else {
-                LibraryMessage::GameModelPicked(path.clone(), Some(console.recommended())).into()
+                LibraryMessage::GameModelPicked(
+                    path.clone(),
+                    Some(ModelPreference::Fixed(console.recommended())),
+                )
+                .into()
             };
             let choice = Choice::new(
                 Icon::Gamepad2,
@@ -573,7 +590,11 @@ fn revisions_page(entry: &LibraryEntry, console: Console) -> DialogContent {
                 revision.name(),
                 ChoiceStyle::Secondary,
                 DialogAction::Stay(
-                    LibraryMessage::GameModelPicked(path.clone(), Some(revision)).into(),
+                    LibraryMessage::GameModelPicked(
+                        path.clone(),
+                        Some(ModelPreference::Fixed(revision)),
+                    )
+                    .into(),
                 ),
             )
             .checked(entry.model() == Some(revision));
@@ -824,9 +845,10 @@ fn delete_question(path: &Path, entry: Option<&LibraryEntry>) -> DialogContent {
 
 /// The question whether to continue a game on `saved`, the model its
 /// automatic save was made on, or start it from the title screen on
-/// `configured`, the model it is now set to start on. The models are named
-/// by their console, or by their revision when both are the same console.
-fn other_model_question(saved: Model, configured: Model) -> DialogContent {
+/// `configured`, the model it is now set to start on. With `remembers`, it
+/// says that continuing keeps the game on `saved`. The models are named by
+/// their console, or by their revision when both are the same console.
+fn other_model_question(saved: Model, configured: Model, remembers: bool) -> DialogContent {
     let name = |model: Model| {
         if Console::of(saved) == Console::of(configured) {
             model.name()
@@ -841,7 +863,12 @@ fn other_model_question(saved: Model, configured: Model) -> DialogContent {
         text: Some(format!(
             "You last played on the {saved}. Starting on the {configured} begins at the title \
              screen and replaces the automatic save from when you stopped. Your in-game saves \
-             stay."
+             stay.{}",
+            if remembers {
+                format!("\n\nContinue keeps this game on the {saved} from now on.")
+            } else {
+                String::new()
+            }
         )),
         notice: None,
         layout: Layout::Buttons,

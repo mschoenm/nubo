@@ -190,7 +190,7 @@ fn a_ticked_box_no_longer_offered_deletes_nothing() {
 
 #[test]
 fn the_other_model_question_names_the_consoles_and_continues_first() {
-    let content = other_model_question(Model::Sgb, Model::Dmg);
+    let content = other_model_question(Model::Sgb, Model::Dmg, true);
 
     assert_eq!(content.title, "Continue on the Super Game Boy?");
     assert_eq!(
@@ -198,7 +198,7 @@ fn the_other_model_question_names_the_consoles_and_continues_first() {
         Some(
             "You last played on the Super Game Boy. Starting on the Game Boy begins at the title \
              screen and replaces the automatic save from when you stopped. Your in-game saves \
-             stay."
+             stay.\n\nContinue keeps this game on the Super Game Boy from now on."
         )
     );
     let (_, buttons) = labels(&content);
@@ -208,9 +208,16 @@ fn the_other_model_question_names_the_consoles_and_continues_first() {
 
 #[test]
 fn the_other_model_question_names_revisions_of_one_console() {
-    let content = other_model_question(Model::CgbC, Model::CgbE);
+    let content = other_model_question(Model::CgbC, Model::CgbE, true);
 
     assert_eq!(content.title, "Continue on the CGB-C?");
     let (_, buttons) = labels(&content);
     assert_eq!(buttons, ["Continue", "Start on the CGB-E"]);
+}
+
+#[test]
+fn the_other_model_question_says_nothing_about_keeping_a_model_from_the_command_line() {
+    let content = other_model_question(Model::Sgb, Model::Dmg, false);
+
+    assert!(!content.text.unwrap().contains("from now on"));
 }

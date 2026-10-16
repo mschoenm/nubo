@@ -81,8 +81,10 @@ pub struct LibraryEntry {
     /// don't read unchanged files again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supports_sgb: Option<bool>,
-    /// The model the player picked for this game in its menu, which it
-    /// starts on instead of the one in the settings. Always a fixed model.
+    /// What the player picked for this game in its menu, which it starts
+    /// on instead of the model in the settings: Automatic (which picks by
+    /// the cartridge even when the settings pick one model for every game)
+    /// or a model. `None` follows the settings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<ModelPreference>,
     /// When the library first found the game, in seconds since 1970, for
@@ -113,7 +115,15 @@ impl LibraryEntry {
         self.size
     }
 
-    /// The model the player picked for this game, if they picked one.
+    /// What the player picked for this game in its menu (see
+    /// [`LibraryEntry::model`](#structfield.model)), or `None` to follow the
+    /// settings.
+    pub fn preference(&self) -> Option<ModelPreference> {
+        self.model
+    }
+
+    /// The model the player picked for this game, if they picked one rather
+    /// than Automatic or the settings.
     pub fn model(&self) -> Option<Model> {
         match self.model {
             Some(ModelPreference::Fixed(model)) => Some(model),
@@ -733,14 +743,18 @@ impl Library {
         self.save()
     }
 
-    /// Starts the game at `path` on `model` from now on, or on the model in
-    /// the settings again with `None`.
-    pub fn set_model(&mut self, path: &Path, model: Option<Model>) -> Result<(), String> {
+    /// Starts the game at `path` as `preference` picks from now on, or on
+    /// the model in the settings again with `None`.
+    pub fn set_model(
+        &mut self,
+        path: &Path,
+        preference: Option<ModelPreference>,
+    ) -> Result<(), String> {
         let Some(entry) = self.entries.iter_mut().find(|entry| entry.path == path) else {
             return Ok(());
         };
 
-        entry.model = model.map(ModelPreference::Fixed);
+        entry.model = preference;
         self.save()
     }
 
