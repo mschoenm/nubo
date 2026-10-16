@@ -78,6 +78,7 @@ The root `Cargo.toml` is a virtual workspace whose default members are `nubo-cor
 - `tools/nubo-benchmark/` (`AGENTS.md`): `cargo benchmark`.
 - `tools/nubo-headless/`: `cargo screenshot`.
 - `xtask/` (`AGENTS.md`): the web build, packaging, licenses, the emulator comparison, the nightly review's tools and the screenshots.
+- `.github/shootout/` (`AGENTS.md`): Nubo's class in the GB Emulator Shootout's harness, kept the same as the Shootout's copy.
 - `fuzz/` (`AGENTS.md`): the fuzz targets of the full review, outside the Cargo workspace, on the nightly toolchain.
 - `images/`: the logo and the screenshots; `images/scenes/` holds the scenes the screenshots are made from (`nubo_frontend::scenes`), with `games.toml`, the games they may use, and `images/screenshots.toml` lists the screenshots.
 

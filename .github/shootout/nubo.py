@@ -2,6 +2,8 @@
 # `emulators/nubo.py` (docs/SHOOTOUT_PLAN.md, Part 2), which the pull request
 # to the Shootout copies. `.github/workflows/shootout.yml` puts it in a
 # checkout of the Shootout and runs the Shootout's tests on the Windows zip.
+# Below this header it is the Shootout's copy byte for byte, comments included:
+# change it only together with that copy (.github/shootout/AGENTS.md).
 from util import *
 from emulator import Emulator
 from test import *
