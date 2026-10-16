@@ -19,7 +19,10 @@ const MAX_BYTES: usize = 64 * 1024 * 1024;
 /// when the two differ in size.
 #[derive(Debug)]
 enum Older {
+    /// The bytes that differ from the next newer state, as `difference`
+    /// writes them.
     Difference(Vec<u8>),
+    /// The whole state, when its size differs from the next newer one's.
     Whole(Vec<u8>),
 }
 
