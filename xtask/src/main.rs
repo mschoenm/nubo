@@ -186,14 +186,20 @@ fn build_commit() -> String {
     }
 }
 
-/// The date of the working tree's commit, such as `2026-10-16` (the day
-/// it was committed, in the committer's time zone), or what
-/// `NUBO_COMMIT_DATE` already says. Empty without git.
+/// The date of the commit [`build_commit`] gives, such as `2026-10-16`
+/// (the day it was committed, in the committer's time zone), or what
+/// `NUBO_COMMIT_DATE` already says. Empty when git doesn't know that
+/// commit, or without git.
 fn build_commit_date() -> String {
     if let Some(date) = env::var_os("NUBO_COMMIT_DATE") {
         return date.to_string_lossy().into_owned();
     }
-    git(&["log", "-1", "--format=%cs", "HEAD"]).unwrap_or_default()
+    let commit = build_commit();
+    let hash = commit.strip_suffix("-dirty").unwrap_or(&commit);
+    if hash.is_empty() {
+        return String::new();
+    }
+    git(&["log", "-1", "--format=%cs", hash]).unwrap_or_default()
 }
 
 /// What git prints for `args` in the workspace, trimmed, or `None` when
