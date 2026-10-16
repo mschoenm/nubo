@@ -27,9 +27,14 @@ const LOGO: [u8; 48] = [
 /// Cartridge effects that keep nothing and run the cartridge clock on
 /// emulated time, so every run of an input is the same.
 pub fn effects() -> Box<NoSaves> {
-    Box::new(NoSaves {
-        rtc_clock: RtcClock::EmulatedTime,
-    })
+    effects_on(RtcClock::EmulatedTime)
+}
+
+/// Cartridge effects that keep nothing and run the cartridge clock on
+/// `clock`. The wall clock always reads zero here, so it stands still, and
+/// every run of an input is still the same.
+pub fn effects_on(clock: RtcClock) -> Box<NoSaves> {
+    Box::new(NoSaves { rtc_clock: clock })
 }
 
 /// A cartridge the boot ROM accepts (the Nintendo logo and a right header
@@ -64,9 +69,10 @@ const BOOTS_KEPT: usize = 4096;
 /// The most CPU steps a boot ROM may take; a real boot takes far fewer.
 const BOOT_STEPS: u64 = 4_000_000;
 
-/// The boots [`start`] keeps: one per model and part of a ROM the boot ROM
-/// reads, `None` for one that didn't finish.
-type Boots = HashMap<(Model, Vec<u8>), Option<Emulator>>;
+/// The boots [`start_on`] keeps: one per model, cartridge clock (whether it
+/// is the wall clock) and part of a ROM the boot ROM reads, `None` for one
+/// that didn't finish.
+type Boots = HashMap<(Model, bool, Vec<u8>), Option<Emulator>>;
 
 /// Whether the boot ROM accepts `rom`'s header: the Nintendo logo and the
 /// header checksum. One it rejects hangs it, as it does a real console, so
@@ -84,14 +90,26 @@ fn header_boots(rom: &[u8]) -> bool {
 }
 
 /// An emulator of `model` with `rom` inserted that has just run its boot ROM,
-/// or `None` when the ROM doesn't load or doesn't boot. The boot depends on the part of the
-/// ROM the boot ROM reads ([`Emulator::boot_rom_input`]), so a boot is run
-/// once for each model and such part, as the test ROM runner does, and copied
-/// with [`Emulator::clone_with_rom`] after that: every ROM starts exactly where
-/// a player's would.
+/// with the cartridge clock on emulated time, or `None` when the ROM doesn't
+/// load or doesn't boot. See [`start_on`].
 pub fn start(model: Model, rom: &[u8]) -> Option<Emulator> {
+    start_on(model, rom, RtcClock::EmulatedTime)
+}
+
+/// An emulator of `model` with `rom` inserted that has just run its boot ROM,
+/// with the cartridge clock on `clock`, or `None` when the ROM doesn't load or
+/// doesn't boot. The boot depends on the part of the ROM the boot ROM reads
+/// ([`Emulator::boot_rom_input`]), so a boot is run once for each model,
+/// clock and such part, as the test ROM runner does, and copied with
+/// [`Emulator::clone_with_rom`] after that: every ROM starts exactly where a
+/// player's would. A zip file is unpacked by loading it, so it is booted on
+/// its own every time.
+pub fn start_on(model: Model, rom: &[u8], clock: RtcClock) -> Option<Emulator> {
     thread_local! {
         static BOOTS: RefCell<Boots> = RefCell::new(HashMap::new());
+    }
+    if rom.starts_with(b"PK\x03\x04") {
+        return boot(model, rom, clock);
     }
     if !header_boots(rom) {
         return None;
@@ -99,23 +117,31 @@ pub fn start(model: Model, rom: &[u8]) -> Option<Emulator> {
     let input = rom.get(Emulator::boot_rom_input(model))?.to_vec();
     BOOTS.with(|boots| {
         let mut boots = boots.borrow_mut();
-        let key = (model, input);
+        let key = (model, clock == RtcClock::WallClock, input);
         if !boots.contains_key(&key) {
-            let mut emulator = Emulator::new(model);
-            emulator.load_rom(rom, effects()).ok()?;
-            let mut steps = 0;
-            while emulator.is_running_boot_rom() && steps < BOOT_STEPS {
-                emulator.step();
-                steps += 1;
-            }
             if boots.len() >= BOOTS_KEPT {
                 boots.clear();
             }
-            let booted = (!emulator.is_running_boot_rom()).then_some(emulator);
-            boots.insert(key.clone(), booted);
+            boots.insert(key.clone(), boot(model, rom, clock));
         }
-        boots[&key].as_ref()?.clone_with_rom(rom, effects()).ok()
+        boots[&key]
+            .as_ref()?
+            .clone_with_rom(rom, effects_on(clock))
+            .ok()
     })
+}
+
+/// Powers on an emulator of `model` with `rom` inserted and runs its boot
+/// ROM, or `None` when the ROM doesn't load or the boot doesn't finish.
+fn boot(model: Model, rom: &[u8], clock: RtcClock) -> Option<Emulator> {
+    let mut emulator = Emulator::new(model);
+    emulator.load_rom(rom, effects_on(clock)).ok()?;
+    let mut steps = 0;
+    while emulator.is_running_boot_rom() && steps < BOOT_STEPS {
+        emulator.step();
+        steps += 1;
+    }
+    (!emulator.is_running_boot_rom()).then_some(emulator)
 }
 
 /// The model a byte of the input picks.

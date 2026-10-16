@@ -5,7 +5,7 @@
 
 use libfuzzer_sys::fuzz_target;
 use nubo_core::{Emulator, Model, RtcClock, RtcState};
-use nubo_fuzz::{effects, minimal_rom, model_from_byte, run_frames, start};
+use nubo_fuzz::{effects, minimal_rom, model_from_byte, run_frames, start_on};
 use std::sync::OnceLock;
 
 /// Every cartridge type code Nubo loads, found by trying them all, so the
@@ -38,7 +38,7 @@ fuzz_target!(|data: &[u8]| {
     let rtc = RtcState::from_bytes(&data[4..4 + RtcState::BYTES]);
     let ram = &data[4 + RtcState::BYTES..];
     let rom = minimal_rom(cartridge_type, 1, ram_size, true);
-    let Some(mut emulator) = start(model, &rom) else {
+    let Some(mut emulator) = start_on(model, &rom, clock) else {
         return;
     };
     emulator.set_cartridge_ram(ram);
