@@ -127,6 +127,7 @@ struct Crate {
 }
 
 impl Crate {
+    /// The crate's name and version, such as "serde 1.0.228".
     fn label(&self) -> String {
         format!("{} {}", self.name, self.version)
     }
@@ -146,6 +147,9 @@ struct LicenseTexts {
 }
 
 impl LicenseTexts {
+    /// Adds `user` (a crate's label) to the crates that use `text`, listing the
+    /// text if no copy of it is listed yet. Copies that differ only in
+    /// whitespace count as the same text.
     fn add(&mut self, text: &str, standard: bool, user: String) {
         let key = (
             text.split_whitespace().collect::<Vec<_>>().join(" "),

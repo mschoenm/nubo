@@ -139,6 +139,7 @@ enum Task {
 /// Every task reports failures as a message for the user.
 type Result<T = ()> = std::result::Result<T, String>;
 
+/// The workspace's root folder, the one above xtask's.
 fn workspace_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -146,6 +147,8 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
+/// Cargo's target folder: `CARGO_TARGET_DIR` when set, otherwise `target/`
+/// in the workspace root.
 fn target_dir() -> PathBuf {
     env::var_os("CARGO_TARGET_DIR").map_or_else(|| workspace_root().join("target"), PathBuf::from)
 }
