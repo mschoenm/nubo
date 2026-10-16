@@ -8,6 +8,7 @@ This folder is its own Cargo workspace, outside Nubo's, because `cargo-fuzz` nee
 
 - `rom`: any ROM or zip file, on a model picked by the first byte.
 - `state`: any save state of Tobu Tobu Girl Deluxe, one of the benchmark games.
+- `state_fields`: the game's kept save states (`save-states/`) with whole fields changed, one or several at a time, to zero, their largest value or bytes from the input. It finds every field by walking the state's names and lengths, so it needs no list of them and keeps up as fields are added. Changing random bytes, as `state` does, mostly breaks the format and is rejected early; the crashes found so far needed one or two fields the console can never hold.
 - `cheats`: any text of GameShark and Game Genie codes, registered while the game runs.
 - `battery`: any battery save (cartridge RAM of any length and any cartridge clock) on every cartridge type.
 
@@ -20,10 +21,10 @@ From the repository root, once: `cargo install cargo-fuzz --locked`, `rustup too
 ```bash
 mkdir -p corpus/state && cp ../save-states/<newest set>/tobudx.gb-*.state corpus/state/
 cargo fuzz build
-cargo fuzz run state -- -max_total_time=900    # 15 minutes; the same for rom, cheats and battery
+cargo fuzz run state_fields -- -max_total_time=900    # 15 minutes; the same for state, rom, cheats and battery
 ```
 
-Seed `state` with the game's kept states, or it starts from nothing and rarely gets past the header. `corpus/`, `artifacts/` and `target/` are not committed.
+Seed `state` with the game's kept states, or it starts from nothing and rarely gets past the header; `state_fields` reads them itself. `corpus/`, `artifacts/` and `target/` are not committed.
 
 ## When one crashes
 

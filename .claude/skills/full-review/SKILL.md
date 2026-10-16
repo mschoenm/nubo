@@ -106,7 +106,7 @@ Run these one at a time, each in the background with its output in the work fold
 - `cargo clippy --workspace --all-targets -- -W clippy::pedantic -W clippy::nursery`: count by lint for the report. Check the few lints that can point at bugs, such as infinite iterators and formatting arguments; the rest are taste.
 - `cargo llvm-cov --workspace --summary-only --ignore-run-fail`: line coverage per crate, without test files. Delete `target/llvm-cov-target` afterwards.
 - `cargo bloat --release -p nubo --crates -n 40`, against the last nightly metrics' sizes.
-- **Fuzzing,** as `fuzz/AGENTS.md` says: each target for 15 minutes, then `state` and `rom` for an hour more.
+- **Fuzzing,** as `fuzz/AGENTS.md` says: each target for 15 minutes, then `state_fields` and `rom` for an hour more.
   - A crash in Nubo's code is a `FIX-bugs` finding with a regression test.
   - A crash in a target is fixed on the tooling branch.
   - A target that no longer builds is fixed on the tooling branch.
