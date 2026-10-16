@@ -91,12 +91,14 @@ pub fn download(url: &str, destination: &Path) -> Result<(), String> {
     download_with(&agent(), url, destination)
 }
 
-/// Downloads each URL to its destination, several at a time, and stops at
-/// the first that fails.
+/// Downloads each URL to its destination, several at a time. A worker
+/// thread stops at its first failure, while the others go on until the list
+/// is done.
 ///
 /// # Errors
 ///
-/// The first download that failed.
+/// One of the downloads that failed (the one of the lowest-numbered worker
+/// that had a failure).
 pub fn download_all(downloads: &[(PathBuf, String)]) -> Result<(), String> {
     let agent = agent();
     let next = AtomicUsize::new(0);

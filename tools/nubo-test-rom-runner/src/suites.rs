@@ -214,8 +214,9 @@ const AGE_TIMEOUT_SECONDS: u32 = 10;
 const GBMICROTEST_SECONDS_AFTER_BOOT: u32 = 1;
 /// The CGB revision Gambatte's results were recorded on.
 const GAMBATTE_CGB: Model = Model::CgbC;
-/// Extra time added to each Blargg and rtc3test timeout to cover the boot
-/// ROM, which takes 1.7 seconds on DMG and 3.1 on CGB.
+/// Extra time added to each Blargg, rtc3test and smaller screenshot test's
+/// timeout to cover the boot ROM, which takes 1.7 seconds on DMG and 3.1 on
+/// CGB.
 const BOOT_ROM_SECONDS: u32 = 10;
 /// Extra time added to rtc3test's timeouts for picking a subtest from its
 /// menu, which takes up to a second.
@@ -238,7 +239,8 @@ struct ScreenshotTest {
     rom: &'static str,
     /// The models it runs on, each with its reference screenshot.
     screens: &'static [(Model, &'static str)],
-    /// Emulated seconds it needs after the boot ROM.
+    /// Emulated seconds it gets on top of `BOOT_ROM_SECONDS`, counted from
+    /// power-on.
     seconds: u32,
     /// Whether every frame must match instead of any one.
     every_frame: bool,

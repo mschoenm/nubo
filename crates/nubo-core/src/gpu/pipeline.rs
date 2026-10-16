@@ -458,9 +458,12 @@ pub(super) struct Pipeline {
     window_continue_pending: bool,
     /// Set by the DMG glitch that inserts one extra background pixel when the window starts.
     insert_bg_pixel: bool,
-    /// The fields from here to `tall_objects_glitch` are set by `write_timing.rs` around register
-    /// writes that land mid-dot; see the matching setters on `Gpu`.
+    /// DMG: set when the window enable bit is cleared while the window is being fetched
+    /// (`write_timing.rs`), which stops `fetcher_push` from inserting its blank pixel for the rest
+    /// of the line. `start_drawing` clears it.
     pub(super) disable_window_pixel_insertion_glitch: bool,
+    // The fields from here to `tall_objects_glitch` are set for one dot by `write_timing.rs`
+    // around register writes that land mid-dot; see the matching setters on `Gpu`.
     #[serializable(skip)]
     pub(super) wx_just_changed: bool,
     #[serializable(skip)]

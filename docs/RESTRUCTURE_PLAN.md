@@ -6,7 +6,7 @@
 
 - **The Iced app** stays Nubo's main app, on the desktop and in the browser. Its package stays `nubo`,
   so its program stays `nubo` (`nubo.exe` on Windows).
-- **The RetroArch core** ([RETROARCH_PLAN.md](RETROARCH_PLAN.md)) is one of the next things to pick up.
+- **The RetroArch core** ([RETROARCH_PLAN.md](RETROARCH_PLAN.md)) is built on this structure.
 - **An iOS app, a GTK app and a web UI in React** are not planned. The restructuring must keep them
   possible without another restructuring, but it creates no crates, folders or steps for them. See
   "Options kept open" below.

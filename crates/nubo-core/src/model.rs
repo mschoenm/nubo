@@ -11,8 +11,8 @@ use std::str::FromStr;
 /// Game Boy"). The variants are ordered like SameBoy's model numbers, so
 /// revision checks can compare them, as in `model <= Model::CgbC`.
 ///
-/// For the Super Game Boys only the differences in the Game Boy hardware are
-/// emulated, not their screen borders and color palettes.
+/// The Super Game Boys also emulate the Super Nintendo's side: the commands
+/// games send it, colors, borders and multiplayer (see `sgb.rs`).
 ///
 /// The model is chosen when the emulator is made (`Emulator::new`). Each one
 /// leaves the boot ROM in its own state: the CPU registers in

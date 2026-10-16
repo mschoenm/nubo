@@ -214,10 +214,9 @@ impl Emulator {
     }
 
     /// Video RAM (0x8000-0x9FFF; bank 0 followed by bank 1, which only a CGB
-    /// uses) and
-    /// OAM (0xFE00-0xFE9F, the objects' attributes), as stored, whether or
-    /// not the CPU could read them right now. It takes `&mut self` because
-    /// the PPU runs behind until something looks at it (see
+    /// uses) and OAM (0xFE00-0xFE9F, the objects' attributes), as stored,
+    /// whether or not the CPU could read them right now. It takes `&mut self`
+    /// because the PPU runs behind until something looks at it (see
     /// [`Emulator::read_memory`]).
     pub fn video_memory(&mut self) -> (&[u8], &[u8]) {
         self.address_bus_mut().video_memory()
@@ -313,7 +312,9 @@ impl Emulator {
     /// full. Returns whether the buffer is full.
     ///
     /// This lets a caller do other work while an audio buffer is produced, for
-    /// example check a time limit.
+    /// example check a time limit. The samples it makes are dropped (the next
+    /// call clears a full buffer), so it is for callers that don't play
+    /// sound, such as test runners.
     pub fn step_toward_next_audio_buffer(&mut self, max_steps: usize) -> bool {
         if self.address_bus().audio_buffers_full() {
             self.address_bus_mut().clear_audio_buffers();
@@ -547,11 +548,19 @@ impl Emulator {
     }
 
     /// Writes a byte to memory in an emulator made with [`Emulator::for_cpu_tests`].
+    ///
+    /// # Panics
+    ///
+    /// If the emulator wasn't made with [`Emulator::for_cpu_tests`].
     pub fn write_test_memory(&mut self, address: u16, value: u8) {
         self.address_bus_mut().processor_test_ram_mut()[usize::from(address)] = value;
     }
 
     /// Reads a byte from memory in an emulator made with [`Emulator::for_cpu_tests`].
+    ///
+    /// # Panics
+    ///
+    /// If the emulator wasn't made with [`Emulator::for_cpu_tests`].
     pub fn read_test_memory(&self, address: u16) -> u8 {
         self.address_bus().processor_test_ram()[usize::from(address)]
     }

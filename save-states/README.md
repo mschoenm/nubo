@@ -4,7 +4,8 @@ Every later version of Nubo must load these save states, so that an update
 never costs a player their save states. Each folder is a set of states made by
 Nubo on the day it is named after, with `layout.txt`: every field that
 version's save states store with how its value is stored (such as
-`ppu.lcdc: u8`), and every variant each enum value can be stored as. A new set is only made when that list changes: `cargo test` and `cargo
+`ppu.lcdc: u8`), and every variant each enum value can be stored as. A new
+set is only made when that list changes: `cargo test --workspace` and `cargo
 save-states` (see `tools/nubo-save-state-check`) fail when the current version
 stores other fields or variants than the newest set lists, and `cargo
 save-states --record` then adds a set. Never change or remove a set once it is

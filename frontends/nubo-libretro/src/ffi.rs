@@ -101,7 +101,8 @@ type RetroInputState =
 type RetroLogPrintf = unsafe extern "C" fn(level: c_int, format: *const c_char, ...);
 type RetroSetRumbleState = unsafe extern "C" fn(port: c_uint, effect: c_int, strength: u16) -> bool;
 
-/// `struct retro_system_info`
+/// `struct retro_system_info`: the core's name, version and the file
+/// extensions it opens, which RetroArch asks for before loading a game.
 #[repr(C)]
 pub struct RetroSystemInfo {
     library_name: *const c_char,
@@ -111,7 +112,8 @@ pub struct RetroSystemInfo {
     block_extract: bool,
 }
 
-/// `struct retro_game_geometry`
+/// `struct retro_game_geometry`: the size of the picture the core sends, and
+/// the shape to show it in.
 #[repr(C)]
 pub struct RetroGameGeometry {
     base_width: c_uint,
@@ -121,21 +123,24 @@ pub struct RetroGameGeometry {
     aspect_ratio: f32,
 }
 
-/// `struct retro_system_timing`
+/// `struct retro_system_timing`: how many frames a second the core makes, and
+/// its sound's sample rate.
 #[repr(C)]
 pub struct RetroSystemTiming {
     fps: f64,
     sample_rate: f64,
 }
 
-/// `struct retro_system_av_info`
+/// `struct retro_system_av_info`: the picture's size and the timing together,
+/// which RetroArch asks for once a game is loaded.
 #[repr(C)]
 pub struct RetroSystemAvInfo {
     geometry: RetroGameGeometry,
     timing: RetroSystemTiming,
 }
 
-/// `struct retro_game_info`
+/// `struct retro_game_info`: the game RetroArch hands the core to load, as a
+/// path and the file's bytes.
 #[repr(C)]
 pub struct RetroGameInfo {
     path: *const c_char,
@@ -144,14 +149,16 @@ pub struct RetroGameInfo {
     meta: *const c_char,
 }
 
-/// `struct retro_variable`
+/// `struct retro_variable`: one option's key and value, to read the player's
+/// choice or, in the oldest form, to declare the option.
 #[repr(C)]
 struct RetroVariable {
     key: *const c_char,
     value: *const c_char,
 }
 
-/// `struct retro_input_descriptor`
+/// `struct retro_input_descriptor`: a button's name for RetroArch's remapping
+/// menu.
 #[repr(C)]
 struct RetroInputDescriptor {
     port: c_uint,
@@ -161,33 +168,40 @@ struct RetroInputDescriptor {
     description: *const c_char,
 }
 
-/// `struct retro_controller_description`
+/// `struct retro_controller_description`: one kind of controller a player
+/// port can take, by name.
 #[repr(C)]
 struct RetroControllerDescription {
     desc: *const c_char,
     id: c_uint,
 }
 
-/// `struct retro_controller_info`
+/// `struct retro_controller_info`: the list of controller kinds one player
+/// port can take.
 #[repr(C)]
 struct RetroControllerInfo {
     types: *const RetroControllerDescription,
     num_types: c_uint,
 }
 
-/// `struct retro_log_callback`
+/// `struct retro_log_callback`: the function RetroArch gives the core to
+/// write to its log.
 #[repr(C)]
 struct RetroLogCallback {
     log: Option<RetroLogPrintf>,
 }
 
-/// `struct retro_rumble_interface`
+/// `struct retro_rumble_interface`: the function RetroArch gives the core to
+/// make a controller rumble.
 #[repr(C)]
 struct RetroRumbleInterface {
     set_rumble_state: Option<RetroSetRumbleState>,
 }
 
-/// `struct retro_memory_descriptor`
+/// `struct retro_memory_descriptor`: one block of the console's memory that
+/// RetroArch's achievements and cheats read, where it sits in the Game Boy's
+/// address space (`start`, and `select`, the address bits that pick it) and
+/// where its bytes are (`ptr`).
 #[repr(C)]
 struct RetroMemoryDescriptor {
     flags: u64,
@@ -200,14 +214,16 @@ struct RetroMemoryDescriptor {
     addrspace: *const c_char,
 }
 
-/// `struct retro_memory_map`
+/// `struct retro_memory_map`: the list of memory descriptors the core hands
+/// RetroArch.
 #[repr(C)]
 struct RetroMemoryMap {
     descriptors: *const RetroMemoryDescriptor,
     num_descriptors: c_uint,
 }
 
-/// `struct retro_core_option_value`
+/// `struct retro_core_option_value`: one value an option can take, with the
+/// label RetroArch's menu shows for it.
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct RetroCoreOptionValue {
@@ -223,7 +239,8 @@ const NO_VALUES: [RetroCoreOptionValue; RETRO_NUM_CORE_OPTION_VALUES_MAX] = [Ret
 };
     RETRO_NUM_CORE_OPTION_VALUES_MAX];
 
-/// `struct retro_core_option_definition`, for `RETRO_ENVIRONMENT_SET_CORE_OPTIONS`.
+/// `struct retro_core_option_definition`, for `RETRO_ENVIRONMENT_SET_CORE_OPTIONS`: one option as
+/// the version 1 interface declares it, for frontends without version 2.
 #[repr(C)]
 struct RetroCoreOptionDefinition {
     key: *const c_char,
@@ -233,7 +250,8 @@ struct RetroCoreOptionDefinition {
     default_value: *const c_char,
 }
 
-/// `struct retro_core_option_v2_category`
+/// `struct retro_core_option_v2_category`: a heading the version 2 options
+/// can be grouped under in RetroArch's menu.
 #[repr(C)]
 struct RetroCoreOptionV2Category {
     key: *const c_char,
@@ -241,7 +259,8 @@ struct RetroCoreOptionV2Category {
     info: *const c_char,
 }
 
-/// `struct retro_core_option_v2_definition`
+/// `struct retro_core_option_v2_definition`: one option as the version 2
+/// interface declares it, with its description, values and default.
 #[repr(C)]
 struct RetroCoreOptionV2Definition {
     key: *const c_char,
@@ -254,7 +273,8 @@ struct RetroCoreOptionV2Definition {
     default_value: *const c_char,
 }
 
-/// `struct retro_core_options_v2`
+/// `struct retro_core_options_v2`: every option and category, handed to
+/// RetroArch with `RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2`.
 #[repr(C)]
 struct RetroCoreOptionsV2 {
     categories: *mut RetroCoreOptionV2Category,
@@ -994,7 +1014,7 @@ pub unsafe extern "C" fn retro_cheat_set(index: c_uint, enabled: bool, code: *co
             for invalid in core.cheat_set(index, enabled, &code) {
                 log(
                     RETRO_LOG_WARN,
-                    &format!("{} is neither a Game Genie nor a GameShark code", invalid.0),
+                    &format!("The cheat code {} can't be used", invalid.0),
                 );
             }
         }

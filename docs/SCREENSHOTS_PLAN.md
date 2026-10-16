@@ -8,8 +8,8 @@ and with real GNOME window borders where a listing wants them.
 
 ## Status
 
-Steps 1 to 7 are built (see Order of work); step 8, the full nightly run after merging, is left, and then
-the new screenshots. Checked in a cloud session: every kind of picture (`none`, `gnome`, `fullscreen`,
+Steps 1 to 7 are built (see Order of work), and the new screenshots are made; step 8, the full nightly
+run after merging, is left. Checked in a cloud session: every kind of picture (`none`, `gnome`, `fullscreen`,
 `game`, variants side by side, a scene of the library) comes out the same pixel for pixel when made again,
 a scene recorded with Ctrl+F12 renders exactly like its preview, and a scene from `explore` renders exactly
 like its preview at 1×. Every screenshot in the README and the Flathub listing is now made from a scene:
@@ -75,8 +75,8 @@ Scenes are made two ways:
   otherwise) or `game` (the game's picture alone, at the entry's `scale`);
 - `settings`: changes to the scene's settings, by the names `settings.toml` uses, so every setting works,
   later ones included (`appearance = "dark"` is dark mode);
-- `variants` with a `layout` (a row or a grid): the same scene with different settings side by side, such
-  as the palettes, light and dark, or a setting on and off.
+- `[[screenshot.variant]]` tables, laid out by the entry's `layout` (a row, a column or a grid): the
+  same scene with different settings side by side, such as the palettes, light and dark, or a setting on and off.
 
 Images carry no text; the captions stay in the README.
 
@@ -94,14 +94,14 @@ the settings, loads the state, runs the frames, opens the view and holds still) 
   out, so the border is always GNOME's.
 
 Iced's software renderer is always used, so a scene gives the same pixels every time. A file whose pixels
-did not change is left as it is, so git only stores the images that really changed (15 to 70 KB each).
+did not change is left as it is, so git only stores the images that really changed (15 to 100 KB each).
 `--check` only compares with the committed images and writes diff images. The app looks the same as before
 on every system: nothing it shows changes.
 
 ## Upkeep
 
 - **No CI and no nightly job for now.** The task runs when asked. A job would take about 4 to 7 minutes
-  next to the other nightly jobs (building the app, installing GNOME Shell, about ten screenshots), if the
+  next to the other nightly jobs (building the app, installing GNOME Shell, about 15 screenshots), if the
   maintainer wants one later.
 - **The `screenshots` skill** (`.claude/skills/screenshots/SKILL.md`, with the pointer in `.agents/skills/`)
   holds the steps: to regenerate (install GNOME Shell, run the task, show the changed images, update the
@@ -115,8 +115,9 @@ on every system: nothing it shows changes.
 The GB Emulator Shootout starts the real app with `--raw-screen`, `--scale` and `--fresh` and judges
 screenshots of its window; none of that may change.
 
-- `capture` and `--record-scenes` are hidden, do nothing unless given, and refuse `--scale` and
-  `--raw-screen`.
+- `capture` and `--record-scenes` are hidden and do nothing unless given. `--record-scenes` refuses
+  `--scale`, `--raw-screen` and `--fresh`; `capture` takes none of the options for opening the window
+  (its own `--scale` only sets the size of the `game` frame).
 - Changed settings go through the existing settings and `ScreenLook`; `ScreenLook::RAW` keeps turning every
   palette and screen effect off, later ones included.
 - `capture` keeps nothing between runs, like `--fresh`: it reads and writes no settings, saves or library,

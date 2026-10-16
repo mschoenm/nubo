@@ -697,8 +697,9 @@ impl Apu {
             if self.state.is_active(Channel::Noise) && self.registers[NR43] & 7 != 0 {
                 if self.state.noise.counter_countdown <= 2 {
                     // Without the 14-bit wrap of the other increments, as
-                    // SameBoy: 0x3FFF becomes 0x4000, whose bit 14 no NR43
-                    // shift reads, and the next count wraps it to 0x0001.
+                    // SameBoy: 0x3FFF becomes 0x4000, whose bit 14 never
+                    // steps the LFSR (only the NR43 write glitches can see
+                    // it), and the next count wraps it to 0x0001.
                     self.state.noise.counter = self.state.noise.counter.wrapping_add(1);
                 }
                 self.state.noise_counting = NoiseCounting::Stopped;

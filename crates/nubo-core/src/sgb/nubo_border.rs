@@ -285,7 +285,7 @@ fn draw_cloud_bank(canvas: &mut Canvas, look: &Look) {
 }
 
 /// A row of round puffs across the picture with their middles at `base`,
-/// each 10 pixels across plus up to `extra` more, sized by `seed`.
+/// each with a radius of 10 pixels plus up to `extra` more, sized by `seed`.
 fn cloud_puffs(seed: u32, base: f32, extra: f32) -> Vec<Shape> {
     let mut puffs = Vec::new();
     let mut x = -10.0;

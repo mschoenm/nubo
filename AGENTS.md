@@ -15,7 +15,7 @@ cargo test-roms [filter]      # The test ROM suites, compared with tools/nubo-te
 cargo cpu-tests               # Every CPU opcode, checked cycle by cycle
 cargo save-states             # The kept save states still load, and the stored layout is unchanged
 cargo play [rom] [--cgb | --model cgb-c]   # Run the desktop app (models: dmg-0, dmg, mgb, sgb, sgb2, cgb-0 to cgb-e, agb; more options in frontends/nubo/src/command_line.rs)
-cargo screenshot rom.gb --seconds 10   # Run 10 emulated seconds (5 without it) headless, save a PNG to target/screenshots/
+cargo screenshot rom.gb --seconds 10   # Run 10 emulated seconds (5 without it) headless, save a PNG to target/screenshots/ (under the folder it is run from, so run it from the workspace root)
 cargo benchmark <roms> --record a.txt / --compare a.txt   # Speed, and fingerprints of every frame, sample and end state
 cargo xtask screenshots [--check]     # The README's and Flathub's screenshots, made again from their scenes in a headless GNOME Shell (the `screenshots` skill)
 ```
@@ -65,15 +65,15 @@ These keep Nubo exact, and players' saves safe. Never break them.
 The root `Cargo.toml` is a virtual workspace whose default members are `nubo-core` and `nubo-serializable-derive`, so `cargo build` and `cargo test` don't build the apps, the tools or xtask. Libraries are in `crates/`, apps players use in `frontends/`, developer programs in `tools/`. Every package's name starts with `nubo` (except `xtask`), and every crate's folder is named after its package.
 
 - `crates/nubo-core/` (`AGENTS.md`): the emulator, a plain library with no platform dependencies. `Emulator` in `emulator.rs` is its API.
-- `crates/nubo-frontend/` (`AGENTS.md`): everything an app needs that isn't drawing, without a UI toolkit: what it keeps between runs (settings, controls, battery saves, save states, cheats, screenshots), the game library, running a game with its sound (`session`, paced by the sound card on the desktop and by the screen's refreshes in the browser), game controllers (`gamepads`), and the palettes and model rule the RetroArch core shares. Its features `desktop`, `web` and `gamepads` bring each platform's storage, sound and controllers.
+- `crates/nubo-frontend/` (`AGENTS.md`): everything an app needs that isn't drawing, without a UI toolkit: what it keeps between runs (settings, controls, battery saves, save states, cheats, screenshots), the game library, running a game with its sound (`session`, paced by the sound card on the desktop and by the screen's refreshes in the browser), game controllers (`gamepads`), and the palettes, model rule, picture (with the Super Game Boy border) and Super Game Boy menu choices the RetroArch core shares. Its features `desktop`, `web` and `gamepads` bring each platform's storage, sound and controllers.
 - `crates/nubo-serializable-derive/`: the derive macro behind save states.
-- `crates/nubo-logo/`: the logo, drawn from rounded rectangles, for the app's icons.
+- `crates/nubo-logo/`: the logo, drawn from rounded rectangles, for the app (among them its top bar, the empty library, the About tab and its window, Windows, macOS and Flatpak icons and the Windows installer's banner) and in `nubo-core` for the Super Game Boy's intro, attraction mode and Nubo border.
 - `crates/nubo-download/`: downloading test data over HTTPS and checking its SHA-256 checksums, shared by the test ROM runner, the CPU test runner and xtask.
 - `frontends/nubo/` (`AGENTS.md`): the app, desktop and browser.
 - `frontends/nubo-libretro/` (`AGENTS.md`): the RetroArch (libretro) core, a dynamic library; `cargo xtask libretro` packages it.
 - `tools/nubo-test-rom-runner/` (`AGENTS.md`): `cargo test-roms`.
 - `tools/nubo-json-test-runner/`: `cargo cpu-tests`.
-- `tools/nubo-save-state-check/` (`AGENTS.md`): `cargo save-states`, and the kept sets in `save-states/`.
+- `tools/nubo-save-state-check/` (`AGENTS.md`): `cargo save-states`; the kept sets are in the repository's top-level `save-states/`.
 - `tools/nubo-benchmark/` (`AGENTS.md`): `cargo benchmark`.
 - `tools/nubo-headless/`: `cargo screenshot`.
 - `xtask/` (`AGENTS.md`): the web build, packaging, licenses, the emulator comparison, the nightly review's tools and the screenshots.
@@ -92,10 +92,11 @@ Claude Code and Codex both read these `AGENTS.md` files; keep them the only inst
 - `docs/ACCURACY.md`: the test ROM results suite by suite, and the tests that aren't run; the README keeps the summary.
 - `docs/RETROARCH.md`: installing and using the RetroArch core, for players; the README keeps the short version.
 - `docs/ACCURACY_PLAN.md`: the plan towards the most accurate emulator; update it when a phase moves on.
-- `docs/SHOOTOUT_PLAN.md` and `docs/RESTRUCTURE_PLAN.md` (a shared `nubo-frontend` crate and a `tools/` folder, signed off, with the order of the work): plans for work not done yet; update them as their parts get done.
+- `docs/RESTRUCTURE_PLAN.md` (done: the shared `nubo-frontend` crate and the `tools/` folder, why the layout is what it is, and the order of the work) and `docs/SHOOTOUT_PLAN.md` (done but for Nubo appearing in the Shootout's published table): plans whose work is nearly all done; update them when what is left moves on.
 - `docs/RETROARCH_PLAN.md`: the RetroArch core, what was built and what is left (getting it into RetroArch's core downloader).
 - `docs/CI.md`: CI, the nightly run, nightly builds, toolchain updates.
 - `docs/NIGHTLY_REVIEW.md`: what the nightly review does.
 - `docs/EMULATOR_COMPARISON.md`: speed next to other emulators.
 - `docs/SCREENSHOTS_PLAN.md`: the tools that make every screenshot in the README and the Flathub listing again from recorded scenes, and the order of the work; update it as parts get done.
+- `docs/CODE_REVIEW.md`: the code review of October 2026, what it fixed and the findings it left open with their issues; a record of that day, not kept up to date.
 - `docs/SPEED_PLAN.md`: making Nubo faster without changing any result, what was done and what is left; `docs/speed-research/` holds the clean-room reports on other emulators it draws on. Update it as parts get done.

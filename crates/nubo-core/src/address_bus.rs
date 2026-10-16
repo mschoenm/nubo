@@ -687,15 +687,15 @@ impl AddressBus {
         }
     }
 
-    /// Video RAM and OAM, after catching the PPU up so an HBlank DMA it owes
-    /// has copied its bytes.
+    /// Video RAM and OAM, after catching the PPU up, since nothing may look
+    /// at the PPU's state while it runs behind.
     pub(crate) fn video_memory(&mut self) -> (&[u8], &[u8]) {
         self.catch_up_ppu();
         self.gpu.video_memory()
     }
 
-    /// Advances every component except the CPU by one M-cycle (four clock
-    /// ticks, or two in CGB double speed mode). While nothing can tell the
+    /// Advances every component except the CPU by one M-cycle (four PPU
+    /// dots, or two in CGB double speed mode). While nothing can tell the
     /// difference, the M-cycle only waits to run in one go with the ones
     /// around it (see `bulk_cycles.rs`).
     #[inline]

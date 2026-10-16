@@ -30,8 +30,10 @@
 //!
 //! A value that can't be read from its bytes, such as a variant a newer
 //! version added or a field whose size changed under the same name, keeps its
-//! power-on value and the rest of the state still loads ([`collect_unreadable`]
-//! lists them, and the save states kept in `save-states/` must have none).
+//! power-on value, or, when its bytes are longer than it needs, what it read
+//! from their start; either way the rest of the state still loads
+//! ([`collect_unreadable`] lists them, and the save states kept in
+//! `save-states/` must have none).
 //! Only damaged data, whose names and lengths don't add up, and values a
 //! component's own checks reject make a state fail to load.
 //!

@@ -142,7 +142,8 @@ pub fn panel(theme: &Theme) -> container::Style {
     }
 }
 
-/// A small floating card, used for notifications and the paused badge.
+/// A small floating card, used for notifications and the fast forward and
+/// rewinding badges.
 pub fn floating_card(theme: &Theme) -> container::Style {
     let palette = theme.extended_palette();
 
@@ -354,9 +355,9 @@ pub fn card(theme: &Theme, status: button::Status) -> button::Style {
     }
 }
 
-/// A small round button in the corner of a game card, such as the one that
-/// takes a game off "Continue playing": a floating card's colors, so it
-/// stands out on any picture, and the accent color when hovered.
+/// A small round button in the corner of a game card, such as the ⋯ button
+/// that opens a game's menu: a floating card's colors, so it stands out on
+/// any picture, and the accent color when hovered.
 pub fn card_corner_button(theme: &Theme, status: button::Status) -> button::Style {
     let palette = theme.extended_palette();
     let (background, text_color) = match status {

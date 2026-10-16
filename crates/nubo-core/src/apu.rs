@@ -753,7 +753,7 @@ impl Apu {
 
     /// Whether a trigger is too close to the next frame sequencer step to let it count towards the
     /// envelope's first period, when that step clocks the envelopes and the envelope has a period
-    /// (measured against Gambatte's envelope unit; Gambatte's sound
+    /// (measured against Gambatte's behavior; Gambatte's sound
     /// ch2_init_reset_env_counter_timing tests).
     fn envelope_step_missed(&self, nrx2: u8) -> bool {
         envelope_period(nrx2) != 0 && self.next_step_is_imminent(7, ENVELOPE_STEP_MISSED_TICKS)
@@ -1178,8 +1178,9 @@ impl Apu {
         self.registers[register] = value;
     }
 
-    /// Powers the APU on or off. Powering off clears every register except wave
-    /// RAM; on DMG the length counters survive.
+    /// Powers the APU on or off. Powering off clears the length counters and
+    /// every register except wave RAM. On DMG, NRx1 can still load lengths
+    /// while the APU is off, and powering on keeps them.
     fn write_nr52(&mut self, value: u8) {
         let old_lengths = Channel::ALL.map(|channel| self.length_counter(channel).remaining);
 
@@ -1257,7 +1258,8 @@ impl Apu {
         u32::from(t_cycles_per_m_cycle(self.cgb_double_speed)) * self.sample_rate
     }
 
-    /// The analog level a channel sends to one side, between -0.25 and 0.25.
+    /// The analog level a channel sends to one side, between -0.25 and 0.25
+    /// (up to 0.5 on the AGB, whose mixer adds the volume as a bias).
     ///
     /// Keep `output_inputs` in sync: it packs every value this and
     /// `agb_channel_output` read, so the M-cycles in which none of them

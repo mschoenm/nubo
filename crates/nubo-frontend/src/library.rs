@@ -90,9 +90,12 @@ pub struct LibraryEntry {
     /// version that didn't keep it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub added: Option<u64>,
-    /// The file's size and modification time (in seconds since 1970) when
-    /// its header was read, so a scan can tell whether to read it again.
+    /// The file's size in bytes when its header was read, so a scan can tell
+    /// whether to read it again.
     size: u64,
+    /// The file's modification time, in seconds since 1970, when its header
+    /// was read, so a scan can tell whether to read it again. In the browser,
+    /// when the game was kept.
     modified: u64,
 }
 

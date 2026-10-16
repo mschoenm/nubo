@@ -700,10 +700,12 @@ fn step_audio_buffer(
     Ok(())
 }
 
-/// Saves the failing screen as a PNG in `failures_dir/<model>/`, and with a
+/// Saves the failing screen as `<model>/<ROM's path>.png` under
+/// `failures_dir` (under `failures_dir/shootout/` for the Shootout's tests,
+/// with `-<subtest>` after the ROM's name for a subtest), and with a
 /// reference also a `.diff.png` (the reference with the differing pixels
-/// painted red). Errors are ignored
-/// because these images are only a debugging aid.
+/// painted red). Errors are ignored because these images are only a
+/// debugging aid.
 fn save_failure_screens(
     actual: &RgbImage,
     reference: Option<&RgbImage>,

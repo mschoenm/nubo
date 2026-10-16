@@ -217,8 +217,9 @@ struct Transfer {
 pub(crate) struct Sgb {
     /// The command arriving through JOYP.
     receiver: PacketReceiver,
-    /// Whether the cartridge header says the game supports the Super Game
-    /// Boy. Other games' commands are ignored.
+    /// Whether the Super Nintendo listens to commands: the cartridge header
+    /// says the game supports the Super Game Boy, and the game hasn't turned
+    /// commands off with `ICON_EN` bit 2. Other games' commands are ignored.
     commands_enabled: bool,
     /// Whether a game has set colors. Until then the picture keeps the
     /// Game Boy's grays.

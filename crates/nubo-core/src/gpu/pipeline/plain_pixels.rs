@@ -2,8 +2,8 @@
 //! of plain dots, in which the renderer only shifts out a pixel, draws it and takes a fetcher
 //! step, are drawn without working through `Gpu::tick_drawing`'s phases, a whole tile row without
 //! objects at once, usually in runs of such tiles with the fetcher's eight steps for each next row
-//! taken in one go (`draw_background_tiles`), and the eight dots that shift out the line's dummy
-//! row at once (`skip_line_start`). They must give exactly what `tick_drawing` gives dot by dot,
+//! taken in one go (`draw_background_tiles`), and the last seven of the eight dots that shift out
+//! the line's dummy row at once (`skip_line_start`). They must give exactly what `tick_drawing` gives dot by dot,
 //! which the randomized tests in `gpu/tests/random_scenes.rs` check.
 
 use super::{

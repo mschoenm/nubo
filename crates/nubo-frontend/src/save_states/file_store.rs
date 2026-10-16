@@ -13,6 +13,7 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
+/// Saves a state, like [`save_in`], in the player's `states/` folder.
 pub fn save(
     rom_path: &Path,
     slot: Slot,
@@ -22,10 +23,13 @@ pub fn save(
     save_in(&states_directory()?, rom_path, slot, state, pixels)
 }
 
+/// Reads a state, like [`load_in`], from the player's `states/` folder.
 pub fn load(rom_path: &Path, slot: Slot) -> Result<Option<SaveState>, String> {
     load_in(&states_directory()?, rom_path, slot)
 }
 
+/// Describes a slot, like [`slot_info_in`], in the player's `states/`
+/// folder; an empty slot if the system has no data folder.
 pub fn slot_info(rom_path: &Path, slot: Slot) -> SlotInfo {
     match states_directory() {
         Ok(directory) => slot_info_in(&directory, rom_path, slot),
@@ -72,6 +76,7 @@ pub fn load_in(directory: &Path, rom_path: &Path, slot: Slot) -> Result<Option<S
     super::parse(contents).map(Some)
 }
 
+/// Deletes a slot, like [`delete_in`], in the player's `states/` folder.
 pub fn delete(rom_path: &Path, slot: Slot) -> Result<(), String> {
     delete_in(&states_directory()?, rom_path, slot)
 }
@@ -88,6 +93,8 @@ pub fn delete_in(directory: &Path, rom_path: &Path, slot: Slot) -> Result<(), St
     Ok(())
 }
 
+/// Deletes every game's states, like [`delete_all_in`]: the player's whole
+/// `states/` folder.
 pub fn delete_all() -> Result<(), String> {
     delete_all_in(&states_directory()?)
 }
@@ -101,6 +108,8 @@ pub fn delete_all_in(directory: &Path) -> Result<(), String> {
     }
 }
 
+/// Moves a slot's state aside, like [`keep_aside_in`], in the player's
+/// `states/` folder.
 pub fn keep_aside(rom_path: &Path, slot: Slot) -> Result<PathBuf, String> {
     keep_aside_in(&states_directory()?, rom_path, slot)
 }
@@ -143,6 +152,8 @@ pub fn slot_info_in(directory: &Path, rom_path: &Path, slot: Slot) -> SlotInfo {
     }
 }
 
+/// Reads a slot's picture, like [`thumbnail_in`], from the player's
+/// `states/` folder.
 pub fn thumbnail(rom_path: &Path, slot: Slot) -> Option<Picture> {
     thumbnail_in(&states_directory().ok()?, rom_path, slot)
 }
@@ -163,6 +174,8 @@ fn slot_path(directory: &Path, rom_path: &Path, slot: Slot, extension: &str) -> 
         .with_extension(extension)
 }
 
+/// The folder for every game's states: `states/` in the player's data
+/// folder. Players' save states are kept there, so it must never move.
 fn states_directory() -> Result<PathBuf, String> {
     data_folder()
         .map(|folder| folder.join("states"))

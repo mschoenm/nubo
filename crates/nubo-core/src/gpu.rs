@@ -10,8 +10,10 @@
 //! the Mooneye PPU tests and an instrumented SameBoy. The rest is in its submodules: STAT and
 //! LY=LYC with the STAT interrupt (`stat.rs`), when the CPU may access OAM and VRAM and how OAM
 //! DMA and STOP affect the PPU (`access.rs`), the shortcuts that run many dots at once
-//! (`steady.rs`), save states (`save_state.rs`), and the renderer that produces the pixels in
-//! mode 3 (`pipeline.rs`).
+//! (`steady.rs`), save states (`save_state.rs`), the palette registers and colors
+//! (`palettes.rs`), the DMG OAM corruption bug (`oam_bug.rs`), LCDC's bits (`lcdc.rs`), the
+//! screen's size (`constants.rs`), and the renderer that produces the pixels in mode 3
+//! (`pipeline.rs`).
 //!
 //! Which timing rules apply depends on the model and speed (`TimingVariant`). The start of each
 //! line (when STAT shows each mode, LY=LYC, the mode 0 and mode 2 interrupt sources, line 153)

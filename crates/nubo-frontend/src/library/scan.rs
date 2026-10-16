@@ -254,6 +254,8 @@ fn is_rom_file(path: &Path) -> bool {
 /// The file's size and modification time, or `None` if it can't be read.
 fn file_stamp(path: &Path) -> Option<(u64, u64)> {
     let metadata = fs::metadata(path).ok()?;
+    // std's epoch, not `crate::time`'s: file times are std's `SystemTime`,
+    // and in the browser `fs::metadata` fails before this line is reached.
     let modified = metadata
         .modified()
         .ok()

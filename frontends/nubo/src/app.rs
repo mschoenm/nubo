@@ -1,12 +1,14 @@
 //! The application window. It shows the game library until a game starts
-//! and the game screen while one runs; the settings, the drop target and
-//! notifications are drawn on top.
+//! and the game screen while one runs; the settings, the dialogs, the drop
+//! target and notifications are drawn on top.
 //!
 //! The messages come in groups, each handled in a file of its own: the
 //! running game and its pause menu (`app/playing.rs`), the library
 //! (`app/library_screen.rs`), the settings window (`app/settings_window.rs`),
-//! the window itself (`app/window_events.rs`), and keys and controller
-//! buttons (`app/player_input.rs`).
+//! the dialogs (`app/dialogs.rs`), the window itself
+//! (`app/window_events.rs`), keys and controller buttons
+//! (`app/player_input.rs`), and scenes for the documentation's screenshots
+//! (`app/scenes.rs`, desktop only).
 
 use crate::command_line::Options;
 use crate::dialog::Dialog;
