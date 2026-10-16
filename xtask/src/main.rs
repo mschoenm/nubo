@@ -1,8 +1,8 @@
-//! Project tasks run with `cargo xtask <command>`: building the Iced
-//! frontend for the browser and serving it locally, building the macOS app
-//! bundle, the Flatpak, the Windows installer and the RetroArch core, writing the logo and the
-//! license files that go with them, checking a release's version and notes,
-//! timing Nubo next to other emulators, the nightly review's tooling,
+//! Project tasks run with `cargo xtask <command>`: building the Iced frontend
+//! for the browser and serving it locally, building the macOS app bundle, the
+//! Flatpak, the Windows installer and the RetroArch core, writing the logo
+//! and the license files that go with them, checking a release's version and
+//! notes, timing Nubo next to other emulators, the nightly review's tooling,
 //! reading the GB Emulator Shootout's published table, and making the
 //! documentation's screenshots from recorded scenes.
 //!

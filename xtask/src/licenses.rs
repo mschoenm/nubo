@@ -1,9 +1,10 @@
 //! Writes the license files that go with every copy of the app: Nubo's own
-//! LICENSE, LICENSE-APACHE and NOTICE, and `THIRD_PARTY_LICENSES.txt` with the
-//! license texts of every Rust crate the app is built from, which their
-//! licenses (MIT, BSD, Apache-2.0 and the like) ask to include with every copy.
-//! `macos`, `flatpak`, `windows`, `libretro` and `build-web` all put them
-//! next to the app. The crates and their license files are found with `cargo metadata`.
+//! LICENSE, LICENSE-APACHE and NOTICE, and `THIRD_PARTY_LICENSES.txt` with
+//! the license texts of every Rust crate the app is built from, which their
+//! licenses (MIT, BSD, Apache-2.0 and the like) ask to include with every
+//! copy. `macos`, `flatpak`, `windows`, `libretro` and `build-web` all put
+//! them next to the app. The crates and their license files are found with
+//! `cargo metadata`.
 
 use super::{Result, cargo, workspace_root};
 use serde_json::Value;
