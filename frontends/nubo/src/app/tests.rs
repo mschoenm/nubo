@@ -1,9 +1,10 @@
 //! Tests for the app's small helpers, for resetting the settings in a
 //! `--fresh` app, which keeps nothing, for shortcuts while the settings
-//! are open, and for the fixed keys and buttons of the menus.
+//! are open, for dialogs whose content is gone, and for the fixed keys and
+//! buttons of the menus.
 
 use super::settings_window::reset_summary;
-use super::{App, CAPTURE_TIMEOUT, GameMessage, Message, SettingsMessage, cycle};
+use super::{App, CAPTURE_TIMEOUT, GameMessage, LibraryMessage, Message, SettingsMessage, cycle};
 use crate::command_line::Options;
 use crate::dialog::{DialogKind, ResetChoices};
 use crate::input::KeyInput;
@@ -61,6 +62,21 @@ fn a_reset_asks_first_puts_the_settings_back_and_can_be_undone() {
 
     let _ = app.update(GameMessage::Undo.into());
     assert_eq!(app.settings, changed);
+}
+
+#[test]
+fn a_game_menu_closes_when_its_game_is_gone() {
+    let (mut app, _) = App::new(
+        None,
+        &Options {
+            fresh: true,
+            ..Options::default()
+        },
+    );
+
+    let _ = app.update(LibraryMessage::OpenGameMenu(PathBuf::from("gone.gb")).into());
+
+    assert!(app.dialog.is_none());
 }
 
 #[test]

@@ -304,6 +304,15 @@ impl App {
         }
     }
 
+    /// Closes the open dialog once what it was about is gone, such as a
+    /// game's menu after a rescan removed the game: it would show nothing,
+    /// yet keep the controller and the game waiting behind it.
+    pub(super) fn close_emptied_dialog(&mut self) {
+        if self.dialog.is_some() && self.dialog_content().is_none() {
+            self.dialog = None;
+        }
+    }
+
     /// Dismisses the open dialog, as B and Esc do.
     pub(super) fn dismiss_dialog(&mut self) -> Task<Message> {
         match self.dialog_content() {
