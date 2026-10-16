@@ -76,9 +76,9 @@ pub fn definitions() -> Vec<OptionDefinition> {
             key: MODEL,
             description: "Model",
             info: "The hardware to emulate. Automatic runs Game Boy Color games on a Game Boy \
-                   Color (CGB-E) and other games on the original Game Boy (DMG); pick the \
-                   Super Game Boy (SGB) for its colors and borders. Takes effect when the \
-                   game is restarted or loaded again.",
+                   Color (CGB-E), Super Game Boy games on a Super Game Boy (SGB) with their \
+                   colors and borders, and other games on the original Game Boy (DMG). Takes \
+                   effect when the game is restarted or loaded again.",
             values: models.collect(),
         },
         OptionDefinition {
