@@ -310,7 +310,7 @@ fn build_gambatte(root: &Path) -> Result {
     let resample = source.join("common/resample/src");
     let mut sources: Vec<PathBuf> = files_with_extension(&library.join("src"), "cpp", true)?
         .into_iter()
-        // The C interface and zip support aren't part of the core Gambatte's
+        // The C interface and zip support aren't part of the core: Gambatte's
         // own build compiles without zlib.
         .filter(|path| !path.ends_with("cinterface.cpp") && !path.ends_with("file_zip.cpp"))
         .collect();
