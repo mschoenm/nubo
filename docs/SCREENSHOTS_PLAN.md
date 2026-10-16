@@ -75,8 +75,8 @@ Scenes are made two ways:
   otherwise) or `game` (the game's picture alone, at the entry's `scale`);
 - `settings`: changes to the scene's settings, by the names `settings.toml` uses, so every setting works,
   later ones included (`appearance = "dark"` is dark mode);
-- `variants` with a `layout` (a row or a grid): the same scene with different settings side by side, such
-  as the palettes, light and dark, or a setting on and off.
+- `[[screenshot.variant]]` tables with a `layout` (a row, a column or a grid): the same scene with
+  different settings side by side, such as the palettes, light and dark, or a setting on and off.
 
 Images carry no text; the captions stay in the README.
 
