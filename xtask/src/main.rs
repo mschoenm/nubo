@@ -159,15 +159,18 @@ fn target_dir() -> PathBuf {
 
 /// The cargo that runs xtask, so the same toolchain builds everything, with
 /// `NUBO_COMMIT` set to the commit it builds ([`build_commit`]), which save
-/// states store.
+/// states store, and `NUBO_COMMIT_DATE` to that commit's date
+/// ([`build_commit_date`]).
 ///
-/// The core keeps it in `nubo_core::BUILD_COMMIT`, so the states of every
-/// release and nightly build say exactly which build made them. Every build
-/// xtask runs gets it, the Flatpak's included; a plain `cargo build` leaves
-/// it empty.
+/// The core keeps the commit in `nubo_core::BUILD_COMMIT`, so the states of
+/// every release and nightly build say exactly which build made them, and
+/// the app shows both with its version, on the About tab and with
+/// `--version`. Every build xtask runs gets them, the Flatpak's included; a
+/// plain `cargo build` leaves them empty.
 fn cargo() -> Command {
     let mut command = Command::new(env::var_os("CARGO").unwrap_or_else(|| "cargo".into()));
     command.env("NUBO_COMMIT", build_commit());
+    command.env("NUBO_COMMIT_DATE", build_commit_date());
     command
 }
 
@@ -178,15 +181,6 @@ fn build_commit() -> String {
     if let Some(commit) = env::var_os("NUBO_COMMIT") {
         return commit.to_string_lossy().into_owned();
     }
-    let git = |args: &[&str]| {
-        Command::new("git")
-            .args(args)
-            .current_dir(workspace_root())
-            .output()
-            .ok()
-            .filter(|output| output.status.success())
-            .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned())
-    };
     match git(&["rev-parse", "HEAD"]) {
         Some(commit) => match git(&["status", "--porcelain", "--untracked-files=no"]) {
             Some(changes) if !changes.is_empty() => format!("{commit}-dirty"),
@@ -194,6 +188,34 @@ fn build_commit() -> String {
         },
         None => env::var("GITHUB_SHA").unwrap_or_default(),
     }
+}
+
+/// The date of the commit [`build_commit`] gives, such as `2026-10-16`
+/// (the day it was committed, in the committer's time zone), or what
+/// `NUBO_COMMIT_DATE` already says. Empty when git doesn't know that
+/// commit, or without git.
+fn build_commit_date() -> String {
+    if let Some(date) = env::var_os("NUBO_COMMIT_DATE") {
+        return date.to_string_lossy().into_owned();
+    }
+    let commit = build_commit();
+    let hash = commit.strip_suffix("-dirty").unwrap_or(&commit);
+    if hash.is_empty() {
+        return String::new();
+    }
+    git(&["log", "-1", "--format=%cs", hash]).unwrap_or_default()
+}
+
+/// What git prints for `args` in the workspace, trimmed, or `None` when
+/// git isn't there or fails, as outside a git checkout.
+fn git(args: &[&str]) -> Option<String> {
+    Command::new("git")
+        .args(args)
+        .current_dir(workspace_root())
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned())
 }
 
 /// Runs a command and turns a failure to start or a non-zero exit into an
@@ -443,21 +465,15 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_commit, workspace_root};
+    use super::{build_commit, build_commit_date, git};
     use std::env;
-    use std::process::Command;
 
     /// Checks the commit git gives. `NUBO_COMMIT` is passed on as it is, and
     /// outside a git checkout, such as a source archive, there is no commit
     /// to read, so the test has nothing to check then.
     #[test]
     fn the_build_commit_is_a_commit_hash() {
-        let in_git = Command::new("git")
-            .args(["rev-parse", "HEAD"])
-            .current_dir(workspace_root())
-            .output()
-            .is_ok_and(|output| output.status.success());
-        if env::var_os("NUBO_COMMIT").is_some() || !in_git {
+        if env::var_os("NUBO_COMMIT").is_some() || git(&["rev-parse", "HEAD"]).is_none() {
             return;
         }
         let commit = build_commit();
@@ -466,6 +482,22 @@ mod tests {
         assert!(
             hash.chars().all(|digit| digit.is_ascii_hexdigit()),
             "{commit}"
+        );
+    }
+
+    /// Checks that the commit's date is written as `YYYY-MM-DD`, when git
+    /// gives one.
+    #[test]
+    fn the_build_commit_date_is_a_date() {
+        if env::var_os("NUBO_COMMIT_DATE").is_some() || git(&["rev-parse", "HEAD"]).is_none() {
+            return;
+        }
+        let date = build_commit_date();
+        let digits: Vec<_> = date.split('-').map(str::len).collect();
+        assert_eq!(digits, [4, 2, 2], "{date}");
+        assert!(
+            date.chars().all(|c| c.is_ascii_digit() || c == '-'),
+            "{date}"
         );
     }
 }
