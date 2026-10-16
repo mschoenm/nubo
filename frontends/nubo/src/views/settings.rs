@@ -1378,12 +1378,12 @@ fn menu_buttons<'a>(settings: &Settings, stack_wide_controls: bool) -> Element<'
     let current = settings.shared.controls.menu_buttons;
     let description = String::from(match current {
         MenuButtons::Nintendo => {
-            "The right button (B on Xbox) picks and the bottom button (A on Xbox) goes \
-             back, as on Nintendo's consoles."
+            "Like a Nintendo Switch: in Nubo's menus, the right button picks and the \
+             bottom button goes back. Games use the Game Boy buttons below."
         }
         MenuButtons::Xbox => {
-            "The bottom button (A on Xbox) picks and the right button (B on Xbox) goes \
-             back, as on Xbox and PlayStation."
+            "Like an Xbox or PlayStation: in Nubo's menus, the bottom button picks and \
+             the right button goes back. Games use the Game Boy buttons below."
         }
     });
     let choices = segmented(
@@ -1393,11 +1393,11 @@ fn menu_buttons<'a>(settings: &Settings, stack_wide_controls: bool) -> Element<'
         |buttons| Message::Settings(SettingsMessage::MenuButtonsSelected(buttons)),
     );
     if stack_wide_controls {
-        column![label("Pick and go back", Some(description)), choices]
+        column![label("Menu buttons", Some(description)), choices]
             .spacing(10)
             .into()
     } else {
-        setting("Pick and go back", Some(description), choices)
+        setting("Menu buttons", Some(description), choices)
     }
 }
 
