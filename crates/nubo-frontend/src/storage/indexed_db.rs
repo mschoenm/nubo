@@ -17,8 +17,9 @@
 //! reads all of `files` into memory once, when the app starts; reads come
 //! from memory, and writes change memory at once and reach the database in
 //! the background, in the order they were made. A write the database
-//! refuses (it is full, say) is collected for the app to show ([`take_errors`]).
-//! ROMs are too big to hold them all, so they are read when a game starts
+//! refuses (it is full, say) is collected for the app to show ([`take_errors`]),
+//! and [`settled`] waits until every write so far has committed, before
+//! anything kept elsewhere is let go. ROMs are too big to hold them all, so they are read when a game starts
 //! ([`read_rom`]).
 //!
 //! Without a browser (the tests, and builds with the `web` feature for
@@ -59,6 +60,10 @@ thread_local! {
     static ROMS_IN_MEMORY: RefCell<HashMap<String, Arc<[u8]>>> = RefCell::new(HashMap::new());
     /// Writes the database refused, waiting for the app to show them.
     static ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    /// How many writes are on their way to the database, and how many it
+    /// has refused so far (see [`settled`]).
+    #[cfg(target_arch = "wasm32")]
+    static WRITES: std::cell::Cell<(u32, u64)> = const { std::cell::Cell::new((0, 0)) };
     /// The open database, in the browser.
     #[cfg(target_arch = "wasm32")]
     static DATABASE_HANDLE: RefCell<Option<web_sys::IdbDatabase>> = const { RefCell::new(None) };
@@ -199,6 +204,24 @@ pub fn remove_rom(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Waits until every write made so far has reached the database for good
+/// (its transaction committed), and fails if any of them was refused, so
+/// data kept elsewhere is only let go once it is safely here. Without a
+/// browser, writes are done at once.
+pub async fn settled() -> Result<(), String> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        let (_, refused_before) = WRITES.get();
+        while WRITES.get().0 > 0 {
+            crate::background::pause().await;
+        }
+        if WRITES.get().1 != refused_before {
+            return Err(String::from("the browser refused to keep some of it"));
+        }
+    }
+    Ok(())
+}
+
 /// Removes and returns the writes the database refused since the last call,
 /// each as a message for the player.
 pub fn take_errors() -> Vec<String> {
@@ -231,7 +254,10 @@ mod browser {
     use wasm_bindgen::closure::Closure;
     use wasm_bindgen::{JsCast, JsValue};
     use wasm_bindgen_futures::JsFuture;
-    use web_sys::{IdbDatabase, IdbObjectStore, IdbOpenDbRequest, IdbRequest, IdbTransactionMode};
+    use web_sys::{
+        IdbDatabase, IdbObjectStore, IdbOpenDbRequest, IdbRequest, IdbTransaction,
+        IdbTransactionMode,
+    };
 
     /// The database's version. A newer one that adds an object store makes
     /// it in `upgradeneeded`, as `create_stores` does.
@@ -344,18 +370,44 @@ mod browser {
         let Some(database) = super::DATABASE_HANDLE.with_borrow(Clone::clone) else {
             return;
         };
-        let request = store(&database, store_name, IdbTransactionMode::Readwrite)
-            .and_then(|store| change(&store).map_err(describe));
+        let transaction =
+            store(&database, store_name, IdbTransactionMode::Readwrite).and_then(|store| {
+                let transaction = store.transaction();
+                change(&store).map(|_| transaction).map_err(describe)
+            });
         let key = key.to_owned();
+        let (pending, refused) = super::WRITES.get();
+        super::WRITES.set((pending + 1, refused));
         wasm_bindgen_futures::spawn_local(async move {
-            let result = match request {
-                Ok(request) => finished(&request).await.map(drop),
+            let result = match transaction {
+                Ok(transaction) => committed(&transaction).await,
                 Err(error) => Err(error),
             };
+            let (pending, mut refused) = super::WRITES.get();
             if let Err(error) = result {
+                refused += 1;
                 super::report(format!("{key} couldn't be kept in the browser: {error}"));
             }
+            super::WRITES.set((pending - 1, refused));
         });
+    }
+
+    /// Waits for `transaction` to commit, or returns why it didn't.
+    async fn committed(transaction: &IdbTransaction) -> Result<(), String> {
+        let promise = js_sys::Promise::new(&mut |resolve, reject| {
+            transaction.set_oncomplete(Some(&resolve));
+            transaction.set_onerror(Some(&reject));
+            transaction.set_onabort(Some(&reject));
+        });
+        let outcome = JsFuture::from(promise).await;
+        transaction.set_oncomplete(None);
+        transaction.set_onerror(None);
+        transaction.set_onabort(None);
+        outcome.map(drop).map_err(|_| {
+            transaction
+                .error()
+                .map_or_else(|| String::from("it was given up"), |error| error.message())
+        })
     }
 
     /// The object store `name`, in a new transaction.

@@ -420,17 +420,17 @@ impl App {
         Err(String::from("Add a folder of games instead"))
     }
 
-    /// Keeps the game just started in the browser's library, unless it
-    /// keeps that very file already (it was started from the library), so
-    /// it shows up there next time.
+    /// Keeps a game the player picked to open in the browser's library, so
+    /// it shows up there next time, replacing any game kept under the same
+    /// file name: the player picked this file, which may be another version.
+    /// A game that isn't one the emulator can start isn't kept, and says why
+    /// when it fails to start. Games started from the library come from
+    /// what it keeps, so they aren't kept again.
     #[cfg(target_arch = "wasm32")]
     pub(super) fn keep_game(&mut self, rom: &Rom) {
-        let kept = self.library.keeps_game(&rom.path)
-            && self
-                .library
-                .entry(&rom.path)
-                .is_some_and(|entry| entry.size() == rom.bytes.len() as u64);
-        if !kept && let Err(error) = self.library.add_game(rom) {
+        if nubo_core::Emulator::read_rom_header(&rom.bytes).is_ok()
+            && let Err(error) = self.library.add_game(rom)
+        {
             self.toasts.error(error);
         }
     }

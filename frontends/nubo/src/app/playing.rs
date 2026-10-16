@@ -111,7 +111,13 @@ impl App {
             GameMessage::OpenRom => {
                 return Task::perform(rom_picker::pick(), |rom| GameMessage::RomPicked(rom).into());
             }
-            GameMessage::RomPicked(Some(rom)) => self.start_game(rom, true),
+            GameMessage::RomPicked(Some(rom)) => {
+                #[cfg(target_arch = "wasm32")]
+                if !self.fresh {
+                    self.keep_game(&rom);
+                }
+                self.start_game(rom, true);
+            }
             GameMessage::RomPicked(None) => {}
             GameMessage::RomRead(rom) => self.open(rom),
             GameMessage::PlayGame(path) => return read_rom(path),
@@ -362,10 +368,6 @@ impl App {
 
                 self.stop_game();
 
-                #[cfg(target_arch = "wasm32")]
-                if !self.fresh {
-                    self.keep_game(game.session.rom());
-                }
                 if !self.fresh
                     && let Err(error) = self.library.record_played(&path, game.session.header())
                 {

@@ -208,6 +208,10 @@ pub enum Message {
     /// The browser's storage was opened, or why it couldn't be.
     #[cfg(target_arch = "wasm32")]
     StorageOpened(Result<(), String>),
+    /// The last game played that older versions kept in localStorage is in
+    /// the browser's storage for good now, or couldn't be kept there.
+    #[cfg(target_arch = "wasm32")]
+    LastGameMoved(Result<(), String>),
 }
 
 impl App {
@@ -354,19 +358,27 @@ impl App {
             self.toasts.error(error);
         }
 
+        // The old entry is only forgotten once the library's copy has
+        // committed (`Message::LastGameMoved`), so it is never lost.
+        let mut moved = Task::none();
         if let Some(rom) = nubo_frontend::rom::remembered() {
             let kept = self.library.add_game(&rom).and_then(|()| {
                 let header = nubo_core::Emulator::read_rom_header(&rom.bytes)
                     .map_err(|error| error.to_string())?;
                 self.library.record_played(&rom.path, &header)
             });
-            match kept.and_then(|()| nubo_frontend::rom::forget()) {
-                Ok(()) => {}
+            match kept {
+                Ok(()) => {
+                    moved = Task::perform(
+                        nubo_frontend::storage::indexed_db::settled(),
+                        Message::LastGameMoved,
+                    );
+                }
                 Err(error) => self.toasts.error(error),
             }
         }
         self.ask_about_box_art();
-        self.library_read()
+        Task::batch([self.library_read(), moved])
     }
 
     /// The window title, including the game's name while one is running.
@@ -432,6 +444,17 @@ impl App {
             Message::Scene(message) => self.update_scene(message),
             #[cfg(target_arch = "wasm32")]
             Message::StorageOpened(result) => self.storage_opened(result),
+            // Why it couldn't be kept was shown already, and the old entry
+            // stays for the next start to try again.
+            #[cfg(target_arch = "wasm32")]
+            Message::LastGameMoved(result) => {
+                if result.is_ok()
+                    && let Err(error) = nubo_frontend::rom::forget()
+                {
+                    self.toasts.error(error);
+                }
+                Task::none()
+            }
         };
 
         self.apply_to_game();
