@@ -189,20 +189,24 @@ fn a_ticked_box_no_longer_offered_deletes_nothing() {
 }
 
 #[test]
-fn the_other_model_question_names_the_consoles_and_continues_first() {
+fn the_other_model_question_names_the_consoles_and_stays_first() {
     let content = other_model_question(Model::Sgb, Model::Dmg, true);
 
-    assert_eq!(content.title, "Continue on the Super Game Boy?");
+    assert_eq!(content.title, "Switch to the Game Boy?");
     assert_eq!(
         content.text.as_deref(),
         Some(
-            "You last played on the Super Game Boy. Starting on the Game Boy begins at the title \
-             screen and replaces the automatic save from when you stopped. Your in-game saves \
-             stay.\n\nContinue keeps this game on the Super Game Boy from now on."
+            "This game is set to the Game Boy, but you last played it on the Super Game Boy. \
+             Switching starts at the title screen and replaces the automatic save from when you \
+             stopped. Your in-game saves stay.\n\nStaying keeps this game on the Super Game Boy \
+             from now on."
         )
     );
     let (_, buttons) = labels(&content);
-    assert_eq!(buttons, ["Continue", "Start on the Game Boy"]);
+    assert_eq!(
+        buttons,
+        ["Stay on the Super Game Boy", "Switch to the Game Boy"]
+    );
     assert_eq!(content.choices[0].style, ChoiceStyle::Primary);
 }
 
@@ -210,9 +214,9 @@ fn the_other_model_question_names_the_consoles_and_continues_first() {
 fn the_other_model_question_names_revisions_of_one_console() {
     let content = other_model_question(Model::CgbC, Model::CgbE, true);
 
-    assert_eq!(content.title, "Continue on the CGB-C?");
+    assert_eq!(content.title, "Switch to the CGB-E?");
     let (_, buttons) = labels(&content);
-    assert_eq!(buttons, ["Continue", "Start on the CGB-E"]);
+    assert_eq!(buttons, ["Stay on the CGB-C", "Switch to the CGB-E"]);
 }
 
 #[test]

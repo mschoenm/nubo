@@ -843,10 +843,10 @@ fn delete_question(path: &Path, entry: Option<&LibraryEntry>) -> DialogContent {
     }
 }
 
-/// The question whether to continue a game on `saved`, the model its
-/// automatic save was made on, or start it from the title screen on
-/// `configured`, the model it is now set to start on. With `remembers`, it
-/// says that continuing keeps the game on `saved`. The models are named by
+/// The question whether to switch a game to `configured`, the model it is
+/// now set to start on, starting it from the title screen, or stay on
+/// `saved`, the model its automatic save was made on, continuing from that
+/// save. With `remembers`, it says that staying keeps the game on `saved`. The models are named by
 /// their console, or by their revision when both are the same console.
 fn other_model_question(saved: Model, configured: Model, remembers: bool) -> DialogContent {
     let name = |model: Model| {
@@ -859,13 +859,13 @@ fn other_model_question(saved: Model, configured: Model, remembers: bool) -> Dia
     let (saved, configured) = (name(saved), name(configured));
     let answer = |answer| DialogAction::CloseThen(GameMessage::ResumeAnswered(answer).into());
     DialogContent {
-        title: format!("Continue on the {saved}?"),
+        title: format!("Switch to the {configured}?"),
         text: Some(format!(
-            "You last played on the {saved}. Starting on the {configured} begins at the title \
-             screen and replaces the automatic save from when you stopped. Your in-game saves \
-             stay.{}",
+            "This game is set to the {configured}, but you last played it on the {saved}. \
+             Switching starts at the title screen and replaces the automatic save from when you \
+             stopped. Your in-game saves stay.{}",
             if remembers {
-                format!("\n\nContinue keeps this game on the {saved} from now on.")
+                format!("\n\nStaying keeps this game on the {saved} from now on.")
             } else {
                 String::new()
             }
@@ -875,13 +875,13 @@ fn other_model_question(saved: Model, configured: Model, remembers: bool) -> Dia
         choices: vec![
             Choice::new(
                 Icon::Play,
-                "Continue",
+                format!("Stay on the {saved}"),
                 ChoiceStyle::Primary,
                 answer(ResumeAnswer::Continue),
             ),
             Choice::new(
                 Icon::RotateCcw,
-                format!("Start on the {configured}"),
+                format!("Switch to the {configured}"),
                 ChoiceStyle::Secondary,
                 answer(ResumeAnswer::StartOver),
             ),
