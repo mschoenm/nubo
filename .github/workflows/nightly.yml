@@ -24,10 +24,12 @@ permissions:
 
 # Scheduled runs go one at a time: each reads the wiki in the `metrics` job
 # and pushes to it in the `wiki` job, and two at once would read the same
-# wiki. Other runs don't write to it, so each gets a group of its own.
+# wiki. Every waiting run stays queued (`queue: max`), where by default a new
+# one would cancel the one already waiting and lose its night. Other runs
+# don't write to the wiki, so each gets a group of its own.
 concurrency:
   group: ${{ github.event_name == 'schedule' && 'nightly-wiki' || format('nightly-{0}', github.run_id) }}
-  cancel-in-progress: false
+  queue: max
 
 env:
   CARGO_TERM_COLOR: always
