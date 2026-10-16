@@ -41,7 +41,9 @@ const FLATPAK_EXECUTABLE: &str = "/app/bin/nubo";
 /// Closes the installed Nubo on Windows, as clicking its close button does,
 /// and stops it by force if it is still running after `CLOSE_TIMEOUT`.
 /// Prints how many were running, then `forced` for each one stopped by force.
+/// Any error ends it with a failure.
 const WINDOWS_CLOSE_SCRIPT: &str = r"
+$ErrorActionPreference = 'Stop'
 $path = Join-Path $env:LOCALAPPDATA 'Programs\Nubo\nubo.exe'
 $running = @(Get-Process -Name nubo -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $path })
 Write-Output $running.Count
@@ -260,7 +262,10 @@ fn install_from_worktree(commit: &str, name: &str) -> Result {
              this way"
         ));
     }
-    let folder = target_dir().join("install");
+    // Absolute, since git runs in the workspace root and cargo in the
+    // worktree, while a relative `CARGO_TARGET_DIR` is relative to here.
+    let folder = std::path::absolute(target_dir().join("install"))
+        .map_err(|error| format!("failed to find the target folder: {error}"))?;
     let worktree = folder.join("worktree");
     remove_worktree(&worktree);
     git(&[
@@ -365,6 +370,12 @@ fn close_on_windows() -> Result {
         .args(["-NoProfile", "-NonInteractive", "-Command", &script])
         .output()
         .map_err(|error| format!("failed to run PowerShell: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "couldn't close the running Nubo: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
     let lines = String::from_utf8_lossy(&output.stdout);
     let mut lines = lines.lines().map(str::trim);
     if lines.next().is_some_and(|count| count != "0") {
