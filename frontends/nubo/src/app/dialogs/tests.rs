@@ -197,9 +197,9 @@ fn the_other_model_question_names_the_consoles_and_stays_first() {
         content.text.as_deref(),
         Some(
             "You last played this game on the Super Game Boy, but it's now set to the Game Boy. \
-             Switching starts at the title screen and replaces the automatic save from when you \
-             stopped. Your in-game saves stay.\n\nStaying keeps this game on the Super Game Boy \
-             from now on."
+             Switching starts the game at the title screen and replaces the automatic save from \
+             when you stopped. Your in-game saves stay.\n\nStaying keeps this game on the Super \
+             Game Boy from now on."
         )
     );
     let (_, buttons) = labels(&content);
