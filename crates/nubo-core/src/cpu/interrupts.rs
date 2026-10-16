@@ -232,8 +232,9 @@ impl Cpu {
         kept
     }
 
-    /// Leaves HALT: the CPU runs again, and OAM and HBlank DMA paused by the
-    /// HALT go on.
+    /// Leaves HALT: the CPU runs again, OAM DMA paused by the HALT goes on,
+    /// and `hdma_halt_ended` decides whether a pending HBlank DMA block is
+    /// kept.
     fn leave_halt(&mut self) {
         self.run_state = RunState::Running;
         self.address_bus.hdma_halt_ended();
