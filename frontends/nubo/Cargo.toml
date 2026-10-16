@@ -37,6 +37,11 @@ console_error_panic_hook = "0.1"
 # generator in xtask, which must match it exactly.
 wasm-bindgen.workspace = true
 
+# SIGTERM and the other stop signals close the app like its window's close
+# button (subscriptions.rs); Windows has no such signals.
+[target.'cfg(unix)'.dependencies]
+signal-hook = "0.4.5"
+
 # For the Windows executable's icon and file properties (build.rs).
 [build-dependencies]
 nubo-logo.workspace = true
