@@ -214,10 +214,9 @@ impl Emulator {
     }
 
     /// Video RAM (0x8000-0x9FFF; bank 0 followed by bank 1, which only a CGB
-    /// uses) and
-    /// OAM (0xFE00-0xFE9F, the objects' attributes), as stored, whether or
-    /// not the CPU could read them right now. It takes `&mut self` because
-    /// the PPU runs behind until something looks at it (see
+    /// uses) and OAM (0xFE00-0xFE9F, the objects' attributes), as stored,
+    /// whether or not the CPU could read them right now. It takes `&mut self`
+    /// because the PPU runs behind until something looks at it (see
     /// [`Emulator::read_memory`]).
     pub fn video_memory(&mut self) -> (&[u8], &[u8]) {
         self.address_bus_mut().video_memory()
