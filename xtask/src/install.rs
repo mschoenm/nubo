@@ -336,6 +336,12 @@ fn running_nubo() -> Result<Vec<String>> {
             .args(["-axo", "pid=,comm="])
             .output()
             .map_err(|error| format!("failed to run ps: {error}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "couldn't list the running programs: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+        }
         Ok(String::from_utf8_lossy(&output.stdout)
             .lines()
             .filter_map(|line| line.trim().split_once(' '))
