@@ -2,6 +2,7 @@
 //! `Emulator::read_rom_header`.
 
 use super::{LibraryEntry, seconds_since_epoch};
+use crate::rom::EXTENSIONS;
 use crate::settings::LibraryFolder;
 use crate::time::SystemTime;
 use nubo_core::{CartridgeHeader, Emulator};
@@ -10,8 +11,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-/// The file extensions of ROMs and zipped ROMs.
-const EXTENSIONS: [&str; 3] = ["gb", "gbc", "zip"];
 /// The largest Game Boy ROMs are 8 MiB; bigger files are something else.
 const MAX_FILE_SIZE: u64 = 16 * 1024 * 1024;
 

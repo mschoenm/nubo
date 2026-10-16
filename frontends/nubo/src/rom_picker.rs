@@ -3,12 +3,9 @@
 //! browser's file picker on the web. Reading a ROM from a path is in
 //! `nubo_frontend::rom`, and scanning a folder in `nubo_frontend::library`.
 
-use nubo_frontend::rom::Rom;
+use nubo_frontend::rom::{EXTENSIONS, Rom};
 use std::path::PathBuf;
 use std::sync::Arc;
-
-/// The file extensions offered by the file picker.
-const EXTENSIONS: [&str; 3] = ["gb", "gbc", "zip"];
 
 /// Opens the file picker and reads the chosen ROM, or returns `None` if the
 /// user cancels. In the browser this is rfd's browser file picker, which

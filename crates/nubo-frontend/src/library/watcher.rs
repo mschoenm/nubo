@@ -6,6 +6,7 @@
 //! while nothing changes.
 
 use super::WatchEvent;
+use crate::rom::EXTENSIONS;
 use crate::settings::LibraryFolder;
 use notify_debouncer_mini::notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer};
@@ -15,9 +16,6 @@ use std::time::Duration;
 /// Changes are collected for this long before the library hears about
 /// them, so copying a game in leads to one rescan instead of dozens.
 const QUIET_TIME: Duration = Duration::from_secs(1);
-
-/// The file extensions of ROMs and zipped ROMs.
-const EXTENSIONS: [&str; 3] = ["gb", "gbc", "zip"];
 
 /// Watches the library folders until it is dropped; see [`watch`].
 pub struct Watcher {
