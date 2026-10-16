@@ -5,7 +5,8 @@
 //! in `settings.toml` (see [`crate::settings`]).
 //!
 //! The menus don't follow these bindings: they always take the same keys
-//! and buttons ([`Action::for_menu_button`] on a controller), so no
+//! and buttons ([`MenuButtons::action`] on a controller, where the player
+//! only picks which of two face buttons picks and which goes back), so no
 //! remapping can leave the app impossible to control. To get into the
 //! menus while a game runs, the keyboard has Esc, which can't be bound, and
 //! the controller has the pause menu's button, which can be moved but never
@@ -132,25 +133,6 @@ impl Action {
         }
     }
 
-    /// What a controller button does in the menus, which is fixed whatever
-    /// the bindings say: the D-pad moves, the bottom button (A on an Xbox
-    /// controller) and Start pick, the right button (B on an Xbox
-    /// controller) steps back, and Select opens a game's menu or clears a
-    /// setting. The left stick moves too (see [`Action::for_direction`]).
-    pub fn for_menu_button(button: ControllerButton) -> Option<Action> {
-        match button {
-            ControllerButton::DPadUp => Some(Action::Up),
-            ControllerButton::DPadDown => Some(Action::Down),
-            ControllerButton::DPadLeft => Some(Action::Left),
-            ControllerButton::DPadRight => Some(Action::Right),
-            ControllerButton::South => Some(Action::A),
-            ControllerButton::East => Some(Action::B),
-            ControllerButton::Start => Some(Action::Start),
-            ControllerButton::Select => Some(Action::Select),
-            _ => None,
-        }
-    }
-
     /// Whether this is one of the D-pad's four directions.
     pub fn is_direction(self) -> bool {
         matches!(
@@ -236,6 +218,21 @@ pub struct Controls {
     pub keyboard: Bindings<KeyCode>,
     /// Which controller button does each action.
     pub controller: Bindings<PadButton>,
+    /// Which face buttons pick and go back in the menus. Only saved once it
+    /// differs from the default, so files from versions without it write
+    /// back unchanged.
+    #[serde(skip_serializing_if = "is_default_menu_buttons")]
+    pub menu_buttons: MenuButtons,
+}
+
+/// Whether `buttons` are the menu buttons a new user gets, which settings
+/// leave out.
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde's skip_serializing_if passes a reference"
+)]
+fn is_default_menu_buttons(buttons: &MenuButtons) -> bool {
+    *buttons == MenuButtons::default()
 }
 
 impl Default for Controls {
@@ -243,6 +240,7 @@ impl Default for Controls {
         Controls {
             keyboard: default_keyboard(),
             controller: default_controller(),
+            menu_buttons: MenuButtons::default(),
         }
     }
 }
@@ -322,11 +320,15 @@ impl Controls {
             .find(|&button| self.controller.action(button).is_none())
     }
 
-    /// Puts back the bindings a new user gets on `device`.
+    /// Puts back the bindings a new user gets on `device`, and on a
+    /// controller the menu buttons too.
     pub fn reset(&mut self, device: Device) {
         match device {
             Device::Keyboard => self.keyboard = default_keyboard(),
-            Device::Controller => self.controller = default_controller(),
+            Device::Controller => {
+                self.controller = default_controller();
+                self.menu_buttons = MenuButtons::default();
+            }
         }
     }
 
@@ -344,6 +346,74 @@ impl Controls {
         }
 
         mapping
+    }
+}
+
+/// Which controller face buttons pick and go back in the menus (the
+/// library, the pause menu, the settings and dialogs). The rest of the menu
+/// buttons are fixed whatever the bindings say: the D-pad moves, Start picks
+/// too, and Select opens a game's menu or clears a setting. The left stick
+/// moves too (see [`Action::for_direction`]). Buttons are named by where
+/// they are, since the letters on them differ: an Xbox controller's A is at
+/// the bottom, where a Nintendo controller has its B.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MenuButtons {
+    /// The right face button (B on an Xbox controller) picks and the bottom
+    /// one (A on Xbox) goes back, as on Nintendo's consoles, and as in Game
+    /// Boy games with the default bindings, which put the Game Boy's A on the
+    /// right.
+    #[default]
+    Nintendo,
+    /// The bottom face button (A on an Xbox controller) picks and the right
+    /// one (B on Xbox) goes back, as on an Xbox or a PlayStation.
+    Xbox,
+}
+
+impl MenuButtons {
+    /// Both layouts, in the order the settings show them.
+    pub const ALL: [MenuButtons; 2] = [MenuButtons::Nintendo, MenuButtons::Xbox];
+
+    /// The face button that picks.
+    pub fn pick(self) -> ControllerButton {
+        match self {
+            MenuButtons::Nintendo => ControllerButton::East,
+            MenuButtons::Xbox => ControllerButton::South,
+        }
+    }
+
+    /// The face button that goes back.
+    pub fn back(self) -> ControllerButton {
+        match self {
+            MenuButtons::Nintendo => ControllerButton::South,
+            MenuButtons::Xbox => ControllerButton::East,
+        }
+    }
+
+    /// What a controller button does in the menus: A for picking and B for
+    /// going back, as the menus take them, or `None` for a button the menus
+    /// leave alone.
+    pub fn action(self, button: ControllerButton) -> Option<Action> {
+        match button {
+            ControllerButton::DPadUp => Some(Action::Up),
+            ControllerButton::DPadDown => Some(Action::Down),
+            ControllerButton::DPadLeft => Some(Action::Left),
+            ControllerButton::DPadRight => Some(Action::Right),
+            ControllerButton::Start => Some(Action::Start),
+            ControllerButton::Select => Some(Action::Select),
+            _ if button == self.pick() => Some(Action::A),
+            _ if button == self.back() => Some(Action::B),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for MenuButtons {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            MenuButtons::Nintendo => "Nintendo",
+            MenuButtons::Xbox => "Xbox",
+        })
     }
 }
 

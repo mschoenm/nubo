@@ -12,7 +12,7 @@ use crate::settings::Appearance;
 use crate::views::settings::SettingsTab;
 use iced::keyboard::{self, Modifiers};
 use nubo_core::{ControllerButton, ControllerState};
-use nubo_frontend::controls::{Action, Device, KeyCode, PadButton};
+use nubo_frontend::controls::{Action, Device, KeyCode, MenuButtons, PadButton};
 use nubo_frontend::gamepads::{ControllerEvent, Controllers};
 use nubo_frontend::rom::Rom;
 use std::path::PathBuf;
@@ -327,7 +327,7 @@ fn key_press(key: keyboard::Key, code: Option<KeyCode>) -> Message {
 }
 
 #[test]
-fn the_menus_take_the_bottom_and_right_buttons_whatever_a_and_b_are_bound_to() {
+fn the_menus_take_the_right_and_bottom_buttons_whatever_a_and_b_are_bound_to() {
     let mut app = playing_app();
     app.settings
         .shared
@@ -345,6 +345,28 @@ fn the_menus_take_the_bottom_and_right_buttons_whatever_a_and_b_are_bound_to() {
     // The buttons bound to A and B do nothing in the menu.
     let _ = app.update(pad(&[ControllerButton::North]));
     let _ = app.update(pad(&[ControllerButton::West]));
+    let _ = app.update(pad(&[]));
+    assert!(paused(&app));
+    // The right button picks "Resume", as on a Nintendo console.
+    let _ = app.update(pad(&[ControllerButton::East]));
+    let _ = app.update(pad(&[]));
+    assert!(!paused(&app));
+
+    let _ = app.update(pad(&[ControllerButton::LeftShoulder]));
+    let _ = app.update(pad(&[]));
+    // The bottom button steps back out of the menu.
+    let _ = app.update(pad(&[ControllerButton::South]));
+    let _ = app.update(pad(&[]));
+    assert!(!paused(&app));
+}
+
+#[test]
+fn the_menus_take_the_bottom_button_to_pick_when_the_player_picks_xbox() {
+    let mut app = playing_app();
+    let _ = app.update(SettingsMessage::MenuButtonsSelected(MenuButtons::Xbox).into());
+    let paused = |app: &App| app.game.as_ref().unwrap().is_paused();
+
+    let _ = app.update(pad(&[ControllerButton::LeftShoulder]));
     let _ = app.update(pad(&[]));
     assert!(paused(&app));
     // The bottom button picks "Resume".
