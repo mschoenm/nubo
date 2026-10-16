@@ -1237,7 +1237,8 @@ impl Apu {
         u32::from(t_cycles_per_m_cycle(self.cgb_double_speed)) * self.sample_rate
     }
 
-    /// The analog level a channel sends to one side, between -0.25 and 0.25.
+    /// The analog level a channel sends to one side, between -0.25 and 0.25
+    /// (up to 0.5 on the AGB, whose mixer adds the volume as a bias).
     ///
     /// Keep `output_inputs` in sync: it packs every value this and
     /// `agb_channel_output` read, so the M-cycles in which none of them

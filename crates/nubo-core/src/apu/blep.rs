@@ -16,8 +16,9 @@ use std::sync::LazyLock;
 /// How many output samples each step is spread over.
 pub(super) const BLEP_WIDTH: usize = 64;
 /// A bound far above any level the audio output reaches (the channels'
-/// levels add up to at most 1), which save states are checked against: a
-/// corrupted level could otherwise grow into infinity as steps add to it.
+/// levels add up to at most 1, or 1.75 on the AGB), which save states are
+/// checked against: a corrupted level could otherwise grow into infinity as
+/// steps add to it.
 pub(super) const MAX_PLAUSIBLE_LEVEL: f32 = 16.0;
 /// How many positions within one output sample the table distinguishes.
 pub(super) const BLEP_PHASES: usize = 256;
