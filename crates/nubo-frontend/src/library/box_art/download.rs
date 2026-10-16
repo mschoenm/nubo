@@ -103,6 +103,8 @@ fn download(url: &str) -> Result<Option<Vec<u8>>, String> {
     }
 }
 
+/// The folder the downloaded game lists are kept in: `box_art/lists` in the
+/// player's data folder.
 fn lists_folder() -> Result<PathBuf, String> {
     data_folder()
         .map(|folder| folder.join("box_art").join("lists"))
