@@ -54,6 +54,8 @@ Where the code differs from the plan below:
   0.45 ms (a frame takes about 0.5 ms), with the same bytes stored.
 - **`CartridgeEffects: Send`**, so the emulator is `Send` and the core can keep it in a `static Mutex`.
 - **Pixel format:** when the frontend refuses XRGB8888, the core converts to the default 0RGB1555.
+- **A call that finishes no frame hands over the last frame again** instead of `NULL`, which RetroArch accepts as a
+  duplicate frame.
 - **Cheats:** setting a cheat first removes every code its index had, and a disabled cheat registers nothing (the
   last review finding on mschoenm/nubo#37). A restart keeps the cheats.
 - **Restart** takes on the model and clock the options pick now (another finding there).
@@ -226,7 +228,7 @@ before.
    move between the Nubo app and RetroArch: `.sav` and `.srm` are both the raw cartridge RAM.
 4. **Share the model rule and the palettes.** Done by step 2 of the restructuring plan:
    `nubo-frontend`'s `model` module has `ModelPreference::Automatic`'s rule (`supports_cgb` →
-   `Model::CgbE`, else `Model::Dmg`), and its `palettes` module has the palette colors and `recolor`.
+   `Model::CgbE`, `supports_sgb` → `Model::Sgb`, else `Model::Dmg`), and its `palettes` module has the palette colors and `recolor`.
    The core uses `nubo-frontend` without default features, so neither Iced nor any platform library
    comes along.
 5. **Read access to memory for achievements:** work RAM (all banks), HRAM and cartridge RAM as `&[u8]`.
