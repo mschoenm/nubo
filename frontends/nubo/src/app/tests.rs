@@ -1,9 +1,9 @@
 //! Tests for the app's small helpers, for resetting the settings in a
-//! `--fresh` app, which keeps nothing, and for shortcuts while the settings
-//! are open.
+//! `--fresh` app, which keeps nothing, for shortcuts while the settings
+//! are open, and for the fixed keys and buttons of the menus.
 
 use super::settings_window::reset_summary;
-use super::{App, GameMessage, Message, SettingsMessage, cycle};
+use super::{App, CAPTURE_TIMEOUT, GameMessage, Message, SettingsMessage, cycle};
 use crate::command_line::Options;
 use crate::dialog::{DialogKind, ResetChoices};
 use crate::input::KeyInput;
@@ -11,6 +11,7 @@ use crate::settings::Appearance;
 use crate::views::settings::SettingsTab;
 use iced::keyboard::{self, Modifiers};
 use nubo_core::{ControllerButton, ControllerState};
+use nubo_frontend::controls::{Action, Device, KeyCode, PadButton};
 use nubo_frontend::gamepads::{ControllerEvent, Controllers};
 use nubo_frontend::rom::Rom;
 use std::path::PathBuf;
@@ -210,24 +211,17 @@ fn controller_shortcuts_wait_while_the_settings_are_open() {
         bytes: Arc::from(vec![0; 0x8000]),
     });
     let _ = app.update(GameMessage::PlayRemembered.into());
-    let pad = |buttons: &[ControllerButton]| {
-        let mut state = ControllerState::new();
-        for &button in buttons {
-            state.set_button(button, true);
-        }
-        Message::Controller(ControllerEvent::Changed(Controllers::from(vec![state])))
-    };
     let rewinding = |app: &App| app.game.as_ref().unwrap().session.is_rewinding();
 
     let _ = app.update(SettingsMessage::Open.into());
-    let _ = app.update(pad(&[ControllerButton::West]));
+    let _ = app.update(pad(&[ControllerButton::RightShoulder]));
     assert!(!rewinding(&app));
     let _ = app.update(pad(&[ControllerButton::LeftShoulder]));
     assert!(!app.game.as_ref().unwrap().is_paused());
     let _ = app.update(pad(&[]));
 
     let _ = app.update(SettingsMessage::Close.into());
-    let _ = app.update(pad(&[ControllerButton::West]));
+    let _ = app.update(pad(&[ControllerButton::RightShoulder]));
     assert!(rewinding(&app));
     let _ = app.update(SettingsMessage::Open.into());
     let _ = app.update(pad(&[]));
@@ -263,4 +257,111 @@ fn pausing_with_the_command_key_waits_while_the_settings_are_open() {
     let _ = app.update(SettingsMessage::Close.into());
     let _ = app.update(command_p);
     assert!(app.game.as_ref().unwrap().is_paused());
+}
+
+/// A `--fresh` app playing an empty game.
+fn playing_app() -> App {
+    let (mut app, _) = App::new(
+        None,
+        &Options {
+            fresh: true,
+            ..Options::default()
+        },
+    );
+    app.remembered = Some(Rom {
+        path: PathBuf::from("game.gb"),
+        bytes: Arc::from(vec![0; 0x8000]),
+    });
+    let _ = app.update(GameMessage::PlayRemembered.into());
+    app
+}
+
+/// The first controller holding `buttons`.
+fn pad(buttons: &[ControllerButton]) -> Message {
+    let mut state = ControllerState::new();
+    for &button in buttons {
+        state.set_button(button, true);
+    }
+    Message::Controller(ControllerEvent::Changed(Controllers::from(vec![state])))
+}
+
+/// `key` going down, with no modifiers.
+fn key_press(key: keyboard::Key, code: Option<KeyCode>) -> Message {
+    Message::Key(KeyInput {
+        code,
+        key,
+        modifiers: Modifiers::empty(),
+        pressed: true,
+        repeat: false,
+    })
+}
+
+#[test]
+fn the_menus_take_the_bottom_and_right_buttons_whatever_a_and_b_are_bound_to() {
+    let mut app = playing_app();
+    app.settings
+        .shared
+        .controls
+        .bind_button(Action::A, PadButton(ControllerButton::North));
+    app.settings
+        .shared
+        .controls
+        .bind_button(Action::B, PadButton(ControllerButton::West));
+    let paused = |app: &App| app.game.as_ref().unwrap().is_paused();
+
+    let _ = app.update(pad(&[ControllerButton::LeftShoulder]));
+    let _ = app.update(pad(&[]));
+    assert!(paused(&app));
+    // The buttons bound to A and B do nothing in the menu.
+    let _ = app.update(pad(&[ControllerButton::North]));
+    let _ = app.update(pad(&[ControllerButton::West]));
+    let _ = app.update(pad(&[]));
+    assert!(paused(&app));
+    // The bottom button picks "Resume".
+    let _ = app.update(pad(&[ControllerButton::South]));
+    let _ = app.update(pad(&[]));
+    assert!(!paused(&app));
+
+    let _ = app.update(pad(&[ControllerButton::LeftShoulder]));
+    let _ = app.update(pad(&[]));
+    // The right button steps back out of the menu.
+    let _ = app.update(pad(&[ControllerButton::East]));
+    let _ = app.update(pad(&[]));
+    assert!(!paused(&app));
+}
+
+#[test]
+fn the_menus_take_enter_whatever_the_keys_are_bound_to() {
+    let mut app = playing_app();
+    let controls = &mut app.settings.shared.controls;
+    controls.keyboard.bind(Action::Start, Some(KeyCode::KeyP));
+    controls.keyboard.bind(Action::A, Some(KeyCode::KeyK));
+    let paused = |app: &App| app.game.as_ref().unwrap().is_paused();
+
+    let _ = app.update(GameMessage::TogglePause.into());
+    assert!(paused(&app));
+    let _ = app.update(key_press(
+        keyboard::Key::Character("k".into()),
+        Some(KeyCode::KeyK),
+    ));
+    assert!(paused(&app));
+    let _ = app.update(key_press(
+        keyboard::Key::Named(keyboard::key::Named::Enter),
+        Some(KeyCode::Enter),
+    ));
+    assert!(!paused(&app));
+}
+
+#[test]
+fn waiting_for_a_button_gives_up_after_a_while() {
+    let mut app = playing_app();
+    let _ = app.update(SettingsMessage::Open.into());
+    let _ = app.update(SettingsMessage::CaptureBinding(Device::Controller, Action::A).into());
+
+    let _ = app.update(Message::Tick);
+    assert!(app.capture.is_some());
+
+    app.capture_started -= CAPTURE_TIMEOUT;
+    let _ = app.update(Message::Tick);
+    assert_eq!(app.capture, None);
 }
