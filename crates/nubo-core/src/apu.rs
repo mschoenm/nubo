@@ -649,6 +649,10 @@ impl Apu {
         self.silence(Channel::Square1);
     }
 
+    /// Switches the APU between normal speed and the Game Boy Color's double
+    /// speed. Entering double speed flips whether frame sequencer steps come
+    /// an M-cycle late (`late_div_events`); leaving it runs a step held back
+    /// for that.
     pub(crate) fn set_cgb_double_speed(&mut self, cgb_double_speed: bool) {
         self.prepare_for_change();
         if cgb_double_speed && !self.cgb_double_speed {
@@ -766,6 +770,9 @@ impl Apu {
         }
     }
 
+    /// Handles a change of the DIV-APU bit: a falling edge steps the frame
+    /// sequencer (or holds the step back an M-cycle, see `late_div_events`),
+    /// and a rising edge prepares the envelope ticks of the next step.
     fn div_apu_bit_changed(&mut self, old: u16, new: u16, during_div_write: bool) {
         let apu_bit = self.div_apu_bit;
         if old & !new & apu_bit != 0 {
@@ -876,6 +883,8 @@ impl Apu {
         }
     }
 
+    /// Runs the frame sequencer step and envelope ticks held back from the
+    /// last M-cycle.
     fn run_held_back_events(&mut self) {
         self.prepare_for_change();
         if let Some(during_div_write) = self.pending_div_event.take() {
@@ -887,6 +896,7 @@ impl Apu {
         self.update_held_back_events();
     }
 
+    /// Sets `held_back_events` from what is held back now.
     fn update_held_back_events(&mut self) {
         self.held_back_events =
             self.pending_div_event.is_some() || self.state.pending_envelope_tick;
@@ -1083,6 +1093,8 @@ impl Apu {
             & apu.effective_pcm_mask(1)
     }
 
+    /// The mask for PCM12 (`index` 0) or PCM34 (1) reads: on CGB-C and older
+    /// it holds this M-cycle's read glitch, later models have none.
     fn effective_pcm_mask(&self, index: usize) -> u8 {
         if self.model <= Model::CgbC {
             self.pcm_mask[index]
@@ -1091,6 +1103,10 @@ impl Apu {
         }
     }
 
+    /// Reads register `register` (its address minus 0xFF10), with its unused
+    /// bits set. While channel 3 plays, wave RAM reads give the byte it is
+    /// reading, or 0xFF on a DMG outside the moment it reads one and always
+    /// on an AGB.
     fn read_register(&self, register: usize) -> u8 {
         if register == NR52 {
             let channels = self.state.active_channels & 0x0F;
@@ -1112,6 +1128,10 @@ impl Apu {
         self.registers[register] | READ_MASKS[register]
     }
 
+    /// Writes register `register` (its address minus 0xFF10). While the APU
+    /// is off, only NR52, wave RAM and (on a DMG) the length registers take
+    /// writes. While channel 3 plays, wave RAM writes go to the byte it is
+    /// reading, or are dropped where reads would give 0xFF.
     fn write_register(&mut self, mut register: usize, mut value: u8) {
         let is_length_register = matches!(register, NR11 | NR21 | NR31 | NR41);
         if !self.state.powered_on
