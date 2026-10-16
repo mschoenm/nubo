@@ -25,6 +25,12 @@ Nubo plays your Game Boy and Game Boy Color games the way you remember them. It 
 
 Point it at your games folder and your games appear in a library with their title screens, the ones you played last up front. Save anywhere with a save state, pick up right where you left off, play with a keyboard or a controller, and see Super Game Boy games in their own colors and borders, as they looked on a TV.
 
+## Made with AI
+
+Nubo is made almost entirely by AI. Nearly all of its code and documentation, this README included, and even its name were written by Claude, Anthropic's AI model, working in Claude Code. I decide what Nubo should do, review the changes and choose what goes in, but I write very little of it myself. It started as a fork of [RetroBoy](https://github.com/smparsons/retroboy), Samuel Parsons's own work (see [Credits](#credits)).
+
+If you'd rather not use software made this way, that's a fair choice, and it's why this is said up front.
+
 <p align="center">
   <img src="images/screenshots/super-game-boy.png" width="700" alt="Tobu Tobu Girl Deluxe being played in Nubo: the girl jumps toward a crab over pink mountains, inside the game's own illustrated Super Game Boy border">
 </p>

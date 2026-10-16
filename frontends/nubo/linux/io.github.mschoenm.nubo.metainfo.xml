@@ -16,6 +16,13 @@
       the first Game Boy to the Game Boy Advance and is checked against thousands of hardware test
       ROMs.
     </p>
+    <p>
+      Nubo is made almost entirely by AI. Nearly all of its code and documentation, and even its
+      name, were written by Claude, Anthropic's AI model, working in Claude Code. Its developer
+      decides what Nubo should do, reviews the changes and chooses what goes in. It started as a
+      fork of RetroBoy by Samuel Parsons. If you'd rather not use software made this way, that's a
+      fair choice, and it's why this is said up front.
+    </p>
     <ul>
       <li>A game library built from your ROM folders, with each game's title screen or box art</li>
       <li>Save states with pictures, and continuing where you left off</li>
