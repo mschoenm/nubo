@@ -1,6 +1,7 @@
 //! Unit tests for the APU, driven through its registers like a game would.
 
 use super::*;
+use crate::test_random::Random;
 
 const DIV_APU_PERIOD_M_CYCLES: usize = 1024;
 
@@ -592,28 +593,6 @@ fn fixed_scenario() -> Scenario {
         speed_switch: 15000,
         sample_rate: 44100,
         cycles: 30000,
-    }
-}
-
-/// A small pseudo-random number generator (xorshift64*), so the random
-/// scenarios are the same on every run.
-struct Random(u64);
-
-impl Random {
-    fn next(&mut self) -> u64 {
-        self.0 ^= self.0 >> 12;
-        self.0 ^= self.0 << 25;
-        self.0 ^= self.0 >> 27;
-        self.0.wrapping_mul(0x2545_F491_4F6C_DD1D)
-    }
-
-    /// A number below `limit`.
-    fn below(&mut self, limit: usize) -> usize {
-        (self.next() % limit as u64) as usize
-    }
-
-    fn byte(&mut self) -> u8 {
-        self.next() as u8
     }
 }
 
