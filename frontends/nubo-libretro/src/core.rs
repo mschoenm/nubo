@@ -114,8 +114,9 @@ pub enum Video<'a> {
     Rgb1555(&'a [u16]),
 }
 
-/// What the cartridge asked the core to save during a frame. The emulator's
-/// [`CartridgeEffects`] sets the flags, [`Core::run`] clears them.
+/// What the cartridge asked the core to save during a frame. [`CoreEffects`]
+/// sets the flags when the emulator tells it the game saved, and
+/// [`Core::run`] clears them.
 #[derive(Debug, Default)]
 struct SaveRequests {
     ram: AtomicBool,
@@ -181,7 +182,8 @@ impl Cheat {
     }
 }
 
-/// What went wrong with a cheat code.
+/// A cheat code, as RetroArch sent it, that is neither a Game Genie nor a
+/// GameShark code.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InvalidCheat(pub String);
 
