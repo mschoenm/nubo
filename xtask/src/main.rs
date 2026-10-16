@@ -1,6 +1,7 @@
 //! Project tasks run with `cargo xtask <command>`: building the Iced frontend
 //! for the browser and serving it locally, building the macOS app bundle, the
-//! Flatpak, the Windows installer and the RetroArch core, writing the logo
+//! Flatpak, the Windows installer and the RetroArch core, installing Nubo on
+//! this computer, writing the logo
 //! and the license files that go with them, checking a release's version and
 //! notes, timing Nubo next to other emulators, the nightly review's tooling,
 //! reading the GB Emulator Shootout's published table, and making the
@@ -78,6 +79,9 @@ enum Task {
     /// Build the Windows installer (an MSI, with the WiX Toolset) and a zip to run without
     /// installing into target/bundle (Windows only)
     Windows(windows::Options),
+    /// Build Nubo for this computer and install it, closing a running Nubo first: the app in
+    /// /Applications on macOS, the Flatpak on Linux, the MSI on Windows, without questions
+    Install(install::Options),
     /// Build the RetroArch core for this computer into target/bundle as a folder and a zip: the
     /// core under RetroArch's file name, its info file and the licenses
     Libretro,
@@ -402,6 +406,7 @@ fn main() -> ExitCode {
                 );
             })
         }
+        Task::Install(options) => install::install(&options),
         Task::Libretro => libretro::build_libretro_core().map(|zip| {
             println!(
                 "Built {}. Copy the core into RetroArch's cores folder and the .info file into \
@@ -469,6 +474,7 @@ mod benchmark_roms;
 mod compare_emulators;
 mod flatpak;
 mod icon;
+mod install;
 mod libretro;
 mod licenses;
 mod macos;

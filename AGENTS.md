@@ -17,6 +17,7 @@ cargo save-states             # The kept save states still load, and the stored 
 cargo play [rom] [--cgb | --model cgb-c]   # Run the desktop app (models: dmg-0, dmg, mgb, sgb, sgb2, cgb-0 to cgb-e, agb; more options in frontends/nubo/src/command_line.rs)
 cargo screenshot rom.gb --seconds 10   # Run 10 emulated seconds (5 without it) headless, save a PNG to target/screenshots/ (under the folder it is run from, so run it from the workspace root)
 cargo benchmark <roms> --record a.txt / --compare a.txt   # Speed, and fingerprints of every frame, sample and end state
+cargo xtask install [--build main | checkout | 0.12 | <commit>]   # Build Nubo for this computer and install it; when it stops for --build (not the newest origin/main), ask the user which
 cargo xtask screenshots [--check]     # The README's and Flathub's screenshots, made again from their scenes in a headless GNOME Shell (the `screenshots` skill)
 ```
 
