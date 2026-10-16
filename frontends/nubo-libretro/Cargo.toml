@@ -14,7 +14,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 nubo-core.workspace = true
-# Only the palettes and the model rule: without features (it has no default
+# The palettes, the model rule, the picture with its Super Game Boy border and
+# the Super Game Boy menu's choices: without features (it has no default
 # ones), no storage, sound or controllers.
 nubo-frontend.workspace = true
 
