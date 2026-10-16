@@ -29,6 +29,7 @@ use clap::builder::PossibleValue;
 use clap::{Args, ValueEnum};
 use image::RgbImage;
 use std::collections::BTreeMap;
+use std::fmt::Write;
 use std::fs;
 use std::num::NonZero;
 use std::path::{Path, PathBuf};
@@ -863,7 +864,7 @@ fn table(
     for row in &rows {
         let mut line = format!("{:<width$}", row[0], width = widths[0]);
         for (cell, width) in row.iter().zip(&widths).skip(1) {
-            line.push_str(&format!("  {cell:>width$}"));
+            let _ = write!(line, "  {cell:>width$}");
         }
         text.push_str(line.trim_end());
         text.push('\n');

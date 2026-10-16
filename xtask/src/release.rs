@@ -6,6 +6,7 @@
 
 use super::{APP_ID, LINUX_FILES, Result, workspace_root};
 use roxmltree::{Document, Node};
+use std::fmt::Write;
 use std::fs;
 
 /// The version every crate of the workspace shares, from the root
@@ -142,9 +143,9 @@ fn text_of(node: Node) -> String {
         if child.is_text() {
             text.push_str(child.text().unwrap_or_default());
         } else if child.has_tag_name("code") {
-            text.push_str(&format!("`{}`", text_of(child)));
+            let _ = write!(text, "`{}`", text_of(child));
         } else if child.has_tag_name("em") {
-            text.push_str(&format!("*{}*", text_of(child)));
+            let _ = write!(text, "*{}*", text_of(child));
         } else {
             text.push_str(&text_of(child));
         }
