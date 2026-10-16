@@ -961,7 +961,7 @@ fn playing<'a>(
     games.push(rings.row(fast_forward, SettingsRow::FastForwardSpeed));
 
     column![
-        group("Console", None, console, None),
+        group("Game Boy", None, console, None),
         group("Games", None, games, None),
         group(
             "Sound",

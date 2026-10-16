@@ -191,16 +191,16 @@ impl App {
                 DialogAction::CloseThen(GameMessage::PlayGame(path.clone()).into()),
             ),
             Choice::new(
-                Icon::Cpu,
-                "Play on…",
+                Icon::Gamepad2,
+                "Which Game Boy…",
                 ChoiceStyle::Secondary,
                 DialogAction::Stay(
                     DialogMessage::ShowGameMenu(path.clone(), GameMenuPage::Consoles).into(),
                 ),
             )
             .hint(match entry.model() {
-                Some(model) => String::from(model.name()),
-                None => String::from("As in the settings"),
+                Some(model) => String::from(Console::of(model).label()),
+                None => format!("Default ({})", self.default_model_label()),
             }),
         ];
         if links::CAN_SHOW_FOLDERS {
@@ -251,19 +251,15 @@ impl App {
     fn consoles_page(&self, entry: &LibraryEntry) -> DialogContent {
         let path = &entry.path;
         let picked = entry.model();
-        let settings_model = match self.settings.shared.model {
-            ModelPreference::Automatic => String::from("Automatic"),
-            ModelPreference::Fixed(model) => String::from(model.name()),
-        };
 
         let mut choices = vec![
             Choice::new(
                 Icon::Settings,
-                "As in the settings",
+                "Default",
                 ChoiceStyle::Secondary,
                 DialogAction::Stay(LibraryMessage::GameModelPicked(path.clone(), None).into()),
             )
-            .hint(settings_model)
+            .hint(self.default_model_label())
             .checked(picked.is_none()),
         ];
         choices.extend(Console::ALL.map(|console| {
@@ -287,7 +283,7 @@ impl App {
         }));
 
         DialogContent {
-            title: format!("Play {} on", entry.name()),
+            title: format!("Which Game Boy for {}?", entry.name()),
             text: None,
             notice: None,
             layout: Layout::List,
@@ -296,6 +292,15 @@ impl App {
                 DialogMessage::ShowGameMenu(path.clone(), GameMenuPage::Main).into(),
             ),
             click_outside_dismisses: true,
+        }
+    }
+
+    /// The Game Boy the settings start games on, which a game whose menu
+    /// picked none uses: "Automatic", or the console's name.
+    fn default_model_label(&self) -> &'static str {
+        match self.settings.shared.model {
+            ModelPreference::Automatic => "Automatic",
+            ModelPreference::Fixed(model) => Console::of(model).label(),
         }
     }
 
@@ -576,7 +581,7 @@ fn revisions_page(entry: &LibraryEntry, console: Console) -> DialogContent {
         .collect();
 
     DialogContent {
-        title: format!("Play {} on", entry.name()),
+        title: format!("Which Game Boy for {}?", entry.name()),
         text: Some(String::from(model::about(
             entry
                 .model()
