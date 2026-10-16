@@ -314,6 +314,8 @@ pub fn top_bar<'a, Message: 'a>(content: iced::widget::Row<'a, Message>) -> Elem
     column![bar_body(content), divider()].into()
 }
 
+/// The inside of the top bar: `content` in a row, centered vertically, on
+/// the bar's background.
 fn bar_body<'a, Message: 'a>(content: iced::widget::Row<'a, Message>) -> Element<'a, Message> {
     container(content.spacing(4).align_y(Alignment::Center))
         .padding([6, 10])
@@ -322,6 +324,7 @@ fn bar_body<'a, Message: 'a>(content: iced::widget::Row<'a, Message>) -> Element
         .into()
 }
 
+/// The one-pixel line under the top bar, across its whole width.
 fn divider<'a, Message: 'a>() -> Element<'a, Message> {
     container(iced::widget::space())
         .width(Fill)

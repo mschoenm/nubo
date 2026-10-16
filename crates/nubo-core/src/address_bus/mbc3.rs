@@ -101,11 +101,12 @@ impl RtcState {
         self
     }
 
-    /// Moves the clock forward by `elapsed_ms` milliseconds. A register that
-    /// holds an invalid value (such as 61 seconds) doesn't carry into the next
-    /// one; it keeps counting until it overflows its bits and wraps to 0.
-    fn advance(&mut self, elapsed_ms: f64) {
-        let mut new_milliseconds = u64::from(self.milliseconds).saturating_add(elapsed_ms as u64);
+    /// Moves the clock forward by `elapsed_milliseconds`. A register that holds
+    /// an invalid value (such as 61 seconds) doesn't carry into the next one;
+    /// it keeps counting until it overflows its bits and wraps to 0.
+    fn advance(&mut self, elapsed_milliseconds: f64) {
+        let mut new_milliseconds =
+            u64::from(self.milliseconds).saturating_add(elapsed_milliseconds as u64);
         let mut new_seconds = u64::from(self.seconds);
         let mut new_minutes = u64::from(self.minutes);
         let mut new_hours = u64::from(self.hours);
@@ -163,12 +164,12 @@ impl RtcState {
             self.base_timestamp = current_time;
             return false;
         }
-        let elapsed_ms = (current_time - self.base_timestamp).floor();
-        if self.halted || elapsed_ms < 1.0 {
+        let elapsed_milliseconds = (current_time - self.base_timestamp).floor();
+        if self.halted || elapsed_milliseconds < 1.0 {
             return false;
         }
-        self.advance(elapsed_ms);
-        self.base_timestamp += elapsed_ms;
+        self.advance(elapsed_milliseconds);
+        self.base_timestamp += elapsed_milliseconds;
         true
     }
 

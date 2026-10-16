@@ -138,10 +138,12 @@ pub(super) fn prepare(
     (ready, left_out)
 }
 
+/// Where `emulator`'s object files and CMake build go, under `root`.
 fn build_folder(root: &Path, emulator: Emulator) -> PathBuf {
     root.join(format!("{}-build", emulator.id()))
 }
 
+/// The folder with the harnesses' sources, which time each emulator.
 fn harness_folder() -> PathBuf {
     workspace_root().join(HARNESS_FOLDER)
 }
@@ -200,7 +202,13 @@ fn build_stamp(emulator: Emulator, source: Source) -> Result<String> {
 fn build_nubo(emulator: Emulator, root: &Path) -> Result {
     let mut command = cargo();
     command
-        .args(["build", "--release", "--package", "nubo-benchmark"])
+        .args([
+            "build",
+            "--release",
+            "--locked",
+            "--package",
+            "nubo-benchmark",
+        ])
         .current_dir(workspace_root());
     if emulator == Emulator::NuboEager {
         command.args(["--features", "nubo-core/eager"]);
@@ -265,6 +273,8 @@ fn sameboy_compiler() -> &'static str {
     if has_tool("clang") { "clang" } else { "cc" }
 }
 
+/// Fetches SameBoy and builds its boot ROMs, for the emulators that run them
+/// (`Emulator::runs_sameboy_boot_roms`).
 fn build_boot_roms(root: &Path) -> Result {
     let source = Emulator::SameBoy
         .source()
@@ -279,6 +289,8 @@ fn build_boot_roms(root: &Path) -> Result {
     )
 }
 
+/// Builds SameBoy's core library and boot ROMs with its release flags, and
+/// links the harness against the library.
 fn build_sameboy(root: &Path) -> Result {
     let source = source_folder(root, Emulator::SameBoy);
     let compiler = sameboy_compiler();
@@ -304,6 +316,9 @@ fn build_sameboy(root: &Path) -> Result {
     )
 }
 
+/// Compiles Gambatte's core and its resampler with the flags of its own
+/// build, leaving out the C interface and zip support, and links the harness
+/// with them.
 fn build_gambatte(root: &Path) -> Result {
     let source = source_folder(root, Emulator::Gambatte);
     let library = source.join("libgambatte");
@@ -344,6 +359,8 @@ fn build_gambatte(root: &Path) -> Result {
     )
 }
 
+/// Builds mGBA's library with CMake, and compiles the harness with the same
+/// feature defines, since mGBA's structs depend on them.
 fn build_mgba(root: &Path) -> Result {
     let source = source_folder(root, Emulator::Mgba);
     let build = build_folder(root, Emulator::Mgba);
@@ -388,6 +405,8 @@ fn build_mgba(root: &Path) -> Result {
     )
 }
 
+/// Compiles the binjgb sources the harness needs and links the harness with
+/// them.
 fn build_binjgb(root: &Path) -> Result {
     let source = source_folder(root, Emulator::Binjgb).join("src");
     let sources: Vec<PathBuf> = BINJGB_SOURCES
@@ -414,6 +433,8 @@ fn build_binjgb(root: &Path) -> Result {
     )
 }
 
+/// Compiles Gearboy's core, its audio code and miniz, and links the harness
+/// with them.
 fn build_gearboy(root: &Path) -> Result {
     let source = source_folder(root, Emulator::Gearboy);
     let core = source.join("src");
@@ -453,6 +474,7 @@ fn build_gearboy(root: &Path) -> Result {
     )
 }
 
+/// A copy of `flags` with `flag` added at the end.
 fn with_flag(flags: &[String], flag: &str) -> Vec<String> {
     let mut flags = flags.to_vec();
     flags.push(flag.to_owned());

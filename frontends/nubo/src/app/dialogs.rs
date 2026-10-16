@@ -54,6 +54,8 @@ impl DialogAction {
 }
 
 impl App {
+    /// Handles a message about the open dialog: closing it after a choice,
+    /// turning to another page of a game's menu, or ticking a box.
     pub(super) fn update_dialog(&mut self, message: DialogMessage) -> Task<Message> {
         match message {
             DialogMessage::Closed(message) => {

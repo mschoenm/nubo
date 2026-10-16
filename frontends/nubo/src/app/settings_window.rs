@@ -78,6 +78,8 @@ impl From<SettingsMessage> for Message {
 }
 
 impl App {
+    /// Handles what the player does in the settings window, and the sound
+    /// settings the game's top bar changes too.
     pub(super) fn update_settings(&mut self, message: SettingsMessage) -> Task<Message> {
         match message {
             SettingsMessage::Open => {

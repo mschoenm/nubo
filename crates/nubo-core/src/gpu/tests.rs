@@ -40,13 +40,13 @@ fn should_start_first_line_after_lcd_on_in_mode_0() {
 }
 
 #[test]
-fn should_increment_ly_at_the_start_of_a_line_and_show_mode_2_four_dots_later() {
+fn should_increment_ly_at_the_start_of_a_line_and_show_mode_2_a_dot_later() {
     let mut gpu = gpu_at(5, 455);
     tick_dots(&mut gpu, 1);
     assert_eq!(gpu.ly, 6);
     assert_eq!(gpu.mode(), 0);
 
-    tick_dots(&mut gpu, 4);
+    tick_dots(&mut gpu, 1);
     assert_eq!(gpu.mode(), 2);
 }
 
@@ -391,8 +391,6 @@ fn should_compare_lyc_against_153_then_nothing_then_0_on_line_153() {
     );
 }
 
-mod random_scenes;
-
 #[test]
 fn should_reject_a_save_state_without_the_super_game_boy_its_model_has() {
     let bytes = serialize(&Gpu::new());
@@ -405,3 +403,5 @@ fn should_reject_a_save_state_without_the_super_game_boy_its_model_has() {
     let bytes = serialize(&with_sgb);
     assert!(Gpu::new().deserialize(&mut bytes.as_slice()).is_err());
 }
+
+mod random_scenes;

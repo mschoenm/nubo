@@ -82,6 +82,9 @@ pub enum SceneMessage {
     Pictured(window::Screenshot),
     /// The window's picture was taken for the scene being recorded.
     Recorded(window::Screenshot),
+    /// There was no window to take the picture of for the scene being
+    /// recorded.
+    NoWindowToRecord,
 }
 
 impl From<SceneMessage> for Message {
@@ -304,6 +307,12 @@ impl App {
                 self.finish_recording(&screenshot);
                 Task::none()
             }
+            SceneMessage::NoWindowToRecord => {
+                self.recording = None;
+                self.toasts
+                    .error("Couldn't record the scene: there was no window to take a picture of");
+                Task::none()
+            }
         }
     }
 
@@ -415,7 +424,7 @@ impl App {
             .then(|()| window::latest())
             .then(|id| match id {
                 Some(id) => window::screenshot(id).map(|shot| SceneMessage::Recorded(shot).into()),
-                None => Task::none(),
+                None => Task::done(SceneMessage::NoWindowToRecord.into()),
             })
     }
 
