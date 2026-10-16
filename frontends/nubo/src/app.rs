@@ -159,9 +159,10 @@ pub struct App {
     /// The game to start once the saves are deleted, and whether it
     /// continues where the player left off, if one was asked for meanwhile.
     start_after_deleting: Option<(Rom, bool)>,
-    /// The last game played, which the browser's start screen offers to
-    /// play again (see `nubo_frontend::rom::remember`).
-    remembered: Option<Rom>,
+    /// Whether the browser's storage was opened (see
+    /// `nubo_frontend::storage::indexed_db`), which the library is read from;
+    /// always on the desktop.
+    storage_open: bool,
     /// A newer version than this one, once the app found one is out.
     newer_version: Option<String>,
     /// With `--record-scenes`: the folder Ctrl+F12 saves scenes in (see
@@ -204,6 +205,13 @@ pub enum Message {
     /// What a scene being shown or recorded hears back (see `scenes`).
     #[cfg(not(target_arch = "wasm32"))]
     Scene(SceneMessage),
+    /// The browser's storage was opened, or why it couldn't be.
+    #[cfg(target_arch = "wasm32")]
+    StorageOpened(Result<(), String>),
+    /// The last game played that older versions kept in localStorage is in
+    /// the browser's storage for good now, or couldn't be kept there.
+    #[cfg(target_arch = "wasm32")]
+    LastGameMoved(Result<(), String>),
 }
 
 impl App {
@@ -216,7 +224,10 @@ impl App {
         } else {
             Settings::load()
         };
-        let (library, library_error) = if options.fresh {
+        // The browser reads its library once its storage is open (see
+        // `Message::StorageOpened`).
+        let storage_open = !cfg!(target_arch = "wasm32");
+        let (library, library_error) = if options.fresh || !storage_open {
             (Library::default(), None)
         } else {
             Library::load()
@@ -274,11 +285,7 @@ impl App {
             recording: None,
             #[cfg(not(target_arch = "wasm32"))]
             scene_run: None,
-            remembered: if options.fresh {
-                None
-            } else {
-                nubo_frontend::rom::remembered()
-            },
+            storage_open,
         };
 
         for error in [settings_error, library_error].into_iter().flatten() {
@@ -311,19 +318,67 @@ impl App {
         app.ask_about_updates();
 
         let updates = app.look_for_updates();
-        let check = app.check_files();
-        let scan = app.rescan();
-        let pictures = app.load_pictures(false);
+        #[cfg(not(target_arch = "wasm32"))]
+        let library = app.library_read();
+        #[cfg(target_arch = "wasm32")]
+        let library = Task::perform(
+            nubo_frontend::storage::indexed_db::open(),
+            Message::StorageOpened,
+        );
         (
             app,
             Task::batch([
                 system::theme().map(|mode| WindowMessage::SystemThemeChanged(mode).into()),
-                check,
-                scan,
-                pictures,
+                library,
                 updates,
             ]),
         )
+    }
+
+    /// Brings the library just read up to date: looks whether its games'
+    /// files are still there, scans its folders and reads its pictures.
+    fn library_read(&mut self) -> Task<Message> {
+        Task::batch([self.check_files(), self.rescan(), self.load_pictures(false)])
+    }
+
+    /// Reads the library from the browser's storage, now open, and moves
+    /// the last game played that older versions kept into it. Storage that
+    /// couldn't be opened (as in some private windows) leaves the library
+    /// empty; games still play, and what they can't keep says so.
+    #[cfg(target_arch = "wasm32")]
+    fn storage_opened(&mut self, result: Result<(), String>) -> Task<Message> {
+        self.storage_open = true;
+        if let Err(error) = result {
+            self.toasts.error(error);
+            return Task::none();
+        }
+        let (library, error) = Library::load();
+        self.library = library;
+        if let Some(error) = error {
+            self.toasts.error(error);
+        }
+
+        // The old entry is only forgotten once the library's copy has
+        // committed (`Message::LastGameMoved`), so it is never lost.
+        let mut moved = Task::none();
+        if let Some(rom) = nubo_frontend::rom::remembered() {
+            let kept = self.library.add_game(&rom).and_then(|()| {
+                let header = nubo_core::Emulator::read_rom_header(&rom.bytes)
+                    .map_err(|error| error.to_string())?;
+                self.library.record_played(&rom.path, &header)
+            });
+            match kept {
+                Ok(()) => {
+                    moved = Task::perform(
+                        nubo_frontend::storage::indexed_db::settled(),
+                        Message::LastGameMoved,
+                    );
+                }
+                Err(error) => self.toasts.error(error),
+            }
+        }
+        self.ask_about_box_art();
+        Task::batch([self.library_read(), moved])
     }
 
     /// The window title, including the game's name while one is running.
@@ -387,9 +442,25 @@ impl App {
             }
             #[cfg(not(target_arch = "wasm32"))]
             Message::Scene(message) => self.update_scene(message),
+            #[cfg(target_arch = "wasm32")]
+            Message::StorageOpened(result) => self.storage_opened(result),
+            // Why it couldn't be kept was shown already, and the old entry
+            // stays for the next start to try again.
+            #[cfg(target_arch = "wasm32")]
+            Message::LastGameMoved(result) => {
+                if result.is_ok()
+                    && let Err(error) = nubo_frontend::rom::forget()
+                {
+                    self.toasts.error(error);
+                }
+                Task::none()
+            }
         };
 
         self.apply_to_game();
+        // The browser's title screen captures share the game's one thread.
+        #[cfg(target_arch = "wasm32")]
+        nubo_frontend::library::title_screens::hold(self.game.is_some());
         self.save_stepped_sgb_colors();
         self.show_notices();
         Task::batch([task, self.load_slot_thumbnails()])
@@ -429,7 +500,7 @@ impl App {
                 self.window_width,
                 self.library_selection,
                 &self.controllers,
-                self.remembered.as_ref(),
+                self.storage_open,
                 views::library::TopBar {
                     newer_version: self.newer_version.as_deref(),
                     fullscreen: self.fullscreen,
@@ -679,9 +750,14 @@ impl App {
         }
     }
 
-    /// Turns problems reported by the running game into toasts.
+    /// Turns problems reported by the running game, and in the browser
+    /// what its storage couldn't keep, into toasts.
     fn show_notices(&mut self) {
         for message in self.notices.take() {
+            self.toasts.error(message);
+        }
+        #[cfg(target_arch = "wasm32")]
+        for message in nubo_frontend::storage::indexed_db::take_errors() {
             self.toasts.error(message);
         }
     }

@@ -24,7 +24,6 @@ use iced::widget::{
 use iced::{Alignment, ContentFit, Element, Fill, widget};
 use nubo_frontend::controls::{Action, Device};
 use nubo_frontend::library::{self, Library, LibraryEntry};
-use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states;
 use nubo_frontend::time::{Duration, SystemTime};
 use nubo_frontend::updates;
@@ -101,13 +100,13 @@ impl<'a> Shelves<'a> {
         } else {
             Vec::new()
         };
-        let mut games: Vec<&LibraryEntry> = if settings.shared.library_folders.is_empty() {
-            Vec::new()
-        } else {
+        let mut games: Vec<&LibraryEntry> = if has_games(library, settings) {
             library
                 .games(search)
                 .filter(|entry| settings.library_filter.allows(entry.supports_cgb))
                 .collect()
+        } else {
+            Vec::new()
         };
         // The library lists its games by name; sorting keeps that order
         // among games played or added at the same time.
@@ -331,14 +330,19 @@ pub fn view<'a>(
     window_width: f32,
     selection: Option<usize>,
     controllers: &'a [String],
-    remembered: Option<&'a Rom>,
+    storage_open: bool,
     top: TopBar<'a>,
 ) -> Element<'a, Message> {
+    // The browser shows nothing until its library is read, rather than
+    // the welcome for a moment.
+    if !storage_open {
+        return column![bar(None, top)].into();
+    }
     let shelves = Shelves::new(library, settings, search, window_width);
-    let has_folders = !settings.shared.library_folders.is_empty();
+    let has_folders = has_games(library, settings);
 
     if !library::AVAILABLE || (!has_folders && library.recently_played(1).is_empty()) {
-        return column![bar(None, top), welcome(settings, controllers, remembered)].into();
+        return column![bar(None, top), welcome(settings, controllers)].into();
     }
 
     let mut content = Column::new().spacing(SECTION_SPACING);
@@ -366,7 +370,16 @@ pub fn view<'a>(
         Some(sort_button(settings)),
     ));
 
-    content = if !has_folders {
+    content = if !has_folders && library::KEEPS_GAMES {
+        content.push(notice(
+            "Add your games to keep them all here, in this browser.",
+            Some(secondary_button(
+                Icon::FilePlus,
+                "Add games",
+                Message::Library(LibraryMessage::AddGames),
+            )),
+        ))
+    } else if !has_folders {
         content.push(notice(
             "Add the folder with your games to see them all here.",
             Some(secondary_button(
@@ -522,29 +535,35 @@ fn brand<'a>() -> Element<'a, Message> {
         .into()
 }
 
+/// Whether the library has somewhere to find its games: a folder on the
+/// desktop, or in the browser a game it keeps.
+pub fn has_games(library: &Library, settings: &Settings) -> bool {
+    if library::KEEPS_GAMES {
+        library.games("").next().is_some()
+    } else {
+        !settings.shared.library_folders.is_empty()
+    }
+}
+
 /// The first screen a new user sees: what to do first, where to get free
 /// games, and which keys (or, with one connected, which controller buttons)
 /// press the Game Boy's buttons.
-fn welcome<'a>(
-    settings: &'a Settings,
-    controllers: &'a [String],
-    remembered: Option<&'a Rom>,
-) -> Element<'a, Message> {
-    let actions: Element<'_, Message> = if let Some(rom) = remembered {
-        column![
+fn welcome<'a>(settings: &'a Settings, controllers: &'a [String]) -> Element<'a, Message> {
+    let actions: Element<'_, Message> = if library::KEEPS_GAMES {
+        row![
             primary_button(
-                Icon::Play,
-                format!("Play {} again", rom.name()),
-                Message::Game(GameMessage::PlayRemembered),
+                Icon::FilePlus,
+                "Add games",
+                Message::Library(LibraryMessage::AddGames)
             ),
             secondary_button(
                 Icon::FolderOpen,
-                "Open another game",
+                "Open game",
                 Message::Game(GameMessage::OpenRom)
             ),
         ]
         .spacing(10)
-        .align_x(Alignment::Center)
+        .align_y(Alignment::Center)
         .into()
     } else if library::AVAILABLE {
         row![
@@ -570,7 +589,9 @@ fn welcome<'a>(
         )
     };
 
-    let description = if library::AVAILABLE {
+    let description = if library::KEEPS_GAMES {
+        "Add your Game Boy games to keep them in this browser, or open a single game."
+    } else if library::AVAILABLE {
         "Add the folder with your Game Boy games, or open a single game."
     } else {
         "Open a Game Boy or Game Boy Color game to start."

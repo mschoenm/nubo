@@ -1,5 +1,5 @@
-//! Builds without the `desktop` feature, such as the browser build, keep no
-//! library, since they can't scan folders.
+//! Builds without the `desktop` or `web` feature, such as the RetroArch
+//! core's, keep no library.
 
 use super::{Cache, LibraryEntry, PictureKind};
 use std::path::Path;
@@ -20,9 +20,7 @@ pub fn save_thumbnail(_cache: &Cache, _rom_path: &Path, _pixels: &[u8]) -> Resul
 }
 
 pub fn save_title_screen(_cache: &Cache, _rom_path: &Path, _pixels: &[u8]) -> Result<(), String> {
-    Err(String::from(
-        "title screens aren't available in the browser",
-    ))
+    Err(String::from("this build keeps no library"))
 }
 
 pub fn read_picture(
@@ -42,5 +40,5 @@ pub fn decode_png(_png: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
 }
 
 pub fn save_box_art(_cache: &Cache, _rom_path: &Path, _png: &[u8]) -> Result<(), String> {
-    Err(String::from("box art isn't available in the browser"))
+    Err(String::from("this build keeps no library"))
 }
