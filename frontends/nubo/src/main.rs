@@ -144,9 +144,12 @@ fn launch(
 }
 
 /// The window the app usually opens: at `saved_size`, the size it had when
-/// it last closed, or else wide enough for a whole row of library cards and
-/// high enough for the game screen at four times its size.
+/// it last closed (at least the smallest size the window allows; a size that
+/// isn't a finite number, from a damaged `settings.toml`, is ignored), or
+/// else wide enough for a whole row of library cards and high enough for the
+/// game screen at four times its size.
 fn default_window(saved_size: Option<(f32, f32)>) -> iced::window::Settings {
+    let saved_size = saved_size.filter(|(width, height)| width.is_finite() && height.is_finite());
     let size = match saved_size {
         Some((width, height)) => {
             iced::Size::new(width.max(MINIMUM_SIZE.0), height.max(MINIMUM_SIZE.1))
@@ -223,3 +226,6 @@ mod subscriptions;
 mod ticks;
 mod ui;
 mod views;
+
+#[cfg(test)]
+mod tests;
