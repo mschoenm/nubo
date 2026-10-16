@@ -5,9 +5,11 @@
 //! Another platform adds its own. [`platform`] picks the one this build has,
 //! and a build with neither feature keeps nothing ([`NoStorage`]).
 //!
-//! Save states, screenshots and the library are only kept on the desktop.
-//! They need more than reading and writing whole entries (renaming, file
-//! times, folders of pictures), so they use `files` directly.
+//! Save states and the library need more than reading and writing whole
+//! entries (renaming, file times, folders of pictures), so they use `files`
+//! directly on the desktop, and the browser's IndexedDB (`indexed_db`, the
+//! `web` feature) in the browser, which holds more than localStorage's few
+//! megabytes.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -28,9 +30,9 @@ pub enum Entry<'a> {
     /// The cheat list of the game at this path, as TOML text
     /// (`<rom file name>.toml`).
     Cheats(&'a Path),
-    /// The last game played, kept so it can start again without picking
-    /// its file (see `rom::remember`). Only the browser keeps it
-    /// (`last-game`).
+    /// The last game played, which versions of the browser build before its
+    /// library kept so it could start again without picking its file (see
+    /// `rom::remembered`). Only the browser has it (`last-game`).
     LastGame,
 }
 
@@ -129,6 +131,8 @@ fn deleted(failures: usize, first_error: Option<String>) -> Result<(), String> {
 
 #[cfg(feature = "desktop")]
 pub mod files;
+#[cfg(any(feature = "web", test))]
+pub mod indexed_db;
 pub mod local_storage;
 #[cfg(test)]
 mod tests;

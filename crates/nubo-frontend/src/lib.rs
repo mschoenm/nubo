@@ -16,7 +16,8 @@
 //!   ([`settings`], with the key bindings of [`controls`]), battery saves
 //!   ([`battery`]), save states ([`save_states`]), cheats ([`cheats`]) and
 //!   screenshots ([`screenshots`]), and the ROM files themselves ([`rom`]);
-//! - the game library ([`library`]): the games in the player's folders,
+//! - the game library ([`library`]): the games in the player's folders (in
+//!   the browser, the games the player added),
 //!   scanned in the background and cached between runs with pictures of
 //!   their title screens, their last screen played and their box art;
 //! - running a game (`session`): the emulator with its sound, paced by the
@@ -33,12 +34,12 @@
 //! features, so a build only takes the dependencies it can use:
 //!
 //! - **`desktop`**: files in the user's folders (`storage::files`) and the
-//!   desktop's sound (cpal). Save states, cheats, screenshots and the
-//!   library are only kept with it, and only it watches the library
-//!   folders and downloads box art.
+//!   desktop's sound (cpal). Only it watches the library folders.
 //! - **`web`**: the browser's localStorage (`storage::local_storage`), which
-//!   keeps the settings and battery saves, and the browser's sound (cpal's
-//!   WebAudio backend).
+//!   keeps the settings, battery saves and cheats, its IndexedDB
+//!   (`storage::indexed_db`), which keeps save states, the library and the
+//!   games' files, and the browser's sound (cpal's WebAudio backend).
+//!   Screenshots become downloads.
 //! - **`gamepads`**: game controllers, read with gilrs.
 //!
 //! Without `desktop` or `web`, nothing is kept ([`storage::NoStorage`]) and

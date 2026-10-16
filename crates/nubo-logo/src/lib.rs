@@ -98,6 +98,13 @@ const SAMPLES: u32 = 4;
 /// side: 0 for a window icon, about 0.1 for a macOS app icon, whose icons
 /// leave room around the shape.
 pub fn render(size: u32, margin: f32) -> Vec<u8> {
+    render_in(size, margin, Part::color)
+}
+
+/// Draws the logo as [`render`] does, with each part in the RGBA color
+/// `color` gives it, such as a transparent background for an app that draws
+/// the rounded square itself in its theme's color.
+pub fn render_in(size: u32, margin: f32, color: impl Fn(Part) -> [u8; 4]) -> Vec<u8> {
     let inner = size as f32 * (1.0 - 2.0 * margin);
     let offset = size as f32 * margin;
     let scale = DESIGN_SIZE / inner;
@@ -115,8 +122,8 @@ pub fn render(size: u32, margin: f32) -> Vec<u8> {
                     let (x, y) = (to_design(column, sample_x), to_design(row, sample_y));
 
                     if let Some(shape) = SHAPES.iter().rev().find(|shape| shape.contains(x, y)) {
-                        let color = shape.part.color();
-                        for (total, channel) in sum.iter_mut().zip(color) {
+                        let part_color = color(shape.part);
+                        for (total, channel) in sum.iter_mut().zip(part_color) {
                             *total += f32::from(channel);
                         }
                     }

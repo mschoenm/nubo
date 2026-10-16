@@ -1,54 +1,64 @@
-//! The Nubo logo drawn in the app with a canvas, from the shapes in the
-//! `nubo-logo` crate: a pixel buddy puffed into a cloud, on a rounded square
-//! that is purple elsewhere. Here its background takes the theme's accent
-//! color, so it fits both the light and the dark theme.
+//! The Nubo logo, from the shapes in the `nubo-logo` crate: a pixel buddy
+//! puffed into a cloud, on a rounded square that is purple elsewhere. Here
+//! the square takes the theme's accent color, so it fits both the light and
+//! the dark theme.
+//!
+//! The square is a container's background and the rest a picture drawn once
+//! for each size. Drawn as a canvas, the logo's triangles came back on screen
+//! in the browser after it was gone (Iced 0.14 with WebGL): a later frame
+//! with fewer canvases, such as the library after the welcome or after the
+//! settings' About tab, showed the old logo again where it had been. Nothing
+//! else in the app draws triangles.
 
-use iced::widget::canvas::{self, Frame, Geometry, Path};
-use iced::{Color, Element, Point, Rectangle, Renderer, Size, Theme, mouse};
+use iced::widget::{container, image};
+use iced::{Border, Element, Theme};
 use nubo_logo::{DESIGN_SIZE, Part, SHAPES};
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock, PoisonError};
+
+/// How many pixels the picture has for each pixel of the logo's size, so it
+/// stays sharp on high-density screens.
+const PIXEL_DENSITY: f32 = 2.0;
 
 /// The logo, `size` pixels wide and high.
 pub fn logo<'a, Message: 'a>(size: f32) -> Element<'a, Message> {
-    canvas::Canvas::new(Logo).width(size).height(size).into()
+    let radius = SHAPES
+        .iter()
+        .find(|shape| shape.part == Part::Background)
+        .map_or(0.0, |shape| shape.radius * size / DESIGN_SIZE);
+
+    container(image(foreground(size)).width(size).height(size))
+        .width(size)
+        .height(size)
+        .style(move |theme: &Theme| container::Style {
+            background: Some(theme.palette().primary.into()),
+            border: Border {
+                radius: radius.into(),
+                ..Border::default()
+            },
+            ..container::Style::default()
+        })
+        .into()
 }
 
-/// Draws the logo's shapes, scaled to the canvas.
-struct Logo;
+/// The logo without its square, for `size`: drawn the first time that size
+/// is shown, and the same handle after, so it is uploaded to the graphics
+/// card only once.
+fn foreground(size: f32) -> image::Handle {
+    static HANDLES: OnceLock<Mutex<HashMap<u32, image::Handle>>> = OnceLock::new();
 
-impl<Message> canvas::Program<Message> for Logo {
-    type State = ();
-
-    fn draw(
-        &self,
-        _state: &(),
-        renderer: &Renderer,
-        theme: &Theme,
-        bounds: Rectangle,
-        _cursor: mouse::Cursor,
-    ) -> Vec<Geometry> {
-        let mut frame = Frame::new(renderer, bounds.size());
-        let scale = bounds.width.min(bounds.height) / DESIGN_SIZE;
-
-        for shape in SHAPES {
-            let path = Path::rounded_rectangle(
-                Point::new(shape.x * scale, shape.y * scale),
-                Size::new(shape.width * scale, shape.height * scale),
-                (shape.radius * scale).into(),
-            );
-            frame.fill(&path, color(shape.part, theme));
-        }
-
-        vec![frame.into_geometry()]
-    }
-}
-
-/// The color of a part of the logo: the theme's accent for the background,
-/// the logo's own colors for the rest.
-fn color(part: Part, theme: &Theme) -> Color {
-    if part == Part::Background {
-        return theme.palette().primary;
-    }
-
-    let [red, green, blue, alpha] = part.color();
-    Color::from_rgba8(red, green, blue, f32::from(alpha) / 255.0)
+    let pixels = (size * PIXEL_DENSITY).round().max(1.0) as u32;
+    HANDLES
+        .get_or_init(Mutex::default)
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .entry(pixels)
+        .or_insert_with(|| {
+            let rgba = nubo_logo::render_in(pixels, 0.0, |part| match part {
+                Part::Background => [0, 0, 0, 0],
+                part => part.color(),
+            });
+            image::Handle::from_rgba(pixels, pixels, rgba)
+        })
+        .clone()
 }

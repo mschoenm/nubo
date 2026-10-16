@@ -29,6 +29,9 @@ pub enum DialogKind {
     FolderMenu(usize),
     /// Asks whether to delete the save states of the game at the path.
     DeleteSaveStates(PathBuf),
+    /// Asks whether to take the game at the path out of the browser's
+    /// library, which deletes the file it keeps.
+    RemoveGame(PathBuf),
     /// Asks what to start over with, ticked as so far: the settings, the
     /// saves, the library's folders and "Continue playing".
     ResetSettings(ResetChoices),
@@ -46,10 +49,10 @@ pub struct ResetChoices {
     pub delete_battery_saves: bool,
     /// Deletes every game's save states.
     pub delete_save_states: bool,
-    /// Takes every folder out of the library.
+    /// Takes every folder out of the library, or in the browser every game
+    /// it keeps.
     pub remove_folders: bool,
-    /// Empties "Continue playing", or in the browser forgets the last game
-    /// played.
+    /// Empties "Continue playing".
     pub clear_recently_played: bool,
 }
 

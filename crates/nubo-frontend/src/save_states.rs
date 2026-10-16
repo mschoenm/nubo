@@ -6,8 +6,9 @@
 //! data folder: `<slot>.state` holds the snapshot and `<slot>.png` the screen
 //! at that moment. A state that can't be loaded is renamed to
 //! `<slot>.kept-<number>.state`, so saving to the slot again can't overwrite
-//! it. Only the desktop build (the `desktop` feature) keeps save states; the
-//! browser build has none yet.
+//! it. The browser build keeps the same entries under the same names in its
+//! IndexedDB (`storage::indexed_db`), where a slot's time is when its entry
+//! was written. Builds with neither feature keep none.
 //!
 //! The functions that end in `_in` do the same in a folder of the caller's
 //! choosing instead of the player's, for tests and measurements.
@@ -21,8 +22,14 @@ use std::path::Path;
 #[cfg(feature = "desktop")]
 pub use store::{delete_all_in, keep_aside_in, load_in, save_in, slot_info_in, thumbnail_in};
 
-/// Whether this build can keep save states: only the desktop build can.
-pub const AVAILABLE: bool = cfg!(feature = "desktop");
+/// Whether this build can keep save states: the desktop and browser builds
+/// can.
+pub const AVAILABLE: bool = cfg!(any(feature = "desktop", feature = "web"));
+
+/// What `.state` files of Nubo 0.3.0 and earlier started with, before the
+/// core's save states had a format that later versions keep loading.
+#[cfg(any(feature = "desktop", feature = "web", test))]
+const EARLY_STATE_PREFIX: &[u8] = b"Nubo state ";
 
 /// A place to keep one save state of a game.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -180,8 +187,49 @@ pub fn time_ago(time: SystemTime) -> String {
     }
 }
 
-#[cfg_attr(not(feature = "desktop"), path = "save_states/no_store.rs")]
-#[cfg_attr(feature = "desktop", path = "save_states/file_store.rs")]
+/// Reads a kept `.state` entry, which holds exactly the core's save state
+/// (`Emulator::save_state`), whose header names the model it was made on.
+/// It is the same on every platform, so there is one format to keep loading
+/// in other versions of Nubo.
+#[cfg(any(feature = "desktop", feature = "web", test))]
+fn parse(contents: Vec<u8>) -> Result<SaveState, String> {
+    if contents.starts_with(EARLY_STATE_PREFIX) {
+        return Err(String::from(
+            "the state was made by Nubo 0.3.0 or earlier, whose save states later versions \
+             can't read",
+        ));
+    }
+    let header = nubo_core::SaveStateHeader::read(&contents).map_err(|error| match error {
+        nubo_core::SaveStateError::InvalidFormat => {
+            String::from("the file isn't a Nubo save state")
+        }
+        error => error.to_string(),
+    })?;
+    Ok(SaveState {
+        model: header.model,
+        data: contents,
+    })
+}
+
+/// The name of a slot's entries, without extension.
+#[cfg(any(feature = "desktop", feature = "web", test))]
+fn file_stem(slot: Slot) -> String {
+    match slot {
+        Slot::Resume => String::from("resume"),
+        Slot::Quick => String::from("quick"),
+        Slot::Numbered(number) => format!("slot-{number}"),
+    }
+}
+
+#[cfg(any(test, all(feature = "web", not(feature = "desktop"))))]
+mod browser_store;
+#[cfg(all(feature = "web", not(feature = "desktop")))]
+use browser_store as store;
+#[cfg(feature = "desktop")]
+#[path = "save_states/file_store.rs"]
+mod store;
+#[cfg(not(any(feature = "desktop", feature = "web")))]
+#[path = "save_states/no_store.rs"]
 mod store;
 #[cfg(all(test, feature = "desktop"))]
 mod tests;
