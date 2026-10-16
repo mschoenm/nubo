@@ -311,7 +311,16 @@ fn close_running_nubo() -> Result {
     }
     println!("Closing the running Nubo...");
     for process in &running {
-        let _ = Command::new("kill").args(["-TERM", process]).status();
+        let output = Command::new("kill")
+            .args(["-TERM", process])
+            .output()
+            .map_err(|error| format!("failed to run kill: {error}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "couldn't ask Nubo (process {process}) to close: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+        }
     }
     let deadline = Instant::now() + CLOSE_TIMEOUT;
     while running.iter().any(|process| is_running(process)) && Instant::now() < deadline {
@@ -327,13 +336,14 @@ fn close_running_nubo() -> Result {
     Ok(())
 }
 
-/// The process ids of the installed Nubo running on macOS or Linux: the
-/// app in `/Applications`, or the Flatpak. A Nubo started from a build
-/// folder isn't one.
+/// The process ids of the installed Nubo this user runs on macOS or Linux:
+/// the app in `/Applications`, or the Flatpak. A Nubo started from a build
+/// folder isn't one, and neither is another user's, which this user can't
+/// close (Linux doesn't show this user their programs' paths either).
 fn running_nubo() -> Result<Vec<String>> {
     if cfg!(target_os = "macos") {
         let output = Command::new("ps")
-            .args(["-axo", "pid=,comm="])
+            .args(["-xo", "pid=,comm="])
             .output()
             .map_err(|error| format!("failed to run ps: {error}"))?;
         if !output.status.success() {
