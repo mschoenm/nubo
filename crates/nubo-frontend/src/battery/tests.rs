@@ -158,6 +158,21 @@ fn load_ram_drops_trailing_rtc_footer_from_other_emulators() {
 }
 
 #[test]
+fn an_mbc2_save_of_512_bytes_loads_with_or_without_a_footer() {
+    let directory = temporary_saves_directory("mbc2");
+    fs::create_dir_all(&directory).unwrap();
+    let saves = saves_in(&directory);
+
+    fs::write(directory.join("game.sav"), [0x42; 0x200]).unwrap();
+    assert_eq!(saves.load_ram().unwrap(), vec![0x42; 0x200]);
+
+    let mut contents = vec![0x42; 0x200];
+    contents.extend_from_slice(&[0xFF; 48]);
+    fs::write(directory.join("game.sav"), contents).unwrap();
+    assert_eq!(saves.load_ram().unwrap(), vec![0x42; 0x200]);
+}
+
+#[test]
 fn emulator_starts_with_ram_from_existing_save_file() {
     let directory = temporary_saves_directory("emulator");
     let saved_ram: Vec<u8> = (0..0x2000).map(|index| index as u8).collect();
