@@ -43,6 +43,9 @@ const SLOT_THUMBNAIL_HEIGHT: f32 = 72.0;
 /// bar doesn't move when the game pauses or resumes.
 const PAUSE_WIDEST: &str = "Resume";
 
+/// The game screen: the Game Boy screen, the fast forward or rewinding
+/// badge, the pause menu when it's open, and the bar, above the picture in a
+/// window and over its top in fullscreen while the mouse moves.
 pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<'a, Message> {
     let screen = game.session.screen();
     let picture: Element<'a, Message> =
@@ -432,6 +435,8 @@ fn pause_menu<'a>(
         .into()
 }
 
+/// The pause menu's first page: the game's name and the menu's rows, in
+/// groups, with the row the D-pad is on highlighted.
 fn main_page<'a>(
     game: &'a Game,
     selection: usize,
@@ -526,6 +531,9 @@ fn slots_page<'a>(
     .into()
 }
 
+/// A save state slot as a row of the Save or Load page: its picture (or a
+/// placeholder), its name and how long ago it was saved. An empty slot can't
+/// be picked for loading.
 fn slot_row(info: &SlotInfo, saving: bool, selected: bool) -> Element<'_, Message> {
     let picture: Element<'_, Message> = match info.thumbnail.as_ref().map(pictures::handle) {
         Some(handle) => image(handle)

@@ -102,6 +102,8 @@ impl From<LibraryMessage> for Message {
 }
 
 impl App {
+    /// Handles a message from the library: the player searching and changing
+    /// its folders, and the background work that fills it.
     pub(super) fn update_library(&mut self, message: LibraryMessage) -> Task<Message> {
         match message {
             LibraryMessage::SearchChanged(search) => {
