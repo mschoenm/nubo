@@ -1,6 +1,6 @@
 # Failing test ROMs
 
-`cargo test-roms` passes 6784 of the 6815 tests it runs. This file explains the 31 that fail: what each
+`cargo test-roms` passes 6793 of the 6824 tests it runs. This file explains the 31 that fail: what each
 test checks, what Nubo does instead, and why it isn't fixed yet or can't be. `cargo test-roms --verbose`
 prints the same list with each test's symptom, and failing screenshot tests leave the emulator's
 screen and a diff in `target/test-roms/failures/<model>/`.
@@ -20,8 +20,8 @@ ported.
 | [Mooneye's MGB madness test](#mooneyes-mgb-madness-test) | 2 | Open, unexplained by its author |
 | [AGE oam-write on DMG-C](#age-oam-write-on-dmg-c) | 1 | Depends on state its author flags as unexplained |
 
-All 258 GB Emulator Shootout tests that the runner runs pass; [the GB Emulator
-Shootout](#the-gb-emulator-shootout) explains the six published tests it doesn't count.
+All 261 GB Emulator Shootout tests that the runner runs pass; [the GB Emulator
+Shootout](#the-gb-emulator-shootout) explains the three published tests it doesn't count.
 
 Tests are named as the runner prints them: the hardware model, then the ROM's path under
 `target/test-roms/v7.0/`.

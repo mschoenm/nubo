@@ -4,7 +4,7 @@ Nubo's goal is to be the most accurate Game Boy and Game Boy Color emulator ther
 it would take to claim that honestly: what the claim has to mean, where Nubo stands, and the work left,
 in the order it should happen. Update it as phases finish.
 
-Status on 2026-10-13: `cargo test-roms` passes 6526 of 6557 tests on 12 hardware models, and
+Status on 2026-10-16: `cargo test-roms` passes 6793 of 6824 tests on 12 hardware models, and
 [FAILING_TESTS.md](../tools/nubo-test-rom-runner/FAILING_TESTS.md) explains the other 31. That makes Nubo
 one of the strongest emulators on public test ROMs, but nobody can verify a "most accurate" claim yet:
 other emulators haven't been run on the same tests, nothing has been checked on a real console, and some
@@ -32,7 +32,7 @@ the README or a release says "most accurate".
 
 What is strong:
 
-- 6526 of 6557 test ROMs from 20 suites pass, on DMG-0, DMG, MGB, SGB, SGB2, CGB-0 to CGB-E and AGB. The
+- 6793 of 6824 test ROMs from 21 suites pass, on DMG-0, DMG, MGB, SGB, SGB2, CGB-0 to CGB-E and AGB. The
   JSON CPU tests pass on every opcode, M-cycle by M-cycle.
 - Each model leaves the boot ROM in its own state (registers, DIV phase, frame position, the boot
   sound's phase), calibrated against Mooneye's, GBMicrotest's and Gambatte's tests.
