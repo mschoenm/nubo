@@ -93,9 +93,14 @@ impl Session {
         })
     }
 
-    /// Carries out `command` right away.
+    /// Carries out `command` right away. When the game goes on after a
+    /// pause, the time until the next tick starts again; other playback
+    /// changes, such as fast forward, keep the ticks' timing.
     pub fn send(&mut self, command: Command) {
-        if matches!(command, Command::SetPlayback(_)) {
+        if let Command::SetPlayback(playback) = &command
+            && playback.running
+            && !self.machine.playback.running
+        {
             self.last_tick = None;
         }
         if self.machine.handle(command) {
