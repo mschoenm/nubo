@@ -1,0 +1,10 @@
+[game]
+file = "Rebound.gbc"
+sha256 = "195765b8ca3b0fb7d37b7b92d0242d6c7e01ec71f27f93e565fa081e449cbb92"
+model = "CGB-E"
+frames = 2
+
+[view]
+screen = "game"
+
+[settings]

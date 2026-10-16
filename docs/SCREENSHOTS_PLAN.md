@@ -12,8 +12,9 @@ Steps 1 to 7 are built (see Order of work); step 8, the full nightly run after m
 the new screenshots. Checked in a cloud session: every kind of picture (`none`, `gnome`, `fullscreen`,
 `game`, variants side by side, a scene of the library) comes out the same pixel for pixel when made again,
 a scene recorded with Ctrl+F12 renders exactly like its preview, and a scene from `explore` renders exactly
-like its preview at 1×. No screenshot in the README or the Flathub listing is replaced yet:
-`images/screenshots.toml` lists none, and `images/scenes/` holds only `games.toml`.
+like its preview at 1×. Every screenshot in the README and the Flathub listing is now made from a scene:
+`images/screenshots.toml` lists them, and their scenes are in `images/scenes/`, made with `explore` (the
+library's scene is written by hand, since it has no save state).
 
 Where the build differs from the plan below:
 
@@ -28,8 +29,10 @@ Where the build differs from the plan below:
   renders.
 - **GNOME 46's border:** GNOME draws the border of an XWayland window with GTK 4, so on GNOME 46 (Ubuntu
   24.04, which cloud sessions and GitHub's runners have) it has the shadow and rounded top corners, square
-  bottom corners and plain window buttons, not libadwaita's round ones. A newer GNOME would draw a newer
-  border, and GNOME's version decides the pixels of those pictures.
+  bottom corners, and plain GTK 4's beige title bar with bare buttons. A stylesheet the task gives GTK
+  (`TITLE_BAR_STYLE` in `xtask/src/screenshots/gnome.rs`) draws libadwaita's title bar instead: the window's
+  color with round buttons, as GNOME's own apps and newer GNOME versions look. GNOME's version still decides
+  the pixels of those pictures.
 - **The recorder's preview** leaves out the toasts and isn't taken while a question is open, since scenes keep
   neither; nor while the player's own data shows (box art, a cheat that is on, or a pause menu page listing
   saved states or cheats), which a capture never has. A scene's game keeps no battery saves, with its cartridge
@@ -146,4 +149,5 @@ night before, so nothing changed while staying green.
    anything that broke fixed.
 
 Then a new session collects screenshots with the skill, the maintainer picks from its gallery, and the README
-and Flathub images are replaced.
+and Flathub images are replaced (done: the README's and Flathub's pictures were made again from scenes, and six
+new ones added from the first gallery).

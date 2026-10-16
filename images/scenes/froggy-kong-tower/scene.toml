@@ -1,0 +1,10 @@
+[game]
+file = "Froggy Kong.gbc"
+sha256 = "7d6c53032c444cdf99bf03ece3fee1ed3e9540deb8b7b8b5abb527b34793b0fc"
+model = "CGB-E"
+frames = 2
+
+[view]
+screen = "game"
+
+[settings]

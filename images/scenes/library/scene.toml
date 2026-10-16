@@ -1,0 +1,41 @@
+[window]
+width = 1280.0
+height = 800.0
+
+[view]
+screen = "library"
+
+[library]
+games = [
+    "Airaki.gb",
+    "Big2Small.gb",
+    "Dawn Will Come.gb",
+    "El Dueloroso.gb",
+    "Europa Rescue.gbc",
+    "Froggy Kong.gbc",
+    "Geometrix.gbc",
+    "Moki the Monster Kid.gb",
+    "Rebound.gbc",
+    "Rhythm Land.gb",
+    "Sushi Nights.gb",
+    "Tobu Tobu Girl Deluxe.gb",
+]
+
+[[library.played]]
+file = "Moki the Monster Kid.gb"
+minutes_ago = 20
+
+[[library.played]]
+file = "Big2Small.gb"
+minutes_ago = 180
+
+[[library.played]]
+file = "Froggy Kong.gbc"
+minutes_ago = 1500
+
+[[library.played]]
+file = "Dawn Will Come.gb"
+minutes_ago = 4400
+
+[settings]
+appearance = "light"

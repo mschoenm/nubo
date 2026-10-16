@@ -1,0 +1,10 @@
+[game]
+file = "El Dueloroso.gb"
+sha256 = "21b8c78aec985c9c9335db154b186adde9e2aaba32fc7ed76c9cf37cb8ffcf3c"
+model = "DMG"
+frames = 2
+
+[view]
+screen = "game"
+
+[settings]

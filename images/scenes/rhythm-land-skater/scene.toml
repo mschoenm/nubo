@@ -1,0 +1,10 @@
+[game]
+file = "Rhythm Land.gb"
+sha256 = "ca7ae6e97011fb423e85514aa9ca245967c01fcfe084ca4232106a39dd6ee9a4"
+model = "DMG"
+frames = 2
+
+[view]
+screen = "game"
+
+[settings]
