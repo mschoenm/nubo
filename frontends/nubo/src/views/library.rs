@@ -187,7 +187,13 @@ impl<'a> Shelves<'a> {
                 if index + columns < recent {
                     index + columns
                 } else if self.games.is_empty() {
-                    index
+                    // Like down in All games: from a row above the last, the
+                    // last card when the column below is empty.
+                    if index / columns + 1 < recent.div_ceil(columns) {
+                        index + columns
+                    } else {
+                        index
+                    }
                 } else {
                     recent + index % columns
                 }
