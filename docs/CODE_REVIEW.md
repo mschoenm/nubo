@@ -15,8 +15,9 @@ fix; everything else is listed below and, where it needs a decision, filed as an
   file of its area in full and wrote down what it found with the path from a real input to the
   failure. They found 163 things: 53 bugs, 7 breaks of a rule in `AGENTS.md`, 26 idioms, 13 style
   points and 64 places where the docs were wrong.
-- **Every finding was checked again** in the code before it was fixed or reported: wrong ones were
-  dropped, and ones `main` had fixed meanwhile were skipped.
+- **Every finding was checked again** in the code before it was fixed or reported. None was wrong
+  outright; one was half wrong (#159, whose RetroArch part didn't hold), and five that `main` had
+  fixed or made moot meanwhile were skipped.
 - **The fixes** went onto five branches by theme, each a pull request of its own, one commit per
   finding with a message saying why, and each branch passing what CI runs.
 - **A second reviewer**, a separate Claude Code session that could not push, reviewed every
