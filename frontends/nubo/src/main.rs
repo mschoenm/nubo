@@ -1,6 +1,7 @@
-//! Desktop frontend built with Iced. The game runs in
-//! `nubo_frontend::session` (on a thread of its own on the desktop, on each
-//! frame tick in the browser build) and the window shows the latest frame.
+//! The app, built with Iced, for the desktop and the browser. The game runs
+//! in `nubo_frontend::session` (on a thread of its own on the desktop, on
+//! each frame tick in the browser build) and the window shows the latest
+//! frame.
 //! Run it with `cargo play [rom] [--cgb | --model <name>] [--scale <n>]
 //! [--fresh] [--speed <n>] [--raw-screen]`; `command_line` explains the
 //! options, and `cargo play --help` lists them.
