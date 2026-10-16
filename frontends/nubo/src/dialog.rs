@@ -39,8 +39,14 @@ pub enum DialogKind {
     /// Asks whether to continue a game on `saved`, the model its automatic
     /// save (where the player left off) was made on, or start it from the
     /// title screen on `configured`, the model it is now set to start on.
-    /// The game waits in `App::pending_start` meanwhile.
-    OtherModel { saved: Model, configured: Model },
+    /// With `remembers`, continuing also sets the game to start on `saved`
+    /// from now on (not with a model picked on the command line). The game
+    /// waits in `App::pending_start` meanwhile.
+    OtherModel {
+        saved: Model,
+        configured: Model,
+        remembers: bool,
+    },
 }
 
 /// What "Start over" resets, as the player ticks it in its dialog. Only

@@ -15,6 +15,7 @@ use iced::keyboard::{self, Modifiers};
 use nubo_core::{ControllerButton, ControllerState, Emulator, Model};
 use nubo_frontend::controls::{Action, Device, KeyCode, MenuButtons, PadButton};
 use nubo_frontend::gamepads::{ControllerEvent, Controllers};
+use nubo_frontend::model::ModelPreference;
 use nubo_frontend::rom::Rom;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -323,6 +324,39 @@ fn another_game_starting_replaces_the_one_waiting() {
     );
 }
 
+#[test]
+fn continuing_keeps_a_game_on_automatic_when_automatic_picks_its_model() {
+    let (mut app, _) = App::new(
+        None,
+        &Options {
+            fresh: true,
+            ..Options::default()
+        },
+    );
+    // An empty cartridge is for the original Game Boy only.
+    let header = Emulator::read_rom_header(&[0; 0x8000]).unwrap();
+    let preference = |app: &App, model| app.preference_starting_on(&header, model);
+
+    assert_eq!(preference(&app, Model::Dmg), None);
+    assert_eq!(
+        preference(&app, Model::Sgb),
+        Some(ModelPreference::Fixed(Model::Sgb))
+    );
+
+    app.settings.shared.model = ModelPreference::Fixed(Model::Sgb);
+    assert_eq!(
+        preference(&app, Model::Dmg),
+        Some(ModelPreference::Automatic)
+    );
+    assert_eq!(
+        preference(&app, Model::CgbE),
+        Some(ModelPreference::Fixed(Model::CgbE))
+    );
+
+    app.settings.shared.model = ModelPreference::Fixed(Model::Mgb);
+    assert_eq!(preference(&app, Model::Mgb), None);
+}
+
 /// A `--fresh` app set to start games on the Game Boy, asking whether to
 /// continue an empty game from where it was left off on the Super Game Boy.
 fn waiting_app() -> App {
@@ -338,6 +372,7 @@ fn waiting_app() -> App {
     app.dialog = Some(Dialog::new(DialogKind::OtherModel {
         saved: Model::Sgb,
         configured: Model::Dmg,
+        remembers: false,
     }));
     app.pending_start = Some(PendingStart {
         header: Emulator::read_rom_header(&rom.bytes).unwrap(),

@@ -31,6 +31,7 @@ use nubo_frontend::controls::{self, Action, Device};
 use nubo_frontend::gamepads::{ControllerEvent, Controllers};
 use nubo_frontend::library::box_art::GameList;
 use nubo_frontend::library::{Library, LibraryEntry};
+use nubo_frontend::model::ModelPreference;
 use nubo_frontend::notices::Notices;
 use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states;
@@ -605,11 +606,34 @@ impl App {
 
     /// The model to start the game at `path` with this header on: the one
     /// picked on the command line, else the one picked for the game in its
-    /// menu, else the one the settings pick.
+    /// menu (Automatic or a model), else the one the settings pick.
     fn model_for(&self, path: &Path, header: &CartridgeHeader) -> Model {
-        self.model_override
-            .or_else(|| self.library.entry(path).and_then(LibraryEntry::model))
-            .unwrap_or_else(|| self.settings.shared.model.model_for(header))
+        self.model_override.unwrap_or_else(|| {
+            self.library
+                .entry(path)
+                .and_then(LibraryEntry::preference)
+                .unwrap_or(self.settings.shared.model)
+                .model_for(header)
+        })
+    }
+
+    /// What to pick for a game with this header in its menu so it starts on
+    /// `model` from now on: Automatic when that picks `model` (left to the
+    /// settings when they are on Automatic too), else nothing when the
+    /// settings pick `model`, else `model` itself.
+    fn preference_starting_on(
+        &self,
+        header: &CartridgeHeader,
+        model: Model,
+    ) -> Option<ModelPreference> {
+        let settings = self.settings.shared.model;
+        if ModelPreference::Automatic.model_for(header) == model {
+            (settings != ModelPreference::Automatic).then_some(ModelPreference::Automatic)
+        } else if settings.model_for(header) == model {
+            None
+        } else {
+            Some(ModelPreference::Fixed(model))
+        }
     }
 
     /// Whether the running game uses another model than the settings pick,
