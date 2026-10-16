@@ -7,19 +7,19 @@
 //!   games ([`palettes`]), the Super Game Boy menu's choices ([`sgb_menu`])
 //!   and the rule that picks the hardware a game starts on ([`model`]);
 //! - neutral building blocks: clocks that work in the browser too ([`time`]),
-//!   opening web pages and folders ([`links`]), the looks of the Game
-//!   Boy's own screen ([`lcd`]) and whether a newer Nubo is out
-//!   ([`updates`]),
-//!   pictures as plain RGBA pixels ([`picture`]), slow work on a thread of its
-//!   own ([`background`]) and problems for the app to show ([`notices`]);
+//!   opening web pages and folders ([`links`]), the looks of the Game Boy's
+//!   own screen ([`lcd`]), whether a newer Nubo is out ([`updates`]),
+//!   pictures as plain RGBA pixels ([`picture`]), slow work on a thread of
+//!   its own ([`background`]) and problems for the app to show
+//!   ([`notices`]);
 //! - what an app keeps between runs, through [`storage`]: the settings
 //!   ([`settings`], with the key bindings of [`controls`]), battery saves
 //!   ([`battery`]), save states ([`save_states`]), cheats ([`cheats`]) and
 //!   screenshots ([`screenshots`]), and the ROM files themselves ([`rom`]);
 //! - the game library ([`library`]): the games in the player's folders (in
-//!   the browser, the games the player added),
-//!   scanned in the background and cached between runs with pictures of
-//!   their title screens, their last screen played and their box art;
+//!   the browser, the games the player added), scanned in the background
+//!   and cached between runs with pictures of their title screens, their
+//!   last screen played and their box art;
 //! - running a game (`session`): the emulator with its sound, paced by the
 //!   sound card on the desktop and by the screen's refreshes in the
 //!   browser, and what an app shows and keeps of the game (playback,
