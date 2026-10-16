@@ -1158,9 +1158,9 @@ impl Apu {
         self.registers[register] = value;
     }
 
-    /// Powers the APU on or off. Powering off clears every register except wave
-    /// RAM, and the length counters. On DMG, NRx1 can still load lengths while
-    /// the APU is off, and powering on keeps them.
+    /// Powers the APU on or off. Powering off clears the length counters and
+    /// every register except wave RAM. On DMG, NRx1 can still load lengths
+    /// while the APU is off, and powering on keeps them.
     fn write_nr52(&mut self, value: u8) {
         let old_lengths = Channel::ALL.map(|channel| self.length_counter(channel).remaining);
 
