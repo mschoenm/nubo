@@ -135,7 +135,7 @@ pub(super) fn draw(border: &NuboBorder, frame: u32) -> BorderPicture {
             let y = cloud.top + index / cloud.width;
             let target = x + y * BORDERED_WIDTH;
             // Only the open sky's share of the pixel shows the cloud.
-            let amount = f32::from(pixel[3]) / 255.0 * visibility * border.open_frame[target];
+            let amount = f32::from(pixel[3]) / 255.0 * visibility * border.open_sky[target];
             if amount == 0.0 {
                 continue;
             }
@@ -153,7 +153,7 @@ mod tests {
     use crate::sgb::{BORDERED_HEIGHT, SCREEN_OFFSET, SgbBorderTime};
 
     #[test]
-    fn the_clouds_fade_in_over_the_open_frame_only() {
+    fn the_clouds_fade_in_over_the_open_sky_only() {
         let border = NuboBorder::get(SgbBorderTime::Day);
         assert_eq!(draw(border, 0).pixels, border.picture.pixels);
 
@@ -164,7 +164,7 @@ mod tests {
         assert!(!changed.is_empty());
         for index in changed {
             let (x, y) = (index % BORDERED_WIDTH, index / BORDERED_WIDTH);
-            assert!(border.open_frame[index] > 0.0, "{x}, {y}");
+            assert!(border.open_sky[index] > 0.0, "{x}, {y}");
             let (left, top) = SCREEN_OFFSET;
             assert!(!((left..left + 160).contains(&x) && (top..top + 144).contains(&y)));
         }

@@ -123,7 +123,7 @@ pub(super) struct NuboBorder {
     pub(super) colors: Vec<[f32; 3]>,
     /// How much of each pixel is open sky rather than the panel, the buddy
     /// or the cloud bank, from 0 to 1.
-    pub(super) open_frame: Vec<f32>,
+    pub(super) open_sky: Vec<f32>,
     /// The clouds of the attraction mode.
     pub(super) clouds: Vec<Cloud>,
 }
@@ -181,7 +181,7 @@ impl NuboBorder {
         NuboBorder {
             picture: BorderPicture { pixels },
             colors: canvas.colors,
-            open_frame: canvas.open_frame,
+            open_sky: canvas.open_sky,
             clouds: attraction::clouds(),
         }
     }
@@ -572,7 +572,7 @@ struct Canvas {
     /// Every pixel's color, row by row.
     colors: Vec<Color>,
     /// How much of each pixel is open sky, from 0 to 1.
-    open_frame: Vec<f32>,
+    open_sky: Vec<f32>,
 }
 
 impl Canvas {
@@ -580,7 +580,7 @@ impl Canvas {
     fn new() -> Self {
         Canvas {
             colors: vec![[0.0; 3]; BORDERED_WIDTH * BORDERED_HEIGHT],
-            open_frame: vec![1.0; BORDERED_WIDTH * BORDERED_HEIGHT],
+            open_sky: vec![1.0; BORDERED_WIDTH * BORDERED_HEIGHT],
         }
     }
 
@@ -637,7 +637,7 @@ impl Canvas {
             let color = fill(x as f32 + 0.5, y as f32 + 0.5);
             self.colors[index] = mix(self.colors[index], color, amount);
             if layer == Layer::Front {
-                self.open_frame[index] *= 1.0 - amount;
+                self.open_sky[index] *= 1.0 - amount;
             }
         }
     }
