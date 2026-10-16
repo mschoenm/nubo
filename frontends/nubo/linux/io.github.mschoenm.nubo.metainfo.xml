@@ -71,6 +71,22 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.11.0" date="2026-10-16">
+      <description>
+        <p>Nubo in the browser now has everything the desktop app has, the menus always answer the same keys and buttons, and Game Boy games with an MBC2 cartridge keep their saves.</p>
+        <ul>
+          <li>The browser version has the library, save states, cheats, screenshots and box art: games you open or add stay in the library, and the settings' Library tab shows how much room they take</li>
+          <li>Menus always take the arrow keys, Enter, Esc, the D-pad and the controller's face buttons, whatever you bound them to, so no remapping can lock you out; the controller's pause menu button can be moved but never cleared</li>
+          <li>New controller buttons at first: L1 opens the pause menu, R1 rewinds and R2 fast forwards while held</li>
+          <li>Games with an MBC2 cartridge load their battery saves again instead of starting blank and overwriting them</li>
+          <li>The game menu's "Play on…" is now "Which Game Boy…", and the settings' Console group is called Game Boy</li>
+          <li>Logging out, shutting down or stopping Nubo now closes it as its close button does, so it keeps where you left off</li>
+          <li>The light theme's gray around the game is back while Nubo is in a window</li>
+          <li>The app is about a fifth smaller, the About tab shows which commit a build was made from, and a damaged save state, clock save or settings file no longer crashes Nubo</li>
+          <li>Save states made by Nubo 0.4.0 to 0.10.0 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.10.0" date="2026-10-16">
       <description>
         <p>Nubo looks more like the Game Boy you remember, with one Original screen look switch and a Super Game Boy border that follows the time of day, and its library and settings are tidier.</p>

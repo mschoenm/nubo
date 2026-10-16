@@ -23,7 +23,7 @@ use iced::widget::{
 };
 use iced::{Alignment, Color, Element, Fill, Padding, Shrink, Theme, widget};
 use nubo_core::Model;
-use nubo_frontend::controls::{Action, Controls, Device};
+use nubo_frontend::controls::{Action, Controls, Device, MenuButtons};
 use nubo_frontend::library::{self, Library, box_art};
 use nubo_frontend::model::{self, Console, ModelPreference};
 use nubo_frontend::palettes::DmgPalette;
@@ -223,6 +223,8 @@ pub enum SettingsRow {
     Device,
     ResetControls,
     Binding(Action),
+    /// Which controller buttons pick and go back in the menus.
+    MenuButtons,
     /// A library folder, by its place in the list.
     Folder(usize),
     /// The row that adds a folder, or in the browser games.
@@ -275,6 +277,9 @@ pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec
         }
         SettingsTab::Controls => {
             rows.extend([SettingsRow::Device, SettingsRow::ResetControls]);
+            if state.device == Device::Controller {
+                rows.push(SettingsRow::MenuButtons);
+            }
             rows.extend(Action::GAME_BOY.map(SettingsRow::Binding));
             rows.extend(
                 shortcuts(state.device)
@@ -1260,7 +1265,8 @@ fn palette_button<'a>(palette: DmgPalette, selected: bool) -> Element<'a, Messag
 }
 
 /// The keyboard or controller switch with a button beside it (under it in
-/// a narrow window) that resets that device's bindings, then the bindings
+/// a narrow window) that resets that device's bindings, then on a
+/// controller which buttons pick and go back in the menus, and the bindings
 /// of the Game Boy's buttons and the shortcuts.
 fn controls<'a>(
     settings: &'a Settings,
@@ -1308,13 +1314,13 @@ fn controls<'a>(
         Device::Controller if page.controllers.is_empty() => String::from(
             "No controller connected. Click a button, then press the new one on your \
              controller within 5 seconds; Backspace leaves it unset. The left stick always \
-             works as the D-pad. In the menus the D-pad, the bottom button (pick) and the \
-             right button (back) always work.",
+             works as the D-pad. In the menus the D-pad and the buttons picked below always \
+             work.",
         ),
         Device::Controller => format!(
             "Connected: {}. Click a button, then press the new one within 5 seconds; \
-             Backspace clears. The left stick is always the D-pad. In the menus the D-pad, \
-             the bottom button (pick) and the right button (back) always work.",
+             Backspace clears. The left stick is always the D-pad. In the menus the D-pad \
+             and the buttons picked below always work.",
             page.controllers.join(", ")
         ),
     };
@@ -1337,6 +1343,17 @@ fn controls<'a>(
             .collect()
     };
 
+    let menus = (device == Device::Controller).then(|| {
+        group(
+            "Menus",
+            None,
+            vec![rings.row(
+                menu_buttons(settings, page.layout.stacks_wide_controls()),
+                SettingsRow::MenuButtons,
+            )],
+            None,
+        )
+    });
     let game_boy = bindings(&Action::GAME_BOY);
     let mut shortcut_rows = Vec::new();
     if device == Device::Keyboard {
@@ -1344,13 +1361,44 @@ fn controls<'a>(
     }
     shortcut_rows.extend(bindings(shortcuts(device)));
 
-    column![
-        column![header, container(note_text(hint)).padding([0, 6])].spacing(4),
-        group("Game Boy buttons", None, game_boy, None),
-        group("Shortcuts", None, shortcut_rows, None),
-    ]
-    .spacing(20)
-    .into()
+    let mut content =
+        column![column![header, container(note_text(hint)).padding([0, 6])].spacing(4)].spacing(20);
+    if let Some(menus) = menus {
+        content = content.push(menus);
+    }
+    content
+        .push(group("Game Boy buttons", None, game_boy, None))
+        .push(group("Shortcuts", None, shortcut_rows, None))
+        .into()
+}
+
+/// The choice of which controller buttons pick and go back in the menus,
+/// whatever the Game Boy's A and B are bound to.
+fn menu_buttons<'a>(settings: &Settings, stack_wide_controls: bool) -> Element<'a, Message> {
+    let current = settings.shared.controls.menu_buttons;
+    let description = String::from(match current {
+        MenuButtons::Nintendo => {
+            "The right button (B on Xbox) picks and the bottom button (A on Xbox) goes \
+             back, as on Nintendo's consoles."
+        }
+        MenuButtons::Xbox => {
+            "The bottom button (A on Xbox) picks and the right button (B on Xbox) goes \
+             back, as on Xbox and PlayStation."
+        }
+    });
+    let choices = segmented(
+        &MenuButtons::ALL,
+        current,
+        |_| None,
+        |buttons| Message::Settings(SettingsMessage::MenuButtonsSelected(buttons)),
+    );
+    if stack_wide_controls {
+        column![label("Pick and go back", Some(description)), choices]
+            .spacing(10)
+            .into()
+    } else {
+        setting("Pick and go back", Some(description), choices)
+    }
 }
 
 /// The pause menu's key on the keyboard, Esc, which can't be changed so

@@ -1,7 +1,7 @@
 //! Keys and controller buttons: picking one for an action in the settings,
 //! the app's shortcuts, moving through the menus, and playing. The menus
 //! take fixed keys and buttons, whatever the player bound (see
-//! `input::menu_action` and `Action::for_menu_button`).
+//! `input::menu_action` and `MenuButtons::action`).
 
 use super::window_events::toggle_fullscreen;
 use super::{App, GameMessage, Message};
@@ -150,6 +150,7 @@ impl App {
                     game.session.set_controller_states(states);
                 }
 
+                let menu_buttons = self.settings.shared.controls.menu_buttons;
                 if let Some((device, action)) = self.capture {
                     let pressed = changed
                         .iter()
@@ -165,9 +166,7 @@ impl App {
                         }
                         // Waiting for a keyboard key: the controller's back
                         // button cancels, and its other buttons are ignored.
-                        (Device::Keyboard, Some(button))
-                            if Action::for_menu_button(button) == Some(Action::B) =>
-                        {
+                        (Device::Keyboard, Some(button)) if button == menu_buttons.back() => {
                             self.capture = None;
                         }
                         _ => {}
@@ -189,7 +188,7 @@ impl App {
                     let buttons = changed
                         .iter()
                         .filter(|&&(_, pressed)| pressed)
-                        .filter_map(|&(button, _)| Action::for_menu_button(button));
+                        .filter_map(|&(button, _)| menu_buttons.action(button));
                     let steps: Vec<Action> = stick.chain(buttons).collect();
 
                     for action in steps {
@@ -200,7 +199,7 @@ impl App {
                 let shortcuts: Vec<(Action, bool)> = changed
                     .into_iter()
                     .filter(|&(button, pressed)| {
-                        !(pressed && in_menus && Action::for_menu_button(button).is_some())
+                        !(pressed && in_menus && menu_buttons.action(button).is_some())
                     })
                     .filter_map(|(button, pressed)| {
                         let action = self
@@ -225,7 +224,7 @@ impl App {
     /// pause menu or the library) with a direction, picks with A or Start,
     /// and steps back with B. These come from the fixed menu keys and
     /// buttons, never from the player's bindings (see `input::menu_action`
-    /// and `Action::for_menu_button`). A fresh press past either end of a
+    /// and `MenuButtons::action`). A fresh press past either end of a
     /// list wraps around to the other end, while `held`, a held key
     /// repeating, stops there (see `crate::selection`).
     fn navigate(&mut self, action: Action, held: bool) -> Task<Message> {
