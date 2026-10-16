@@ -44,9 +44,27 @@ pub(crate) struct CheatState {
     registered: Vec<RegisteredCheat>,
 }
 
+/// The text at `range` in `code`, if it is only hexadecimal digits.
+/// `from_str_radix` alone would also take a leading `+`.
+fn hex_digits<'a>(
+    code: &'a str,
+    range: Range<usize>,
+    field: &'static str,
+) -> Result<&'a str, CheatError> {
+    let digits = code.get(range).unwrap_or_default();
+    if digits.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        Ok(digits)
+    } else {
+        Err(CheatError::InvalidDigits {
+            field,
+            digits: digits.to_string(),
+        })
+    }
+}
+
 /// Reads the hexadecimal digits at `range` in `code`.
 fn parse_hex(code: &str, range: Range<usize>, field: &'static str) -> Result<u16, CheatError> {
-    let digits = code.get(range).unwrap_or_default();
+    let digits = hex_digits(code, range, field)?;
     u16::from_str_radix(digits, 16).map_err(|_| CheatError::InvalidDigits {
         field,
         digits: digits.to_string(),
@@ -55,7 +73,7 @@ fn parse_hex(code: &str, range: Range<usize>, field: &'static str) -> Result<u16
 
 /// Reads the two hexadecimal digits at `range` in `code`.
 fn parse_hex_byte(code: &str, range: Range<usize>, field: &'static str) -> Result<u8, CheatError> {
-    let digits = code.get(range).unwrap_or_default();
+    let digits = hex_digits(code, range, field)?;
     u8::from_str_radix(digits, 16).map_err(|_| CheatError::InvalidDigits {
         field,
         digits: digits.to_string(),
@@ -107,11 +125,20 @@ pub(super) fn parse_gamegenie_code(code: &str) -> Result<Cheat, CheatError> {
             digits: code.to_string(),
         });
     }
+    let dashes_in_place = code
+        .char_indices()
+        .all(|(index, character)| (character == '-') == (index == 3 || index == 7));
+    if !dashes_in_place {
+        return Err(CheatError::InvalidGameGenieLength);
+    }
 
     let digits = code.replace('-', "");
     let (digits, has_compare_value) = match digits.len() {
         6 => (digits, false),
-        9 => (format!("{}{}", &digits[..7], &digits[8..]), true),
+        9 => {
+            hex_digits(&digits, 7..8, "unused digit")?;
+            (format!("{}{}", &digits[..7], &digits[8..]), true)
+        }
         _ => return Err(CheatError::InvalidGameGenieLength),
     };
 
@@ -261,6 +288,26 @@ mod tests {
         assert_eq!(cheat.new_value, 0xFF);
         assert_eq!(cheat.compare_value, None);
         assert_eq!(cheat.bank, None);
+    }
+
+    #[test]
+    fn rejects_cheat_codes_with_a_sign_or_misplaced_dashes() {
+        assert!(parse_gameshark_code("+1FF56D3").is_err());
+        assert!(parse_gameshark_code("01FF+6D3").is_err());
+        for code in [
+            "CED-+6A",
+            "CED56A-",
+            "-CED56A",
+            "CE-D56A",
+            "CED-56AD50-",
+            "CED-56A-D5-",
+            "CED-56A+D50",
+            "CED-56A-DZ0",
+        ] {
+            assert!(parse_gamegenie_code(code).is_err(), "{code}");
+        }
+        assert!(parse_gamegenie_code("CED-56A").is_ok());
+        assert!(parse_gamegenie_code("CED-56A-D50").is_ok());
     }
 
     #[test]

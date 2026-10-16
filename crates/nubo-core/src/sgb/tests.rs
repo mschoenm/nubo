@@ -295,6 +295,11 @@ fn border_tiles_flip_and_pick_their_palette() {
         .copy_from_slice(&0x1234_u16.to_le_bytes());
     assert_eq!(border.pixel(7, 0), Some(0x1234));
     assert_eq!(border.pixel(0, 0), None);
+
+    // Black with the top bit set is still black, not the transparent marker.
+    border.map[color_3_of_palette_1..color_3_of_palette_1 + 2]
+        .copy_from_slice(&0x8000_u16.to_le_bytes());
+    assert_eq!(border.pixel(7, 0), Some(0x0000));
 }
 
 #[test]

@@ -23,9 +23,10 @@ const SETTLE_TIME: Duration = Duration::from_millis(250);
 /// A game that keeps writing is still saved this often: some games use the
 /// battery-backed RAM as scratch space, and some read the clock every frame.
 const LONGEST_DELAY: Duration = Duration::from_secs(1);
-/// Cartridge RAM sizes are multiples of 2 KiB. Other emulators append an RTC
-/// footer to `.sav` files, and rounding down to this size drops it.
-const RAM_SIZE_GRANULARITY: usize = 0x800;
+/// Cartridge RAM sizes are multiples of 512 bytes (MBC2's built-in RAM, the
+/// smallest). Other emulators append an RTC footer of 44 or 48 bytes to
+/// `.sav` files, and rounding down to this size drops it.
+const RAM_SIZE_GRANULARITY: usize = 0x200;
 
 /// Save data waiting to be written.
 #[derive(Default)]

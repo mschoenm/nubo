@@ -95,6 +95,22 @@ fn a_fresh_press_wraps_around_the_ends() {
 }
 
 #[test]
+fn down_from_continue_playing_wraps_when_all_games_is_empty() {
+    // 0 1 2
+    // 3 4
+    let recent = entries(5);
+    let shelves = shelves(&recent, &[]);
+
+    assert_eq!(shelves.step(3, Action::Down, WIDTH, true), 0);
+    assert_eq!(shelves.step(4, Action::Down, WIDTH, true), 1);
+    // Held down, the selection stays at the bottom.
+    assert_eq!(shelves.step(3, Action::Down, WIDTH, false), 3);
+    // There is no card under 2 in the bottom row, so down goes to its last card.
+    assert_eq!(shelves.step(2, Action::Down, WIDTH, true), 4);
+    assert_eq!(shelves.step(2, Action::Down, WIDTH, false), 4);
+}
+
+#[test]
 fn wrapping_without_continue_playing_finds_the_nearest_card() {
     // 0 1 2
     // 3 4

@@ -613,29 +613,62 @@ fn run_frame_goes_on_alike_after_loading_a_save_state() {
 
 #[test]
 fn a_save_state_with_an_impossible_time_since_power_on_does_not_load() {
-    assert_state_with_field_does_not_load(b"\x0celapsed_dots", &u64::MAX.to_le_bytes());
+    assert_state_with_field_does_not_load(&[b"\x0celapsed_dots"], &u64::MAX.to_le_bytes());
 }
 
 #[test]
 fn a_save_state_with_an_impossible_ppu_dot_debt_does_not_load() {
     for debt in [i16::MIN, -2, 3, i16::MAX] {
-        assert_state_with_field_does_not_load(b"\x0cppu_dot_debt", &debt.to_le_bytes());
+        assert_state_with_field_does_not_load(&[b"\x0cppu_dot_debt"], &debt.to_le_bytes());
     }
 }
 
-/// Checks that a save state whose field `name` (with its length byte in
+#[test]
+fn a_save_state_with_an_impossible_oam_dma_does_not_load() {
+    for offset in [161, u8::MAX] {
+        assert_state_with_field_does_not_load(&[b"\x07oam_dma", b"\x06offset"], &[offset]);
+    }
+    assert_state_with_field_does_not_load(
+        &[b"\x07oam_dma", b"\x0esource_address"],
+        &0xFFFF_u16.to_le_bytes(),
+    );
+    assert_state_with_field_does_not_load(&[b"\x07oam_dma", b"\x0bstart_delay"], &[3]);
+}
+
+#[test]
+fn a_save_state_with_an_impossible_serial_bit_count_does_not_load() {
+    for bits in [8, u8::MAX] {
+        assert_state_with_field_does_not_load(&[b"\x06serial", b"\x10bits_transferred"], &[bits]);
+    }
+}
+
+#[test]
+fn a_save_state_with_an_impossible_speed_switch_does_not_load() {
+    let speed_switch: &[u8] = b"\x0cspeed_switch";
+    assert_state_with_field_does_not_load(&[speed_switch, b"\x12double_speed_delay"], &[7]);
+    assert_state_with_field_does_not_load(&[speed_switch, b"\x06freeze"], &[4]);
+    assert_state_with_field_does_not_load(
+        &[speed_switch, b"\x0ahalt_units"],
+        &0x2_0009_u32.to_le_bytes(),
+    );
+}
+
+/// Checks that a save state whose field at `path` (the names of the
+/// components it lies in and then its own, each with its length byte in
 /// front) holds `value` fails to load, leaves the emulator as it was, and
 /// that the emulator then runs on.
-fn assert_state_with_field_does_not_load(name: &[u8], value: &[u8]) {
+fn assert_state_with_field_does_not_load(path: &[&[u8]], value: &[u8]) {
     let rom = busy_rom();
     let mut emulator = booted(Model::CgbE, &rom);
     let mut state = emulator.save_state();
-    let start = state
-        .windows(name.len())
-        .position(|window| window == name)
-        .expect("the state holds the field")
-        + name.len()
-        + size_of::<u32>();
+    let start = path.iter().fold(0, |start, name| {
+        start
+            + state[start..]
+                .windows(name.len())
+                .position(|window| window == *name)
+                .expect("the state holds the field")
+            + name.len()
+    }) + size_of::<u32>();
     state[start..start + value.len()].copy_from_slice(value);
     let before = emulator.save_state();
 

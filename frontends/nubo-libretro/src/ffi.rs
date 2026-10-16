@@ -946,15 +946,20 @@ pub extern "C" fn retro_serialize_size() -> usize {
 ///
 /// # Safety
 ///
-/// `data` must point to `size` bytes the core may write.
+/// `data` must point to `size` bytes the core may write. They may be
+/// uninitialized: RetroArch allocates the buffer without clearing it.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
     guard("retro_serialize", false, || {
         if data.is_null() {
             return false;
         }
-        // SAFETY: RetroArch passes a buffer of `size` bytes to write.
-        let buffer = unsafe { std::slice::from_raw_parts_mut(data.cast::<u8>(), size) };
+        // SAFETY: RetroArch passes a buffer of `size` bytes to write, maybe uninitialized (it
+        // mallocs it); zeroing them first makes them valid bytes to make a slice of.
+        let buffer = unsafe {
+            ptr::write_bytes(data.cast::<u8>(), 0, size);
+            std::slice::from_raw_parts_mut(data.cast::<u8>(), size)
+        };
         lock(&CORE)
             .as_mut()
             .is_some_and(|core| core.serialize(buffer))
@@ -1102,13 +1107,14 @@ pub extern "C" fn retro_load_game_special(
 pub extern "C" fn retro_unload_game() {
     guard("retro_unload_game", (), || {
         *lock(&CORE) = None;
-        let mut frontend = lock(&FRONTEND);
+        let frontend = frontend();
         if frontend.rumble != 0
             && let Some(set_rumble_state) = frontend.set_rumble_state
         {
             // SAFETY: a plain call into RetroArch with numbers.
             unsafe { set_rumble_state(0, RETRO_RUMBLE_STRONG, 0) };
         }
+        let mut frontend = lock(&FRONTEND);
         frontend.rumble = 0;
         frontend.set_rumble_state = None;
     });

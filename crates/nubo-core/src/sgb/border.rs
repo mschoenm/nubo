@@ -55,8 +55,8 @@ impl Default for Border {
 }
 
 impl Border {
-    /// The RGB555 color of the border at `x`, `y` in the 256×224 picture, or
-    /// `None` where it is transparent.
+    /// The RGB555 color of the border at `x`, `y` in the 256×224 picture
+    /// (with the unused top bit clear), or `None` where it is transparent.
     ///
     /// Each map entry holds the tile number in bits 0-7, the palette in bits
     /// 10-11, and flips the tile horizontally with bit 14 and vertically with
@@ -92,7 +92,8 @@ impl Border {
         }
         let palette = usize::from((entry >> 10) & 0x03);
         let index = PALETTES_START + (palette * 16 + usize::from(color)) * 2;
-        Some(u16::from_le_bytes([self.map[index], self.map[index + 1]]))
+        // The Super Nintendo ignores a color's top bit, which `TRANSPARENT` uses.
+        Some(u16::from_le_bytes([self.map[index], self.map[index + 1]]) & 0x7FFF)
     }
 }
 

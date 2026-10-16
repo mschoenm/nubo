@@ -21,7 +21,7 @@ use super::{Entry, Storage};
 pub use crate::picture::{decode_png, encode_png};
 use directories::ProjectDirs;
 use std::fs;
-use std::io::{self, ErrorKind};
+use std::io::{self, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
@@ -179,14 +179,36 @@ impl Storage for Files {
 }
 
 /// Replaces the contents of `path`, creating its folder if needed. It writes
-/// a temporary file first and renames it, so a crash halfway never leaves a
-/// half-written file.
+/// a temporary file next to it, makes sure that file is on the disk, and then
+/// renames it over `path`, so a crash or a power cut halfway leaves either the
+/// old contents or the new ones, never a half-written file. When writing or
+/// renaming fails, it removes the temporary file again. A disk that can't
+/// sync files, such as some network folders, is written without it.
 pub fn write_atomically(path: &Path, contents: &[u8]) -> io::Result<()> {
     let mut temporary_name = path.as_os_str().to_owned();
     temporary_name.push(".tmp");
     let temporary_path = PathBuf::from(temporary_name);
 
     path.parent().map_or(Ok(()), fs::create_dir_all)?;
-    fs::write(&temporary_path, contents)?;
-    fs::rename(&temporary_path, path)
+    let written = fs::File::create(&temporary_path)
+        .and_then(|mut file| {
+            file.write_all(contents)?;
+            match file.sync_all() {
+                // What fsync gives on a file system that can't sync (EINVAL or ENOTSUP).
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        io::ErrorKind::Unsupported | io::ErrorKind::InvalidInput
+                    ) =>
+                {
+                    Ok(())
+                }
+                synced => synced,
+            }
+        })
+        .and_then(|()| fs::rename(&temporary_path, path));
+    if written.is_err() {
+        let _ = fs::remove_file(&temporary_path);
+    }
+    written
 }

@@ -459,6 +459,7 @@ impl App {
             }
         };
 
+        self.close_emptied_dialog();
         self.apply_to_game();
         // The browser's title screen captures share the game's one thread.
         #[cfg(target_arch = "wasm32")]

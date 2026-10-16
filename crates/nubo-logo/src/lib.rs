@@ -51,7 +51,8 @@ pub struct Shape {
     pub width: f32,
     /// The height.
     pub height: f32,
-    /// The radius of the rounded corners.
+    /// The radius of the rounded corners. One larger than half the width or
+    /// height counts as that half, and a negative one as no rounding.
     pub radius: f32,
 }
 
@@ -70,15 +71,24 @@ impl Shape {
     /// Whether the point `(x, y)` (in design units) lies inside the shape,
     /// rounded corners included.
     pub fn contains(&self, x: f32, y: f32) -> bool {
-        if x < self.x || y < self.y || x >= self.x + self.width || y >= self.y + self.height {
+        let inside =
+            x >= self.x && y >= self.y && x < self.x + self.width && y < self.y + self.height;
+        if !inside {
             return false;
         }
 
         // Inside the rectangle; only the corner squares need a closer look.
-        let nearest_x = x.clamp(self.x + self.radius, self.x + self.width - self.radius);
-        let nearest_y = y.clamp(self.y + self.radius, self.y + self.height - self.radius);
+        // `max` and `min` rather than `clamp`, which panics when rounding
+        // puts the two ends of a circle's range the wrong way round.
+        let radius = self
+            .radius
+            .min(self.width / 2.0)
+            .min(self.height / 2.0)
+            .max(0.0);
+        let nearest_x = x.max(self.x + radius).min(self.x + self.width - radius);
+        let nearest_y = y.max(self.y + radius).min(self.y + self.height - radius);
         let (dx, dy) = (x - nearest_x, y - nearest_y);
-        dx * dx + dy * dy <= self.radius * self.radius
+        dx * dx + dy * dy <= radius * radius
     }
 }
 
@@ -100,6 +110,10 @@ const SAMPLES: u32 = 4;
 /// `margin` is the empty border around it, as a fraction of `size` on each
 /// side: 0 for a window icon, about 0.1 for a macOS app icon, whose icons
 /// leave room around the shape.
+///
+/// # Panics
+///
+/// As [`render_in`] does, when the picture is too large to count its bytes.
 pub fn render(size: u32, margin: f32) -> Vec<u8> {
     render_in(size, margin, Part::color)
 }
@@ -107,11 +121,21 @@ pub fn render(size: u32, margin: f32) -> Vec<u8> {
 /// Draws the logo as [`render`] does, with each part in the RGBA color
 /// `color` gives it, such as a transparent background for an app that draws
 /// the rounded square itself in its theme's color.
+///
+/// # Panics
+///
+/// When the picture has more bytes than a `usize` can count: a `size` of
+/// 2^31 pixels or more on a 64-bit computer, 2^15 on a 32-bit one.
 pub fn render_in(size: u32, margin: f32, color: impl Fn(Part) -> [u8; 4]) -> Vec<u8> {
     let inner = size as f32 * (1.0 - 2.0 * margin);
     let offset = size as f32 * margin;
     let scale = DESIGN_SIZE / inner;
-    let mut pixels = vec![0; (size * size * 4) as usize];
+    let side = size as usize;
+    let length = side
+        .checked_mul(side)
+        .and_then(|count| count.checked_mul(4))
+        .expect("the logo is too large to draw");
+    let mut pixels = vec![0; length];
 
     for row in 0..size {
         for column in 0..size {
@@ -135,7 +159,7 @@ pub fn render_in(size: u32, margin: f32, color: impl Fn(Part) -> [u8; 4]) -> Vec
 
             let samples = (SAMPLES * SAMPLES) as f32;
             let alpha = sum[3] / samples;
-            let index = ((row * size + column) * 4) as usize;
+            let index = (row as usize * side + column as usize) * 4;
             for channel in 0..3 {
                 // The color channels are averaged over the covered samples
                 // only, so edges fade out instead of darkening.
@@ -274,6 +298,36 @@ mod tests {
         let with_margin = render(100, 0.1);
         assert_eq!(pixel(&with_margin, 100, 5, 50)[3], 0);
         assert_eq!(pixel(&with_margin, 100, 50, 15)[3], 255);
+    }
+
+    #[test]
+    fn a_radius_beyond_half_a_side_rounds_the_shape_into_a_circle() {
+        let shape = Shape::new(Part::Body, 0.0, 0.0, 10.0, 10.0, 40.0);
+        let circle = Shape {
+            radius: 5.0,
+            ..shape
+        };
+
+        for (x, y) in [(5.0, 5.0), (0.5, 0.5), (1.5, 1.5), (9.5, 5.0), (5.0, 0.1)] {
+            assert_eq!(shape.contains(x, y), circle.contains(x, y), "{x}, {y}");
+        }
+        let not_a_number = Shape {
+            radius: f32::NAN,
+            ..shape
+        };
+        assert!(not_a_number.contains(5.0, 5.0));
+        let unrounded = Shape {
+            radius: -3.0,
+            ..shape
+        };
+        assert!(unrounded.contains(0.1, 0.1));
+        assert!(
+            !Shape {
+                width: f32::NAN,
+                ..shape
+            }
+            .contains(5.0, 5.0)
+        );
     }
 
     #[test]

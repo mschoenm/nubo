@@ -64,11 +64,14 @@ fn scene_count_and_seed() -> (usize, u64) {
     (count, seed)
 }
 
-/// The three timing variants (DMG, CGB, CGB in double speed), as a model and a speed.
-const TIMINGS: [(Model, bool); 3] = [
+/// The three timing variants (DMG, CGB, CGB in double speed), as a model and a speed, and a CGB
+/// from before CGB-D, whose fetcher reads the tile map's y again for each read
+/// (`caches_fetcher_y`).
+const TIMINGS: [(Model, bool); 4] = [
     (Model::Dmg, false),
     (Model::CgbE, false),
     (Model::CgbE, true),
+    (Model::CgbC, false),
 ];
 
 /// A PPU with random VRAM, OAM, palettes and registers that has just switched the LCD on.
@@ -293,9 +296,7 @@ fn a_corrupted_save_state_is_rejected_or_runs_without_panicking() {
         tick_dots(&mut scene, &mut hdma, DOTS_PER_FRAME + 70 * 456 + 120);
         let state = serialize(&scene);
 
-        // The scalar state sits before the frame buffer, VRAM and OAM, and after them.
-        let offsets = (0..400).chain(state.len() - 200..state.len());
-        for offset in offsets {
+        for offset in offsets_worth_corrupting(&state) {
             for value in [0x00, 0xFF, 0x80, state[offset] ^ 0x55, random.byte()] {
                 let mut corrupted = state.clone();
                 corrupted[offset] = value;
@@ -307,4 +308,34 @@ fn a_corrupted_save_state_is_rejected_or_runs_without_panicking() {
             }
         }
     }
+}
+
+/// The offsets of every byte of `state`, a serialized PPU, but the contents of the frame buffer,
+/// VRAM and OAM: any value is valid there, and leaving those thousands of bytes out keeps the
+/// corruption test fast. Their names and lengths are still corrupted.
+fn offsets_worth_corrupting(state: &[u8]) -> Vec<usize> {
+    let mut offsets = Vec::new();
+    let mut position = 0;
+    // Each field is a name with its length byte in front, the value's length as a u32, and the
+    // value; a name of length 0 ends the fields.
+    while state[position] != 0 {
+        let name_end = position + 1 + usize::from(state[position]);
+        let value_start = name_end + size_of::<u32>();
+        let length = u32::from_le_bytes(state[name_end..value_start].try_into().unwrap());
+        let value_end = value_start + usize::try_from(length).unwrap();
+        let contents_valid = matches!(
+            &state[position + 1..name_end],
+            b"frame_buffer" | b"video_ram" | b"object_attribute_memory"
+        );
+        offsets.extend(
+            position..if contents_valid {
+                value_start
+            } else {
+                value_end
+            },
+        );
+        position = value_end;
+    }
+    offsets.push(position);
+    offsets
 }

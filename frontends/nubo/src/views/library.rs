@@ -186,6 +186,14 @@ impl<'a> Shelves<'a> {
             Action::Down if index < recent => {
                 if index + columns < recent {
                     index + columns
+                } else if self.games.is_empty() {
+                    // Like down in All games: from a row above the last, the
+                    // last card when the column below is empty.
+                    if index / columns + 1 < recent.div_ceil(columns) {
+                        index + columns
+                    } else {
+                        index
+                    }
                 } else {
                     recent + index % columns
                 }
@@ -863,13 +871,16 @@ fn card(
     });
 
     let mut content = column![picture, caption].spacing(8);
-    if recent && let Some(played) = entry.last_played {
+    // A time too far ahead for the system's clock, from a damaged
+    // library.toml, shows no line.
+    let played = entry
+        .last_played
+        .and_then(|played| SystemTime::UNIX_EPOCH.checked_add(Duration::from_secs(played)));
+    if recent && let Some(played) = played {
         content = content.push(
-            text(save_states::time_ago(
-                SystemTime::UNIX_EPOCH + Duration::from_secs(played),
-            ))
-            .size(12)
-            .style(theme::muted_text),
+            text(save_states::time_ago(played))
+                .size(12)
+                .style(theme::muted_text),
         );
     }
 

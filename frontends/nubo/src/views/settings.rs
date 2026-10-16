@@ -235,6 +235,15 @@ pub enum SettingsRow {
     ResetSettings,
 }
 
+/// The row the D-pad's focus at `index` is on, with its index: the last row
+/// when rows went away from under the focus, such as the box art's Try again
+/// once it hid itself, so the outline and what A does stay on the same row.
+/// `None` when there are no rows.
+pub fn focused_row(rows: &[SettingsRow], index: usize) -> Option<(usize, SettingsRow)> {
+    let index = index.min(rows.len().checked_sub(1)?);
+    Some((index, rows[index]))
+}
+
 /// The rows of `tab` in the order the D-pad moves through them, which is
 /// the order the page shows them in (a test checks that the pages draw them
 /// in this order).
@@ -426,7 +435,9 @@ pub fn view<'a>(
     .align_y(Alignment::Center);
 
     let focused = match focus {
-        Some(SettingsFocus::Row(index)) => rows(tab, settings, state).get(index).copied(),
+        Some(SettingsFocus::Row(index)) => {
+            focused_row(&rows(tab, settings, state), index).map(|(_, row)| row)
+        }
         _ => None,
     };
     let shown = page_scroller(page(tab, settings, library, state, &Rings::new(focused)))

@@ -545,7 +545,10 @@ impl Pipeline {
     /// one of the 40 in OAM), and tile addresses within VRAM. The FIFOs check their own contents
     /// as they load. `drawing_line` is the line being drawn once the renderer has started on it
     /// (`start_drawing`), if any: pixels are only written then, at `lcd_x`, which matches the
-    /// position.
+    /// position, the line isn't finished yet (the dot that draws the last pixel also ends the
+    /// drawing), and an object fetch always has an object left to fetch. (After the LCD is
+    /// switched off in the middle of a fetch, the phase stays behind with no objects, which is
+    /// fine: the next line starts it again.)
     pub(super) fn is_consistent(&self, drawing_line: Option<u8>) -> bool {
         let position_valid = self.position_in_line <= GB_SCREEN_WIDTH as u8
             || self.position_in_line >= POSITION_LINE_START;
@@ -566,9 +569,16 @@ impl Pipeline {
             && self.visible_object_indices[..count]
                 .iter()
                 .all(|&index| u16::from(index) < OAM_ENTRY_COUNT);
+        let fetching_object = self.phase.is_object_fetch()
+            || matches!(self.phase, Phase::ReadObjectHigh | Phase::OverlayObject);
+        let fetch_has_object = drawing_line.is_none() || !fetching_object || count > 0;
+        let line_unfinished = drawing_line.is_none()
+            || (self.position_in_line != GB_SCREEN_WIDTH as u8 && self.phase != Phase::Done);
         position_valid
             && lcd_x_valid
             && objects_valid
+            && fetch_has_object
+            && line_unfinished
             && self.last_tile_index_address < VRAM_BANK_SIZE
             && self.last_tile_data_address < 2 * VRAM_BANK_SIZE
             && self.window_tile_x < TILE_MAP_WIDTH

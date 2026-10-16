@@ -514,8 +514,8 @@ impl App {
                     .recently_played(crate::views::library::most_recent_shown())
                     .into_iter()
                     .filter_map(|entry| {
-                        let played =
-                            SystemTime::UNIX_EPOCH + Duration::from_secs(entry.last_played?);
+                        let played = SystemTime::UNIX_EPOCH
+                            .checked_add(Duration::from_secs(entry.last_played?))?;
                         Some(PlayedGame {
                             file: file_name(&entry.path)?,
                             minutes_ago: now
@@ -670,7 +670,12 @@ fn record_played(
     let path = folder.join(&game.file);
     let rom = Rom::read(&path)?;
     let header = Emulator::read_rom_header(&rom.bytes).map_err(|error| error.to_string())?;
-    let time = SystemTime::now() - Duration::from_secs(game.minutes_ago * 60 + order);
+    let time = game
+        .minutes_ago
+        .checked_mul(60)
+        .and_then(|seconds| seconds.checked_add(order))
+        .and_then(|seconds| SystemTime::now().checked_sub(Duration::from_secs(seconds)))
+        .ok_or_else(|| format!("{} was played too long ago", game.file))?;
     library.record_played_at(&path, &header, time)
 }
 

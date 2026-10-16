@@ -1,8 +1,9 @@
 //! Unit tests for the mode 3 renderer: each test draws one line and checks its pixels.
 
 use super::*;
-use crate::gpu::Gpu;
+use crate::address_bus::hdma::HdmaState;
 use crate::gpu::palettes::{BLACK, Color, DARK_GRAY, LIGHT_GRAY, Palettes, WHITE};
+use crate::gpu::{DOTS_PER_LINE, Gpu, LineState};
 use crate::utils::set_bit;
 
 const BLACK_TILE: [u8; 16] = [
@@ -816,4 +817,57 @@ fn should_find_the_first_ten_objects_on_the_line_in_oam_order() {
         pipeline.visible_object_x[..count].is_sorted_by(|a, b| a >= b),
         "the objects are sorted by descending x"
     );
+}
+
+/// A PPU drawing line 1, at position 40 of the line, where a save state can catch it.
+fn gpu_drawing() -> Gpu {
+    let mut gpu = Gpu::new();
+    gpu.set_lcdc(0b1000_0000);
+    gpu.set_frame_position(1, 0);
+    let mut hdma = HdmaState::new();
+    for _ in 0..DOTS_PER_LINE {
+        if gpu.line_state == LineState::Drawing
+            && gpu.fetcher_start_delay == 0
+            && gpu.pipeline.position_in_line == 40
+        {
+            return gpu;
+        }
+        gpu.tick_dot(&mut hdma);
+    }
+    panic!("the PPU never drew position 40");
+}
+
+/// Whether a save state of `gpu` loads.
+fn state_loads(gpu: &Gpu) -> bool {
+    let mut state = Vec::new();
+    gpu.serialize(&mut state).unwrap();
+    Gpu::new().deserialize(&mut state.as_slice()).is_ok()
+}
+
+#[test]
+fn a_save_state_fetching_an_object_while_none_is_left_does_not_load() {
+    let mut gpu = gpu_drawing();
+    gpu.pipeline.phase = Phase::ReadObjectAttributes;
+    gpu.pipeline.visible_object_count = 1;
+    assert!(state_loads(&gpu));
+
+    gpu.pipeline.visible_object_count = 0;
+    assert!(!state_loads(&gpu));
+}
+
+#[test]
+fn a_save_state_still_drawing_a_finished_line_does_not_load() {
+    let mut gpu = gpu_drawing();
+    gpu.pipeline.phase = Phase::Render;
+    gpu.pipeline.position_in_line = GB_SCREEN_WIDTH as u8 - 1;
+    gpu.pipeline.lcd_x = GB_SCREEN_WIDTH as u8 - 1;
+    assert!(state_loads(&gpu));
+
+    gpu.pipeline.position_in_line = GB_SCREEN_WIDTH as u8;
+    gpu.pipeline.lcd_x = GB_SCREEN_WIDTH as u8;
+    assert!(!state_loads(&gpu));
+
+    let mut gpu = gpu_drawing();
+    gpu.pipeline.phase = Phase::Done;
+    assert!(!state_loads(&gpu));
 }

@@ -117,6 +117,31 @@ fn the_palette_repaints_only_the_screen_inside_a_border() {
     );
 }
 
+/// A Game Boy Color frame with every channel of every pixel at `level`.
+fn color_frame(level: u8) -> Frame {
+    Frame {
+        pixels: vec![level; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize],
+        ..screen_frame(false)
+    }
+}
+
+#[test]
+fn a_repainted_frame_stays_blended_with_the_one_before() {
+    let mut screen = Screen::new();
+    screen.set_effects(ScreenEffects {
+        correct_colors: false,
+        blend_frames: true,
+    });
+    screen.show(color_frame(0xFF));
+    screen.show(color_frame(0x00));
+    let blended = screen.pixels().unwrap().to_vec();
+    assert_ne!(blended, color_frame(0x00).pixels);
+
+    screen.set_palette(DmgPalette::Green);
+
+    assert_eq!(screen.pixels(), Some(&blended[..]));
+}
+
 #[test]
 fn the_original_screen_look_follows_each_models_screen() {
     for model in Model::ALL {

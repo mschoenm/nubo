@@ -37,7 +37,7 @@ fn no_storage_keeps_nothing() {
 
 #[cfg(feature = "desktop")]
 mod files {
-    use super::super::files::Files;
+    use super::super::files::{Files, write_atomically};
     use super::*;
     use std::fs;
 
@@ -91,6 +91,18 @@ mod files {
                 .display()
                 .to_string()
         );
+    }
+
+    #[test]
+    fn writing_again_replaces_the_file_and_leaves_no_temporary_file() {
+        let folder = temporary_folder("replace");
+        let path = folder.join("game.sav");
+
+        write_atomically(&path, &[1, 2, 3]).unwrap();
+        write_atomically(&path, &[4]).unwrap();
+
+        assert_eq!(fs::read(&path).unwrap(), [4]);
+        assert!(!folder.join("game.sav.tmp").exists());
     }
 
     #[test]

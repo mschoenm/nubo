@@ -89,6 +89,24 @@ impl SpeedSwitch {
         self.cgb_double_speed
     }
 
+    /// Whether a loaded save state holds values a switch can reach, which the
+    /// emulator never saves otherwise: a delay, freeze and halt no longer than
+    /// a switch starts with, no switch at all on a console without double speed
+    /// (`cgb` is false), and no delay or freeze left once double speed has
+    /// begun, where a freeze of an odd number of units would leave half a dot.
+    pub(super) fn is_consistent(&self, cgb: bool) -> bool {
+        let within_limits = self.double_speed_delay <= DOUBLE_SPEED_DELAY
+            && self.freeze <= FREEZE_UNITS_TO_NORMAL_SPEED
+            && self.halt_units <= SPEED_SWITCH_HALT_UNITS;
+        let switching = self.cgb_double_speed
+            || self.double_speed_delay != 0
+            || self.freeze != 0
+            || self.halt_units != 0;
+        let settled_in_double_speed =
+            !self.cgb_double_speed || (self.double_speed_delay == 0 && self.freeze == 0);
+        within_limits && (cgb || !switching) && settled_in_double_speed
+    }
+
     /// Whether no switch is in progress, so M-cycles run as usual.
     pub(super) fn is_idle(&self) -> bool {
         self.double_speed_delay == 0
@@ -267,6 +285,39 @@ mod tests {
             ..SpeedSwitch::default()
         };
         assert_eq!(speed_switch.key1(), 0x7F);
+    }
+
+    #[test]
+    fn a_loaded_switch_is_consistent_only_where_a_switch_can_get_to() {
+        let double_speed = SpeedSwitch {
+            cgb_double_speed: true,
+            ..SpeedSwitch::default()
+        };
+        assert!(double_speed.is_consistent(true));
+        assert!(!double_speed.is_consistent(false));
+        assert!(
+            !SpeedSwitch {
+                freeze: 1,
+                ..double_speed.clone()
+            }
+            .is_consistent(true)
+        );
+        assert!(
+            !SpeedSwitch {
+                double_speed_delay: 2,
+                ..double_speed
+            }
+            .is_consistent(true)
+        );
+
+        let entering = SpeedSwitch {
+            double_speed_delay: DOUBLE_SPEED_DELAY,
+            freeze: FREEZE_UNITS_TO_DOUBLE_SPEED,
+            halt_units: SPEED_SWITCH_HALT_UNITS,
+            ..SpeedSwitch::default()
+        };
+        assert!(entering.is_consistent(true));
+        assert!(!entering.is_consistent(false));
     }
 
     #[test]

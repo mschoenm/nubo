@@ -459,8 +459,11 @@ impl AddressBus {
         self.apu.clear_audio_buffers();
     }
 
-    /// Sets how many audio samples per second the APU makes.
+    /// Sets how many audio samples per second the APU makes. That moves the
+    /// M-cycle that fills the audio buffer, so how many plain M-cycles may
+    /// wait is worked out again (see `deferrable_cycles`).
     pub(crate) fn set_sample_rate(&mut self, sample_rate: u32) {
+        self.run_deferred_cycles_before_change();
         self.apu.set_sample_rate(sample_rate);
     }
 
@@ -1352,10 +1355,34 @@ impl AddressBus {
             "timers" => self.timers.deserialize(bytes)?,
             "ppu" => self.gpu.deserialize(bytes)?,
             "apu" => self.apu.deserialize(bytes)?,
-            "oam_dma" => self.dma.deserialize(bytes)?,
+            "oam_dma" => {
+                self.dma.deserialize(bytes)?;
+                if !self.dma.is_consistent() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "OAM DMA state out of range",
+                    ));
+                }
+            }
             "vram_dma" => self.hdma.deserialize(bytes)?,
-            "serial" => self.serial.deserialize(bytes)?,
-            "speed_switch" => self.speed_switch.deserialize(bytes)?,
+            "serial" => {
+                self.serial.deserialize(bytes)?;
+                if !self.serial.is_consistent() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "serial transfer state out of range",
+                    ));
+                }
+            }
+            "speed_switch" => {
+                self.speed_switch.deserialize(bytes)?;
+                if !self.speed_switch.is_consistent(self.cgb_mode) {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "speed switch state out of range",
+                    ));
+                }
+            }
             "joypad" => self.joypad.deserialize(bytes)?,
             _ => return Ok(false),
         }

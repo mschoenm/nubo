@@ -91,6 +91,7 @@ fn the_menu_has_few_enough_values_and_unique_keys() {
         .iter()
         .map(|definition| definition.key)
         .collect();
+    keys.sort_unstable();
     keys.dedup();
     assert_eq!(keys.len(), definitions.len());
 }
