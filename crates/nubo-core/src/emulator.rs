@@ -313,7 +313,9 @@ impl Emulator {
     /// full. Returns whether the buffer is full.
     ///
     /// This lets a caller do other work while an audio buffer is produced, for
-    /// example check a time limit.
+    /// example check a time limit. The samples it makes are dropped (the next
+    /// call clears a full buffer), so it is for callers that don't play
+    /// sound, such as test runners.
     pub fn step_toward_next_audio_buffer(&mut self, max_steps: usize) -> bool {
         if self.address_bus().audio_buffers_full() {
             self.address_bus_mut().clear_audio_buffers();
