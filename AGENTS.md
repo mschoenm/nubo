@@ -92,7 +92,7 @@ Claude Code and Codex both read these `AGENTS.md` files; keep them the only inst
 - `docs/ACCURACY.md`: the test ROM results suite by suite, and the tests that aren't run; the README keeps the summary.
 - `docs/RETROARCH.md`: installing and using the RetroArch core, for players; the README keeps the short version.
 - `docs/ACCURACY_PLAN.md`: the plan towards the most accurate emulator; update it when a phase moves on.
-- `docs/SHOOTOUT_PLAN.md` and `docs/RESTRUCTURE_PLAN.md` (a shared `nubo-frontend` crate and a `tools/` folder, signed off, with the order of the work): plans for work not done yet; update them as their parts get done.
+- `docs/RESTRUCTURE_PLAN.md` (done: the shared `nubo-frontend` crate and the `tools/` folder, why the layout is what it is, and the order of the work) and `docs/SHOOTOUT_PLAN.md` (done but for Nubo appearing in the Shootout's published table): plans whose work is nearly all done; update them when what is left moves on.
 - `docs/RETROARCH_PLAN.md`: the RetroArch core, what was built and what is left (getting it into RetroArch's core downloader).
 - `docs/CI.md`: CI, the nightly run, nightly builds, toolchain updates.
 - `docs/NIGHTLY_REVIEW.md`: what the nightly review does.
