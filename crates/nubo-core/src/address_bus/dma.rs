@@ -111,6 +111,18 @@ impl DmaState {
         self.start_delay == 0 && !self.in_progress
     }
 
+    /// Whether a loaded save state holds values the transfer can run with,
+    /// which the emulator never saves otherwise: at most 160 bytes copied, a
+    /// source address at the start of a 256-byte page (so adding the offset
+    /// can't overflow) and at most the start delay a write to the DMA
+    /// register sets. A larger offset would make the transfer write past the
+    /// end of OAM.
+    pub(super) fn is_consistent(&self) -> bool {
+        self.offset <= DMA_TRANSFER_BYTES
+            && self.source_address & 0xFF == 0
+            && self.start_delay <= DMA_START_DELAY
+    }
+
     /// Whether a transfer runs (see `in_progress`), which keeps the CPU from
     /// OAM.
     pub(super) fn in_progress(&self) -> bool {

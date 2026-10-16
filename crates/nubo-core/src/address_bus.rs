@@ -1337,7 +1337,15 @@ impl AddressBus {
             "timers" => self.timers.deserialize(bytes)?,
             "ppu" => self.gpu.deserialize(bytes)?,
             "apu" => self.apu.deserialize(bytes)?,
-            "oam_dma" => self.dma.deserialize(bytes)?,
+            "oam_dma" => {
+                self.dma.deserialize(bytes)?;
+                if !self.dma.is_consistent() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "OAM DMA state out of range",
+                    ));
+                }
+            }
             "vram_dma" => self.hdma.deserialize(bytes)?,
             "serial" => self.serial.deserialize(bytes)?,
             "speed_switch" => self.speed_switch.deserialize(bytes)?,
