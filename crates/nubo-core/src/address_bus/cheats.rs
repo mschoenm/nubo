@@ -16,7 +16,9 @@ const CHEAT_LIMIT: usize = 10;
 /// `new_value` instead of what is really stored there.
 #[derive(Clone, Debug)]
 pub(super) struct Cheat {
+    /// The address whose reads the cheat changes.
     pub address: u16,
+    /// The value those reads see instead.
     pub new_value: u8,
     /// Game Genie codes only apply while the original byte has this value.
     pub compare_value: Option<u8>,
