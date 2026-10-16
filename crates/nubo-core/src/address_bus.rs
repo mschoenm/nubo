@@ -684,8 +684,8 @@ impl AddressBus {
         }
     }
 
-    /// Video RAM and OAM, after catching the PPU up so an HBlank DMA it owes
-    /// has copied its bytes.
+    /// Video RAM and OAM, after catching the PPU up, since nothing may look
+    /// at the PPU's state while it runs behind.
     pub(crate) fn video_memory(&mut self) -> (&[u8], &[u8]) {
         self.catch_up_ppu();
         self.gpu.video_memory()
