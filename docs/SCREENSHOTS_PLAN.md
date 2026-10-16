@@ -12,8 +12,9 @@ Steps 1 to 7 are built (see Order of work); step 8, the full nightly run after m
 the new screenshots. Checked in a cloud session: every kind of picture (`none`, `gnome`, `fullscreen`,
 `game`, variants side by side, a scene of the library) comes out the same pixel for pixel when made again,
 a scene recorded with Ctrl+F12 renders exactly like its preview, and a scene from `explore` renders exactly
-like its preview at 1×. No screenshot in the README or the Flathub listing is replaced yet:
-`images/screenshots.toml` lists none, and `images/scenes/` holds only `games.toml`.
+like its preview at 1×. Every screenshot in the README and the Flathub listing is now made from a scene:
+`images/screenshots.toml` lists them, and their scenes are in `images/scenes/`, made with `explore` (the
+library's scene is written by hand, since it has no save state).
 
 Where the build differs from the plan below:
 
@@ -146,4 +147,5 @@ night before, so nothing changed while staying green.
    anything that broke fixed.
 
 Then a new session collects screenshots with the skill, the maintainer picks from its gallery, and the README
-and Flathub images are replaced.
+and Flathub images are replaced (done for the README's and Flathub's existing pictures; more candidates wait for
+the maintainer's pick).

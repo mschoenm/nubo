@@ -1,8 +1,7 @@
 # The screenshots the README and the Flathub listing show, made again from
 # their scenes in images/scenes/ by `cargo xtask screenshots` (see
 # docs/SCREENSHOTS_PLAN.md, xtask/src/screenshots/lists.rs and the
-# `screenshots` skill). None are listed yet: the next ones are collected with
-# the skill and picked by the maintainer.
+# `screenshots` skill).
 #
 # Each [[screenshot]] names its file and its scene, and may say:
 #
@@ -37,3 +36,65 @@
 # settings = { dmg_palette = "pocket" }
 # [[screenshot.variant]]
 # settings = { dmg_palette = "gray" }
+
+[[screenshot]]
+file = "images/screenshots/super-game-boy.png"
+scene = "tobu-tobu-super-game-boy"
+size = [1000, 800]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "images/screenshots/big2small.png"
+scene = "big2small-forest"
+size = [1000, 780]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "images/screenshots/rebound.png"
+scene = "rebound-steps"
+size = [1000, 780]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "images/screenshots/moki.png"
+scene = "moki-bedroom"
+size = [1000, 780]
+settings = { appearance = "dark" }
+
+[[screenshot]]
+file = "images/screenshots/rhythm-land.png"
+scene = "rhythm-land-skater"
+size = [1000, 780]
+settings = { appearance = "dark", dmg_palette = "pocket" }
+
+[[screenshot]]
+file = "images/screenshots/palettes.png"
+scene = "el-dueloroso-saloon"
+frame = "game"
+gap = 32
+padding = 16
+background = "#0d0f14"
+[[screenshot.variant]]
+settings = { dmg_palette = "green" }
+[[screenshot.variant]]
+settings = { dmg_palette = "pocket" }
+[[screenshot.variant]]
+settings = { dmg_palette = "gray" }
+
+[[screenshot]]
+file = "images/screenshots/library.png"
+scene = "library"
+
+[[screenshot]]
+file = "images/screenshots/pause-menu.png"
+scene = "tobu-tobu-hills"
+size = [1000, 780]
+settings = { appearance = "dark" }
+pause_menu = "main"
+
+[[screenshot]]
+file = "images/flatpak/tobu-tobu-girl-deluxe.png"
+scene = "tobu-tobu-hills"
+frame = "gnome"
+size = [900, 620]
+settings = { appearance = "light" }

@@ -1,0 +1,10 @@
+[game]
+file = "Moki the Monster Kid.gb"
+sha256 = "39bb44cc69b04d7ec16eb93e853d14ed57653ebb5bbd59724ecc3a600c06e561"
+model = "CGB-E"
+frames = 2
+
+[view]
+screen = "game"
+
+[settings]

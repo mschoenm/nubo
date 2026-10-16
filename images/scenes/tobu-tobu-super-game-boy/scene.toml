@@ -1,0 +1,10 @@
+[game]
+file = "Tobu Tobu Girl Deluxe.gb"
+sha256 = "0a0e8018dbbc8d7f8cd99f05e7cdc7b4cc9e358ecfe9377ebfb2291a84c6e310"
+model = "SGB2"
+frames = 2
+
+[view]
+screen = "game"
+
+[settings]
