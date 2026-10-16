@@ -225,9 +225,9 @@ fn record(sets: &Path, cartridges: &[Cartridge]) -> Result<(), String> {
 }
 
 /// Checks that every state of every set in `sets` loads and plays on, and
-/// that this version has the layout the newest set lists. States of games
-/// that aren't in `cartridges` are left out. Returns how many states it
-/// checked.
+/// that this version has the layout the newest set lists. When `cartridges`
+/// holds only the test cartridges (as in `cargo test`), the games' states are
+/// left out. Returns how many states it checked.
 fn check(sets: &Path, cartridges: &[Cartridge]) -> Result<usize, String> {
     let kept = kept_sets(sets)?;
     let Some(newest) = kept.last() else {
