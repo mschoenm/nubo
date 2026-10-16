@@ -854,3 +854,20 @@ fn a_save_state_fetching_an_object_while_none_is_left_does_not_load() {
     gpu.pipeline.visible_object_count = 0;
     assert!(!state_loads(&gpu));
 }
+
+#[test]
+fn a_save_state_still_drawing_a_finished_line_does_not_load() {
+    let mut gpu = gpu_drawing();
+    gpu.pipeline.phase = Phase::Render;
+    gpu.pipeline.position_in_line = GB_SCREEN_WIDTH as u8 - 1;
+    gpu.pipeline.lcd_x = GB_SCREEN_WIDTH as u8 - 1;
+    assert!(state_loads(&gpu));
+
+    gpu.pipeline.position_in_line = GB_SCREEN_WIDTH as u8;
+    gpu.pipeline.lcd_x = GB_SCREEN_WIDTH as u8;
+    assert!(!state_loads(&gpu));
+
+    let mut gpu = gpu_drawing();
+    gpu.pipeline.phase = Phase::Done;
+    assert!(!state_loads(&gpu));
+}
