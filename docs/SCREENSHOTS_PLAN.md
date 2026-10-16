@@ -115,8 +115,9 @@ on every system: nothing it shows changes.
 The GB Emulator Shootout starts the real app with `--raw-screen`, `--scale` and `--fresh` and judges
 screenshots of its window; none of that may change.
 
-- `capture` and `--record-scenes` are hidden, do nothing unless given, and refuse `--scale` and
-  `--raw-screen`.
+- `capture` and `--record-scenes` are hidden and do nothing unless given. `--record-scenes` refuses
+  `--scale`, `--raw-screen` and `--fresh`; `capture` takes none of the options for opening the window
+  (its own `--scale` only sets the size of the `game` frame).
 - Changed settings go through the existing settings and `ScreenLook`; `ScreenLook::RAW` keeps turning every
   palette and screen effect off, later ones included.
 - `capture` keeps nothing between runs, like `--fresh`: it reads and writes no settings, saves or library,
