@@ -14,6 +14,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 const SAMPLE_FRAMES: [u32; 4] = [150, 300, 450, 600];
 /// Gives up on games that stop drawing frames, such as ones that crash.
 const MAX_STEPS: u32 = 40_000_000;
+/// The most instructions one piece of a capture runs (see [`Capture::run`]),
+/// about 15 frames' worth, so a game that stops drawing frames still lets
+/// the browser draw the page between pieces.
+const MAX_STEPS_AT_ONCE: u32 = 300_000;
 /// The sample rate the emulator makes its (unused) sound at.
 const SAMPLE_RATE: u32 = 32_768;
 /// A frame needs at least this much detail to count as a title screen,
@@ -81,14 +85,24 @@ impl Capture {
         })
     }
 
-    /// Runs up to `frame_count` more of the game's frames. Returns the
-    /// title screen once the capture is done (`None` inside if the game
-    /// showed nothing worth a picture), or `None` while it isn't.
+    /// Runs up to `frame_count` more of the game's frames, and no more than
+    /// `MAX_STEPS_AT_ONCE` instructions, unless `frame_count` is `u32::MAX`
+    /// (the whole capture at once, see [`capture`]). Returns the title
+    /// screen once the capture is done (`None` inside if the game showed
+    /// nothing worth a picture), or `None` while it isn't.
     pub fn run(&mut self, frame_count: u32) -> Option<Option<Vec<u8>>> {
         let last_sample = SAMPLE_FRAMES[SAMPLE_FRAMES.len() - 1];
         let stop = self.frames.saturating_add(frame_count);
+        let step_limit = if frame_count == u32::MAX {
+            MAX_STEPS
+        } else {
+            self.steps.saturating_add(MAX_STEPS_AT_ONCE).min(MAX_STEPS)
+        };
 
         while self.steps < MAX_STEPS {
+            if self.steps >= step_limit {
+                return None;
+            }
             self.emulator.step();
             self.steps += 1;
 

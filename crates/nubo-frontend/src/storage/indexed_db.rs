@@ -197,9 +197,11 @@ pub fn has_rom(name: &str) -> bool {
 /// Keeps `bytes` as the ROM file called `name`, replacing any kept before.
 pub fn write_rom(name: &str, bytes: &[u8]) -> Result<(), String> {
     check_open()?;
-    ROM_NAMES.with_borrow_mut(|names| names.insert(name.to_owned()));
+    let replaces = !ROM_NAMES.with_borrow_mut(|names| names.insert(name.to_owned()));
     #[cfg(target_arch = "wasm32")]
-    browser::put_rom(name, bytes);
+    browser::put_rom(name, bytes, replaces);
+    #[cfg(not(target_arch = "wasm32"))]
+    let _ = replaces;
     #[cfg(not(target_arch = "wasm32"))]
     ROMS_IN_MEMORY.with_borrow_mut(|roms| roms.insert(name.to_owned(), Arc::from(bytes)));
     Ok(())
@@ -402,8 +404,10 @@ mod browser {
         value
     }
 
-    /// Writes the ROM `bytes` as `name` in `roms`, in the background.
-    pub fn put_rom(name: &str, bytes: &[u8]) {
+    /// Writes the ROM `bytes` as `name` in `roms`, in the background. If the
+    /// database refuses it, the name stays kept only if it `replaces` a ROM,
+    /// which the database still has.
+    pub fn put_rom(name: &str, bytes: &[u8], replaces: bool) {
         let value = Uint8Array::from(bytes);
         let refused = name.to_owned();
         in_background(
@@ -411,7 +415,9 @@ mod browser {
             name,
             |store| store.put_with_key(&value, &JsValue::from_str(name)),
             move || {
-                super::ROM_NAMES.with_borrow_mut(|names| names.remove(&refused));
+                if !replaces {
+                    super::ROM_NAMES.with_borrow_mut(|names| names.remove(&refused));
+                }
             },
         );
     }
