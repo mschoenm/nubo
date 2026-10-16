@@ -768,7 +768,10 @@ impl Gpu {
     }
 
     /// Fills the rest of the line by repeating the last pixel written, for lines where the
-    /// renderer ended before writing all 160 pixels.
+    /// renderer ended before writing all 160 pixels. A guard: the LCD's pixel count (`lcd_x`)
+    /// moves on screen together with `position_in_line`, and a line only ends at position 160, so
+    /// in a real run `lcd_x` is already 160 here and nothing is filled. A damaged save state can
+    /// still leave the two apart.
     fn fill_rest_of_desynced_line(&mut self) {
         let line_start = usize::from(self.ly) * GB_SCREEN_WIDTH as usize;
         if line_start >= self.frame_buffer.len() {
