@@ -27,7 +27,9 @@ Point it at your games folder and your games appear in a library with their titl
 
 ## Made with AI
 
-Nubo is made almost entirely by AI. Nearly all of its code and documentation, this README included, and even its name were written by Claude, Anthropic's AI model, working in Claude Code. I decide what Nubo should do, review the changes and choose what goes in, but I write very little of it myself. It started as a fork of [RetroBoy](https://github.com/smparsons/retroboy), Samuel Parsons's own work (see [Credits](#credits)).
+Nubo is made almost entirely by AI. Nearly all of its code and documentation, this README included, and even its name were written by Claude, Anthropic's AI model, working in Claude Code. I decide what Nubo should do and choose what goes in, but I write very little of it myself.
+
+It started as an experiment: how good an emulator could I make using only AI, and how well would the quality of the code hold up? Nubo has very few original ideas. It rests on the clever ideas and hard work of many others, from the emulators it learned from to the people who wrote the test ROMs and documented the hardware, all named in the [Credits](#credits).
 
 If you'd rather not use software made this way, that's a fair choice, and it's why this is said up front.
 
