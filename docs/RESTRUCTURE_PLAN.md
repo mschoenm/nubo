@@ -9,7 +9,7 @@
 - **The RetroArch core** ([RETROARCH_PLAN.md](RETROARCH_PLAN.md)) is built on this structure.
 - **An iOS app, a GTK app and a web UI in React** are not planned. The restructuring must keep them
   possible without another restructuring, but it creates no crates, folders or steps for them. See
-  "Options kept open" below.
+  "Options kept open" below. The iOS app has a draft plan of its own since: [IOS_PLAN.md](IOS_PLAN.md).
 
 Today everything the Iced app needs besides its views lives inside the Iced crate: running a game at
 the right pace, battery saves, save states, cheats, palettes, settings, key bindings and the library.
@@ -165,6 +165,9 @@ restructuring:
   - **What already makes it possible:** no UI toolkit in `nubo-frontend`; screen-refresh pacing (iOS's
     `CADisplayLink`); `Storage` as a trait (the app's sandbox); gamepads behind a feature (iOS has its
     own controller API); cpal supports iOS.
+  - **Since then:** [IOS_PLAN.md](IOS_PLAN.md) drafts it with a C header written by hand instead of
+    UniFFI, and with the emulator paced by the sound card as on the desktop, since iOS has threads;
+    `CADisplayLink` only draws.
 - **GTK:**
   - **What it would add:** a `frontends/gtk` crate with gtk4-rs, mostly for Linux.
   - **What already makes it possible:** either pacing (the sound card, or GTK's frame clock); everything

@@ -70,6 +70,7 @@ The root `Cargo.toml` is a virtual workspace whose default members are `nubo-cor
 - `crates/nubo-serializable-derive/`: the derive macro behind save states.
 - `crates/nubo-logo/`: the logo, drawn from rounded rectangles, for the app (among them its top bar, the empty library, the About tab and its window, Windows, macOS and Flatpak icons and the Windows installer's banner) and in `nubo-core` for the Super Game Boy's intro, attraction mode and Nubo border.
 - `crates/nubo-download/`: downloading test data over HTTPS and checking its SHA-256 checksums, shared by the test ROM runner, the CPU test runner and xtask.
+- `crates/nubo-ffi/`: planned, not a crate yet (`docs/IOS_PLAN.md`); so far only `include/nubo.h`, the C interface the iOS app in its own repository will build against.
 - `frontends/nubo/` (`AGENTS.md`): the app, desktop and browser.
 - `frontends/nubo-libretro/` (`AGENTS.md`): the RetroArch (libretro) core, a dynamic library; `cargo xtask libretro` packages it.
 - `tools/nubo-test-rom-runner/` (`AGENTS.md`): `cargo test-roms`.
@@ -97,6 +98,7 @@ Claude Code and Codex both read these `AGENTS.md` files; keep them the only inst
 - `docs/ACCURACY_PLAN.md`: the plan towards the most accurate emulator; update it when a phase moves on.
 - `docs/RESTRUCTURE_PLAN.md` (done: the shared `nubo-frontend` crate and the `tools/` folder, why the layout is what it is, and the order of the work) and `docs/SHOOTOUT_PLAN.md` (done but for Nubo appearing in the Shootout's published table): plans whose work is nearly all done; update them when what is left moves on.
 - `docs/RETROARCH_PLAN.md`: the RetroArch core, what was built and what is left (getting it into RetroArch's core downloader).
+- `docs/IOS_PLAN.md`: an iOS app in its own repository over a C interface in `crates/nubo-ffi`, a draft for review; update it as parts get done.
 - `docs/CI.md`: CI, the nightly run, nightly builds, toolchain updates.
 - `docs/NIGHTLY_REVIEW.md`: what the nightly review does.
 - `docs/EMULATOR_COMPARISON.md`: speed next to other emulators.
