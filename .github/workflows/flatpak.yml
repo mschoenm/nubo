@@ -48,7 +48,7 @@ jobs:
         run: rustup toolchain install
 
       # Installs the freedesktop runtime from Flathub the first time, builds
-      # the app in it and writes target/bundle/Nubo-<version>-<arch>.flatpak.
+      # the app in it and writes target/bundle/Nubo-<version>-linux-<arch>.flatpak.
       - name: Build the Flatpak
         run: cargo xtask flatpak
 
