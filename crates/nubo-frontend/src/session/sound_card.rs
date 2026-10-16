@@ -69,10 +69,12 @@ impl FrameListener {
     ///
     /// The callback runs on the emulator thread while the frame is locked,
     /// so it must be quick and must not call the session.
-    pub fn listen(&self, mut on_frame: impl FnMut() + Send + 'static) {
-        on_frame();
+    pub fn listen(&self, on_frame: impl FnMut() + Send + 'static) {
+        // Installing it and the first call happen under one lock, so a frame finished in between
+        // can't go unannounced.
         if let Ok(mut frame) = self.frame.lock() {
-            frame.on_frame = Some(Box::new(on_frame));
+            let on_frame = frame.on_frame.insert(Box::new(on_frame));
+            on_frame();
         }
     }
 }
