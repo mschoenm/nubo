@@ -28,7 +28,7 @@ First find out what is gone: open the page's URL (the `Artifact` tool's `read`),
 
    > Daily issue-triage refresh. Fetch `origin/main` and follow `docs/ISSUE_TRIAGE.md`: part A, then part B for every request still `nieuw`. The page is <page URL>.
 
-   Delete the old routine if it still fires into a session that is gone.
+   Once it exists, delete every other routine named `Nubo issue-triage bijwerken` (`list_triggers`, then `delete_trigger`), whether or not its session is still there, so only one fires each morning and none updates a page that is gone. When step 2 made a new session, archive the old one if it still exists (`archive_session`).
 4. **The docs:** update "Current setup" in `docs/ISSUE_TRIAGE.md` in a pull request, so the next setup starts from the right names.
 
 ## Changing the page
