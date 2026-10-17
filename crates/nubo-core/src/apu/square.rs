@@ -269,8 +269,6 @@ impl Apu {
                 }
             }
             channel.delay = 4 - tick_parity + extra_delay;
-            channel.sample_countdown =
-                inverted_period(channel.period) * 2 + u16::from(channel.delay);
         } else {
             if late_revision
                 && value & 4 == 0
@@ -284,9 +282,8 @@ impl Apu {
             // In ticks, the first step comes as late in double speed as at normal speed, on
             // every model (Gambatte's sound ch1_duty0_pos6_to_pos7_timing_ds tests).
             channel.delay = 6 - tick_parity;
-            channel.sample_countdown =
-                inverted_period(channel.period) * 2 + u16::from(channel.delay);
         }
+        channel.sample_countdown = inverted_period(channel.period) * 2 + u16::from(channel.delay);
 
         channel.envelope.restart(nrx2, step_missed);
         if stepped {
