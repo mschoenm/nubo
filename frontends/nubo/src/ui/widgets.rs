@@ -24,6 +24,15 @@ pub fn shortcut(key: &str) -> String {
     }
 }
 
+/// A tooltip naming the key the player bound for what a button does, such as
+/// "Fullscreen (F11)", or the label alone when the action has no key.
+pub fn with_key(label: &str, key: Option<String>) -> String {
+    match key {
+        Some(key) => format!("{label} ({key})"),
+        None => label.to_owned(),
+    }
+}
+
 /// A borderless icon button with a tooltip below it saying what it does.
 /// Without a message the button is shown disabled.
 pub fn icon_button<'a, Message: Clone + 'a>(
