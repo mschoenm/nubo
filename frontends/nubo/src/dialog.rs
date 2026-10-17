@@ -49,6 +49,25 @@ pub enum DialogKind {
     },
 }
 
+impl DialogKind {
+    /// Whether the dialog closes when a game starts: the menus and questions
+    /// of the library and the settings, which the game replaces, and a game
+    /// waiting to be asked about, which the started one replaces. The box
+    /// art and updates questions have nothing to do with the game and stay.
+    pub fn closes_when_game_starts(&self) -> bool {
+        match self {
+            DialogKind::BoxArt | DialogKind::Updates => false,
+            DialogKind::SortMenu
+            | DialogKind::GameMenu(..)
+            | DialogKind::FolderMenu(_)
+            | DialogKind::DeleteSaveStates(_)
+            | DialogKind::RemoveGame(_)
+            | DialogKind::ResetSettings(_)
+            | DialogKind::OtherModel { .. } => true,
+        }
+    }
+}
+
 /// What "Start over" resets, as the player ticks it in its dialog. Only
 /// the settings start ticked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

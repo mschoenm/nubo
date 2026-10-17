@@ -329,6 +329,11 @@ impl App {
     /// `App::deletions_running`), and a reset can't be undone once a game
     /// starts.
     ///
+    /// A game that starts, however it was started (a dropped file and
+    /// Ctrl+O included), closes the settings, stops waiting for a key to
+    /// bind and closes the library's and the settings' dialogs
+    /// (`DialogKind::closes_when_game_starts`), so none stays over it.
+    ///
     /// Restarting the same ROM stops it first, so its battery save and
     /// where the player left off are written before it loads again and
     /// reads them; another ROM replaces the running game only once it has
@@ -446,15 +451,13 @@ impl App {
                 }
                 self.game = Some(game);
                 self.settings_tab = None;
-                // The reset question belongs to the settings, so it closes
-                // with them, and a game waiting to be asked about is
-                // replaced by this one.
-                if self.dialog.as_ref().is_some_and(|dialog| {
-                    matches!(
-                        dialog.kind,
-                        DialogKind::ResetSettings(_) | DialogKind::OtherModel { .. }
-                    )
-                }) {
+                self.capture = None;
+                self.settings_focus = None;
+                if self
+                    .dialog
+                    .as_ref()
+                    .is_some_and(|dialog| dialog.kind.closes_when_game_starts())
+                {
                     self.dialog = None;
                 }
                 self.pending_start = None;
