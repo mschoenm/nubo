@@ -62,6 +62,8 @@ h1 { font-size: 26px; line-height: 1.2; margin: 0; text-wrap: balance; }
 .count.yes { background: var(--yes-bg); color: var(--yes); }
 .count.maybe { background: var(--maybe-bg); color: var(--maybe); }
 .count.no { background: var(--no-bg); color: var(--no); }
+.card.working { padding: 12px 14px; gap: 6px; }
+.card.working .status { margin: 0; }
 .count.done { background: var(--done-bg); color: var(--done); }
 
 .filters { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 10px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
@@ -130,8 +132,9 @@ code { font-family: var(--font-mono); font-size: 0.86em; background: var(--bg); 
   <header>
     <div class="brand">Nubo · mschoenm/nubo</div>
     <h1>Open issues: wat fixen we?</h1>
-    <p class="lede">Alle <span id="total"></span> open issues, nagelopen tegen <code>main</code> op <span id="asof"></span>. Elke ochtend om 06:50 werk ik deze lijst bij. Vink aan wat ik moet oplossen en druk op Start: elk aangevinkt issue krijgt een eigen sessie, met een pull request die ik pas merge als jij dat vraagt.</p>
-    <div class="refresh-row"><button class="btn" id="refresh" type="button">Nu bijwerken</button><p class="msg" id="refreshmsg" hidden></p></div>
+    <p class="lede">Alle <span id="total"></span> open issues, nagelopen tegen <code>main</code> op <span id="asof"></span>. Elk uur werk ik deze lijst bij. Vink aan wat ik moet oplossen en druk op Start: elk aangevinkt issue krijgt een eigen sessie, met een pull request die ik pas merge als jij dat vraagt.</p>
+    <div class="refresh-row"><button class="btn" id="refresh" type="button">Nu bijwerken</button><span class="msg" id="checked"></span><p class="msg" id="refreshmsg" hidden></p></div>
+    <p class="msg" id="pending" hidden></p>
     <div class="summary" id="summary"></div>
   </header>
 
@@ -157,6 +160,7 @@ const REPO = "https://github.com/mschoenm/nubo/issues/";
 const VERDICT = { ja: ["yes", "Fixen"], twijfel: ["maybe", "Twijfel"], nee: ["no", "Niet fixen"] };
 const AREAS = ["Emulator", "App", "Browser", "macOS", "RetroArch", "Tools en CI", "Overig"];
 const ORDER = { ja: 0, twijfel: 1, nee: 2 };
+const LATER = "Binnen een uur pakt de routine het op. Zit je in een triage-sessie met mij, dan gaat het binnen een minuut, of meteen als je \"ga\" zegt.";
 
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -168,9 +172,10 @@ let filter = store.get("nubo-triage-filter", "alles");
 let ISSUES = [];
 let META = {};
 let statuses = {};
+let pending = [];
 let phase = "laden";
 let confirming = false;
-let db = null, mcp = null;
+let db = null;
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -178,6 +183,16 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 const rich = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
 const openIssues = () => ISSUES.filter((i) => !i.closed);
 const areaOf = (i) => (AREAS.includes(i.area) ? i.area : "Overig");
+const issueTitle = (n) => (ISSUES.find((i) => i.n === n) || {}).title || "";
+
+function clock(iso) {
+  const t = Date.parse(iso || "");
+  if (!t) return "";
+  const d = new Date(t);
+  const same = d.toDateString() === new Date().toDateString();
+  const time = d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+  return same ? time : `${d.toLocaleDateString("nl-NL", { day: "numeric", month: "short" })} ${time}`;
+}
 
 function save() {
   store.set("nubo-triage-selected", [...selected]);
@@ -191,9 +206,17 @@ function renderSummary() {
   const done = open.filter((i) => i.status === "opgelost").length;
   $("total").textContent = phase === "klaar" ? open.length : "…";
   $("asof").textContent = META.asof || "…";
+  const checked = clock(META.checked_at || META.updated_at);
+  $("checked").textContent = checked ? `Laatst gecontroleerd om ${checked}.` : "";
   $("summary").innerHTML = phase !== "klaar" ? "" :
     `<span class="count yes">${c.ja} fixen</span><span class="count maybe">${c.twijfel} twijfel</span><span class="count no">${c.nee} niet</span>` +
     (done ? `<span class="count done">${done} al opgelost op main</span>` : "");
+  const waiting = pending.filter((r) => r.state === "nieuw");
+  $("pending").hidden = !waiting.length;
+  $("pending").textContent = waiting.length
+    ? `${waiting.length === 1 ? "Eén verzoek wacht" : waiting.length + " verzoeken wachten"} op de routine: ` +
+      waiting.map((r) => (r.type === "refresh" ? "bijwerken" : (r.issues || []).map((x) => "#" + x.n).join(", "))).join("; ") + "."
+    : "";
 }
 
 function renderFilters() {
@@ -208,14 +231,26 @@ function visible(i) {
   return areaOf(i) === filter;
 }
 
-function statusHtml(n) {
-  const s = statuses[n];
-  if (!s) return "";
+function statusParts(s) {
   const parts = [`<span class="badge done">${esc(s.state || "Aangevraagd")}</span>`];
   if (s.session_url) parts.push(`<a href="${esc(s.session_url)}" target="_blank" rel="noopener">Open sessie</a>`);
   if (s.pr) parts.push(`<a href="https://github.com/mschoenm/nubo/pull/${esc(s.pr)}" target="_blank" rel="noopener">PR #${esc(s.pr)}</a>`);
   if (s.note) parts.push(`<span>${rich(s.note)}</span>`);
-  return `<div class="status">${parts.join("")}</div>`;
+  return parts.join("");
+}
+
+function statusHtml(n) {
+  const s = statuses[n];
+  return s ? `<div class="status">${statusParts(s)}</div>` : "";
+}
+
+function workingHtml() {
+  const busy = Object.values(statuses).filter((s) => s.state !== "Klaar").sort((a, b) => a.n - b.n);
+  if (!busy.length) return "";
+  return `<h3 class="group-title">Bezig</h3><div class="list">${busy.map((s) => `<article class="card working">
+    <div class="titles"><span class="num"><a href="${REPO}${s.n}" target="_blank" rel="noopener">#${s.n}</a></span>
+    <h2 class="title">${esc(issueTitle(s.n) || "Issue #" + s.n)}</h2></div>
+    <div class="status">${statusParts(s)}</div></article>`).join("")}</div>`;
 }
 
 function card(i) {
@@ -248,11 +283,11 @@ function card(i) {
 }
 
 function closedCard(i) {
-  return `<article class="card closed-on-main"><div class="head"><span></span><div class="titles">
+  return `<article class="card closed-on-main working"><div class="titles">
     <span class="num"><a href="${REPO}${i.n}" target="_blank" rel="noopener">#${i.n}</a> · ${esc(areaOf(i))}</span>
     <h2 class="title">${esc(i.title)}</h2>
     <div class="badges"><span class="badge done">Gesloten${i.closed_by ? " door " + esc(i.closed_by) : ""}</span></div>
-  </div></div><div style="height:12px"></div></article>`;
+  </div></article>`;
 }
 
 function renderList() {
@@ -260,14 +295,14 @@ function renderList() {
   if (phase === "geen-db") { $("main").innerHTML = `<p class="msg err">De lijst kon niet worden geladen. Open de pagina op claude.ai, ingelogd met je eigen account.</p>`; return; }
   const open = new Set([...document.querySelectorAll("details[open]")].map((d) => d.id));
   const items = openIssues().filter(visible).sort((a, b) => (ORDER[a.verdict] ?? 1) - (ORDER[b.verdict] ?? 1) || a.n - b.n);
-  let html = "";
+  let html = filter === "alles" ? workingHtml() : "";
   for (const area of AREAS) {
     const group = items.filter((i) => areaOf(i) === area);
     if (!group.length) continue;
     html += `<h3 class="group-title">${esc(area)}</h3><div class="list">${group.map(card).join("")}</div>`;
   }
-  if (!openIssues().length) html = `<p class="msg">Er staan geen open issues. Dien er een in op GitHub en tik op Nu bijwerken.</p>`;
-  else if (!html) html = `<p class="msg">Niets in dit filter.</p>`;
+  if (!openIssues().length) html += `<p class="msg">Er staan geen open issues. Dien er een in op GitHub; binnen een uur staat hij hier.</p>`;
+  else if (!items.length) html += `<p class="msg">Niets in dit filter.</p>`;
   const closed = ISSUES.filter((i) => i.closed).sort((a, b) => b.n - a.n);
   if (closed.length && filter === "alles") html += `<h3 class="group-title">Onlangs gesloten</h3><div class="list">${closed.map(closedCard).join("")}</div>`;
   $("main").innerHTML = html;
@@ -285,23 +320,17 @@ function renderBar() {
 
 function render() { renderSummary(); renderFilters(); renderList(); renderBar(); }
 
-function say(text, kind) {
-  const m = $("msg");
+function say(el, text, kind) {
+  const m = $(el);
   m.hidden = !text;
   m.textContent = text || "";
   m.className = "msg" + (kind ? " " + kind : "");
 }
 
-async function message(text) {
-  if (!mcp || !META.session_id) return { sent: false, code: mcp ? "no_session" : "no_mcp" };
-  try { await mcp.callTool("Claude Code Remote", "send_message", { session_id: META.session_id, message: text }); return { sent: true }; }
-  catch (err) { return { sent: false, code: err && err.code ? err.code : "upstream_error" }; }
-}
-
-function why(code) {
-  if (code === "server_not_connected" || code === "needs_reauth") return " (de connector Claude Code Remote is niet verbonden)";
-  if (code === "not_in_manifest" || code === "approval_required") return " (de pagina mocht de sessie geen bericht sturen)";
-  return "";
+async function addRequest(request) {
+  if (!db) return false;
+  try { await db.collection("requests").add({ ...request, created_at: new Date().toISOString(), state: "nieuw" }); return true; }
+  catch { return false; }
 }
 
 document.addEventListener("click", (e) => {
@@ -313,7 +342,7 @@ document.addEventListener("change", (e) => {
   if (!p) return;
   const n = Number(p.dataset.pick);
   p.checked ? selected.add(n) : selected.delete(n);
-  confirming = false; say("");
+  confirming = false; say("msg", "");
   save(); renderList(); renderBar();
 });
 document.addEventListener("input", (e) => {
@@ -324,41 +353,30 @@ document.addEventListener("input", (e) => {
 });
 $("pickyes").addEventListener("click", () => {
   openIssues().filter((i) => i.verdict === "ja" && i.status !== "opgelost" && !statuses[i.n]).forEach((i) => selected.add(i.n));
-  confirming = false; say(""); save(); render();
+  confirming = false; say("msg", ""); save(); render();
 });
-$("clear").addEventListener("click", () => { selected.clear(); confirming = false; say(""); save(); render(); });
+$("clear").addEventListener("click", () => { selected.clear(); confirming = false; say("msg", ""); save(); render(); });
 
 $("refresh").addEventListener("click", async () => {
   const b = $("refresh");
   b.disabled = true;
-  const r = await message("Werk de issue-triage bij (docs/ISSUE_TRIAGE.md, deel A).");
-  $("refreshmsg").hidden = false;
-  $("refreshmsg").className = "msg" + (r.sent ? " ok" : " err");
-  $("refreshmsg").textContent = r.sent
-    ? "Gevraagd. De lijst ververst vanzelf zodra ik klaar ben; dat duurt een paar minuten."
-    : `Dat lukte niet${why(r.code)}. Vraag het me in de chat, of wacht tot 06:50.`;
+  const ok = await addRequest({ type: "refresh" });
+  say("refreshmsg", ok ? `Gevraagd. ${LATER}` : "Opslaan lukte niet. Vraag het me in de chat.", ok ? "ok" : "err");
   setTimeout(() => { b.disabled = false; }, 30000);
 });
 
 $("start").addEventListener("click", async () => {
   if (!selected.size) return;
-  if (!confirming) { confirming = true; renderBar(); say("Tik nog een keer om de sessies te starten."); return; }
+  if (!confirming) { confirming = true; renderBar(); say("msg", "Tik nog een keer om de sessies te starten."); return; }
   confirming = false;
   $("start").disabled = true;
   const picked = [...selected].sort((a, b) => a - b);
-  const request = { issues: picked.map((n) => ({ n, note: (notes[n] || "").trim() })), created_at: new Date().toISOString(), state: "nieuw" };
-  let requestId = null;
-  if (db) { try { requestId = (await db.collection("requests").add(request)).id; } catch { requestId = null; } }
-  const lines = picked.map((n) => { const note = (notes[n] || "").trim(); return `- #${n}` + (note ? `: ${note}` : ""); });
-  const r = await message(`Issue-triage: los deze issues op, elk in een eigen sessie (docs/ISSUE_TRIAGE.md, deel B).\n${lines.join("\n")}` + (requestId ? `\nVerzoek: requests/${requestId}` : ""));
-  if (r.sent) {
-    say(`Verstuurd: ${picked.length} ${picked.length === 1 ? "issue" : "issues"}. Ik start de sessies; de links verschijnen bij elk issue.`, "ok");
-    selected.clear(); save();
-  } else if (requestId) {
-    say(`Je keuze is opgeslagen, maar ik kreeg geen seintje${why(r.code)}. Ik pak hem op bij de volgende bijwerking om 06:50, of zeg in de chat "issues gekozen".`, "err");
+  const ok = await addRequest({ type: "start", issues: picked.map((n) => ({ n, note: (notes[n] || "").trim() })) });
+  if (ok) {
+    say("msg", `Opgeslagen: ${picked.map((n) => "#" + n).join(", ")}. ${LATER}`, "ok");
     selected.clear(); save();
   } else {
-    say(`Opslaan en versturen lukte niet. Stuur me in de chat: ${picked.map((n) => "#" + n).join(", ")}.`, "err");
+    say("msg", `Opslaan lukte niet. Stuur me in de chat: ${picked.map((n) => "#" + n).join(", ")}.`, "err");
   }
   render();
 });
@@ -379,9 +397,10 @@ render();
     snap.docs.forEach((d) => { const v = d.data(); if (v && v.n) statuses[v.n] = v; });
     renderList();
   }, () => {});
-})();
-(async () => {
-  try { mcp = await window.claude?.use?.("mcp"); } catch { mcp = null; }
+  db.collection("requests").onSnapshot((snap) => {
+    pending = snap.docs.map((d) => d.data()).filter(Boolean);
+    renderSummary();
+  }, () => {});
 })();
 </script>
 
