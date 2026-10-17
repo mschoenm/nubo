@@ -124,12 +124,76 @@ fn unknown_models_are_rejected() {
 
 #[test]
 fn without_saved_settings_the_defaults_load_quietly() {
-    let (settings, problem) = load(&crate::storage::NoStorage, |contents| {
+    let loaded = load(&crate::storage::NoStorage, |contents| {
         toml::from_str::<Settings>(contents)
     });
 
-    assert_eq!(settings, Settings::default());
-    assert_eq!(problem, None);
+    assert_eq!(loaded.settings, Settings::default());
+    assert_eq!(loaded.problem, None);
+    assert!(loaded.saving_is_safe);
+}
+
+#[cfg(feature = "desktop")]
+#[test]
+fn unreadable_settings_are_kept_aside_before_the_defaults_can_replace_them() {
+    use crate::storage::files::Files;
+    use std::fs;
+
+    let folder = std::env::temp_dir().join(format!("nubo-settings-kept-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&folder);
+    let files = Files::in_folders(Some(folder.clone()), None);
+    let from_newer_nubo = "model = \"Game Boy Advance SP\"\nmuted = true\n";
+    for _ in 0..2 {
+        files
+            .write(Entry::Settings, from_newer_nubo.as_bytes())
+            .unwrap();
+        let loaded = load(&files, |contents| toml::from_str::<Settings>(contents));
+        assert_eq!(loaded.settings, Settings::default());
+        assert!(loaded.saving_is_safe);
+        assert!(loaded.problem.unwrap().contains("kept them as"));
+        save(&files, &loaded.settings).unwrap();
+    }
+
+    for kept in ["settings.kept-1.toml", "settings.kept-2.toml"] {
+        assert_eq!(
+            fs::read_to_string(folder.join(kept)).unwrap(),
+            from_newer_nubo
+        );
+    }
+    let _ = fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn settings_that_cant_be_kept_aside_are_not_safe_to_save_over() {
+    struct Unreadable;
+
+    impl Storage for Unreadable {
+        fn read(&self, _entry: Entry<'_>) -> Result<Option<Vec<u8>>, String> {
+            Ok(Some(b"muted = 3".to_vec()))
+        }
+
+        fn write(&self, _entry: Entry<'_>, _contents: &[u8]) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn location(&self, entry: Entry<'_>) -> String {
+            entry.file_name().display().to_string()
+        }
+
+        fn delete_battery_saves(&self) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn keep_aside(&self, _entry: Entry<'_>) -> Result<String, String> {
+            Err(String::from("the disk is read-only"))
+        }
+    }
+
+    let loaded = load(&Unreadable, |contents| toml::from_str::<Settings>(contents));
+
+    assert_eq!(loaded.settings, Settings::default());
+    assert!(!loaded.saving_is_safe);
+    assert!(loaded.problem.unwrap().contains("the disk is read-only"));
 }
 
 /// A `settings.toml` as Nubo 0.5.0 writes it, with every setting changed

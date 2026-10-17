@@ -21,16 +21,25 @@ fn invalid_archive(reason: impl Display) -> LoadRomError {
     LoadRomError::InvalidArchive(reason.to_string())
 }
 
+/// Whether the archive entry `name` is a ROM: it ends in `.gb` or `.gbc` and
+/// is not one of the metadata files macOS Finder adds to the zip archives it
+/// makes, which sit under `__MACOSX/` and whose file names start with `._`
+/// (`__MACOSX/._Game.gb`, a few hundred bytes next to the real `Game.gb`).
 fn is_rom_name(name: &str) -> bool {
     let name = name.to_ascii_lowercase();
-    ROM_EXTENSIONS
-        .iter()
-        .any(|extension| name.ends_with(extension))
+    let mut components = name.split(['/', '\\']);
+    let file_name = components.next_back().unwrap_or_default();
+    let is_macos_metadata =
+        file_name.starts_with("._") || components.any(|folder| folder == "__macosx");
+    !is_macos_metadata
+        && ROM_EXTENSIONS
+            .iter()
+            .any(|extension| file_name.ends_with(extension))
 }
 
 /// Returns the ROM inside `data`. Plain ROMs are returned as they are; for a
-/// zip archive, the first `.gb` or `.gbc` file in it is unpacked. Frontends
-/// use it to look at the ROM itself, for example to take its checksum.
+/// zip archive, the first `.gb` or `.gbc` file in it is unpacked, skipping
+/// the `__MACOSX/` and `._` metadata files macOS adds. Frontends use it to look at the ROM itself, for example to take its checksum.
 pub fn extract_rom(data: &[u8]) -> Result<Vec<u8>, LoadRomError> {
     extract_rom_borrowed(data).map(Cow::into_owned)
 }
@@ -115,6 +124,42 @@ mod tests {
             ("Roms/GAME.GBC", &rom, CompressionMethod::Deflated),
         ]);
         assert_eq!(extract_rom(&zip).unwrap(), rom);
+    }
+
+    #[test]
+    fn skips_macos_metadata_files() {
+        let rom = vec![0x77; 0x8000];
+        let zip = build_zip(&[
+            (
+                "__MACOSX/._Game.gb",
+                &[0x00; 256],
+                CompressionMethod::Deflated,
+            ),
+            (
+                "__MACOSX/Roms/Game.gbc",
+                &[0x00; 256],
+                CompressionMethod::Deflated,
+            ),
+            ("._Game.gb", &[0x00; 256], CompressionMethod::Deflated),
+            ("Roms/._Game.gbc", &[0x00; 256], CompressionMethod::Deflated),
+            ("Game.gb", &rom, CompressionMethod::Deflated),
+        ]);
+        assert_eq!(extract_rom(&zip).unwrap(), rom);
+    }
+
+    #[test]
+    fn fails_when_zip_has_only_macos_metadata() {
+        let zip = build_zip(&[(
+            "__MACOSX/._Game.gb",
+            &[0x00; 256],
+            CompressionMethod::Deflated,
+        )]);
+        let error = extract_rom(&zip).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("does not contain a .gb or .gbc ROM")
+        );
     }
 
     #[test]

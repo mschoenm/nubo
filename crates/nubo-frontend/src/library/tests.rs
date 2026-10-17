@@ -502,3 +502,22 @@ fn a_game_set_to_automatic_keeps_automatic_rather_than_the_settings() {
     assert_eq!(entry.preference(), Some(ModelPreference::Automatic));
     assert_eq!(entry.model(), None);
 }
+
+#[cfg(feature = "desktop")]
+#[test]
+fn an_unreadable_library_file_is_kept_aside_before_a_save_can_replace_it() {
+    let data_folder = temporary_folder("kept");
+    let from_newer_nubo = "[[games]]\nmodel = \"Game Boy Advance SP\"\n";
+    fs::write(data_folder.join("library.toml"), from_newer_nubo).unwrap();
+
+    let (mut library, error) = Library::load_from(Cache::in_folder(data_folder.clone()));
+    let error = error.unwrap();
+    assert!(error.contains("library.kept-1.toml"), "{error}");
+    library.reset_games(true, true).unwrap();
+
+    assert_eq!(
+        fs::read_to_string(data_folder.join("library.kept-1.toml")).unwrap(),
+        from_newer_nubo
+    );
+    assert!(data_folder.join("library.toml").exists());
+}

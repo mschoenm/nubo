@@ -50,6 +50,10 @@ impl Storage for Memory {
             .retain(|name, _| !name.ends_with(".sav") && !name.ends_with(".rtc"));
         Ok(())
     }
+
+    fn keep_aside(&self, _entry: Entry<'_>) -> Result<String, String> {
+        Err(String::from("the tests keep nothing aside"))
+    }
 }
 
 const NORMAL_SPEED: Playback = Playback {

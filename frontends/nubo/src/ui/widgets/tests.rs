@@ -1,7 +1,7 @@
-//! Tests for shortening text that doesn't fit and for growing the screen in
-//! whole steps.
+//! Tests for shortening text that doesn't fit, for growing the screen in
+//! whole steps and for naming a bound key in a tooltip.
 
-use super::{truncate, whole_step_factor, whole_step_or_fitting_factor};
+use super::{truncate, whole_step_factor, whole_step_or_fitting_factor, with_key};
 use iced::Size;
 
 #[test]
@@ -59,4 +59,13 @@ fn spaces_before_the_ellipsis_are_dropped() {
 #[test]
 fn no_room_leaves_only_the_ellipsis() {
     assert_eq!(truncate("Tetris", 0.0, 10.0), "…");
+}
+
+#[test]
+fn a_tooltip_names_the_bound_key_and_leaves_out_a_missing_one() {
+    assert_eq!(
+        with_key("Fullscreen", Some(String::from("F11"))),
+        "Fullscreen (F11)"
+    );
+    assert_eq!(with_key("Fullscreen", None), "Fullscreen");
 }

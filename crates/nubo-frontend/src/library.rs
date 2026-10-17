@@ -7,7 +7,9 @@
 //! title screen (see [`title_screens`]) and of the last screen played,
 //! PNG files in the `title_screens` and `thumbnails` folders next to it,
 //! and, if the player wants it, box art (see [`box_art`]) in `box_art`.
-//! [`Cache`] says where those files are.
+//! [`Cache`] says where those files are. A `library.toml` that can't be
+//! read (such as one a newer Nubo wrote) is kept aside as
+//! `library.kept-<number>.toml` before the next save can replace it.
 //!
 //! The desktop build (the `desktop` feature) finds its games in the player's
 //! folders. The browser build (the `web` feature) has no folders to scan, so
@@ -353,14 +355,12 @@ impl Library {
 
     /// Reads what the library knew from `cache`, and keeps the library
     /// there from now on. If that can't be read, the library starts empty
-    /// and the reason is returned too.
+    /// and the reason is returned too; a `library.toml` that can't be parsed
+    /// is kept aside first, so the next save can't lose it.
     pub fn load_from(cache: Cache) -> (Library, Option<String>) {
         let (entries, error) = match store::load_entries(&cache) {
             Ok(entries) => (entries, None),
-            Err(error) => (
-                Vec::new(),
-                Some(format!("The game library couldn't be read: {error}")),
-            ),
+            Err(error) => (Vec::new(), Some(error)),
         };
 
         let mut library = Library {
@@ -1072,6 +1072,21 @@ fn keeps_file(_path: &Path) -> bool {
 /// A picture of a frame of the Game Boy screen.
 fn screen_picture(pixels: Vec<u8>) -> Picture {
     Picture::new(SCREEN_WIDTH, SCREEN_HEIGHT, pixels)
+}
+
+/// What to tell the player when `library.toml` couldn't be parsed because
+/// of `error`, and `kept` says where it was kept aside or why it couldn't
+/// be.
+#[cfg(any(feature = "desktop", feature = "web", test))]
+fn unreadable_library(error: &str, kept: Result<String, String>) -> String {
+    match kept {
+        Ok(location) => format!(
+            "The game library couldn't be read, so Nubo starts a new one and kept the old one as {location}: {error}"
+        ),
+        Err(keep_error) => format!(
+            "The game library couldn't be read (keeping it aside failed too: {keep_error}): {error}"
+        ),
+    }
 }
 
 /// A time as whole seconds since 1970, or 0 for times before that.
