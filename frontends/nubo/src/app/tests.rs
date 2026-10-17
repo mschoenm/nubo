@@ -7,7 +7,7 @@ use super::playing::{PendingStart, ResumeAnswer};
 use super::settings_window::reset_summary;
 use super::{App, CAPTURE_TIMEOUT, GameMessage, LibraryMessage, Message, SettingsMessage, cycle};
 use crate::command_line::Options;
-use crate::dialog::{Dialog, DialogKind, ResetChoices};
+use crate::dialog::{Dialog, DialogKind, GameMenuPage, ResetChoices};
 use crate::input::KeyInput;
 use crate::settings::Appearance;
 use crate::views::settings::SettingsTab;
@@ -322,6 +322,71 @@ fn another_game_starting_replaces_the_one_waiting() {
         app.game.as_ref().unwrap().session.rom().path,
         PathBuf::from("other.gb")
     );
+}
+
+/// Starts `other.gb`, an empty game, as a dropped file or Ctrl+O would.
+fn start_other_game(app: &mut App) {
+    let _ = app.update(
+        GameMessage::RomPicked(Some(Rom {
+            path: PathBuf::from("other.gb"),
+            bytes: Arc::from(vec![0; 0x8000]),
+        }))
+        .into(),
+    );
+}
+
+#[test]
+fn a_game_starting_closes_the_library_and_settings_dialogs() {
+    for kind in [
+        DialogKind::SortMenu,
+        DialogKind::GameMenu(PathBuf::from("game.gb"), GameMenuPage::Main),
+        DialogKind::FolderMenu(0),
+        DialogKind::DeleteSaveStates(PathBuf::from("game.gb")),
+        DialogKind::RemoveGame(PathBuf::from("game.gb")),
+        DialogKind::ResetSettings(ResetChoices::default()),
+    ] {
+        let mut app = playing_app();
+        app.dialog = Some(Dialog::new(kind.clone()));
+        start_other_game(&mut app);
+
+        assert!(app.dialog.is_none(), "{kind:?} stayed open");
+        assert!(!app.game.as_ref().unwrap().is_paused());
+    }
+}
+
+#[test]
+fn a_game_starting_keeps_a_question_that_has_nothing_to_do_with_it() {
+    for kind in [DialogKind::BoxArt, DialogKind::Updates] {
+        let mut app = playing_app();
+        app.dialog = Some(Dialog::new(kind.clone()));
+        start_other_game(&mut app);
+
+        assert_eq!(app.dialog.map(|dialog| dialog.kind), Some(kind));
+    }
+}
+
+#[test]
+fn a_game_starting_stops_waiting_for_a_key() {
+    let mut app = playing_app();
+    let _ = app.update(SettingsMessage::Open.into());
+    let _ = app.update(SettingsMessage::CaptureBinding(Device::Keyboard, Action::A).into());
+    assert!(app.capture.is_some());
+    start_other_game(&mut app);
+
+    assert_eq!(app.capture, None);
+    assert_eq!(app.settings_focus, None);
+    assert_eq!(app.settings_tab, None);
+}
+
+#[test]
+fn a_game_continuing_after_the_model_question_stops_waiting_for_a_key() {
+    let mut app = waiting_app();
+    let _ = app.update(SettingsMessage::Open.into());
+    let _ = app.update(SettingsMessage::CaptureBinding(Device::Keyboard, Action::A).into());
+    let _ = app.update(GameMessage::ResumeAnswered(ResumeAnswer::Continue).into());
+
+    assert!(app.game.is_some());
+    assert_eq!(app.capture, None);
 }
 
 #[test]
