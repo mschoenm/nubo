@@ -50,7 +50,7 @@ These keep Nubo exact, and players' saves safe. Never break them.
 - **Code the browser build shares** takes `Instant`, `SystemTime` and `Duration` from `nubo_frontend::time`, which re-exports the `web-time` crate (std's panic on wasm32; the UI code may use `iced::time`, the same types), and text that sets a font uses `theme::BODY_FONT` or `theme::HEADING_FONT`, never `Font::DEFAULT` or another font of its own, which draw nothing in the browser. Plain `text()` without `.font()` is fine, and so are the icons (`ui::icons`).
 - **No `unsafe`.** The workspace lints forbid it. The one exception is the RetroArch core's exported C functions: they live in `frontends/nubo-libretro/src/ffi.rs` (and its tests), under one `#[expect(unsafe_code)]`, with that crate's own lint table (`unsafe_code = "deny"`) and the `unsafe` in as few places as possible. Any later crate that binds Nubo to another language follows the same rule; every other crate, `nubo-core`, `nubo-frontend` and the apps included, keeps it forbidden.
 - **Newest stable versions** of Rust, crates, GitHub Actions and tools, never a pre-release unless nothing else works; test data stays pinned. Details, and the Flatpak's exception: `docs/CI.md`. The one exception for Rust itself: the fuzz targets in `fuzz/` use the nightly toolchain, which `cargo-fuzz` needs; that folder is outside the Cargo workspace, nothing that ships or that CI builds depends on it, and only a full review runs it.
-- **Merging a pull request:** follow the `merge` skill (CI green, Codex's review done and handled). **Making a release:** follow the `release` skill. **Regenerating or collecting screenshots:** follow the `screenshots` skill. **A full review of the repository:** only when the maintainer asks for one, never on your own; follow the `full-review` skill.
+- **Merging a pull request:** follow the `merge` skill (CI green, Codex's review done and handled). **Making a release:** follow the `release` skill. **Regenerating or collecting screenshots:** follow the `screenshots` skill. **Setting up the issue-triage page or its routine again:** follow the `issue-triage` skill. **A full review of the repository:** only when the maintainer asks for one, never on your own; follow the `full-review` skill.
 
 ## Style
 
@@ -84,7 +84,7 @@ The root `Cargo.toml` is a virtual workspace whose default members are `nubo-cor
 
 ## Agent Instructions
 
-Claude Code and Codex both read these `AGENTS.md` files; keep them the only instruction files. Claude Code ignores `AGENTS.md` in a folder that also has a `CLAUDE.md`, so don't add one. The `merge`, `release`, `screenshots` and `full-review` skills are written in `.claude/skills/`, where Claude Code reads them; `.agents/skills/` holds pointers to them for Codex, so change the steps only in `.claude/skills/`. Each skill's `name` and `description` appear in both places; keep them the same.
+Claude Code and Codex both read these `AGENTS.md` files; keep them the only instruction files. Claude Code ignores `AGENTS.md` in a folder that also has a `CLAUDE.md`, so don't add one. The `merge`, `release`, `screenshots`, `full-review` and `issue-triage` skills are written in `.claude/skills/`, where Claude Code reads them; `.agents/skills/` holds pointers to them for Codex, so change the steps only in `.claude/skills/`. Each skill's `name` and `description` appear in both places; keep them the same.
 
 **See your pull requests through.** After opening a pull request, watch it without being asked (in Claude Code on the web, subscribe to its activity) and fix what comes up: red CI, a conflict with `main`, Codex's findings and reviewers' comments, until CI is green and Codex's review is handled. Merging still waits until the maintainer asks for it (the `merge` skill). A pull request that fixes an open issue, such as one the nightly review opened, says `Fixes #<number>` in its description, so GitHub closes the issue when it merges.
 
@@ -99,6 +99,7 @@ Claude Code and Codex both read these `AGENTS.md` files; keep them the only inst
 - `docs/RETROARCH_PLAN.md`: the RetroArch core, what was built and what is left (getting it into RetroArch's core downloader).
 - `docs/CI.md`: CI, the nightly run, nightly builds, toolchain updates.
 - `docs/NIGHTLY_REVIEW.md`: what the nightly review does.
+- `docs/ISSUE_TRIAGE.md`: the daily issue-triage page, where the maintainer picks the open issues to solve; the `issue-triage` skill sets it up again.
 - `docs/EMULATOR_COMPARISON.md`: speed next to other emulators.
 - `docs/SCREENSHOTS_PLAN.md`: the tools that make every screenshot in the README and the Flathub listing again from recorded scenes, and the order of the work; update it as parts get done.
 - `docs/reviews/`: the report of each full review (the `full-review` skill), with a list of them in its `README.md`; each report is a record of its day, not kept up to date.

@@ -1,0 +1,387 @@
+<title>Nubo issue-triage</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;600&family=Silkscreen&display=swap">
+<style>
+/* Layout: one narrow reading column of issue cards, a sticky filter row on top and a sticky action bar at the bottom. Palette from the DMG shell: warm putty gray, the screen's olive green for "fix", the A/B buttons' berry as the accent. */
+:root {
+  --bg: #ecebe6;
+  --surface: #f8f7f3;
+  --fg: #23222a;
+  --muted: #5d5b66;
+  --line: #d4d2ca;
+  --accent: #8b1d4f;
+  --accent-fg: #ffffff;
+  --yes: #3c6b2a;
+  --yes-bg: #e1ecd6;
+  --maybe: #8a5a00;
+  --maybe-bg: #f6e8c8;
+  --no: #6b6873;
+  --no-bg: #e6e4e9;
+  --done: #1f5f8b;
+  --done-bg: #dbe9f4;
+  --font-display: "Silkscreen", ui-monospace, monospace;
+  --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #18171c; --surface: #222128; --fg: #ecebf0; --muted: #a9a6b3; --line: #35333d;
+    --accent: #e0669d; --accent-fg: #18171c;
+    --yes: #9fd283; --yes-bg: #24331d; --maybe: #f0c46a; --maybe-bg: #3a2f17;
+    --no: #b3b0bc; --no-bg: #2d2b33; --done: #8cc4ef; --done-bg: #1b2d3b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #18171c; --surface: #222128; --fg: #ecebf0; --muted: #a9a6b3; --line: #35333d;
+  --accent: #e0669d; --accent-fg: #18171c;
+  --yes: #9fd283; --yes-bg: #24331d; --maybe: #f0c46a; --maybe-bg: #3a2f17;
+  --no: #b3b0bc; --no-bg: #2d2b33; --done: #8cc4ef; --done-bg: #1b2d3b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 120px;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+header { display: flex; flex-direction: column; gap: 6px; padding-top: 24px; }
+.brand { font-family: var(--font-display); font-size: 13px; letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; }
+h1 { font-size: 26px; line-height: 1.2; margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 62ch; }
+.refresh-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 4px; }
+.refresh-row .msg { flex: 1 1 220px; }
+.summary { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.count { font-family: var(--font-mono); font-size: 13px; padding: 4px 10px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+.count.yes { background: var(--yes-bg); color: var(--yes); }
+.count.maybe { background: var(--maybe-bg); color: var(--maybe); }
+.count.no { background: var(--no-bg); color: var(--no); }
+.count.done { background: var(--done-bg); color: var(--done); }
+
+.filters { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 10px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.filters::-webkit-scrollbar { display: none; }
+.chip { flex: none; font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.chip:focus-visible, button:focus-visible, summary:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.group-title { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 12px 0 0; }
+.list { display: flex; flex-direction: column; gap: 10px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; min-width: 0; }
+.card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.card.closed-on-main { opacity: 0.75; }
+.head { display: grid; grid-template-columns: 44px 1fr; gap: 4px; padding: 12px 14px 0 6px; align-items: start; }
+.pick { width: 44px; height: 44px; display: grid; place-items: center; cursor: pointer; }
+.pick input { width: 24px; height: 24px; accent-color: var(--accent); cursor: pointer; margin: 0; }
+.titles { min-width: 0; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.num { font-family: var(--font-mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.num a { color: inherit; }
+.title { font-weight: 700; font-size: 17px; line-height: 1.3; margin: 0; text-wrap: balance; overflow-wrap: anywhere; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.badge { font-size: 12.5px; padding: 2px 8px; border-radius: 6px; font-weight: 700; white-space: nowrap; }
+.badge.yes { background: var(--yes-bg); color: var(--yes); }
+.badge.maybe { background: var(--maybe-bg); color: var(--maybe); }
+.badge.no { background: var(--no-bg); color: var(--no); }
+.badge.plain { background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 400; }
+.badge.done { background: var(--done-bg); color: var(--done); }
+.verdict { margin: 8px 14px 0 56px; font-size: 15px; }
+details { margin: 4px 14px 12px 56px; }
+summary { cursor: pointer; color: var(--accent); font-weight: 700; font-size: 14.5px; padding-block: 8px; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: " ▾"; }
+details[open] summary::after { content: " ▴"; }
+dl { margin: 4px 0 0; display: flex; flex-direction: column; gap: 10px; }
+dt { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--bg); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
+.note { margin: 0 14px 12px 56px; display: flex; flex-direction: column; gap: 4px; }
+.note label { font-size: 13px; color: var(--muted); }
+.note textarea { font: inherit; font-size: 15px; width: 100%; min-height: 64px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--bg); color: var(--fg); }
+.status { margin: 0 14px 12px 56px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
+.status a { color: var(--done); font-weight: 700; }
+
+.bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--surface); border-top: 1px solid var(--line);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+.bar-inner { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+.bar-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.bar-count { flex: 1 1 auto; min-width: 0; font-size: 15px; }
+.bar-count strong { font-variant-numeric: tabular-nums; }
+.btn { font: inherit; font-weight: 700; font-size: 15px; border-radius: 10px; padding: 10px 14px; cursor: pointer; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+#start { flex: 1 0 auto; }
+.msg { font-size: 14px; color: var(--muted); margin: 0; }
+.msg.ok { color: var(--yes); }
+.msg.err { color: var(--accent); }
+.foot { color: var(--muted); font-size: 13px; margin-top: 12px; }
+@media (prefers-reduced-motion: no-preference) { .card { transition: border-color 120ms ease, box-shadow 120ms ease; } }
+@media (max-width: 420px) {
+  .verdict, details, .note, .status { margin-left: 14px; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">Nubo · mschoenm/nubo</div>
+    <h1>Open issues: wat fixen we?</h1>
+    <p class="lede">Alle <span id="total"></span> open issues, nagelopen tegen <code>main</code> op <span id="asof"></span>. Elke ochtend om 06:50 werk ik deze lijst bij. Vink aan wat ik moet oplossen en druk op Start: elk aangevinkt issue krijgt een eigen sessie, met een pull request die ik pas merge als jij dat vraagt.</p>
+    <div class="refresh-row"><button class="btn" id="refresh" type="button">Nu bijwerken</button><p class="msg" id="refreshmsg" hidden></p></div>
+    <div class="summary" id="summary"></div>
+  </header>
+
+  <nav class="filters" id="filters" aria-label="Filter"></nav>
+  <main id="main"></main>
+  <p class="foot">Oordeel en omvang zijn mijn inschatting na het lezen van de code. Klein is een paar uur werk voor een sessie, groot vraagt ontwerpkeuzes of veel controles.</p>
+</div>
+
+<div class="bar" role="region" aria-label="Gekozen issues">
+  <div class="bar-inner">
+    <div class="bar-row">
+      <div class="bar-count"><strong id="selcount">0</strong> gekozen</div>
+      <button class="btn" id="pickyes" type="button">Kies mijn aanraders</button>
+      <button class="btn" id="clear" type="button">Wis</button>
+      <button class="btn primary" id="start" type="button" disabled>Start</button>
+    </div>
+    <p class="msg" id="msg" hidden></p>
+  </div>
+</div>
+
+<script>
+const REPO = "https://github.com/mschoenm/nubo/issues/";
+const VERDICT = { ja: ["yes", "Fixen"], twijfel: ["maybe", "Twijfel"], nee: ["no", "Niet fixen"] };
+const AREAS = ["Emulator", "App", "Browser", "macOS", "RetroArch", "Tools en CI", "Overig"];
+const ORDER = { ja: 0, twijfel: 1, nee: 2 };
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+let selected = new Set(store.get("nubo-triage-selected", []));
+let notes = store.get("nubo-triage-notes", {});
+let filter = store.get("nubo-triage-filter", "alles");
+let ISSUES = [];
+let META = {};
+let statuses = {};
+let phase = "laden";
+let confirming = false;
+let db = null, mcp = null;
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// Backticks in the texts become <code>.
+const rich = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+const openIssues = () => ISSUES.filter((i) => !i.closed);
+const areaOf = (i) => (AREAS.includes(i.area) ? i.area : "Overig");
+
+function save() {
+  store.set("nubo-triage-selected", [...selected]);
+  store.set("nubo-triage-notes", notes);
+}
+
+function renderSummary() {
+  const open = openIssues();
+  const c = { ja: 0, twijfel: 0, nee: 0 };
+  open.forEach((i) => { if (c[i.verdict] != null) c[i.verdict]++; });
+  const done = open.filter((i) => i.status === "opgelost").length;
+  $("total").textContent = phase === "klaar" ? open.length : "…";
+  $("asof").textContent = META.asof || "…";
+  $("summary").innerHTML = phase !== "klaar" ? "" :
+    `<span class="count yes">${c.ja} fixen</span><span class="count maybe">${c.twijfel} twijfel</span><span class="count no">${c.nee} niet</span>` +
+    (done ? `<span class="count done">${done} al opgelost op main</span>` : "");
+}
+
+function renderFilters() {
+  const opts = [["alles", "Alles"], ["ja", "Fixen"], ["twijfel", "Twijfel"], ["nee", "Niet"], ["gekozen", "Gekozen"], ...AREAS.map((a) => [a, a])];
+  $("filters").innerHTML = opts.map(([k, l]) => `<button class="chip" type="button" data-f="${esc(k)}" aria-pressed="${filter === k}">${esc(l)}</button>`).join("");
+}
+
+function visible(i) {
+  if (filter === "alles") return true;
+  if (filter === "gekozen") return selected.has(i.n);
+  if (VERDICT[filter]) return i.verdict === filter;
+  return areaOf(i) === filter;
+}
+
+function statusHtml(n) {
+  const s = statuses[n];
+  if (!s) return "";
+  const parts = [`<span class="badge done">${esc(s.state || "Aangevraagd")}</span>`];
+  if (s.session_url) parts.push(`<a href="${esc(s.session_url)}" target="_blank" rel="noopener">Open sessie</a>`);
+  if (s.pr) parts.push(`<a href="https://github.com/mschoenm/nubo/pull/${esc(s.pr)}" target="_blank" rel="noopener">PR #${esc(s.pr)}</a>`);
+  if (s.note) parts.push(`<span>${rich(s.note)}</span>`);
+  return `<div class="status">${parts.join("")}</div>`;
+}
+
+function card(i) {
+  const [vk, vl] = VERDICT[i.verdict] || VERDICT.twijfel;
+  const sel = selected.has(i.n);
+  const statusBadge = i.status === "opgelost" ? `<span class="badge done">Al opgelost op main</span>` : i.status === "deels" ? `<span class="badge plain">Deels opgelost</span>` : "";
+  return `<article class="card${sel ? " selected" : ""}${i.status === "opgelost" ? " closed-on-main" : ""}" data-n="${i.n}">
+    <div class="head">
+      <label class="pick" title="Kies #${i.n}"><input type="checkbox" id="pick-${i.n}" data-pick="${i.n}" ${sel ? "checked" : ""} aria-label="Laat #${i.n} oplossen"></label>
+      <div class="titles">
+        <span class="num"><a href="${REPO}${i.n}" target="_blank" rel="noopener">#${i.n}</a> · ${esc(areaOf(i))}</span>
+        <h2 class="title">${esc(i.title)}</h2>
+        <div class="badges"><span class="badge ${vk}">${vl}</span><span class="badge plain">${esc(i.size)}</span>${statusBadge}</div>
+      </div>
+    </div>
+    <p class="verdict">${rich(i.opinion)}</p>
+    <details id="d-${i.n}">
+      <summary>Details</summary>
+      <dl>
+        <div><dt>Probleem</dt><dd>${rich(i.problem)}</dd></div>
+        <div><dt>Voorgestelde oplossing</dt><dd>${rich(i.fix)}</dd></div>
+        <div><dt>Gevolgen</dt><dd>${rich(i.effects)}</dd></div>
+        <div><dt>Alternatieven</dt><dd>${rich(i.alternatives)}</dd></div>
+        <div><dt>Voor de sessie</dt><dd>${rich(i.notes)}</dd></div>
+      </dl>
+    </details>
+    ${sel ? `<div class="note"><label for="note-${i.n}">Opmerking voor de sessie (optioneel)</label><textarea id="note-${i.n}" data-note="${i.n}" placeholder="Bijvoorbeeld: kies het alternatief, of laat de tests weg">${esc(notes[i.n] || "")}</textarea></div>` : ""}
+    ${statusHtml(i.n)}
+  </article>`;
+}
+
+function closedCard(i) {
+  return `<article class="card closed-on-main"><div class="head"><span></span><div class="titles">
+    <span class="num"><a href="${REPO}${i.n}" target="_blank" rel="noopener">#${i.n}</a> · ${esc(areaOf(i))}</span>
+    <h2 class="title">${esc(i.title)}</h2>
+    <div class="badges"><span class="badge done">Gesloten${i.closed_by ? " door " + esc(i.closed_by) : ""}</span></div>
+  </div></div><div style="height:12px"></div></article>`;
+}
+
+function renderList() {
+  if (phase === "laden") { $("main").innerHTML = `<p class="msg">De issues worden geladen…</p>`; return; }
+  if (phase === "geen-db") { $("main").innerHTML = `<p class="msg err">De lijst kon niet worden geladen. Open de pagina op claude.ai, ingelogd met je eigen account.</p>`; return; }
+  const open = new Set([...document.querySelectorAll("details[open]")].map((d) => d.id));
+  const items = openIssues().filter(visible).sort((a, b) => (ORDER[a.verdict] ?? 1) - (ORDER[b.verdict] ?? 1) || a.n - b.n);
+  let html = "";
+  for (const area of AREAS) {
+    const group = items.filter((i) => areaOf(i) === area);
+    if (!group.length) continue;
+    html += `<h3 class="group-title">${esc(area)}</h3><div class="list">${group.map(card).join("")}</div>`;
+  }
+  if (!openIssues().length) html = `<p class="msg">Er staan geen open issues. Dien er een in op GitHub en tik op Nu bijwerken.</p>`;
+  else if (!html) html = `<p class="msg">Niets in dit filter.</p>`;
+  const closed = ISSUES.filter((i) => i.closed).sort((a, b) => b.n - a.n);
+  if (closed.length && filter === "alles") html += `<h3 class="group-title">Onlangs gesloten</h3><div class="list">${closed.map(closedCard).join("")}</div>`;
+  $("main").innerHTML = html;
+  open.forEach((id) => { const d = document.getElementById(id); if (d) d.open = true; });
+}
+
+function renderBar() {
+  const valid = new Set(openIssues().map((i) => i.n));
+  if (phase === "klaar") for (const n of [...selected]) if (!valid.has(n)) selected.delete(n);
+  $("selcount").textContent = selected.size;
+  const start = $("start");
+  start.disabled = selected.size === 0 || phase !== "klaar";
+  start.textContent = confirming ? `Bevestig: start ${selected.size} ${selected.size === 1 ? "sessie" : "sessies"}` : "Start";
+}
+
+function render() { renderSummary(); renderFilters(); renderList(); renderBar(); }
+
+function say(text, kind) {
+  const m = $("msg");
+  m.hidden = !text;
+  m.textContent = text || "";
+  m.className = "msg" + (kind ? " " + kind : "");
+}
+
+async function message(text) {
+  if (!mcp || !META.session_id) return { sent: false, code: mcp ? "no_session" : "no_mcp" };
+  try { await mcp.callTool("Claude Code Remote", "send_message", { session_id: META.session_id, message: text }); return { sent: true }; }
+  catch (err) { return { sent: false, code: err && err.code ? err.code : "upstream_error" }; }
+}
+
+function why(code) {
+  if (code === "server_not_connected" || code === "needs_reauth") return " (de connector Claude Code Remote is niet verbonden)";
+  if (code === "not_in_manifest" || code === "approval_required") return " (de pagina mocht de sessie geen bericht sturen)";
+  return "";
+}
+
+document.addEventListener("click", (e) => {
+  const f = e.target.closest("[data-f]");
+  if (f) { filter = f.dataset.f; store.set("nubo-triage-filter", filter); render(); }
+});
+document.addEventListener("change", (e) => {
+  const p = e.target.closest("[data-pick]");
+  if (!p) return;
+  const n = Number(p.dataset.pick);
+  p.checked ? selected.add(n) : selected.delete(n);
+  confirming = false; say("");
+  save(); renderList(); renderBar();
+});
+document.addEventListener("input", (e) => {
+  const t = e.target.closest("[data-note]");
+  if (!t) return;
+  notes[t.dataset.note] = t.value;
+  save();
+});
+$("pickyes").addEventListener("click", () => {
+  openIssues().filter((i) => i.verdict === "ja" && i.status !== "opgelost" && !statuses[i.n]).forEach((i) => selected.add(i.n));
+  confirming = false; say(""); save(); render();
+});
+$("clear").addEventListener("click", () => { selected.clear(); confirming = false; say(""); save(); render(); });
+
+$("refresh").addEventListener("click", async () => {
+  const b = $("refresh");
+  b.disabled = true;
+  const r = await message("Werk de issue-triage bij (docs/ISSUE_TRIAGE.md, deel A).");
+  $("refreshmsg").hidden = false;
+  $("refreshmsg").className = "msg" + (r.sent ? " ok" : " err");
+  $("refreshmsg").textContent = r.sent
+    ? "Gevraagd. De lijst ververst vanzelf zodra ik klaar ben; dat duurt een paar minuten."
+    : `Dat lukte niet${why(r.code)}. Vraag het me in de chat, of wacht tot 06:50.`;
+  setTimeout(() => { b.disabled = false; }, 30000);
+});
+
+$("start").addEventListener("click", async () => {
+  if (!selected.size) return;
+  if (!confirming) { confirming = true; renderBar(); say("Tik nog een keer om de sessies te starten."); return; }
+  confirming = false;
+  $("start").disabled = true;
+  const picked = [...selected].sort((a, b) => a - b);
+  const request = { issues: picked.map((n) => ({ n, note: (notes[n] || "").trim() })), created_at: new Date().toISOString(), state: "nieuw" };
+  let requestId = null;
+  if (db) { try { requestId = (await db.collection("requests").add(request)).id; } catch { requestId = null; } }
+  const lines = picked.map((n) => { const note = (notes[n] || "").trim(); return `- #${n}` + (note ? `: ${note}` : ""); });
+  const r = await message(`Issue-triage: los deze issues op, elk in een eigen sessie (docs/ISSUE_TRIAGE.md, deel B).\n${lines.join("\n")}` + (requestId ? `\nVerzoek: requests/${requestId}` : ""));
+  if (r.sent) {
+    say(`Verstuurd: ${picked.length} ${picked.length === 1 ? "issue" : "issues"}. Ik start de sessies; de links verschijnen bij elk issue.`, "ok");
+    selected.clear(); save();
+  } else if (requestId) {
+    say(`Je keuze is opgeslagen, maar ik kreeg geen seintje${why(r.code)}. Ik pak hem op bij de volgende bijwerking om 06:50, of zeg in de chat "issues gekozen".`, "err");
+    selected.clear(); save();
+  } else {
+    say(`Opslaan en versturen lukte niet. Stuur me in de chat: ${picked.map((n) => "#" + n).join(", ")}.`, "err");
+  }
+  render();
+});
+
+render();
+
+(async () => {
+  try { db = await window.claude?.use?.("db"); } catch { db = null; }
+  if (!db) { phase = "geen-db"; render(); return; }
+  db.collection("issues").onSnapshot((snap) => {
+    ISSUES = snap.docs.map((d) => d.data()).filter((v) => v && typeof v.n === "number");
+    phase = "klaar";
+    render();
+  }, () => { phase = "geen-db"; render(); });
+  db.doc("meta/page").onSnapshot((snap) => { META = (snap.exists && snap.data()) || {}; renderSummary(); }, () => {});
+  db.collection("status").onSnapshot((snap) => {
+    statuses = {};
+    snap.docs.forEach((d) => { const v = d.data(); if (v && v.n) statuses[v.n] = v; });
+    renderList();
+  }, () => {});
+})();
+(async () => {
+  try { mcp = await window.claude?.use?.("mcp"); } catch { mcp = null; }
+})();
+</script>
+
