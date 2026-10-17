@@ -16,7 +16,8 @@ use nubo_frontend::notices::Notices;
 use nubo_frontend::rom::Rom;
 use nubo_frontend::session::{ActivityCount, Command, Playback, Saves, Session};
 use nubo_frontend::settings::FastForwardSpeed;
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::thread;
@@ -64,11 +65,14 @@ pub fn run(rom_path: &Path, model: Model) -> ExitCode {
 ///   still after the boot ROM and no frames should reach the window.
 ///
 /// The game's battery saves go to a temporary folder, so the player's own
-/// saves are never touched.
+/// saves are never touched. Each situation starts from no saves at all, in
+/// an empty folder of its own, so no measurement starts from what an
+/// earlier one (or an earlier run) left; the saves are still written, as
+/// for a player, so that work stays in the numbers.
 pub fn measure(rom_path: &Path, model: Model) -> Result<String, String> {
     let rom = Rom::read(rom_path)?;
-    let data_folder = std::env::temp_dir().join("nubo-efficiency");
-    let saves = || BatterySaves::in_data_folder(&data_folder, &rom.path);
+    let folder = TemporaryFolder::new()?;
+    let saves = |situation: &str| folder.empty_saves(situation, &rom.path);
     let normal = Playback {
         running: true,
         fast_forward: None,
@@ -76,8 +80,8 @@ pub fn measure(rom_path: &Path, model: Model) -> Result<String, String> {
         rewinding: false,
     };
 
-    let playing = measure_session(&rom, saves(), model, normal, |_| ())?;
-    let paused = measure_session(&rom, saves(), model, normal, |session| {
+    let playing = measure_session(&rom, saves("playing")?, model, normal, |_| ())?;
+    let paused = measure_session(&rom, saves("paused")?, model, normal, |session| {
         session.send(Command::SetPlayback(Playback {
             running: false,
             ..normal
@@ -85,7 +89,7 @@ pub fn measure(rom_path: &Path, model: Model) -> Result<String, String> {
     })?;
     let fast_forward = measure_session(
         &rom,
-        saves(),
+        saves("fast_forward")?,
         model,
         Playback {
             fast_forward: Some(FastForwardSpeed::default()),
@@ -97,7 +101,7 @@ pub fn measure(rom_path: &Path, model: Model) -> Result<String, String> {
         path: rom.path.with_file_name("nubo-efficiency-blank.gb"),
         bytes: vec![0; 0x8000].into(),
     };
-    let still_screen = measure_session(&blank, saves(), model, normal, |_| ())?;
+    let still_screen = measure_session(&blank, saves("still_screen")?, model, normal, |_| ())?;
 
     Ok(format!(
         "{{\"playing\":{},\"paused\":{},\"fast_forward\":{},\"still_screen\":{}}}",
@@ -106,6 +110,47 @@ pub fn measure(rom_path: &Path, model: Model) -> Result<String, String> {
         json(&fast_forward),
         json(&still_screen),
     ))
+}
+
+/// A folder of this run's own in the system's temporary folder, deleted with
+/// everything in it when the measurement ends.
+struct TemporaryFolder {
+    path: PathBuf,
+}
+
+impl TemporaryFolder {
+    /// Creates the folder, empty, named after this process, so two
+    /// measurements running at once never share one.
+    fn new() -> Result<TemporaryFolder, String> {
+        let path = std::env::temp_dir().join(format!("nubo-efficiency-{}", std::process::id()));
+        // A folder left by a process that had the same id before and was
+        // killed.
+        if path.exists() {
+            fs::remove_dir_all(&path).map_err(|error| folder_error(&path, &error))?;
+        }
+        fs::create_dir_all(&path).map_err(|error| folder_error(&path, &error))?;
+        Ok(TemporaryFolder { path })
+    }
+
+    /// Battery saves for the ROM at `rom_path`, in a new, empty folder named
+    /// `situation`.
+    fn empty_saves(&self, situation: &str, rom_path: &Path) -> Result<Arc<BatterySaves>, String> {
+        let data_folder = self.path.join(situation);
+        fs::create_dir(&data_folder).map_err(|error| folder_error(&data_folder, &error))?;
+        Ok(BatterySaves::in_data_folder(&data_folder, rom_path))
+    }
+}
+
+impl Drop for TemporaryFolder {
+    fn drop(&mut self) {
+        // Nothing else uses the folder; one left behind is only clutter.
+        let _ = fs::remove_dir_all(&self.path);
+    }
+}
+
+/// The message for a temporary folder that couldn't be made ready.
+fn folder_error(path: &Path, error: &std::io::Error) -> String {
+    format!("Couldn't prepare the folder {}: {error}", path.display())
 }
 
 /// Starts `rom` playing as `playback` says, lets it settle, then calls
