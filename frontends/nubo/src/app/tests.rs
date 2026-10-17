@@ -15,6 +15,7 @@ use iced::keyboard::{self, Modifiers};
 use nubo_core::{ControllerButton, ControllerState, Emulator, Model};
 use nubo_frontend::controls::{Action, Device, KeyCode, MenuButtons, PadButton};
 use nubo_frontend::gamepads::{ControllerEvent, Controllers};
+use nubo_frontend::library::{Cache, Library};
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::rom::Rom;
 use std::path::PathBuf;
@@ -420,6 +421,40 @@ fn continuing_keeps_a_game_on_automatic_when_automatic_picks_its_model() {
 
     app.settings.shared.model = ModelPreference::Fixed(Model::Mgb);
     assert_eq!(preference(&app, Model::Mgb), None);
+}
+
+#[test]
+fn continuing_sets_the_saves_model_only_once_the_game_has_continued() {
+    let id = std::process::id();
+    let folder = std::env::temp_dir().join(format!("nubo-continue-library-{id}"));
+    // A name no player's game has, since the state that doesn't load is
+    // kept aside in the save states of a game with this file name.
+    let rom_path = PathBuf::from(format!("nubo-continue-test-{id}.gb"));
+    for (loads, kept) in [
+        (false, None),
+        (true, Some(ModelPreference::Fixed(Model::Sgb))),
+    ] {
+        let _ = std::fs::remove_dir_all(&folder);
+        let mut app = waiting_app();
+        app.model_override = None;
+        let pending = app.pending_start.as_mut().unwrap();
+        pending.rom.path.clone_from(&rom_path);
+        if !loads {
+            pending.state.data = vec![0; 16];
+        }
+        let (mut library, _) = Library::load_from(Cache::in_folder(folder.clone()));
+        library.record_played(&rom_path, &pending.header).unwrap();
+        app.library = library;
+
+        let _ = app.update(GameMessage::ResumeAnswered(ResumeAnswer::Continue).into());
+
+        assert_eq!(
+            app.game.as_ref().map(|game| game.session.model()),
+            Some(Model::Sgb)
+        );
+        assert_eq!(app.library.entry(&rom_path).unwrap().preference(), kept);
+    }
+    let _ = std::fs::remove_dir_all(&folder);
 }
 
 /// A `--fresh` app set to start games on the Game Boy, asking whether to
