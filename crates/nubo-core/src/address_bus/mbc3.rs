@@ -211,7 +211,7 @@ pub(super) struct Mbc3CartridgeMapper {
     latched_rtc: LatchedRtc,
     /// The clock `rtc.base_timestamp` is a time on. A state made on the other
     /// clock is moved over to this emulator's when it loads
-    /// (`Mbc3CartridgeMapper::follow_clock`). A state from before this field
+    /// (`Mbc3CartridgeMapper::finish_loading_save_state`). A state from before this field
     /// lacks it and keeps the value the load starts from: the power-on
     /// state, already moved over to this emulator's clock, so its clock
     /// loads as it is, as it did before.
@@ -371,10 +371,26 @@ impl Mbc3CartridgeMapper {
         }
     }
 
-    /// Moves the clock over to `clock` if it follows the other one (see
+    /// Finishes loading a save state: cuts the registers to the bits they
+    /// have, as a game's writes and a loaded `.rtc` file are, so a damaged
+    /// state can't make one hold a value the hardware can't, and moves the
+    /// clock over to `clock` if it follows the other one (see
     /// [`RtcState::rebase`]), keeping what it shows. `now` gives the current
     /// time on either clock.
-    pub(super) fn follow_clock(&mut self, clock: RtcClock, now: impl Fn(RtcClock) -> f64) {
+    pub(super) fn finish_loading_save_state(
+        &mut self,
+        clock: RtcClock,
+        now: impl Fn(RtcClock) -> f64,
+    ) {
+        let bank = if self.is_mbc30 {
+            self.rom_bank_number
+        } else {
+            self.rom_bank_number & 0x7F
+        };
+        self.rom_bank_number = if bank == 0 { 1 } else { bank };
+        self.ram_bank_or_rtc_register &= 0x0F;
+        self.rtc = std::mem::take(&mut self.rtc).within_register_widths();
+        self.latched_rtc = self.latched_rtc.within_register_widths();
         if self.rtc_clock != clock {
             self.rtc.rebase(now(self.rtc_clock), now(clock));
             self.rtc_clock = clock;
@@ -525,6 +541,18 @@ impl LatchedRtc {
             hours: rtc.hours,
             day_low: (rtc.days & 0xFF) as u8,
             day_high,
+        }
+    }
+
+    /// The registers cut to the bits they have, as `LatchedRtc::of` gives
+    /// them.
+    fn within_register_widths(self) -> Self {
+        LatchedRtc {
+            seconds: self.seconds & SECONDS_REGISTER_MAX,
+            minutes: self.minutes & MINUTES_REGISTER_MAX,
+            hours: self.hours & HOURS_REGISTER_MAX,
+            day_low: self.day_low,
+            day_high: self.day_high & 0xC1,
         }
     }
 

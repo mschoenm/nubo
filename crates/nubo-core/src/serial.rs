@@ -37,7 +37,10 @@ pub struct Serial {
     /// eighth ends the transfer and starts the count again.
     bits_transferred: u8,
     /// Whether the console is a CGB, where SC's clock speed bit exists. A copy
-    /// of the address bus's, which only `AddressBus::set_model` changes.
+    /// of the address bus's, which only `AddressBus::set_model` changes. Save
+    /// states don't store it, since it follows from the model their header
+    /// names.
+    #[serializable(skip)]
     cgb_mode: bool,
     /// The system counter at the previous step, to find the falling edges of the bit that drives
     /// the serial clock. The address bus passes the counter after every M-cycle and every DIV
@@ -71,11 +74,12 @@ impl Serial {
         self.cgb_mode = cgb_mode;
     }
 
-    /// Whether a loaded save state holds a bit count the transfer can reach,
-    /// which the emulator never saves otherwise. A larger count would
-    /// overflow before the transfer ends.
+    /// Whether a loaded save state holds a bit count the transfer can reach
+    /// and a clock speed this console has, which the emulator never saves
+    /// otherwise. A larger count would overflow before the transfer ends, and
+    /// only a CGB can select the high speed clock (`set_control`).
     pub(super) fn is_consistent(&self) -> bool {
-        self.bits_transferred < 8
+        self.bits_transferred < 8 && (self.cgb_mode || !self.is_high_speed_clock)
     }
 
     fn clock_counter_bit(&self) -> u16 {
