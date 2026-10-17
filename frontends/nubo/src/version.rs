@@ -1,11 +1,11 @@
 //! Nubo's version as the app shows it: the version from `Cargo.toml`,
 //! and for a build `cargo xtask` made (every release, nightly build and
 //! package) the commit it was built from and that commit's date. The About
-//! tab shows them together, as `0.4.0 (7c44d39 2026-10-16)`; `--version`
+//! tab shows them together, as `0.10.0 (7c44d39 2026-10-16)`; `--version`
 //! puts the commit on a line of its own under the version
 //! (`command_line`). A commit followed by `-dirty`, as `git describe
 //! --dirty` writes it, was built with changes that weren't committed. A
-//! plain `cargo build` knows neither, and shows only `0.4.0`.
+//! plain `cargo build` knows neither, and shows only `0.10.0`.
 
 use std::sync::LazyLock;
 
@@ -53,12 +53,14 @@ impl Commit {
         if commit.is_empty() {
             return None;
         }
-        let hash = commit.strip_suffix("-dirty");
-        let hash = hash.unwrap_or(commit);
+        let (hash, dirty) = match commit.strip_suffix("-dirty") {
+            Some(hash) => (hash, true),
+            None => (commit, false),
+        };
         Some(Commit {
             hash: hash.to_owned(),
             date: date.to_owned(),
-            dirty: hash.len() < commit.len(),
+            dirty,
             page: format!("{}/commit/{hash}", env!("CARGO_PKG_REPOSITORY")),
         })
     }

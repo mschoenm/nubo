@@ -184,9 +184,10 @@ impl LibraryEntry {
 
 /// Where the library keeps what it knows between runs: `library.toml` and
 /// the `thumbnails`, `title_screens` and `box_art` folders of pictures, all
-/// in one data folder (see `storage::files`). Builds without the `desktop`
-/// feature keep nothing, and neither does a cache without a folder, such as
-/// [`Cache::default`].
+/// in one data folder (see `storage::files`). The browser build keeps the
+/// same in IndexedDB (`storage::indexed_db`), whatever the cache. Builds with
+/// neither feature keep nothing, and on the desktop neither does a cache
+/// without a folder, such as [`Cache::default`].
 #[derive(Debug, Clone, Default)]
 pub struct Cache {
     /// The data folder, or `None` when the system has none for us.
@@ -308,8 +309,9 @@ impl Cache {
     }
 }
 
-/// The games and their thumbnails. [`Library::default`] keeps nothing
-/// between runs; [`Library::load`] keeps the player's library.
+/// The games and their thumbnails. On the desktop [`Library::default`]
+/// keeps nothing between runs; [`Library::load`] keeps the player's library
+/// (in the browser, both keep it in IndexedDB).
 #[derive(Debug, Default)]
 pub struct Library {
     /// Where the library is kept between runs.
@@ -343,8 +345,8 @@ pub struct Library {
 
 impl Library {
     /// Reads what the library knew when the app last ran, from the player's
-    /// data folder. If that can't be read, the library starts empty and the
-    /// reason is returned too.
+    /// data folder (in the browser, from IndexedDB). If that can't be read,
+    /// the library starts empty and the reason is returned too.
     pub fn load() -> (Library, Option<String>) {
         Library::load_from(Cache::for_user())
     }
@@ -830,11 +832,11 @@ impl Library {
         entry.modified = now;
         entry.added = Some(now);
 
-        let mut entries = std::mem::take(&mut self.entries);
-        if let Some(index) = entries.iter().position(|known| known.path == rom.path) {
-            let previous = entries.remove(index);
+        let previous = self.entries.iter().position(|known| known.path == rom.path);
+        if let Some(index) = previous {
+            let previous = &self.entries[index];
             let unchanged = previous.size == entry.size && previous.title == entry.title;
-            entry.keep_from(&previous, unchanged);
+            entry.keep_from(previous, unchanged);
             if !unchanged {
                 store::delete_pictures(&rom.path).map_err(keep_error)?;
                 for pictures in [
@@ -845,6 +847,10 @@ impl Library {
                     pictures.remove(&rom.path);
                 }
             }
+        }
+        let mut entries = std::mem::take(&mut self.entries);
+        if let Some(index) = previous {
+            entries.remove(index);
         }
         entries.push(entry);
         self.replace_entries(entries);
@@ -893,8 +899,8 @@ impl Library {
     }
 
     /// How many games the library keeps the files of, and about how many
-    /// bytes they and the library's pictures take, for the browser build's
-    /// settings.
+    /// bytes they, the library's pictures and the box art game lists take,
+    /// for the browser build's settings.
     #[cfg(all(feature = "web", not(feature = "desktop")))]
     pub fn kept_size(&self) -> (usize, u64) {
         let count = self.entries.iter().filter(|entry| entry.in_folder).count();

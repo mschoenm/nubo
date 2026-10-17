@@ -10,7 +10,7 @@ Every run starts from a fresh clone of `main`.
 
 ```bash
 sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev pkg-config
-rustup toolchain install && rustup target add wasm32-unknown-unknown
+rustup update stable && rustup target add wasm32-unknown-unknown
 git fetch --unshallow origin || true
 ```
 

@@ -283,7 +283,8 @@ fn install_from_worktree(commit: &str, name: &str) -> Result {
         .args(["xtask", "install", "--build", "checkout"])
         .current_dir(&worktree)
         .env("CARGO_TARGET_DIR", folder.join("target"))
-        .env_remove("NUBO_COMMIT"));
+        .env_remove("NUBO_COMMIT")
+        .env_remove("NUBO_COMMIT_DATE"));
     remove_worktree(&worktree);
     installed
 }
