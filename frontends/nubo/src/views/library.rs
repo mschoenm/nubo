@@ -14,7 +14,7 @@ use crate::ui::theme;
 use crate::ui::theme::Badge;
 use crate::ui::widgets::{
     bar_button, framed_screen, icon_button, keycap, primary_button, secondary_button, shortcut,
-    top_bar, truncated_text, with_tooltip,
+    top_bar, truncated_text, with_key, with_tooltip,
 };
 use crate::views::settings::SettingsTab;
 use iced::widget::{
@@ -438,12 +438,14 @@ pub fn view<'a>(
 }
 
 /// What the library's top bar shows besides the search and its buttons.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct TopBar<'a> {
     /// A newer Nubo, if one is out.
     pub newer_version: Option<&'a str>,
     /// Whether the window fills the screen, which shows a button to leave it.
     pub fullscreen: bool,
+    /// The key bound to fullscreen, for that button's tooltip.
+    pub fullscreen_key: Option<String>,
 }
 
 /// The top bar: with games to search, a search field and Open game; on the
@@ -481,7 +483,7 @@ fn bar<'a>(search: Option<&'a str>, top: TopBar<'a>) -> Element<'a, Message> {
     if top.fullscreen {
         bar = bar.push(space().width(6)).push(icon_button(
             Icon::Minimize,
-            String::from("Exit fullscreen (F11)"),
+            with_key("Exit fullscreen", top.fullscreen_key),
             Some(Message::Window(WindowMessage::ToggleFullscreen)),
         ));
     }

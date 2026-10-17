@@ -512,6 +512,11 @@ impl App {
                 views::library::TopBar {
                     newer_version: self.newer_version.as_deref(),
                     fullscreen: self.fullscreen,
+                    fullscreen_key: self
+                        .settings
+                        .shared
+                        .controls
+                        .input_label(Device::Keyboard, Action::Fullscreen),
                 },
             ),
         }];

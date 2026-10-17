@@ -20,7 +20,7 @@ use crate::ui::pictures;
 use crate::ui::theme;
 use crate::ui::widgets::{
     bar_button, bar_separator, icon_button, menu_separator, secondary_button, shortcut,
-    steady_bar_button, toggle_icon_button, top_bar, truncated_text, whole_step_screen,
+    steady_bar_button, toggle_icon_button, top_bar, truncated_text, whole_step_screen, with_key,
 };
 use iced::widget::{
     self, Column, Stack, button, center, column, container, image, mouse_area, opaque, row,
@@ -28,7 +28,7 @@ use iced::widget::{
 };
 use iced::{Alignment, ContentFit, Element, Fill, mouse};
 use nubo_frontend::cheats;
-use nubo_frontend::controls::Action;
+use nubo_frontend::controls::{Action, Device};
 use nubo_frontend::library;
 use nubo_frontend::save_states::{self, Slot, SlotInfo};
 use nubo_frontend::screenshots;
@@ -134,9 +134,15 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
         (Icon::Volume2, "Mute")
     };
     let (fullscreen_icon, fullscreen_label) = if fullscreen {
-        (Icon::Minimize, "Exit fullscreen (F11)")
+        (Icon::Minimize, "Exit fullscreen")
     } else {
-        (Icon::Maximize, "Fullscreen (F11)")
+        (Icon::Maximize, "Fullscreen")
+    };
+    let key = |action| {
+        settings
+            .shared
+            .controls
+            .input_label(Device::Keyboard, action)
     };
     // The browser has no library: leaving a game goes back to the start
     // screen.
@@ -177,7 +183,10 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
         truncated_text(game.session.name(), 15.0, theme::HEADING_FONT),
         toggle_icon_button(
             Icon::FastForward,
-            String::from("Fast forward (hold Tab)"),
+            with_key(
+                "Fast forward",
+                key(Action::FastForward).map(|key| format!("hold {key}")),
+            ),
             game.session.is_fast_forward_on(),
             Message::Game(GameMessage::ToggleFastForward),
         ),
@@ -197,7 +206,7 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
         space().width(4),
         icon_button(
             fullscreen_icon,
-            String::from(fullscreen_label),
+            with_key(fullscreen_label, key(Action::Fullscreen)),
             Some(Message::Window(WindowMessage::ToggleFullscreen)),
         ),
         space().width(6),
