@@ -537,6 +537,12 @@ impl Gpu {
         };
     }
 
+    /// Whether the PPU's timing follows the CPU's speed, as it always does. A loaded save state
+    /// where it doesn't is damaged.
+    pub(super) fn matches_speed(&self, cgb_double_speed: bool) -> bool {
+        self.in_double_speed() == cgb_double_speed
+    }
+
     /// Whether this is a CGB's PPU (the AGB's included), with VRAM banks, palette RAM and its own
     /// timing, also while it runs a DMG game.
     fn is_cgb(&self) -> bool {

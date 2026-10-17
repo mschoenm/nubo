@@ -667,6 +667,13 @@ impl Apu {
         self.update_held_back_events();
     }
 
+    /// Whether the APU's copies of the system counter and the CPU's speed are
+    /// the ones the timers and the speed switch hold, as they always are
+    /// between M-cycles. A loaded save state where they differ is damaged.
+    pub(crate) fn matches_clock(&self, system_counter: u16, cgb_double_speed: bool) -> bool {
+        self.system_counter == system_counter && self.cgb_double_speed == cgb_double_speed
+    }
+
     /// Tells the APU the address the CPU accesses in the current M-cycle,
     /// which the timer of a stopped wave channel latches wave RAM bytes from
     /// (except on AGB).

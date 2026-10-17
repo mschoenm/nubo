@@ -1059,7 +1059,10 @@ fn an_older_super_game_boy_state_past_the_boot_rom_skips_the_intro() {
         .sgb_mut()
         .unwrap()
         .restart_intro_for_tests();
-    loaded.address_bus_mut().finish_loading_save_state();
+    loaded
+        .address_bus_mut()
+        .finish_loading_save_state()
+        .unwrap();
     assert!(!loaded.address_bus().held_in_reset());
 }
 

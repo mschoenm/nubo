@@ -257,14 +257,14 @@ impl Cartridge {
         }
     }
 
-    /// Moves a clock loaded from a save state made on the other
-    /// [`RtcClock`] over to the one this cartridge follows, keeping what it
-    /// shows.
+    /// Cuts a loaded MBC3's registers to the bits they have, and moves a
+    /// clock loaded from a save state made on the other [`RtcClock`] over to
+    /// the one this cartridge follows, keeping what it shows.
     pub fn finish_loading_save_state(&mut self, elapsed_dots: u64) {
         match &mut self.mapper {
             CartridgeMapper::Mbc3(mbc3) => {
                 let effects = self.effects.as_ref();
-                mbc3.follow_clock(effects.rtc_clock(), |clock| {
+                mbc3.finish_loading_save_state(effects.rtc_clock(), |clock| {
                     clock_time(effects, clock, elapsed_dots)
                 });
             }

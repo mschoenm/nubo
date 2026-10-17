@@ -194,8 +194,7 @@ impl Serializable for Emulator {
                     .read_save_state_component(name, bytes)
             }
         })?;
-        self.address_bus_mut().finish_loading_save_state();
-        Ok(())
+        self.address_bus_mut().finish_loading_save_state()
     }
 }
 

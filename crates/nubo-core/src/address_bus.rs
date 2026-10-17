@@ -1391,8 +1391,11 @@ impl AddressBus {
 
     /// Sets up what a loaded save state doesn't hold: the views of the
     /// cartridge's ROM, which player holds which controller's buttons, and
-    /// the PPU and M-cycles caught up (see above).
-    pub(crate) fn finish_loading_save_state(&mut self) {
+    /// the PPU and M-cycles caught up (see above). First rejects a state
+    /// whose components disagree on the copies they keep of the address
+    /// bus's state (see `check_loaded_copies`).
+    pub(crate) fn finish_loading_save_state(&mut self) -> std::io::Result<()> {
+        self.check_loaded_copies()?;
         self.cartridge.finish_loading_save_state(self.elapsed_dots);
         self.joypad.finish_loading_save_state();
         self.show_sgb_buttons_held();
@@ -1412,6 +1415,30 @@ impl AddressBus {
         self.ppu_quiet_dots = 0;
         self.deferred_cycles = 0;
         self.deferral_budget = 0;
+        Ok(())
+    }
+
+    /// Rejects a loaded save state in which the PPU's or the APU's copy of
+    /// the CPU's speed isn't the speed switch's, or the APU's copy of the
+    /// system counter isn't the timers'. Nubo never saves such a state, and
+    /// a damaged one would run differently from the hardware: the wrong STAT
+    /// and VRAM blocking dots, or a frame sequencer that steps at the wrong
+    /// rate or that bulk M-cycles run past. It runs once every component has
+    /// loaded, whatever order the state stores them in.
+    fn check_loaded_copies(&self) -> std::io::Result<()> {
+        let double_speed = self.speed_switch.cgb_double_speed();
+        let consistent = self.gpu.matches_speed(double_speed)
+            && self
+                .apu
+                .matches_clock(self.timers.system_counter(), double_speed);
+        if consistent {
+            Ok(())
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "the PPU's or the APU's copy of the speed or system counter differs",
+            ))
+        }
     }
 }
 

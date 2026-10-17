@@ -1122,3 +1122,123 @@ fn damaged_save_states_are_refused_or_run_without_panicking() {
         );
     }
 }
+
+/// The state `model` saves after running the busy game with `cartridge_type` for a while.
+fn busy_state(model: Model, cartridge_type: u8) -> (Vec<u8>, StoredState) {
+    let rom = busy_game(model, cartridge_type);
+    let mut emulator = booted(model, &rom);
+    let (mut left, mut right) = (Vec::new(), Vec::new());
+    for _ in 0..WARM_UP_FRAMES {
+        emulator.run_frame(&mut left, &mut right);
+    }
+    let layout = Layout::of(&emulator);
+    let state = StoredState::read(emulator.save_state(), &layout);
+    (rom, state)
+}
+
+/// `state` with the value at `path` replaced by `bytes`.
+fn with_value(state: &StoredState, path: &str, bytes: Vec<u8>) -> Vec<u8> {
+    let value = state
+        .values
+        .iter()
+        .find(|value| value.path == path)
+        .unwrap_or_else(|| panic!("a save state stores no {path}"));
+    let replacement = Replacement {
+        bytes,
+        shown: String::new(),
+    };
+    state.changed(&[(value, &replacement)])
+}
+
+/// A variant's name as a state stores it, after its length.
+fn variant_bytes(name: &str) -> Vec<u8> {
+    let mut bytes = vec![u8::try_from(name.len()).expect("a short name")];
+    bytes.extend_from_slice(name.as_bytes());
+    bytes
+}
+
+/// The PPU and the APU keep copies of the CPU's speed and the system counter, which the speed
+/// switch and the timers own. A state where a copy differs, or where a Game Boy's serial port
+/// uses the Game Boy Color's fast clock, is one Nubo never saves.
+#[test]
+fn states_whose_copies_of_the_speed_or_system_counter_differ_are_refused() {
+    let (rom, state) = busy_state(Model::CgbE, 0x10);
+    let mut emulator = Tester::emulator(Model::CgbE, &rom);
+    emulator.load_state(&state.bytes).unwrap();
+    let view = StateView {
+        bytes: &state.bytes,
+        layout: &Layout::of(&emulator),
+    };
+    let double_speed = view.number("speed_switch.cgb_double_speed") != 0;
+    let system_counter = u16::try_from(view.number("apu.system_counter")).unwrap();
+    let other_timing = if double_speed {
+        "Cgb"
+    } else {
+        "CgbDoubleSpeed"
+    };
+    let damaged = [
+        (
+            "apu.system_counter",
+            system_counter.wrapping_add(4).to_le_bytes().to_vec(),
+        ),
+        ("apu.cgb_double_speed", vec![u8::from(!double_speed)]),
+        ("ppu.timing", variant_bytes(other_timing)),
+        (
+            "speed_switch.cgb_double_speed",
+            vec![u8::from(!double_speed)],
+        ),
+    ];
+    for (path, bytes) in damaged {
+        assert!(
+            emulator
+                .load_state(&with_value(&state, path, bytes))
+                .is_err(),
+            "a state with another {path} loaded"
+        );
+    }
+
+    let (rom, state) = busy_state(Model::Dmg, 0x03);
+    let mut emulator = Tester::emulator(Model::Dmg, &rom);
+    emulator.load_state(&state.bytes).unwrap();
+    let fast_serial_clock = with_value(&state, "serial.is_high_speed_clock", vec![1]);
+    assert!(emulator.load_state(&fast_serial_clock).is_err());
+}
+
+/// An MBC3's registers hold only the bits the hardware has, also when a damaged state stores
+/// more, as they do when a game writes them or a `.rtc` file loads.
+#[test]
+fn a_loaded_mbc3_keeps_only_the_bits_its_registers_have() {
+    let (rom, state) = busy_state(Model::CgbE, 0x10);
+    let mut emulator = Tester::emulator(Model::CgbE, &rom);
+    let mut damaged = state.bytes.clone();
+    for path in [
+        "cartridge.mapper.mbc3.rtc.seconds",
+        "cartridge.mapper.mbc3.rtc.minutes",
+        "cartridge.mapper.mbc3.rtc.hours",
+        "cartridge.mapper.mbc3.ram_bank_or_rtc_register",
+        "cartridge.mapper.mbc3.rom_bank_number",
+    ] {
+        let stored = StoredState::read(damaged, &Layout::of(&emulator));
+        damaged = with_value(&stored, path, vec![0xFF]);
+    }
+    let stored = StoredState::read(damaged, &Layout::of(&emulator));
+    damaged = with_value(&stored, "cartridge.mapper.mbc3.rtc.days", vec![0xFF, 0xFF]);
+    emulator.load_state(&damaged).unwrap();
+
+    let rtc = emulator.rtc_state(crate::RtcClock::EmulatedTime).unwrap();
+    assert_eq!(
+        (rtc.seconds, rtc.minutes, rtc.hours, rtc.days),
+        (63, 63, 31, 0x1FF)
+    );
+    let layout = Layout::of(&emulator);
+    let saved = emulator.save_state();
+    let view = StateView {
+        bytes: &saved,
+        layout: &layout,
+    };
+    assert_eq!(
+        view.number("cartridge.mapper.mbc3.ram_bank_or_rtc_register"),
+        0x0F
+    );
+    assert_eq!(view.number("cartridge.mapper.mbc3.rom_bank_number"), 0x7F);
+}
