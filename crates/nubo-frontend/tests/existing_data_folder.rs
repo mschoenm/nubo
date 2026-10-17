@@ -156,11 +156,12 @@ fn saved_cheats() -> Vec<Cheat> {
 
 #[test]
 fn the_settings_read_the_same() {
-    let (settings, problem) = settings::load(&existing_files(), |contents| {
+    let loaded = settings::load(&existing_files(), |contents| {
         toml::from_str::<Settings>(contents)
     });
+    let settings = loaded.settings;
 
-    assert_eq!(problem, None);
+    assert_eq!(loaded.problem, None);
     assert_eq!(settings.model, ModelPreference::Fixed(Model::CgbC));
     assert_eq!(
         settings.library_folders[1],

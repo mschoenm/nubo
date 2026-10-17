@@ -37,6 +37,22 @@ fn the_games_read_back_as_saved() {
 }
 
 #[test]
+fn an_unreadable_library_is_kept_aside_before_a_save_can_replace_it() {
+    let cache = Cache::default();
+    let from_newer_nubo = b"[[games]]\nmodel = \"Game Boy Advance SP\"\n";
+    for _ in 0..2 {
+        indexed_db::write("library.toml", from_newer_nubo).unwrap();
+        assert!(load_entries(&cache).is_err());
+        save_entries(&cache, &[]).unwrap();
+    }
+
+    for kept in ["library.kept-1.toml", "library.kept-2.toml"] {
+        assert_eq!(&*indexed_db::read(kept).unwrap().bytes, from_newer_nubo);
+    }
+    assert_eq!(load_entries(&cache), Ok(Vec::new()));
+}
+
+#[test]
 fn a_new_library_is_empty() {
     assert!(load_entries(&Cache::default()).unwrap().is_empty());
 }

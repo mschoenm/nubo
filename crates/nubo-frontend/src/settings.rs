@@ -277,29 +277,71 @@ impl fmt::Display for FastForwardSpeed {
     }
 }
 
+/// What [`load`] read: the settings, and what to tell the player if the
+/// saved ones couldn't be used.
+#[derive(Debug)]
+pub struct Loaded<T> {
+    /// The saved settings, or the defaults when there are none or they
+    /// couldn't be read.
+    pub settings: T,
+    /// Why the saved settings couldn't be used, for the player.
+    pub problem: Option<String>,
+    /// Whether saving can't lose anything the player saved: there were no
+    /// saved settings, they were read, or the ones that couldn't be read were
+    /// kept aside. When it is `false`, an app saves only what the player
+    /// changes, nothing on its own (such as the window's size).
+    pub saving_is_safe: bool,
+}
+
 /// Reads the settings saved in `storage` with `parse`, which makes a `T` of
 /// the TOML text: [`Settings`] (with `toml::from_str`) or an app's own type
-/// that holds them. Without saved settings this returns the defaults; if
-/// they can't be read it returns the defaults together with the reason.
+/// that holds them. Without saved settings this gives the defaults. Saved
+/// settings that can't be parsed (such as a value only a newer Nubo knows,
+/// after going back to an older one) give the defaults too, and are kept
+/// aside first ([`Storage::keep_aside`], such as `settings.kept-1.toml`), so
+/// saving the defaults can't lose them; the problem names where they went.
 pub fn load<T: Default>(
     storage: &dyn Storage,
     parse: impl FnOnce(&str) -> Result<T, toml::de::Error>,
-) -> (T, Option<String>) {
-    match read_text(storage) {
-        Ok(None) => (T::default(), None),
-        Ok(Some(contents)) => match parse(&contents) {
-            Ok(settings) => (settings, None),
-            Err(error) => (
-                T::default(),
-                Some(format!(
-                    "Your settings couldn't be read and were reset: {error}"
-                )),
-            ),
+) -> Loaded<T> {
+    let parsed = match storage.read(Entry::Settings) {
+        Ok(None) => Ok(None),
+        // The same words as reading a file that isn't text says.
+        Ok(Some(bytes)) => String::from_utf8(bytes)
+            .map_err(|_| String::from("stream did not contain valid UTF-8"))
+            .and_then(|contents| parse(&contents).map_err(|error| error.to_string()))
+            .map(Some),
+        Err(error) => {
+            return Loaded {
+                settings: T::default(),
+                problem: Some(format!("Your settings couldn't be read: {error}")),
+                saving_is_safe: false,
+            };
+        }
+    };
+
+    match parsed {
+        Ok(settings) => Loaded {
+            settings: settings.unwrap_or_default(),
+            problem: None,
+            saving_is_safe: true,
         },
-        Err(error) => (
-            T::default(),
-            Some(format!("Your settings couldn't be read: {error}")),
-        ),
+        Err(error) => {
+            let kept = storage.keep_aside(Entry::Settings);
+            let problem = match &kept {
+                Ok(location) => format!(
+                    "Your settings couldn't be read, so Nubo starts with the defaults and kept them as {location}: {error}"
+                ),
+                Err(keep_error) => format!(
+                    "Your settings couldn't be read and were reset (keeping them aside failed too: {keep_error}): {error}"
+                ),
+            };
+            Loaded {
+                settings: T::default(),
+                problem: Some(problem),
+                saving_is_safe: kept.is_ok(),
+            }
+        }
     }
 }
 
@@ -310,17 +352,6 @@ pub fn save<T: Serialize>(storage: &dyn Storage, settings: &T) -> Result<(), Str
     storage
         .write(Entry::Settings, contents.as_bytes())
         .map_err(|error| format!("Your settings couldn't be saved: {error}"))
-}
-
-/// The saved settings file as text, or `None` if there isn't one yet.
-fn read_text(storage: &dyn Storage) -> Result<Option<String>, String> {
-    match storage.read(Entry::Settings)? {
-        None => Ok(None),
-        // The same words as reading a file that isn't text says.
-        Some(bytes) => String::from_utf8(bytes)
-            .map(Some)
-            .map_err(|_| String::from("stream did not contain valid UTF-8")),
-    }
 }
 
 #[cfg(test)]
