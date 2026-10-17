@@ -102,70 +102,61 @@ impl RtcState {
     }
 
     /// Moves the clock forward by `elapsed_milliseconds`. A register that holds
-    /// an invalid value (such as 61 seconds) doesn't carry into the next one;
-    /// it keeps counting until it overflows its bits and wraps to 0.
+    /// an invalid value (such as 61 seconds) doesn't carry into the next one
+    /// when it passes its normal limit: it keeps counting until it overflows
+    /// its bits and wraps to 0, without a carry, and from there counts as
+    /// usual, so 62 seconds plus 10 reads 8 seconds, as on SameBoy, which
+    /// ticks once a second.
     fn advance(&mut self, elapsed_milliseconds: f64) {
-        let mut new_milliseconds =
+        let total_milliseconds =
             u64::from(self.milliseconds).saturating_add(elapsed_milliseconds as u64);
-        let mut new_seconds = u64::from(self.seconds);
-        let mut new_minutes = u64::from(self.minutes);
-        let mut new_hours = u64::from(self.hours);
-        let mut new_days = u64::from(self.days);
+        let (seconds, minutes_carry) = count_register(
+            self.seconds,
+            total_milliseconds / 1000,
+            60,
+            SECONDS_REGISTER_MAX,
+        );
+        let (minutes, hours_carry) =
+            count_register(self.minutes, minutes_carry, 60, MINUTES_REGISTER_MAX);
+        let (hours, days_carry) = count_register(self.hours, hours_carry, 24, HOURS_REGISTER_MAX);
 
-        let mut invalid_rollover = false;
-
-        new_seconds += new_milliseconds / 1000;
-        new_milliseconds %= 1000;
-
-        if self.seconds < 60 {
-            new_minutes += new_seconds / 60;
-            new_seconds %= 60;
-        } else if new_seconds > u64::from(SECONDS_REGISTER_MAX) {
-            invalid_rollover = true;
-            new_seconds = 0;
-        }
-
-        if self.minutes < 60 && !invalid_rollover {
-            new_hours += new_minutes / 60;
-            new_minutes %= 60;
-        } else if new_minutes > u64::from(MINUTES_REGISTER_MAX) {
-            invalid_rollover = true;
-            new_minutes = 0;
-        }
-
-        if self.hours < 24 && !invalid_rollover {
-            new_days += new_hours / 24;
-            new_hours %= 24;
-        } else if new_hours > u64::from(HOURS_REGISTER_MAX) {
-            invalid_rollover = true;
-            new_hours = 0;
-        }
-
-        if new_days >= 512 && !invalid_rollover {
-            new_days %= 512;
+        let days = u64::from(self.days) + days_carry;
+        if days > u64::from(DAYS_REGISTER_MAX) {
             self.day_carry = true;
         }
 
-        self.milliseconds = new_milliseconds as u16;
-        self.seconds = new_seconds as u8;
-        self.minutes = new_minutes as u8;
-        self.hours = new_hours as u8;
-        self.days = new_days as u16;
+        self.milliseconds = (total_milliseconds % 1000) as u16;
+        self.seconds = seconds;
+        self.minutes = minutes;
+        self.hours = hours;
+        self.days = (days % (u64::from(DAYS_REGISTER_MAX) + 1)) as u16;
     }
 
     /// Counts the whole milliseconds that passed since the clock was last
     /// brought up to date. The fraction of a millisecond left over stays in
     /// `base_timestamp`, so a game that latches the clock very often doesn't
-    /// lose it. A halted clock doesn't count. Returns whether the clock moved.
+    /// lose it. A halted clock doesn't count. Returns whether the clock
+    /// changed, so the frontend saves it.
+    ///
     /// A `base_timestamp` that isn't a number, as a damaged `.rtc` file or
-    /// save state can hold, starts counting from `current_time` instead.
+    /// save state can hold, starts counting from `current_time` instead, and
+    /// so does one in the future: the computer's clock went back, or the
+    /// `.rtc` file came from a computer whose clock was ahead. Waiting for
+    /// the old time to come back would stand the clock still for as long.
     fn catch_up(&mut self, current_time: f64) -> bool {
         if !self.base_timestamp.is_finite() {
             self.base_timestamp = current_time;
             return false;
         }
+        if self.halted {
+            return false;
+        }
+        if current_time < self.base_timestamp {
+            self.base_timestamp = current_time;
+            return true;
+        }
         let elapsed_milliseconds = (current_time - self.base_timestamp).floor();
-        if self.halted || elapsed_milliseconds < 1.0 {
+        if elapsed_milliseconds < 1.0 {
             return false;
         }
         self.advance(elapsed_milliseconds);
@@ -249,6 +240,27 @@ const HOURS_REGISTER_MAX: u8 = 31;
 /// up to 511.
 const DAYS_REGISTER_MAX: u16 = 0x1FF;
 
+/// Counts a clock register holding `value` on by `ticks`. A register below
+/// `period` (60 for seconds and minutes, 24 for hours) counts as usual and
+/// carries into the next register each time it goes past `period - 1`. One
+/// holding an invalid value counts up to `register_max`, wraps to 0 without
+/// a carry and counts as usual from there. Returns the new value and the
+/// carries into the next register.
+fn count_register(value: u8, ticks: u64, period: u8, register_max: u8) -> (u8, u64) {
+    let mut ticks = ticks;
+    if value >= period {
+        let to_wrap = u64::from(register_max - value) + 1;
+        if ticks < to_wrap {
+            return (value + ticks as u8, 0);
+        }
+        ticks -= to_wrap;
+    } else {
+        ticks += u64::from(value);
+    }
+    let period = u64::from(period);
+    ((ticks % period) as u8, ticks / period)
+}
+
 const RTC_SECONDS: u8 = 0x08;
 const RTC_MINUTES: u8 = 0x09;
 const RTC_HOURS: u8 = 0x0A;
@@ -331,7 +343,7 @@ impl Mbc3CartridgeMapper {
     /// seconds register also restarts the current second.
     fn write_rtc_register(&mut self, register: u8, value: u8, current_time: f64) {
         self.rtc.catch_up(current_time);
-        if self.rtc.halted || current_time < self.rtc.base_timestamp {
+        if self.rtc.halted {
             self.rtc.base_timestamp = current_time;
         }
 
@@ -694,6 +706,58 @@ mod tests {
     }
 
     #[test]
+    fn an_invalid_register_wraps_to_0_and_keeps_the_time_left_over() {
+        let mut state = RtcState {
+            seconds: 62,
+            minutes: 5,
+            ..RtcState::default()
+        };
+        state.advance(10_000.0);
+        assert_eq!((state.seconds, state.minutes), (8, 5));
+
+        state.advance(60_000.0);
+        assert_eq!((state.seconds, state.minutes), (8, 6));
+    }
+
+    #[test]
+    fn invalid_registers_carry_only_after_they_wrap() {
+        let mut state = RtcState {
+            seconds: 30,
+            minutes: 62,
+            hours: 30,
+            days: 511,
+            ..RtcState::default()
+        };
+        // 3 minutes: 62 and 63, wrap to 0 without a carry, then 1.
+        state.advance(180_000.0);
+        assert_eq!((state.seconds, state.minutes, state.hours), (30, 1, 30));
+
+        // 59 minutes more: the hours register counts once, from 30 to 31.
+        state.advance(59.0 * 60_000.0);
+        assert_eq!((state.minutes, state.hours, state.days), (0, 31, 511));
+
+        // 25 hours more: 31 wraps to 0 without a carry, then 24 hours make
+        // a day, which overflows the day counter.
+        state.advance(25.0 * 3_600_000.0);
+        assert_eq!((state.hours, state.days, state.day_carry), (0, 0, true));
+    }
+
+    #[test]
+    fn a_clock_whose_time_went_back_counts_on_from_now() {
+        let mut state = RtcState {
+            seconds: 10,
+            base_timestamp: 1_000_000.0,
+            ..RtcState::default()
+        };
+        assert!(state.catch_up(5_000.0));
+        assert_eq!(state.seconds, 10);
+        assert_eq!(state.base_timestamp, 5_000.0);
+
+        assert!(state.catch_up(8_000.0));
+        assert_eq!(state.seconds, 13);
+    }
+
+    #[test]
     fn rebasing_a_halted_clock_counts_nothing() {
         let mut state = RtcState {
             seconds: 10,
@@ -803,6 +867,19 @@ mod tests {
 
         mapper.report_save_changes();
         assert_eq!(saves.get(), 0);
+    }
+
+    #[test]
+    fn a_wall_clock_that_went_back_is_saved_and_counts_on_from_then() {
+        let (mut mapper, now, saves) = adjustable_clock_counting_saves();
+        now.set(-60_000.0);
+        latch(&mut mapper);
+        mapper.report_save_changes();
+        assert_eq!(saves.get(), 1);
+
+        now.set(-55_000.0);
+        latch(&mut mapper);
+        assert_eq!(read_rtc_register(&mut mapper, RTC_SECONDS), 15);
     }
 
     #[test]
