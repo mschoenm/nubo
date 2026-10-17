@@ -2,6 +2,8 @@
 
 A private claude.ai page lists every open issue with an assessment: what it is, the proposed fix and whether that fix is right, what fixing it would change, whether it is worth doing, and alternatives worth exploring. The maintainer reads it on their phone, ticks the issues to work on and taps Start. Each ticked issue is then solved in a cloud session of its own, which opens a pull request and sees it through; merging waits until the maintainer asks. The page also shows what is being worked on.
 
+An issue that a session is solving carries the label `in progress` on GitHub. That session keeps its progress in one comment on the issue and its `status` on the page up to date itself, so the hourly runs leave the issue alone until it is closed or the label is gone.
+
 A routine brings the page up to date every hour and starts the sessions for whatever was ticked since. A session the maintainer opens to work on the triage with Claude (part C) does the same within a minute. This file is the instructions for both; the routine's prompt only points here, so the job changes through pull requests like the code. How to set it all up again: the `issue-triage` skill (`.claude/skills/issue-triage/SKILL.md`).
 
 Write everything the maintainer reads on the page in Dutch (plain, short sentences, "je"); write code, commits, pull requests and issue comments in English, as the rest of the repository does.
@@ -31,18 +33,18 @@ Every write to an existing document passes `if_version` from the last read; more
 The routine asks for this every hour; a `refresh` request asks for it too. Most hours nothing changed, so the run starts with a quick check and stops when it finds nothing to do.
 
 1. **Quick check.** List the open issues of `mschoenm/nubo` (number and `updated_at`, pull requests aside) with the GitHub MCP tools, and read the database's `issues`, `status` and `requests`. There is work when:
-   - an open issue has no `issues/<n>` document, or its `updated_at` is newer than `github_updated_at`;
+   - an open issue without the label `in progress` has no `issues/<n>` document, or its `updated_at` is newer than `github_updated_at` (a session's progress comment changes `updated_at`, which is why labelled issues don't count);
    - an `issues/<n>` document that isn't `closed` belongs to an issue that is no longer open;
    - a `requests` document is `nieuw`;
-   - a `status` document isn't `Klaar` and its pull request (step 6) changed;
+   - a `status` document isn't `Klaar`, its issue has no `in progress` label, and its pull request (step 6) changed;
    - or this is the first run since 06:00 Amsterdam time today, which also does the daily steps (marked "daily" below).
 
    With no work, set `meta/page` `checked_at`, end with the single line "Niets te doen." and stop.
 2. `git fetch origin main && git checkout -q --detach origin/main`, and read `AGENTS.md`.
-3. Assess every open issue that has no `issues/<n>` document or whose GitHub `updated_at` is newer than its `github_updated_at`; daily, also those whose code changed on `main` since `assessed_at` (`git log --since` on the files it names). Read the issue in full and the `AGENTS.md` of the folders involved, check every claim against the code, say where the issue or its proposed fix is wrong, and note issues that touch the same code and should be fixed together. With more than three to assess, give groups of about six to `Explore` subagents in parallel, with these instructions and the field list above. Write the documents.
-4. For each `issues/<n>` whose GitHub issue is now closed, set `closed`, `closed_at` and `closed_by` (the pull request that closed it, from the issue's timeline or a `Fixes #<n>` pull request), and set the matching `status/<n>` to `Klaar`. Daily, delete `issues/<n>` and `status/<n>` documents closed more than seven days ago, and `requests` that are `verwerkt` and older than seven days.
+3. Leave every issue labelled `in progress` alone: its session keeps its `status` up to date. Assess every other open issue that has no `issues/<n>` document or whose GitHub `updated_at` is newer than its `github_updated_at`; daily, also those whose code changed on `main` since `assessed_at` (`git log --since` on the files it names). Read the issue in full and the `AGENTS.md` of the folders involved, check every claim against the code, say where the issue or its proposed fix is wrong, and note issues that touch the same code and should be fixed together. With more than three to assess, give groups of about six to `Explore` subagents in parallel, with these instructions and the field list above. Write the documents.
+4. For each `issues/<n>` whose GitHub issue is now closed, set `closed`, `closed_at` and `closed_by` (the pull request that closed it, from the issue's timeline or a `Fixes #<n>` pull request), and set the matching `status/<n>` to `Klaar`. Daily, delete `issues/<n>` and `status/<n>` documents closed more than seven days ago, and `requests` that are `verwerkt` and older than seven days. Also daily, for each issue labelled `in progress` whose session (`get_session` on the id in its `status` `session_url`) hasn't changed for more than a day while its pull request isn't merged, set the `status` note to `Lijkt vastgelopen sinds <date>`; do nothing else with it.
 5. An issue the assessment finds already fixed on `main` (`status: opgelost`) stays open; the page shows it, and ticking it means "close it" (part B).
-6. Bring `status` up to date: for each issue whose `status` isn't `Klaar`, find its pull request (an open one whose description says `Fixes #<n>`, or the branch `claude/issue-<n>`) and set `pr` and `state`: `PR open`, `PR klaar voor merge` once CI is green and Codex's review is handled (or Codex can't review), `Klaar` once it is merged. When the session's title doesn't name the pull request yet, set it as part B says.
+6. Bring `status` up to date for issues whose `status` isn't `Klaar` and that have no `in progress` label (their sessions began before the label, or stopped without a fix): find its pull request (an open one whose description says `Fixes #<n>`, or the branch `claude/issue-<n>`) and set `pr` and `state`: `PR open`, `PR klaar voor merge` once CI is green and Codex's review is handled (or Codex can't review), `Klaar` once it is merged. When the session's title doesn't name the pull request yet, set it as part B says.
 7. Handle every `requests` document still `nieuw`: part B for `start`; a `refresh` is done by this run, so set it to `verwerkt`.
 8. Update `meta/page`: `asof` and `updated_at` when `issues` changed, and `checked_at`.
 9. End with a short Dutch summary: how many issues are new, assessed again or closed, and the requests handled. Don't message the maintainer otherwise; the page is the report.
@@ -55,7 +57,7 @@ Each session is named after its issue, so the maintainer sees in their sidebar w
 
 For each ticked issue:
 
-1. When its `status/<n>` already shows a running session or an open pull request, start no other; say so in its `status` note.
+1. When the issue already has the label `in progress`, or its `status/<n>` shows a running session or an open pull request, start no other; say so in its `status` note.
 2. When its assessment finds it already fixed on `main`, close the issue with a comment naming the commits or pull requests that fixed it (with the Claude Code footer), set `status/<n>` to `Klaar`, and start no session.
 3. Issues the assessment says belong together (such as #152 and #190) share one session when both are ticked, unless a note says otherwise.
 4. Otherwise start one session with `create_session` (the claude-code-remote MCP server; this session's environment, `source_url` https://github.com/mschoenm/nubo, the title above). Its prompt gives:
@@ -63,8 +65,11 @@ For each ticked issue:
    - the page's assessment (problem, fix, effects, alternatives, notes) and the maintainer's note, which wins over the assessment;
    - that it works on the branch `claude/issue-<n>`, opens a pull request whose description says `Fixes #<n>`, subscribes to it and sees it through as AGENTS.md says (red CI, conflicts, Codex's findings), and never merges it: merging waits until the maintainer asks;
    - that a design choice no note settles takes the choice the assessment's `notes` names, and the pull request says so;
-   - that once its pull request is open, it adds ` · PR #<pr>` to its own title (`get_session` without an id gives its id, then `set_session_title`) and writes `status/<n>` in the page's database (`ArtifactData`, the page's URL above): `state` `PR open`, `pr` and `updated_at`, with `if_version` from its read.
-5. Write `status/<n>`: `state` `Sessie gestart`, `session_url` (`https://claude.ai/code/<session id>`) and `updated_at`.
+   - that it keeps its progress in one comment on the issue, in English with the Claude Code footer: it posts the comment when it starts (that it works on the issue, with its session's title and link) and edits that same comment at each step (pull request opened, CI green and waiting for the maintainer to merge, merged), rather than posting new ones;
+   - that it keeps `status/<n>` in the page's database up to date itself (`ArtifactData`, the page's URL above, with `if_version` from its read): `state` `PR open` with `pr` once its pull request is open, `PR klaar voor merge` once CI is green and Codex's review is handled (or Codex can't review), and `Klaar` once it is merged, each with `updated_at`;
+   - that once its pull request is open, it adds ` · PR #<pr>` to its own title (`get_session` without an id gives its id, then `set_session_title`);
+   - that it removes the label `in progress` from the issue once its pull request is merged, or when it stops without a fix, saying why in its comment and in the `status` note.
+5. Add the label `in progress` to the issue (GitHub creates the label the first time), and write `status/<n>`: `state` `Sessie gestart`, `session_url` (`https://claude.ai/code/<session id>`) and `updated_at`.
 
 Then set the `requests` document to `verwerkt`.
 
