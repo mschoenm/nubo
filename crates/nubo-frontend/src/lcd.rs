@@ -19,7 +19,8 @@
 //! screen look, turns on only the one each model's screen had
 //! ([`ScreenEffects`], see `GameSession::set_screen_look`).
 
-use crate::picture::Frame;
+use crate::palettes::DmgPalette;
+use crate::picture::{Frame, Picture};
 use nubo_core::Model;
 use std::sync::OnceLock;
 
@@ -48,19 +49,36 @@ impl ScreenEffects {
         }
     }
 
-    /// Puts the effects on `frame`, as the emulator drew it: mixes it with
-    /// `previous`, the pixels of the frame before as the emulator drew them,
-    /// when frames blend and there is one, and corrects its colors. Frames
-    /// in the Game Boy's grays and Super Game Boy frames, which a TV showed,
+    /// `frame`, as the emulator drew it, as the player sees it through the
+    /// effects: in `palette` and with or without a Super Game Boy's border
+    /// (see `Frame::shown`), mixed with `previous`, the frame before as the
+    /// emulator drew it, when frames blend and there is one, and with its
+    /// colors corrected. Both frames are repainted in the palette before
+    /// they are mixed: the palette only knows the emulator's four grays, so
+    /// it can't repaint the shades in between that mixing makes. Frames in
+    /// the Game Boy's grays and Super Game Boy frames, which a TV showed,
     /// keep their colors.
-    pub fn apply(self, frame: &mut Frame, previous: Option<&[u8]>) {
-        if self.blend_frames
-            && let Some(previous) = previous
-        {
-            blend(&mut frame.pixels, previous);
-        }
-        if self.correct_colors && !frame.in_dmg_shades && frame.sgb_menu.is_none() {
-            correct_colors(&mut frame.pixels);
+    pub fn show(
+        self,
+        frame: &Frame,
+        previous: Option<&Frame>,
+        palette: DmgPalette,
+        with_border: bool,
+    ) -> Picture {
+        let picture = if self.correct_colors && !frame.in_dmg_shades && frame.sgb_menu.is_none() {
+            let mut corrected = frame.clone();
+            correct_colors(&mut corrected.pixels);
+            corrected.shown(palette, with_border)
+        } else {
+            frame.shown(palette, with_border)
+        };
+        match previous {
+            Some(previous) if self.blend_frames => {
+                let mut pixels = picture.pixels().to_vec();
+                blend(&mut pixels, previous.shown(palette, with_border).pixels());
+                Picture::new(picture.width(), picture.height(), pixels)
+            }
+            _ => picture,
         }
     }
 }

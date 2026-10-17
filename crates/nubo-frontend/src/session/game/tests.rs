@@ -142,6 +142,70 @@ fn a_repainted_frame_stays_blended_with_the_one_before() {
     assert_eq!(screen.pixels(), Some(&blended[..]));
 }
 
+/// An original Game Boy frame whose screen is all the emulator's gray
+/// `shade` (0 is the lightest).
+fn shade_frame(shade: usize) -> Frame {
+    Frame {
+        pixels: nubo_core::DMG_SHADES[shade].repeat((SCREEN_WIDTH * SCREEN_HEIGHT) as usize),
+        ..screen_frame(true)
+    }
+}
+
+/// A screen that blends frames, as an original Game Boy's does.
+fn blending_screen(palette: DmgPalette) -> Screen {
+    let mut screen = Screen::new();
+    screen.set_palette(palette);
+    screen.set_effects(ScreenEffects {
+        correct_colors: false,
+        blend_frames: true,
+    });
+    screen
+}
+
+/// The color halfway between two of `palette`'s colors, as blending mixes
+/// them, as an RGBA pixel.
+fn halfway(palette: DmgPalette, first: usize, second: usize) -> [u8; 4] {
+    let colors = palette.colors();
+    let mut pixel = [0xFF; 4];
+    for channel in 0..3 {
+        pixel[channel] = (u16::from(colors[first][channel]) + u16::from(colors[second][channel]))
+            .div_ceil(2) as u8;
+    }
+    pixel
+}
+
+#[test]
+fn blended_frames_leave_no_gray_in_a_palette() {
+    for palette in [DmgPalette::Green, DmgPalette::Pocket] {
+        for (first, second) in [(0, 3), (0, 2), (1, 3)] {
+            let mut screen = blending_screen(palette);
+            screen.show(shade_frame(first));
+            screen.show(shade_frame(second));
+
+            let expected =
+                halfway(palette, first, second).repeat((SCREEN_WIDTH * SCREEN_HEIGHT) as usize);
+            assert_eq!(
+                screen.pixels(),
+                Some(&expected[..]),
+                "{palette} {first} {second}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_new_palette_repaints_both_blended_frames() {
+    let mut screen = blending_screen(DmgPalette::Green);
+    screen.show(shade_frame(0));
+    screen.show(shade_frame(3));
+
+    screen.set_palette(DmgPalette::Pocket);
+
+    let expected =
+        halfway(DmgPalette::Pocket, 0, 3).repeat((SCREEN_WIDTH * SCREEN_HEIGHT) as usize);
+    assert_eq!(screen.pixels(), Some(&expected[..]));
+}
+
 #[test]
 fn the_original_screen_look_follows_each_models_screen() {
     for model in Model::ALL {
