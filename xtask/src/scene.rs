@@ -293,13 +293,10 @@ fn preview(rom: &[u8], model: Model, state: &[u8], frames: u32) -> Result<image:
             finished.push(Frame::latest(&emulator));
         }
     }
-    let mut frame = finished.pop().unwrap_or_else(|| Frame::latest(&emulator));
+    let frame = finished.pop().unwrap_or_else(|| Frame::latest(&emulator));
     let previous = finished.pop();
-    ScreenEffects::of(model, true).apply(
-        &mut frame,
-        previous.as_ref().map(|frame| frame.pixels.as_slice()),
-    );
-    let picture = frame.shown(DmgPalette::default(), true);
+    let picture =
+        ScreenEffects::of(model, true).show(&frame, previous.as_ref(), DmgPalette::default(), true);
     image::RgbaImage::from_raw(picture.width(), picture.height(), picture.pixels().to_vec())
         .ok_or_else(|| String::from("the game's picture has the wrong size"))
 }

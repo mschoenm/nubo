@@ -454,9 +454,10 @@ struct Screen {
     border: bool,
     /// What the picture goes through to look like the model's own screen.
     effects: ScreenEffects,
-    /// The pixels of the frame before the newest, as the emulator drew
-    /// them, to blend the newest with.
-    previous: Option<Vec<u8>>,
+    /// The frame before the newest, as the emulator drew it, to blend the
+    /// newest with. It is kept in the emulator's grays, so a new palette
+    /// repaints it too.
+    previous: Option<Frame>,
     /// The sequence number of the frame shown, to skip unchanged frames.
     sequence: u64,
 }
@@ -478,25 +479,17 @@ impl Screen {
     /// without any border. Save states and the library keep it as their
     /// picture.
     fn screen_pixels(&self) -> Option<Vec<u8>> {
-        let mut raw = self.raw.clone()?;
-        self.correct(&mut raw);
-        let picture = raw.shown(self.palette, false);
+        let raw = self.raw.as_ref()?;
+        let picture = self.effects.show(raw, None, self.palette, false);
         Some(picture.pixels().to_vec())
     }
 
     /// Shows a frame as the emulator drew it, in the chosen palette, mixed
     /// with the one before and with its colors corrected if the player wants.
     fn show(&mut self, frame: Frame) {
-        self.previous = self.raw.take().map(|raw| raw.pixels);
+        self.previous = self.raw.take();
         self.raw = Some(frame);
         self.show_again();
-    }
-
-    /// Corrects the colors of a Game Boy Color frame, if the player wants.
-    /// Frames in the Game Boy's grays and Super Game Boy frames, which a TV
-    /// showed, stay as they are.
-    fn correct(&self, frame: &mut Frame) {
-        self.effects.apply(frame, None);
     }
 
     /// Shows the picture through `effects` from now on, repainting the frame
@@ -530,9 +523,11 @@ impl Screen {
     /// it came, after a setting changed.
     fn show_again(&mut self) {
         if let Some(raw) = &self.raw {
-            let mut shown = raw.clone();
-            self.effects.apply(&mut shown, self.previous.as_deref());
-            self.picture = Some(shown.shown(self.palette, self.border));
+            self.picture =
+                Some(
+                    self.effects
+                        .show(raw, self.previous.as_ref(), self.palette, self.border),
+                );
         }
     }
 }
