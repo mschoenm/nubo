@@ -80,7 +80,8 @@ enum Task {
     /// installing into target/bundle (Windows only)
     Windows(windows::Options),
     /// Build Nubo for this computer and install it, closing a running Nubo first: the app in
-    /// /Applications on macOS, the Flatpak on Linux, the MSI on Windows, without questions
+    /// /Applications on macOS, the Flatpak on Linux, the MSI on Windows. Asks what to build
+    /// unless the working tree is the newest origin/main or --build says
     Install(install::Options),
     /// Build the RetroArch core for this computer into target/bundle as a folder and a zip: the
     /// core under RetroArch's file name, its info file and the licenses
