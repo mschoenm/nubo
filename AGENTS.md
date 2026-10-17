@@ -88,6 +88,8 @@ Claude Code and Codex both read these `AGENTS.md` files; keep them the only inst
 
 **See your pull requests through.** After opening a pull request, watch it without being asked (in Claude Code on the web, subscribe to its activity) and fix what comes up: red CI, a conflict with `main`, Codex's findings and reviewers' comments, until CI is green and Codex's review is handled. Merging still waits until the maintainer asks for it (the `merge` skill). A pull request that fixes an open issue, such as one the nightly review opened, says `Fixes #<number>` in its description, so GitHub closes the issue when it merges.
 
+**Say what a number is.** When you name a pull request or an issue by its number in a chat message to the maintainer, or in a report such as the nightly review's pull request and comments or a full review's report, add one or two words saying what it is: "#194 (triage setup)", "#156 (MBC3 clock)". Keep it that short. Elsewhere on GitHub a bare number is fine, since GitHub shows the title.
+
 ## More Documentation
 
 - `BUILDING.md`: building, running and packaging Nubo, and where the code is, for people; the `README.md` is for players first. Keep both true when commands, packages or folders change.
