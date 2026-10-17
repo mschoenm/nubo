@@ -122,6 +122,22 @@ code { font-family: var(--font-mono); font-size: 0.86em; background: var(--bg); 
 .msg.ok { color: var(--yes); }
 .msg.err { color: var(--accent); }
 .foot { color: var(--muted); font-size: 13px; margin-top: 12px; }
+.head { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px 0; }
+.verdict, details, .note, .status, .cardfoot { margin-left: 14px; margin-right: 14px; }
+.cardfoot { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.cardfoot .status { margin: 0; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.actions .btn { flex: 1 1 140px; }
+details.notebox { margin: 0; }
+details.notebox summary { font-size: 14px; color: var(--muted); font-weight: 400; padding-block: 4px; }
+details.notebox textarea { font: inherit; font-size: 15px; width: 100%; min-height: 64px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--bg); color: var(--fg); margin-top: 4px; }
+.card.compact { padding: 12px 14px; gap: 6px; }
+.card.compact .status { margin: 0; }
+a.badge { text-decoration: none; }
+.badge.pr-open { background: var(--maybe-bg); color: var(--maybe); }
+.badge.pr-merged { background: var(--yes-bg); color: var(--yes); }
+.badge.pr-closed { background: var(--no-bg); color: var(--no); }
+body { padding-block: 0 40px; }
 @media (prefers-reduced-motion: no-preference) { .card { transition: border-color 120ms ease, box-shadow 120ms ease; } }
 @media (max-width: 420px) {
   .verdict, details, .note, .status { margin-left: 14px; }
@@ -132,7 +148,7 @@ code { font-family: var(--font-mono); font-size: 0.86em; background: var(--bg); 
   <header>
     <div class="brand">Nubo · mschoenm/nubo</div>
     <h1>Open issues: wat fixen we?</h1>
-    <p class="lede">Alle <span id="total"></span> open issues, nagelopen tegen <code>main</code> op <span id="asof"></span>. Elk uur werk ik deze lijst bij. Vink aan wat ik moet oplossen en druk op Start: elk aangevinkt issue krijgt een eigen sessie, met een pull request die ik pas merge als jij dat vraagt.</p>
+    <p class="lede">Alle <span id="total"></span> open issues, nagelopen tegen <code>main</code> op <span id="asof"></span>. Elk uur werk ik deze lijst bij. Druk op Start bij een issue en het krijgt een eigen sessie, met een pull request die ik pas merge als jij dat vraagt.</p>
     <div class="refresh-row"><button class="btn" id="refresh" type="button">Nu bijwerken</button><span class="msg" id="checked"></span><p class="msg" id="refreshmsg" hidden></p></div>
     <p class="msg" id="pending" hidden></p>
     <div class="summary" id="summary"></div>
@@ -143,30 +159,19 @@ code { font-family: var(--font-mono); font-size: 0.86em; background: var(--bg); 
   <p class="foot">Oordeel en omvang zijn mijn inschatting na het lezen van de code. Klein is een paar uur werk voor een sessie, groot vraagt ontwerpkeuzes of veel controles.</p>
 </div>
 
-<div class="bar" role="region" aria-label="Gekozen issues">
-  <div class="bar-inner">
-    <div class="bar-row">
-      <div class="bar-count"><strong id="selcount">0</strong> gekozen</div>
-      <button class="btn" id="pickyes" type="button">Kies mijn aanraders</button>
-      <button class="btn" id="clear" type="button">Wis</button>
-      <button class="btn primary" id="start" type="button" disabled>Start</button>
-    </div>
-    <p class="msg" id="msg" hidden></p>
-  </div>
-</div>
-
 <script>
 const REPO = "https://github.com/mschoenm/nubo/issues/";
+const PULL = "https://github.com/mschoenm/nubo/pull/";
 const VERDICT = { ja: ["yes", "Fixen"], twijfel: ["maybe", "Twijfel"], nee: ["no", "Niet fixen"] };
 const AREAS = ["Emulator", "App", "Browser", "macOS", "RetroArch", "Tools en CI", "Overig"];
 const ORDER = { ja: 0, twijfel: 1, nee: 2 };
 const LATER = "Binnen een uur pakt de routine het op. Zit je in een triage-sessie met mij, dan gaat het binnen een minuut, of meteen als je \"ga\" zegt.";
+const PR_STATE = { open: ["pr-open", "open"], merged: ["pr-merged", "gemerged"], closed: ["pr-closed", "gesloten"] };
 
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
-let selected = new Set(store.get("nubo-triage-selected", []));
 let notes = store.get("nubo-triage-notes", {});
 let filter = store.get("nubo-triage-filter", "alles");
 let ISSUES = [];
@@ -174,16 +179,19 @@ let META = {};
 let statuses = {};
 let pending = [];
 let phase = "laden";
-let confirming = false;
+let confirming = {};
+let messages = {};
 let db = null;
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 // Backticks in the texts become <code>.
 const rich = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
-const openIssues = () => ISSUES.filter((i) => !i.closed);
+const listed = () => ISSUES.filter((i) => !i.closed && !i.dismissed);
 const areaOf = (i) => (AREAS.includes(i.area) ? i.area : "Overig");
 const issueTitle = (n) => (ISSUES.find((i) => i.n === n) || {}).title || "";
+const waiting = () => pending.filter((r) => r.state === "nieuw");
+const requested = (n) => waiting().some((r) => r.type === "start" && (r.issues || []).some((x) => x.n === n));
 
 function clock(iso) {
   const t = Date.parse(iso || "");
@@ -194,13 +202,8 @@ function clock(iso) {
   return same ? time : `${d.toLocaleDateString("nl-NL", { day: "numeric", month: "short" })} ${time}`;
 }
 
-function save() {
-  store.set("nubo-triage-selected", [...selected]);
-  store.set("nubo-triage-notes", notes);
-}
-
 function renderSummary() {
-  const open = openIssues();
+  const open = listed();
   const c = { ja: 0, twijfel: 0, nee: 0 };
   open.forEach((i) => { if (c[i.verdict] != null) c[i.verdict]++; });
   const done = open.filter((i) => i.status === "opgelost").length;
@@ -211,60 +214,79 @@ function renderSummary() {
   $("summary").innerHTML = phase !== "klaar" ? "" :
     `<span class="count yes">${c.ja} fixen</span><span class="count maybe">${c.twijfel} twijfel</span><span class="count no">${c.nee} niet</span>` +
     (done ? `<span class="count done">${done} al opgelost op main</span>` : "");
-  const waiting = pending.filter((r) => r.state === "nieuw");
-  $("pending").hidden = !waiting.length;
-  $("pending").textContent = waiting.length
-    ? `${waiting.length === 1 ? "Eén verzoek wacht" : waiting.length + " verzoeken wachten"} op de routine: ` +
-      waiting.map((r) => (r.type === "refresh" ? "bijwerken" : (r.issues || []).map((x) => "#" + x.n).join(", "))).join("; ") + "."
-    : "";
+  const w = waiting();
+  const label = (r) => r.type === "refresh" ? "bijwerken" : r.type === "close" ? `#${r.n} sluiten` : (r.issues || []).map((x) => "#" + x.n).join(", ") + " starten";
+  $("pending").hidden = !w.length;
+  $("pending").textContent = w.length ? `${w.length === 1 ? "Eén verzoek wacht" : w.length + " verzoeken wachten"} op de routine: ${w.map(label).join("; ")}.` : "";
 }
 
 function renderFilters() {
-  const opts = [["alles", "Alles"], ["ja", "Fixen"], ["twijfel", "Twijfel"], ["nee", "Niet"], ["gekozen", "Gekozen"], ...AREAS.map((a) => [a, a])];
+  const opts = [["alles", "Alles"], ["ja", "Fixen"], ["twijfel", "Twijfel"], ["nee", "Niet"], ...AREAS.map((a) => [a, a])];
   $("filters").innerHTML = opts.map(([k, l]) => `<button class="chip" type="button" data-f="${esc(k)}" aria-pressed="${filter === k}">${esc(l)}</button>`).join("");
 }
 
 function visible(i) {
   if (filter === "alles") return true;
-  if (filter === "gekozen") return selected.has(i.n);
   if (VERDICT[filter]) return i.verdict === filter;
   return areaOf(i) === filter;
 }
 
+function prBadge(s) {
+  if (!s.pr) return "";
+  const key = s.pr_state || (s.state === "Klaar" ? "merged" : "open");
+  const [cls, word] = PR_STATE[key] || PR_STATE.open;
+  return `<a class="badge ${cls}" href="${PULL}${esc(s.pr)}" target="_blank" rel="noopener">PR #${esc(s.pr)} · ${word}</a>`;
+}
+
 function statusParts(s) {
-  const parts = [`<span class="badge done">${esc(s.state || "Aangevraagd")}</span>`];
+  const parts = [`<span class="badge done">${esc(s.state || "Aangevraagd")}</span>`, prBadge(s)];
   if (s.session_url) parts.push(`<a href="${esc(s.session_url)}" target="_blank" rel="noopener">Open sessie</a>`);
-  if (s.pr) parts.push(`<a href="https://github.com/mschoenm/nubo/pull/${esc(s.pr)}" target="_blank" rel="noopener">PR #${esc(s.pr)}</a>`);
   if (s.note) parts.push(`<span>${rich(s.note)}</span>`);
   return parts.join("");
 }
 
-function statusHtml(n) {
+function busy(n) {
   const s = statuses[n];
-  return s ? `<div class="status">${statusParts(s)}</div>` : "";
+  return (s && s.state !== "Klaar") || requested(n);
 }
 
 function workingHtml() {
-  const busy = Object.values(statuses).filter((s) => s.state !== "Klaar").sort((a, b) => a.n - b.n);
-  if (!busy.length) return "";
-  return `<h3 class="group-title">Bezig</h3><div class="list">${busy.map((s) => `<article class="card working">
-    <div class="titles"><span class="num"><a href="${REPO}${s.n}" target="_blank" rel="noopener">#${s.n}</a></span>
-    <h2 class="title">${esc(issueTitle(s.n) || "Issue #" + s.n)}</h2></div>
+  const rows = Object.values(statuses).filter((s) => s.state !== "Klaar").sort((a, b) => a.n - b.n);
+  if (!rows.length) return "";
+  return `<h3 class="group-title">Bezig</h3><div class="list">${rows.map((s) => `<article class="card compact">
+    <span class="num"><a href="${REPO}${s.n}" target="_blank" rel="noopener">#${s.n}</a></span>
+    <h2 class="title">${esc(issueTitle(s.n) || "Issue #" + s.n)}</h2>
     <div class="status">${statusParts(s)}</div></article>`).join("")}</div>`;
+}
+
+function actionsHtml(i) {
+  const n = i.n;
+  if (busy(n)) {
+    const s = statuses[n];
+    return s ? `<div class="status">${statusParts(s)}</div>` : `<div class="status"><span class="badge done">Aangevraagd</span><span>Wacht op de routine.</span></div>`;
+  }
+  const c = confirming[n];
+  const msg = messages[n] ? `<p class="msg ${messages[n][1]}">${esc(messages[n][0])}</p>` : "";
+  return `<div class="actions">
+      <button class="btn primary" type="button" data-start="${n}">${c === "start" ? "Bevestig: start" : "Start"}</button>
+      <button class="btn" type="button" data-close="${n}">${c === "close" ? "Bevestig: sluiten" : "Niet doen"}</button>
+    </div>
+    ${c ? `<p class="msg">${c === "start" ? "Tik nog een keer om een sessie te starten." : "Tik nog een keer om het issue te sluiten als \"niet gedaan\". Het verdwijnt uit de lijst."}</p>` : ""}
+    ${msg}
+    <details class="notebox" id="n-${n}"${notes[n] ? " open" : ""}>
+      <summary>Opmerking voor de sessie</summary>
+      <textarea id="note-${n}" data-note="${n}" placeholder="Bijvoorbeeld: kies het alternatief, of waarom je het niet doet">${esc(notes[n] || "")}</textarea>
+    </details>`;
 }
 
 function card(i) {
   const [vk, vl] = VERDICT[i.verdict] || VERDICT.twijfel;
-  const sel = selected.has(i.n);
   const statusBadge = i.status === "opgelost" ? `<span class="badge done">Al opgelost op main</span>` : i.status === "deels" ? `<span class="badge plain">Deels opgelost</span>` : "";
-  return `<article class="card${sel ? " selected" : ""}${i.status === "opgelost" ? " closed-on-main" : ""}" data-n="${i.n}">
+  return `<article class="card${i.status === "opgelost" ? " closed-on-main" : ""}" data-n="${i.n}">
     <div class="head">
-      <label class="pick" title="Kies #${i.n}"><input type="checkbox" id="pick-${i.n}" data-pick="${i.n}" ${sel ? "checked" : ""} aria-label="Laat #${i.n} oplossen"></label>
-      <div class="titles">
-        <span class="num"><a href="${REPO}${i.n}" target="_blank" rel="noopener">#${i.n}</a> · ${esc(areaOf(i))}</span>
-        <h2 class="title">${esc(i.title)}</h2>
-        <div class="badges"><span class="badge ${vk}">${vl}</span><span class="badge plain">${esc(i.size)}</span>${statusBadge}</div>
-      </div>
+      <span class="num"><a href="${REPO}${i.n}" target="_blank" rel="noopener">#${i.n}</a> · ${esc(areaOf(i))}</span>
+      <h2 class="title">${esc(i.title)}</h2>
+      <div class="badges"><span class="badge ${vk}">${vl}</span><span class="badge plain">${esc(i.size)}</span>${statusBadge}</div>
     </div>
     <p class="verdict">${rich(i.opinion)}</p>
     <details id="d-${i.n}">
@@ -277,55 +299,41 @@ function card(i) {
         <div><dt>Voor de sessie</dt><dd>${rich(i.notes)}</dd></div>
       </dl>
     </details>
-    ${sel ? `<div class="note"><label for="note-${i.n}">Opmerking voor de sessie (optioneel)</label><textarea id="note-${i.n}" data-note="${i.n}" placeholder="Bijvoorbeeld: kies het alternatief, of laat de tests weg">${esc(notes[i.n] || "")}</textarea></div>` : ""}
-    ${statusHtml(i.n)}
+    <div class="cardfoot">${actionsHtml(i)}</div>
   </article>`;
 }
 
 function closedCard(i) {
-  return `<article class="card closed-on-main working"><div class="titles">
+  const s = statuses[i.n];
+  return `<article class="card compact closed-on-main">
     <span class="num"><a href="${REPO}${i.n}" target="_blank" rel="noopener">#${i.n}</a> · ${esc(areaOf(i))}</span>
     <h2 class="title">${esc(i.title)}</h2>
-    <div class="badges"><span class="badge done">Gesloten${i.closed_by ? " door " + esc(i.closed_by) : ""}</span></div>
-  </div></article>`;
+    <div class="status"><span class="badge done">Gesloten${i.closed_by ? " · " + esc(i.closed_by) : ""}</span>${s ? prBadge(s) : ""}</div>
+  </article>`;
 }
 
 function renderList() {
   if (phase === "laden") { $("main").innerHTML = `<p class="msg">De issues worden geladen…</p>`; return; }
   if (phase === "geen-db") { $("main").innerHTML = `<p class="msg err">De lijst kon niet worden geladen. Open de pagina op claude.ai, ingelogd met je eigen account.</p>`; return; }
   const open = new Set([...document.querySelectorAll("details[open]")].map((d) => d.id));
-  const items = openIssues().filter(visible).sort((a, b) => (ORDER[a.verdict] ?? 1) - (ORDER[b.verdict] ?? 1) || a.n - b.n);
+  const focus = document.activeElement && document.activeElement.id;
+  const items = listed().filter(visible).sort((a, b) => (ORDER[a.verdict] ?? 1) - (ORDER[b.verdict] ?? 1) || a.n - b.n);
   let html = filter === "alles" ? workingHtml() : "";
   for (const area of AREAS) {
     const group = items.filter((i) => areaOf(i) === area);
     if (!group.length) continue;
     html += `<h3 class="group-title">${esc(area)}</h3><div class="list">${group.map(card).join("")}</div>`;
   }
-  if (!openIssues().length) html += `<p class="msg">Er staan geen open issues. Dien er een in op GitHub; binnen een uur staat hij hier.</p>`;
+  if (!listed().length) html += `<p class="msg">Er staan geen open issues. Dien er een in op GitHub; binnen een uur staat hij hier.</p>`;
   else if (!items.length) html += `<p class="msg">Niets in dit filter.</p>`;
   const closed = ISSUES.filter((i) => i.closed).sort((a, b) => b.n - a.n);
   if (closed.length && filter === "alles") html += `<h3 class="group-title">Onlangs gesloten</h3><div class="list">${closed.map(closedCard).join("")}</div>`;
   $("main").innerHTML = html;
   open.forEach((id) => { const d = document.getElementById(id); if (d) d.open = true; });
+  if (focus && document.getElementById(focus)) document.getElementById(focus).focus();
 }
 
-function renderBar() {
-  const valid = new Set(openIssues().map((i) => i.n));
-  if (phase === "klaar") for (const n of [...selected]) if (!valid.has(n)) selected.delete(n);
-  $("selcount").textContent = selected.size;
-  const start = $("start");
-  start.disabled = selected.size === 0 || phase !== "klaar";
-  start.textContent = confirming ? `Bevestig: start ${selected.size} ${selected.size === 1 ? "sessie" : "sessies"}` : "Start";
-}
-
-function render() { renderSummary(); renderFilters(); renderList(); renderBar(); }
-
-function say(el, text, kind) {
-  const m = $(el);
-  m.hidden = !text;
-  m.textContent = text || "";
-  m.className = "msg" + (kind ? " " + kind : "");
-}
+function render() { renderSummary(); renderFilters(); renderList(); }
 
 async function addRequest(request) {
   if (!db) return false;
@@ -333,52 +341,61 @@ async function addRequest(request) {
   catch { return false; }
 }
 
+async function start(n) {
+  const note = (notes[n] || "").trim();
+  if (await addRequest({ type: "start", issues: [{ n, note }] })) {
+    messages[n] = null;
+    delete notes[n]; store.set("nubo-triage-notes", notes);
+  } else {
+    messages[n] = [`Opslaan lukte niet. Vraag het me in de chat: start #${n}.`, "err"];
+  }
+  render();
+}
+
+async function dismiss(n) {
+  const note = (notes[n] || "").trim();
+  const ok = await addRequest({ type: "close", n, note });
+  if (ok) {
+    try { await db.doc("issues/" + n).update({ dismissed: true }); } catch {}
+    delete notes[n]; store.set("nubo-triage-notes", notes);
+    $("refreshmsg").hidden = false; $("refreshmsg").className = "msg ok";
+    $("refreshmsg").textContent = `#${n} gaat dicht als "niet gedaan". ${LATER}`;
+  } else {
+    messages[n] = [`Opslaan lukte niet. Vraag het me in de chat: sluit #${n}.`, "err"];
+  }
+  render();
+}
+
 document.addEventListener("click", (e) => {
   const f = e.target.closest("[data-f]");
-  if (f) { filter = f.dataset.f; store.set("nubo-triage-filter", filter); render(); }
-});
-document.addEventListener("change", (e) => {
-  const p = e.target.closest("[data-pick]");
-  if (!p) return;
-  const n = Number(p.dataset.pick);
-  p.checked ? selected.add(n) : selected.delete(n);
-  confirming = false; say("msg", "");
-  save(); renderList(); renderBar();
+  if (f) { filter = f.dataset.f; store.set("nubo-triage-filter", filter); render(); return; }
+  const s = e.target.closest("[data-start]");
+  const c = e.target.closest("[data-close]");
+  const b = s || c;
+  if (!b) return;
+  const n = Number(s ? s.dataset.start : c.dataset.close);
+  const what = s ? "start" : "close";
+  if (confirming[n] !== what) { confirming = { [n]: what }; renderList(); return; }
+  confirming = {};
+  b.disabled = true;
+  what === "start" ? start(n) : dismiss(n);
 });
 document.addEventListener("input", (e) => {
   const t = e.target.closest("[data-note]");
   if (!t) return;
   notes[t.dataset.note] = t.value;
-  save();
+  store.set("nubo-triage-notes", notes);
 });
-$("pickyes").addEventListener("click", () => {
-  openIssues().filter((i) => i.verdict === "ja" && i.status !== "opgelost" && !statuses[i.n]).forEach((i) => selected.add(i.n));
-  confirming = false; say("msg", ""); save(); render();
-});
-$("clear").addEventListener("click", () => { selected.clear(); confirming = false; say("msg", ""); save(); render(); });
 
 $("refresh").addEventListener("click", async () => {
   const b = $("refresh");
   b.disabled = true;
   const ok = await addRequest({ type: "refresh" });
-  say("refreshmsg", ok ? `Gevraagd. ${LATER}` : "Opslaan lukte niet. Vraag het me in de chat.", ok ? "ok" : "err");
+  const m = $("refreshmsg");
+  m.hidden = false;
+  m.className = "msg " + (ok ? "ok" : "err");
+  m.textContent = ok ? `Gevraagd. ${LATER}` : "Opslaan lukte niet. Vraag het me in de chat.";
   setTimeout(() => { b.disabled = false; }, 30000);
-});
-
-$("start").addEventListener("click", async () => {
-  if (!selected.size) return;
-  if (!confirming) { confirming = true; renderBar(); say("msg", "Tik nog een keer om de sessies te starten."); return; }
-  confirming = false;
-  $("start").disabled = true;
-  const picked = [...selected].sort((a, b) => a - b);
-  const ok = await addRequest({ type: "start", issues: picked.map((n) => ({ n, note: (notes[n] || "").trim() })) });
-  if (ok) {
-    say("msg", `Opgeslagen: ${picked.map((n) => "#" + n).join(", ")}. ${LATER}`, "ok");
-    selected.clear(); save();
-  } else {
-    say("msg", `Opslaan lukte niet. Stuur me in de chat: ${picked.map((n) => "#" + n).join(", ")}.`, "err");
-  }
-  render();
 });
 
 render();
@@ -399,7 +416,7 @@ render();
   }, () => {});
   db.collection("requests").onSnapshot((snap) => {
     pending = snap.docs.map((d) => d.data()).filter(Boolean);
-    renderSummary();
+    renderSummary(); renderList();
   }, () => {});
 })();
 </script>
