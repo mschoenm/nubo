@@ -41,7 +41,8 @@ pub enum DialogKind {
     /// title screen on `configured`, the model it is now set to start on.
     /// With `remembers`, continuing also sets the game to start on `saved`
     /// from now on (not with a model picked on the command line). The game
-    /// waits in `App::pending_start` meanwhile.
+    /// waits in `App::pending_start` meanwhile, with the dialog this one
+    /// replaced, which comes back after the answer.
     OtherModel {
         saved: Model,
         configured: Model,
