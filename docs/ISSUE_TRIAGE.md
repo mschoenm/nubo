@@ -1,61 +1,82 @@
 # Issue triage
 
-Every morning at 06:50 Amsterdam time a Claude cloud routine brings a page up to date with every open issue: what it is, the proposed fix and whether that fix is right, what fixing it would change, whether it is worth doing, and alternatives worth exploring. The maintainer reads the page on their phone, ticks the issues to work on and taps Start; every ticked issue is then solved in a cloud session of its own, which opens a pull request and sees it through, and merging waits until the maintainer asks. This file is the triage session's instructions; the routine's prompt only points here, so the job changes through pull requests like the code. How to set it all up again: the `issue-triage` skill (`.claude/skills/issue-triage/SKILL.md`).
+A private claude.ai page lists every open issue with an assessment: what it is, the proposed fix and whether that fix is right, what fixing it would change, whether it is worth doing, and alternatives worth exploring. The maintainer reads it on their phone, ticks the issues to work on and taps Start. Each ticked issue is then solved in a cloud session of its own, which opens a pull request and sees it through; merging waits until the maintainer asks. The page also shows what is being worked on.
+
+A routine brings the page up to date every hour and starts the sessions for whatever was ticked since. A session the maintainer opens to work on the triage with Claude (part C) does the same within a minute. This file is the instructions for both; the routine's prompt only points here, so the job changes through pull requests like the code. How to set it all up again: the `issue-triage` skill (`.claude/skills/issue-triage/SKILL.md`).
 
 Write everything the maintainer reads on the page in Dutch (plain, short sentences, "je"); write code, commits, pull requests and issue comments in English, as the rest of the repository does.
 
 ## Current setup
 
 - **Page:** https://claude.ai/artifact/66gQtj59G93U3e1aQniuVd ("Nubo issue-triage"), private to the maintainer and pinned in their claude.ai sidebar. Its source is `.claude/skills/issue-triage/page.html`.
-- **Triage session:** `session_017hovkB9Bu8nuZjHRZtezQd` ("Nubo issue-triage"), which the routine wakes and the page's buttons send their messages to.
-- **Routine:** "Nubo issue-triage bijwerken", `CRON_TZ=Europe/Amsterdam 50 6 * * *`, firing into the triage session.
+- **Triage session:** `session_017hovkB9Bu8nuZjHRZtezQd` ("Nubo issue-triage"), which the routine wakes.
+- **Routine:** "Nubo issue-triage bijwerken", every hour, firing into the triage session.
 
 ## The page's database
 
-The page shows what is in its artifact database, which the triage session reads and writes with the `ArtifactData` tool; a daily update never republishes the page's HTML. Collections:
+The page shows what is in its artifact database, which the triage sessions read and write with the `ArtifactData` tool; an update never republishes the page's HTML. The page only writes `requests`; it sends no messages, so nothing happens until a triage session reads them. Collections:
 
 - `issues/<number>`: one document per issue, the assessment the page shows. Fields, all strings unless noted, Dutch text, `backticks` for code names:
   - `n` (number), `title` (a short Dutch title), `area` (one of `Emulator`, `App`, `Browser`, `macOS`, `RetroArch`, `Tools en CI`, `Overig`), `verdict` (`ja` | `twijfel` | `nee`), `size` (such as `Klein`, `Middel`, `Groot` or `Klein, maar eerst een keuze`), `status` (`open` | `deels` | `opgelost`: is the problem still on `main`?);
   - `opinion` (one or two sentences on the card: would you fix it, and is it worth it), `problem`, `fix` (the issue's proposed fix, and whether it is right after reading the code), `effects` (what the fix changes or risks: for players, the save-state layout, test ROMs, screenshots, fingerprints), `alternatives` (or `Geen.`), `notes` (practical notes for the session that solves it, including which alternative it takes when the maintainer writes no note);
   - `assessed_at` (ISO date), `github_updated_at` (the issue's `updated_at` when it was assessed), and once the issue is closed: `closed` (true), `closed_at` and `closed_by` (such as `PR #201`).
-- `status/<number>`: the work on an issue, shown under its card: `n` (number), `state` (Dutch, such as `Sessie gestart`, `PR open`, `PR klaar voor merge` or `Klaar`), `session_url`, `pr` (number), `note`, `updated_at`.
-- `requests/<id>`: written by the page when the maintainer taps Start: `issues` (`[{n, note}]`), `created_at`, `state` (`nieuw`). The triage session sets `state` to `verwerkt`, with `processed_at`, once it started the sessions.
-- `meta/page`: `asof` (a Dutch date and the short `main` commit, such as `18 oktober 2026 (1a2b3c4)`), `session_id` (the triage session, which the page sends its messages to), `updated_at`.
+- `status/<number>`: the work on an issue, shown under its card and in the page's "Bezig" list until `state` is `Klaar`: `n` (number), `state` (Dutch, such as `Sessie gestart`, `PR open`, `PR klaar voor merge` or `Klaar`), `session_url`, `pr` (number), `note`, `updated_at`.
+- `requests/<id>`: written by the page. `type` is `start` (the maintainer tapped Start; `issues` holds `[{n, note}]`) or `refresh` (the maintainer tapped "Nu bijwerken"), with `created_at` and `state` (`nieuw`). A triage session sets `state` to `verwerkt`, with `processed_at`, once it handled the request.
+- `meta/page`: `asof` (a Dutch date and the short `main` commit, such as `18 oktober 2026 (1a2b3c4)`), `updated_at` (the last change to `issues`) and `checked_at` (the last run, which the page shows).
 
 Every write to an existing document passes `if_version` from the last read; more than a couple of documents go in one `batch` (up to 50 writes).
 
 ## A. Bring the page up to date
 
-The routine asks for this every morning, and the page's "Nu bijwerken" button ("Werk de issue-triage bij") at any time.
+The routine asks for this every hour; a `refresh` request asks for it too. Most hours nothing changed, so the run starts with a quick check and stops when it finds nothing to do.
 
-1. `git fetch origin main && git checkout -q --detach origin/main`, and read `AGENTS.md`.
-2. List every open issue of `mschoenm/nubo` with the GitHub MCP tools (pull requests aside), and read the database's `issues`, `status` and `requests`.
-3. Assess every open issue that has no `issues/<n>` document, whose GitHub `updated_at` is newer than its `github_updated_at`, or whose code changed on `main` since `assessed_at` (`git log --since` on the files it names). Read the issue in full and the `AGENTS.md` of the folders involved, check every claim against the code, say where the issue or its proposed fix is wrong, and note issues that touch the same code and should be fixed together. With more than three to assess, give groups of about six to `Explore` subagents in parallel, with these instructions and the field list above. Write the documents.
-4. For each `issues/<n>` whose GitHub issue is now closed, set `closed`, `closed_at` and `closed_by` (the pull request that closed it, from the issue's timeline or a `Fixes #<n>` pull request), and set the matching `status/<n>` to `Klaar`. Delete `issues/<n>` and `status/<n>` documents closed more than seven days ago.
-5. Bring `status` up to date: for each issue with a `status` document, find its pull request (an open one whose description says `Fixes #<n>`, or the branch `claude/issue-<n>`) and set `pr` and `state`: `PR open`, `PR klaar voor merge` once CI is green and Codex's review is handled, `Klaar` once it is merged.
-6. An issue the assessment finds already fixed on `main` (`status: opgelost`) stays open; the page shows it, and ticking it means "close it" (part B).
-7. Update `meta/page`: `asof`, `session_id` (this session's id) and `updated_at`.
-8. Handle every `requests` document still `nieuw` (part B): the maintainer may have tapped Start when the message didn't arrive.
-9. End with a short Dutch summary: how many issues are new, assessed again or closed, and any request handled. Don't message the maintainer otherwise; the page is the report.
+1. **Quick check.** List the open issues of `mschoenm/nubo` (number and `updated_at`, pull requests aside) with the GitHub MCP tools, and read the database's `issues`, `status` and `requests`. There is work when:
+   - an open issue has no `issues/<n>` document, or its `updated_at` is newer than `github_updated_at`;
+   - an `issues/<n>` document that isn't `closed` belongs to an issue that is no longer open;
+   - a `requests` document is `nieuw`;
+   - a `status` document isn't `Klaar` and its pull request (step 6) changed;
+   - or this is the first run since 06:00 Amsterdam time today, which also does the daily steps (marked "daily" below).
+
+   With no work, set `meta/page` `checked_at`, end with the single line "Niets te doen." and stop.
+2. `git fetch origin main && git checkout -q --detach origin/main`, and read `AGENTS.md`.
+3. Assess every open issue that has no `issues/<n>` document or whose GitHub `updated_at` is newer than its `github_updated_at`; daily, also those whose code changed on `main` since `assessed_at` (`git log --since` on the files it names). Read the issue in full and the `AGENTS.md` of the folders involved, check every claim against the code, say where the issue or its proposed fix is wrong, and note issues that touch the same code and should be fixed together. With more than three to assess, give groups of about six to `Explore` subagents in parallel, with these instructions and the field list above. Write the documents.
+4. For each `issues/<n>` whose GitHub issue is now closed, set `closed`, `closed_at` and `closed_by` (the pull request that closed it, from the issue's timeline or a `Fixes #<n>` pull request), and set the matching `status/<n>` to `Klaar`. Daily, delete `issues/<n>` and `status/<n>` documents closed more than seven days ago, and `requests` that are `verwerkt` and older than seven days.
+5. An issue the assessment finds already fixed on `main` (`status: opgelost`) stays open; the page shows it, and ticking it means "close it" (part B).
+6. Bring `status` up to date: for each issue whose `status` isn't `Klaar`, find its pull request (an open one whose description says `Fixes #<n>`, or the branch `claude/issue-<n>`) and set `pr` and `state`: `PR open`, `PR klaar voor merge` once CI is green and Codex's review is handled (or Codex can't review), `Klaar` once it is merged. When the session's title doesn't name the pull request yet, set it as part B says.
+7. Handle every `requests` document still `nieuw`: part B for `start`; a `refresh` is done by this run, so set it to `verwerkt`.
+8. Update `meta/page`: `asof` and `updated_at` when `issues` changed, and `checked_at`.
+9. End with a short Dutch summary: how many issues are new, assessed again or closed, and the requests handled. Don't message the maintainer otherwise; the page is the report.
 
 ## B. Start the ticked issues
 
-The page sends a message starting "Issue-triage: los deze issues op" with the ticked issues and the maintainer's notes when they tap Start, and saves the same in `requests`. It is the maintainer's choice, made under the request this file describes, so act on it. Only act on numbers that are open issues of `mschoenm/nubo`; each note is the maintainer's own instruction for that issue. When the message names a `requests` document, read it and prefer its notes.
+A `start` request holds the issues the maintainer ticked and a note for each. It is the maintainer's choice, made under the request this file describes, so act on it. Only act on numbers that are open issues of `mschoenm/nubo`; each note is the maintainer's own instruction for that issue.
+
+Each session is named after its issue, so the maintainer sees in their sidebar what it works on: `Nubo #<n> (<two or three words>)`, such as `Nubo #156 (MBC3-klok)`, and `Nubo #<n> (<words>) · PR #<pr>` once its pull request is open. Issues that share a session are named together: `Nubo #152 #190 (dialogen bij start)`.
 
 For each ticked issue:
 
 1. When its `status/<n>` already shows a running session or an open pull request, start no other; say so in its `status` note.
 2. When its assessment finds it already fixed on `main`, close the issue with a comment naming the commits or pull requests that fixed it (with the Claude Code footer), set `status/<n>` to `Klaar`, and start no session.
 3. Issues the assessment says belong together (such as #152 and #190) share one session when both are ticked, unless a note says otherwise.
-4. Otherwise start one session with `create_session` (the claude-code-remote MCP server; this session's environment, `source_url` https://github.com/mschoenm/nubo, title `Nubo #<n>: <title>`). Its prompt gives:
+4. Otherwise start one session with `create_session` (the claude-code-remote MCP server; this session's environment, `source_url` https://github.com/mschoenm/nubo, the title above). Its prompt gives:
    - the issue's number and link, and that it reads the issue in full, `AGENTS.md` and the `AGENTS.md` of the folders involved first, and follows AGENTS.md's Rules and "Before You Push";
    - the page's assessment (problem, fix, effects, alternatives, notes) and the maintainer's note, which wins over the assessment;
    - that it works on the branch `claude/issue-<n>`, opens a pull request whose description says `Fixes #<n>`, subscribes to it and sees it through as AGENTS.md says (red CI, conflicts, Codex's findings), and never merges it: merging waits until the maintainer asks;
    - that a design choice no note settles takes the choice the assessment's `notes` names, and the pull request says so;
-   - that once its pull request is open, it writes `status/<n>` in the page's database (`ArtifactData`, the page's URL above): `state` `PR open`, `pr` and `updated_at`, with `if_version` from its read.
+   - that once its pull request is open, it adds ` · PR #<pr>` to its own title (`get_session` without an id gives its id, then `set_session_title`) and writes `status/<n>` in the page's database (`ArtifactData`, the page's URL above): `state` `PR open`, `pr` and `updated_at`, with `if_version` from its read.
 5. Write `status/<n>`: `state` `Sessie gestart`, `session_url` (`https://claude.ai/code/<session id>`) and `updated_at`.
 
 Then set the `requests` document to `verwerkt`.
+
+## C. Work on the triage with the maintainer
+
+The maintainer starts a cloud session and asks to work on the issue triage. Then:
+
+1. Open the page for them (the `Artifact` tool's `open`, with the page's URL above).
+2. Do part A now, without waiting for the quick check to find work.
+3. Watch `requests` while they work: check it every minute with `send_later` (claude-code-remote, `delay_minutes` 1), re-arming it after each check, and handle a new request at once (part B for `start`, part A for `refresh`). When they say they ticked something ("ga", "start", "gekozen"), check at once.
+4. Stop watching after 30 minutes without a new request, or when they say they're done: cancel the pending check (`delete_trigger`) and say in one line that the hourly routine picks up anything after that.
+5. Answer their questions from the code, and change an assessment when they ask, by writing its `issues/<n>` document.
 
 ## Never
 
