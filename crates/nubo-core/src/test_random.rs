@@ -7,6 +7,7 @@
 pub(crate) struct Random(pub(crate) u64);
 
 impl Random {
+    /// The next pseudo-random number.
     pub(crate) fn next(&mut self) -> u64 {
         self.0 ^= self.0 >> 12;
         self.0 ^= self.0 << 25;
@@ -19,6 +20,7 @@ impl Random {
         (self.next() % limit as u64) as usize
     }
 
+    /// A random byte.
     pub(crate) fn byte(&mut self) -> u8 {
         self.next() as u8
     }
