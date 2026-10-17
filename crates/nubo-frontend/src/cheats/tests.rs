@@ -79,3 +79,32 @@ fn cheats_that_share_a_code_keep_their_own_ids() {
 
     assert_eq!(emulator.read_memory(0xD056), 0x5A);
 }
+
+#[cfg(feature = "desktop")]
+#[test]
+fn an_unreadable_list_is_kept_aside_before_a_new_one_can_replace_it() {
+    use crate::storage::files::Files;
+    use std::fs;
+
+    let folder = std::env::temp_dir().join(format!("nubo-cheats-kept-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&folder);
+    let files = Files::in_folders(None, Some(folder.clone()));
+    let rom_path = Path::new("roms/Game.gb");
+    let from_newer_nubo = "[[cheats]]\nname = \"Health\"\ncode = \"01FF56D0\"\n";
+    files
+        .write(Entry::Cheats(rom_path), from_newer_nubo.as_bytes())
+        .unwrap();
+
+    let error = load_from(&files, rom_path).unwrap_err();
+    assert!(error.contains("Game.gb.kept-1.toml"), "{error}");
+    assert_eq!(load_from(&files, rom_path), Ok(Vec::new()));
+    let cheats = vec![Cheat::new("", "01ff56d0").unwrap()];
+    save_to(&files, rom_path, &cheats).unwrap();
+
+    assert_eq!(load_from(&files, rom_path), Ok(cheats));
+    assert_eq!(
+        fs::read_to_string(folder.join("cheats/Game.gb.kept-1.toml")).unwrap(),
+        from_newer_nubo
+    );
+    let _ = fs::remove_dir_all(&folder);
+}

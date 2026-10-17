@@ -5,7 +5,9 @@
 //! `nubo:game.sav` for `game.gb`, each game's cheats as TOML text under
 //! `nubo:cheats/` and the ROM's file name, such as
 //! `nubo:cheats/game.gb.toml`, and the last game played as base64 under
-//! `nubo:last-game`. Bigger things, such as save states and the library, are
+//! `nubo:last-game`. An entry that couldn't be read is kept aside under the
+//! same key with `.kept-<number>` before its extension, such as
+//! `nubo:settings.kept-1.toml` (see [`super::kept_name`]). Bigger things, such as save states and the library, are
 //! in IndexedDB (`super::indexed_db`).
 //!
 //! The keys are worked out without the `web` feature too, so their tests run
@@ -46,6 +48,13 @@ impl LocalStorage {
             )),
             Entry::LastGame => Ok(format!("{KEY_PREFIX}last-game")),
         }
+    }
+
+    /// The key `entry` is kept aside under the `number`th time it couldn't
+    /// be read (see [`super::kept_name`]), such as
+    /// `nubo:settings.kept-1.toml`.
+    pub fn kept_key(entry: Entry<'_>, number: u32) -> Result<String, String> {
+        Ok(super::kept_name(&Self::key(entry)?, number))
     }
 }
 
@@ -109,6 +118,25 @@ impl Storage for LocalStorage {
             }
         }
         super::deleted(failures, first_error)
+    }
+
+    fn keep_aside(&self, entry: Entry<'_>) -> Result<String, String> {
+        let key = Self::key(entry)?;
+        let storage = local_storage()?;
+        let kept = (1..)
+            .map(|number| super::kept_name(&key, number))
+            .find(|kept| storage.get_item(kept).ok().flatten().is_none())
+            .unwrap_or_default();
+        let stored = storage
+            .get_item(&key)
+            .map_err(|error| format!("{error:?}"))?
+            .ok_or_else(|| String::from("there is nothing to keep"))?;
+
+        storage
+            .set_item(&kept, &stored)
+            .and_then(|()| storage.remove_item(&key))
+            .map_err(|error| format!("{error:?}"))?;
+        Ok(format!("localStorage key {kept}"))
     }
 }
 

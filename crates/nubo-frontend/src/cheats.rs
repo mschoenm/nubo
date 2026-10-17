@@ -2,7 +2,9 @@
 //! codes, which change a byte of the ROM. Each game keeps its own list, in
 //! `cheats/<rom file name>.toml` in the user's data folder on the desktop and
 //! under `nubo:cheats/<rom file name>.toml` in the browser's localStorage (see
-//! [`Entry::Cheats`]).
+//! [`Entry::Cheats`]). A list that can't be read is kept aside before an
+//! empty one can replace it, such as `cheats/<rom file name>.kept-1.toml`
+//! (see [`load_from`]).
 
 use crate::storage::{self, Entry, Storage};
 use nubo_core::{Emulator, validate_gamegenie_code, validate_gameshark_code};
@@ -182,9 +184,26 @@ pub fn save(rom_path: &Path, cheats: &[Cheat]) -> Result<(), String> {
 }
 
 /// The cheats of the game at `rom_path`, from `storage`; none if it has no
-/// list yet.
+/// list yet. A list that can't be parsed (such as one a newer Nubo wrote) is
+/// kept aside first ([`Storage::keep_aside`]), so saving a new list can't
+/// lose it, and the error says where it went.
 pub fn load_from(storage: &dyn Storage, rom_path: &Path) -> Result<Vec<Cheat>, String> {
-    read_list(storage, rom_path).map_err(|error| format!("The cheats couldn't be read: {error}"))
+    let entry = Entry::Cheats(rom_path);
+    let Some(bytes) = storage
+        .read(entry)
+        .map_err(|error| format!("The cheats couldn't be read: {error}"))?
+    else {
+        return Ok(Vec::new());
+    };
+
+    parse_list(bytes).map_err(|error| match storage.keep_aside(entry) {
+        Ok(location) => {
+            format!("The cheats couldn't be read, so Nubo kept them as {location}: {error}")
+        }
+        Err(keep_error) => format!(
+            "The cheats couldn't be read (keeping them aside failed too: {keep_error}): {error}"
+        ),
+    })
 }
 
 /// Saves the cheats of the game at `rom_path` in `storage`.
@@ -198,11 +217,8 @@ pub fn save_to(storage: &dyn Storage, rom_path: &Path, cheats: &[Cheat]) -> Resu
         .map_err(|error| format!("The cheats couldn't be saved: {error}"))
 }
 
-/// Reads and parses a game's cheats file.
-fn read_list(storage: &dyn Storage, rom_path: &Path) -> Result<Vec<Cheat>, String> {
-    let Some(bytes) = storage.read(Entry::Cheats(rom_path))? else {
-        return Ok(Vec::new());
-    };
+/// Parses the contents of a game's cheats file.
+fn parse_list(bytes: Vec<u8>) -> Result<Vec<Cheat>, String> {
     // The same words as reading a file that isn't text says.
     let contents =
         String::from_utf8(bytes).map_err(|_| String::from("stream did not contain valid UTF-8"))?;

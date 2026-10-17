@@ -17,7 +17,7 @@
 //! run with [`use_folder`]; every lookup of the folders goes through
 //! [`config_folder`] and [`data_folder`], which follow it.
 
-use super::{Entry, Storage};
+use super::{Entry, Storage, kept_name};
 pub use crate::picture::{decode_png, encode_png};
 use directories::ProjectDirs;
 use std::fs;
@@ -176,6 +176,28 @@ impl Storage for Files {
         }
         super::deleted(failures, first_error)
     }
+
+    fn keep_aside(&self, entry: Entry<'_>) -> Result<String, String> {
+        keep_aside(&self.path(entry)?)
+            .map(|kept| kept.display().to_string())
+            .map_err(|error| error.to_string())
+    }
+}
+
+/// Renames the file at `path` to the first free [`kept_name`] next to it,
+/// such as `settings.kept-1.toml` for `settings.toml`, and returns its new
+/// path (see [`Storage::keep_aside`]).
+pub fn keep_aside(path: &Path) -> io::Result<PathBuf> {
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| io::Error::from(ErrorKind::InvalidInput))?
+        .to_string_lossy();
+    let kept = (1..)
+        .map(|number| path.with_file_name(kept_name(&file_name, number)))
+        .find(|kept| !kept.exists())
+        .unwrap_or_default();
+    fs::rename(path, &kept)?;
+    Ok(kept)
 }
 
 /// Replaces the contents of `path`, creating its folder if needed. It writes

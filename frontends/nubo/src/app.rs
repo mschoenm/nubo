@@ -81,9 +81,11 @@ pub struct App {
     /// draws it, whatever palette and screen effects the settings pick (see
     /// `command_line`).
     raw_screen: bool,
-    /// Whether the settings file was read (or there was none). When it
-    /// couldn't be, the app saves nothing on its own, such as the window's
-    /// size, so it doesn't write the defaults over the player's settings.
+    /// Whether saving the settings can't lose the player's: the settings
+    /// file was read, there was none, or the one that couldn't be read was
+    /// kept aside. Otherwise the app saves nothing on its own, such as the
+    /// window's size, so it doesn't write the defaults over the player's
+    /// settings.
     settings_read: bool,
     /// Whether the D-pad changed the player's own Super Game Boy colors
     /// since the settings were last saved: they are saved once the player
@@ -225,10 +227,11 @@ impl App {
     /// defaults and an empty library with `--fresh`), starting the ROM given
     /// on the command line if there is one, as the other `options` say.
     pub fn new(rom: Option<Result<Rom, String>>, options: &Options) -> (Self, Task<Message>) {
-        let (settings, settings_error) = if options.fresh {
-            (Settings::default(), None)
+        let (settings, settings_error, settings_read) = if options.fresh {
+            (Settings::default(), None, true)
         } else {
-            Settings::load()
+            let loaded = Settings::load();
+            (loaded.settings, loaded.problem, loaded.saving_is_safe)
         };
         // The browser reads its library once its storage is open (see
         // `Message::StorageOpened`).
@@ -251,7 +254,7 @@ impl App {
             screen_scale: options.scale,
             fresh: options.fresh,
             raw_screen: options.raw_screen,
-            settings_read: settings_error.is_none(),
+            settings_read,
             sgb_colors_unsaved: false,
             speed: options.speed,
             library,

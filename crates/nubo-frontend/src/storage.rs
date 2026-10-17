@@ -10,6 +10,12 @@
 //! directly on the desktop, and the browser's IndexedDB (`indexed_db`, the
 //! `web` feature) in the browser, which holds more than localStorage's few
 //! megabytes.
+//!
+//! A stored entry that can't be read any more, such as settings a newer Nubo
+//! wrote, is never written over: it is kept aside under the first free
+//! `<name>.kept-<number>.<extension>` name ([`kept_name`],
+//! [`Storage::keep_aside`]), such as `settings.kept-1.toml`, and the player
+//! is told where. Those names are permanent too.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -76,6 +82,27 @@ pub trait Storage: Send + Sync {
     /// the player asks for when they reset the settings. It goes on past an
     /// entry it can't delete, and then says how many it couldn't.
     fn delete_battery_saves(&self) -> Result<(), String>;
+
+    /// Moves what is kept for `entry` to the first free [`kept_name`], so
+    /// writing `entry` again can't lose it, and returns where it went (as
+    /// [`Storage::location`] says it). For an entry that can't be read any
+    /// more, such as settings with a value only a newer Nubo knows.
+    fn keep_aside(&self, entry: Entry<'_>) -> Result<String, String>;
+}
+
+/// The name an entry called `name` is kept aside under (see
+/// [`Storage::keep_aside`]): `.kept-<number>` goes before the last
+/// extension, so `settings.toml` becomes `settings.kept-1.toml` and
+/// `cheats/Tetris.gb.toml` becomes `cheats/Tetris.gb.kept-1.toml`.
+pub fn kept_name(name: &str, number: u32) -> String {
+    let file_name_start = name.rfind('/').map_or(0, |slash| slash + 1);
+    match name[file_name_start..].rfind('.') {
+        Some(dot) if dot > 0 => {
+            let (stem, extension) = name.split_at(file_name_start + dot);
+            format!("{stem}.kept-{number}{extension}")
+        }
+        _ => format!("{name}.kept-{number}"),
+    }
 }
 
 /// The storage of this build: files in the user's folders with the
@@ -113,6 +140,10 @@ impl Storage for NoStorage {
 
     fn delete_battery_saves(&self) -> Result<(), String> {
         Ok(())
+    }
+
+    fn keep_aside(&self, _entry: Entry<'_>) -> Result<String, String> {
+        Err(String::from("this build keeps no data"))
     }
 }
 

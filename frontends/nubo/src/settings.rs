@@ -4,7 +4,8 @@
 //! together in one `settings.toml` (in localStorage in the browser build),
 //! and saved as soon as they change.
 
-use nubo_frontend::storage;
+use nubo_frontend::settings::Loaded;
+use nubo_frontend::storage::{self, Entry};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -208,11 +209,23 @@ impl Settings {
         }
     }
 
-    /// Reads the saved settings. Without saved settings this returns the
-    /// defaults; if they can't be read it returns the defaults together with
-    /// the reason.
-    pub fn load() -> (Settings, Option<String>) {
+    /// Reads the saved settings. Without saved settings this gives the
+    /// defaults; if they can't be read it gives the defaults together with
+    /// the reason, and keeps the unreadable ones aside first (see
+    /// `nubo_frontend::settings::load`).
+    pub fn load() -> Loaded<Settings> {
         nubo_frontend::settings::load(&*storage::platform(), Settings::from_toml)
+    }
+
+    /// The window's size saved in the settings, if they can be read, for
+    /// opening the window before the app starts. Unlike [`Settings::load`]
+    /// it never keeps unreadable settings aside, so the app's own load still
+    /// finds them and tells the player.
+    pub fn saved_window_size() -> Option<(f32, f32)> {
+        let bytes = storage::platform().read(Entry::Settings).ok()??;
+        Settings::from_toml(std::str::from_utf8(&bytes).ok()?)
+            .ok()?
+            .window_size
     }
 
     /// Reads the settings from the text of a `settings.toml`. The shared

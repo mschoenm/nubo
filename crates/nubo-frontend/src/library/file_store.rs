@@ -8,7 +8,7 @@ pub use crate::picture::decode_png;
 use super::{Cache, LibraryEntry, PictureKind};
 use crate::picture::encode_png;
 use crate::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
-use crate::storage::files::write_atomically;
+use crate::storage::files::{keep_aside, write_atomically};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::ErrorKind;
@@ -20,17 +20,29 @@ struct LibraryFile {
     games: Vec<LibraryEntry>,
 }
 
-/// Reads the known games, or none if there is no library file yet.
+/// Reads the known games, or none if there is no library file yet. A file
+/// that can't be parsed is kept aside first (`library.kept-1.toml`), and the
+/// error says where it went.
 pub fn load_entries(cache: &Cache) -> Result<Vec<LibraryEntry>, String> {
-    let path = data_directory(cache)?.join("library.toml");
+    let path = data_directory(cache)
+        .map_err(|error| format!("The game library couldn't be read: {error}"))?
+        .join("library.toml");
 
-    match fs::read_to_string(path) {
-        Ok(contents) => toml::from_str::<LibraryFile>(&contents)
-            .map(|file| file.games)
-            .map_err(|error| error.to_string()),
-        Err(error) if error.kind() == ErrorKind::NotFound => Ok(Vec::new()),
-        Err(error) => Err(error.to_string()),
-    }
+    let parsed = match fs::read(&path) {
+        Ok(bytes) => String::from_utf8(bytes)
+            .map_err(|_| String::from("stream did not contain valid UTF-8"))
+            .and_then(|contents| {
+                toml::from_str::<LibraryFile>(&contents).map_err(|error| error.to_string())
+            }),
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(format!("The game library couldn't be read: {error}")),
+    };
+    parsed.map(|file| file.games).map_err(|error| {
+        let kept = keep_aside(&path)
+            .map(|kept| kept.display().to_string())
+            .map_err(|keep_error| keep_error.to_string());
+        super::unreadable_library(&error, kept)
+    })
 }
 
 /// Writes the known games to `library.toml`.

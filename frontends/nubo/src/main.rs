@@ -85,7 +85,7 @@ fn run(rom: Option<Result<Rom, String>>, options: Options) -> iced::Result {
     let window = match options.scale {
         Some(scale) => screen_only_window(scale),
         None if options.fresh => default_window(None),
-        None => default_window(settings::Settings::load().0.window_size),
+        None => default_window(settings::Settings::saved_window_size()),
     };
 
     launch(window, move || App::new(rom.clone(), &options))

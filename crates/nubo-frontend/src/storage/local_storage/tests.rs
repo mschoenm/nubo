@@ -37,6 +37,19 @@ fn cheats_are_keyed_by_the_rom_file_name() {
 }
 
 #[test]
+fn unreadable_entries_are_kept_aside_next_to_their_key() {
+    assert_eq!(
+        LocalStorage::kept_key(Entry::Settings, 1).unwrap(),
+        "nubo:settings.kept-1.toml"
+    );
+    assert_eq!(
+        LocalStorage::kept_key(Entry::Cheats(Path::new("Pocket Game.gbc")), 2).unwrap(),
+        "nubo:cheats/Pocket Game.gbc.kept-2.toml"
+    );
+    assert!(!is_battery_save_key("nubo:settings.kept-1.toml"));
+}
+
+#[test]
 fn battery_save_keys_are_told_apart() {
     assert!(is_battery_save_key("nubo:Pocket Game.sav"));
     assert!(is_battery_save_key("nubo:Pocket Game.rtc"));

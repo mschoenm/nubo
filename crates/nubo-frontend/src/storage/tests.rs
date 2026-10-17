@@ -24,6 +24,18 @@ fn entries_are_named_after_the_rom_file() {
 }
 
 #[test]
+fn kept_names_put_the_number_before_the_last_extension() {
+    assert_eq!(kept_name("settings.toml", 1), "settings.kept-1.toml");
+    assert_eq!(kept_name("library.toml", 2), "library.kept-2.toml");
+    assert_eq!(
+        kept_name("nubo:cheats/Pocket Game.gbc.toml", 3),
+        "nubo:cheats/Pocket Game.gbc.kept-3.toml"
+    );
+    assert_eq!(kept_name("cheats.d/notes", 1), "cheats.d/notes.kept-1");
+    assert_eq!(kept_name(".hidden", 1), ".hidden.kept-1");
+}
+
+#[test]
 fn no_storage_keeps_nothing() {
     let rom_path = Path::new("game.gb");
 
@@ -91,6 +103,43 @@ mod files {
                 .display()
                 .to_string()
         );
+    }
+
+    #[test]
+    fn entries_are_kept_aside_under_the_first_free_name() {
+        let folder = temporary_folder("keep-aside");
+        let files = Files::in_folders(Some(folder.join("config")), Some(folder.join("data")));
+        let rom_path = Path::new("game.gb");
+
+        files.write(Entry::Settings, b"first").unwrap();
+        let first = files.keep_aside(Entry::Settings).unwrap();
+        files.write(Entry::Settings, b"second").unwrap();
+        let second = files.keep_aside(Entry::Settings).unwrap();
+        files.write(Entry::Cheats(rom_path), b"cheats").unwrap();
+        let cheats = files.keep_aside(Entry::Cheats(rom_path)).unwrap();
+
+        let config = folder.join("config");
+        assert_eq!(
+            first,
+            config.join("settings.kept-1.toml").display().to_string()
+        );
+        assert_eq!(
+            second,
+            config.join("settings.kept-2.toml").display().to_string()
+        );
+        assert_eq!(fs::read(&first).unwrap(), b"first");
+        assert_eq!(fs::read(&second).unwrap(), b"second");
+        assert_eq!(files.read(Entry::Settings), Ok(None));
+        assert_eq!(
+            cheats,
+            folder
+                .join("data")
+                .join("cheats")
+                .join("game.gb.kept-1.toml")
+                .display()
+                .to_string()
+        );
+        assert!(files.keep_aside(Entry::Settings).is_err());
     }
 
     #[test]
