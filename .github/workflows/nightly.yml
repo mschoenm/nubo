@@ -363,6 +363,10 @@ jobs:
           SAVE_STATES: ${{ needs.save-states.result }}
           EAGER: ${{ needs.eager.result }}
           RANDOM_SCENES: ${{ needs.random-scenes.result }}
+          FLATPAK: ${{ needs.flatpak.result }}
+          WINDOWS: ${{ needs.windows.result }}
+          LIBRETRO: ${{ needs.libretro.result }}
+          SHOOTOUT_HARNESS: ${{ needs.shootout.result }}
           PASSED: ${{ needs.verify-boot.outputs.passed }}
           TOTAL: ${{ needs.verify-boot.outputs.total }}
           SHOOTOUT_PASSED: ${{ needs.verify-boot.outputs.shootout_passed }}
@@ -385,6 +389,8 @@ jobs:
             --arg commit "$(git rev-parse --short HEAD)" \
             --arg ci "$CI" --arg advisories "$ADVISORIES" --arg tests "$TESTS" --arg verify_boot "$VERIFY_BOOT" \
             --arg save_states "$SAVE_STATES" --arg eager "$EAGER" --arg random_scenes "$RANDOM_SCENES" \
+            --arg flatpak "$FLATPAK" --arg windows "$WINDOWS" --arg libretro "$LIBRETRO" \
+            --arg shootout_harness "$SHOOTOUT_HARNESS" \
             --arg passed "$PASSED" --arg total "$TOTAL" \
             --arg shootout_passed "$SHOOTOUT_PASSED" --arg shootout_total "$SHOOTOUT_TOTAL" \
             --arg shootout_rank "$SHOOTOUT_RANK" --arg shootout_leader "$SHOOTOUT_LEADER" \
@@ -397,7 +403,9 @@ jobs:
             --argjson wasm "$(stat -c %s target/web/nubo_bg.wasm)" \
             '{date: $date, commit: $commit,
               tests: {ci: $ci, advisories: $advisories, unit_tests: $tests, verify_boot: $verify_boot,
-                      save_states: $save_states, eager: $eager, random_scenes: $random_scenes},
+                      save_states: $save_states, eager: $eager, random_scenes: $random_scenes,
+                      flatpak: $flatpak, windows: $windows, libretro: $libretro,
+                      shootout_harness: $shootout_harness},
               test_roms_passed: ($passed | tonumber? // null),
               test_roms_total: ($total | tonumber? // null),
               shootout: (if $shootout_passed == "" then null else
