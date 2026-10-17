@@ -830,11 +830,11 @@ impl Library {
         entry.modified = now;
         entry.added = Some(now);
 
-        let mut entries = std::mem::take(&mut self.entries);
-        if let Some(index) = entries.iter().position(|known| known.path == rom.path) {
-            let previous = entries.remove(index);
+        let previous = self.entries.iter().position(|known| known.path == rom.path);
+        if let Some(index) = previous {
+            let previous = &self.entries[index];
             let unchanged = previous.size == entry.size && previous.title == entry.title;
-            entry.keep_from(&previous, unchanged);
+            entry.keep_from(previous, unchanged);
             if !unchanged {
                 store::delete_pictures(&rom.path).map_err(keep_error)?;
                 for pictures in [
@@ -845,6 +845,10 @@ impl Library {
                     pictures.remove(&rom.path);
                 }
             }
+        }
+        let mut entries = std::mem::take(&mut self.entries);
+        if let Some(index) = previous {
+            entries.remove(index);
         }
         entries.push(entry);
         self.replace_entries(entries);
