@@ -11,6 +11,8 @@ use std::path::{Path, PathBuf};
 /// The start of every save state entry's name.
 const STATES: &str = "states/";
 
+/// Saves a state in a slot, with the screen as its picture, or without a
+/// picture (removing an older one) when there are no `pixels`.
 pub fn save(
     rom_path: &Path,
     slot: Slot,
@@ -28,12 +30,14 @@ pub fn save(
     }
 }
 
+/// Reads a slot's state; `None` when the slot is empty.
 pub fn load(rom_path: &Path, slot: Slot) -> Result<Option<SaveState>, String> {
     indexed_db::read(&slot_key(rom_path, slot, "state"))
         .map(|record| super::parse(record.bytes.to_vec()))
         .transpose()
 }
 
+/// Deletes a slot's state and picture. An empty slot is fine.
 pub fn delete(rom_path: &Path, slot: Slot) -> Result<(), String> {
     for extension in ["state", "png"] {
         indexed_db::remove(&slot_key(rom_path, slot, extension))?;
@@ -41,6 +45,7 @@ pub fn delete(rom_path: &Path, slot: Slot) -> Result<(), String> {
     Ok(())
 }
 
+/// Deletes every game's states and pictures.
 pub fn delete_all() -> Result<(), String> {
     indexed_db::remove_all(STATES)
 }
@@ -63,6 +68,8 @@ pub fn keep_aside(rom_path: &Path, slot: Slot) -> Result<PathBuf, String> {
     Ok(PathBuf::from(format!("{kept}.state")))
 }
 
+/// Describes a slot: when its state was saved, if it has one, and no
+/// thumbnail (see [`thumbnail`]).
 pub fn slot_info(rom_path: &Path, slot: Slot) -> SlotInfo {
     SlotInfo {
         slot,
@@ -72,6 +79,7 @@ pub fn slot_info(rom_path: &Path, slot: Slot) -> SlotInfo {
     }
 }
 
+/// The picture saved with a slot's state, if it has one that decodes.
 pub fn thumbnail(rom_path: &Path, slot: Slot) -> Option<Picture> {
     let png = indexed_db::read(&slot_key(rom_path, slot, "png"))?;
     let (width, height, pixels) = decode_png(&png.bytes)?;

@@ -73,8 +73,9 @@ pub fn read_picture(
 }
 
 /// The saved picture of the game at `rom_path` as a PNG, if there is one.
-/// Adding a game's file again deletes its pictures (see
-/// [`delete_pictures`]), so any that is left is of the file kept now.
+/// Adding another file under the same name (another size or header title)
+/// deletes its pictures (see [`delete_pictures`]), so any that is left is of
+/// the file kept now.
 pub fn current_picture(_cache: &Cache, kind: PictureKind, rom_path: &Path) -> Option<Vec<u8>> {
     Some(
         indexed_db::read(&picture_key(kind, rom_path))?
@@ -118,7 +119,8 @@ pub fn delete_rom(rom_path: &Path) -> Result<(), String> {
 }
 
 /// How many bytes the kept games' files and the library's pictures take,
-/// roughly: the files' sizes as the library knows them, and the pictures.
+/// roughly: the files' sizes as the library knows them, the pictures and the
+/// box art game lists (kept under `box_art/lists/`).
 pub fn size(entries: &[LibraryEntry]) -> u64 {
     let files: u64 = entries
         .iter()
