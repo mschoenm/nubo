@@ -368,27 +368,49 @@ impl App {
             self.toasts.error(error);
         }
 
-        // The old entry is only forgotten once the library's copy has
-        // committed (`Message::LastGameMoved`), so it is never lost.
-        let mut moved = Task::none();
-        if let Some(rom) = nubo_frontend::rom::remembered() {
-            let kept = self.library.add_game(&rom).and_then(|()| {
-                let header = nubo_core::Emulator::read_rom_header(&rom.bytes)
-                    .map_err(|error| error.to_string())?;
-                self.library.record_played(&rom.path, &header)
-            });
-            match kept {
-                Ok(()) => {
-                    moved = Task::perform(
-                        nubo_frontend::storage::indexed_db::settled(),
-                        Message::LastGameMoved,
-                    );
-                }
-                Err(error) => self.toasts.error(error),
-            }
-        }
+        let moved = nubo_frontend::rom::remembered()
+            .map_or_else(Task::none, |rom| self.move_last_game(&rom));
         self.ask_about_box_art();
         Task::batch([self.library_read(), moved])
+    }
+
+    /// Moves `rom`, the last game played that older versions kept in
+    /// localStorage, into the library. The old entry is only forgotten once
+    /// the library's copy has committed (`Message::LastGameMoved`), so it is
+    /// never lost, or at once when there is nothing to move: the library
+    /// already keeps that game's file (moved at an earlier start, or a newer
+    /// file of the same name the player added since, which must not be
+    /// replaced), or the entry isn't a game, which is said once.
+    #[cfg(target_arch = "wasm32")]
+    fn move_last_game(&mut self, rom: &nubo_frontend::rom::Rom) -> Task<Message> {
+        let header = match nubo_core::Emulator::read_rom_header(&rom.bytes) {
+            Ok(header) => header,
+            Err(error) => {
+                self.toasts.error(format!(
+                    "The last game played, {}, isn't a game Nubo can play: {error}",
+                    rom.name()
+                ));
+                return Task::done(Message::LastGameMoved(Ok(())));
+            }
+        };
+        if self.library.keeps_file_of(&rom.path) {
+            return Task::done(Message::LastGameMoved(Ok(())));
+        }
+
+        let kept = self
+            .library
+            .add_game(rom)
+            .and_then(|()| self.library.record_played(&rom.path, &header));
+        match kept {
+            Ok(()) => Task::perform(
+                nubo_frontend::storage::indexed_db::settled(),
+                Message::LastGameMoved,
+            ),
+            Err(error) => {
+                self.toasts.error(error);
+                Task::none()
+            }
+        }
     }
 
     /// The window title, including the game's name while one is running.
