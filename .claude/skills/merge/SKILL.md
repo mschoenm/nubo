@@ -5,7 +5,7 @@ description: Merge a Nubo pull request - wait for green CI and a branch without 
 
 # Merging a pull request
 
-Codex no longer reviews pull requests (its reviews are turned off), so a merge waits for CI only, never for a review.
+Codex no longer reviews pull requests (its app was removed from GitHub), so a merge waits for CI only, never for a review.
 
 1. **Wait for CI.** Read the checks and comments of the pull request (GitHub MCP `pull_request_read`, or `gh pr checks` and `gh pr view --comments`). Only "CI passed" is required; other workflows that run on some pull requests (the Flatpak, the Windows installer, the RetroArch core) never hold up a merge, but look at their results. When CI is red or the branch conflicts with `main`, fix that first, or tell the maintainer what blocks it when the cause isn't this pull request's.
 2. **Handle review comments** that are there, from the maintainer or anyone else: fix and push, or answer why not, then resolve the thread. Don't ask for a review or wait for one.
