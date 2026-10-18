@@ -2,10 +2,11 @@
 //! core's, keep no library.
 
 use super::{Cache, LibraryEntry, PictureKind};
+use crate::storage::Unreadable;
 use std::path::Path;
 
 #[expect(clippy::unnecessary_wraps, reason = "matches the file store")]
-pub fn load_entries(_cache: &Cache) -> Result<Vec<LibraryEntry>, String> {
+pub fn load_entries(_cache: &Cache) -> Result<Vec<LibraryEntry>, Unreadable> {
     Ok(Vec::new())
 }
 

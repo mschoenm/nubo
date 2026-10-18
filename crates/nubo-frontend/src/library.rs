@@ -22,6 +22,8 @@ use crate::model::ModelPreference;
 use crate::palettes::DmgPalette;
 use crate::picture::{Picture, SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::settings::LibraryFolder;
+#[cfg(any(feature = "desktop", feature = "web", test))]
+use crate::storage::Unreadable;
 use crate::time::SystemTime;
 use box_art::GameList;
 use jobs::Jobs;
@@ -343,6 +345,10 @@ pub struct Library {
     /// Counts the scans whose result was taken in, so a quick file check
     /// that started before a scan finished doesn't undo what it found.
     finished_scans: u64,
+    /// Whether the saved list of games couldn't be read and is still in
+    /// place (it couldn't be kept aside), so saving would write over it.
+    /// The list is then not saved this run.
+    read_only: bool,
 }
 
 impl Library {
@@ -356,15 +362,22 @@ impl Library {
     /// Reads what the library knew from `cache`, and keeps the library
     /// there from now on. If that can't be read, the library starts empty
     /// and the reason is returned too; a `library.toml` that can't be parsed
-    /// is kept aside first, so the next save can't lose it.
+    /// is kept aside first, so the next save can't lose it. One that can't
+    /// be read at all, or can't be kept aside, is never written over: the
+    /// library then works as usual but saves no list of games this run.
     pub fn load_from(cache: Cache) -> (Library, Option<String>) {
-        let (entries, error) = match store::load_entries(&cache) {
-            Ok(entries) => (entries, None),
-            Err(error) => (Vec::new(), Some(error)),
+        let (entries, error, read_only) = match store::load_entries(&cache) {
+            Ok(entries) => (entries, None, false),
+            Err(unreadable) => (
+                Vec::new(),
+                Some(unreadable.problem),
+                !unreadable.saving_is_safe,
+            ),
         };
 
         let mut library = Library {
             cache,
+            read_only,
             ..Library::default()
         };
         library.replace_entries(entries);
@@ -932,7 +945,12 @@ impl Library {
         self.entries = entries;
     }
 
+    /// Saves the list of games, unless that would write over a saved one
+    /// that couldn't be read (see [`Library::load_from`]).
     fn save(&self) -> Result<(), String> {
+        if self.read_only {
+            return Ok(());
+        }
         store::save_entries(&self.cache, &self.entries)
             .map_err(|error| format!("The game library couldn't be saved: {error}"))
     }
@@ -1080,18 +1098,27 @@ fn screen_picture(pixels: Vec<u8>) -> Picture {
     Picture::new(SCREEN_WIDTH, SCREEN_HEIGHT, pixels)
 }
 
-/// What to tell the player when `library.toml` couldn't be parsed because
-/// of `error`, and `kept` says where it was kept aside or why it couldn't
-/// be.
+/// What to tell the player when `library.toml` couldn't be used because of
+/// `error`, and whether saving over it is safe: `kept` says where it was
+/// kept aside or why it couldn't be, and is `None` when it couldn't be read
+/// at all (so it wasn't tried).
 #[cfg(any(feature = "desktop", feature = "web", test))]
-fn unreadable_library(error: &str, kept: Result<String, String>) -> String {
-    match kept {
-        Ok(location) => format!(
+fn unreadable_library(error: &str, kept: Option<Result<String, String>>) -> Unreadable {
+    let saving_is_safe = matches!(kept, Some(Ok(_)));
+    let problem = match kept {
+        Some(Ok(location)) => format!(
             "The game library couldn't be read, so Nubo starts a new one and kept the old one as {location}: {error}"
         ),
-        Err(keep_error) => format!(
-            "The game library couldn't be read (keeping it aside failed too: {keep_error}): {error}"
+        Some(Err(keep_error)) => format!(
+            "The game library couldn't be read, and keeping it aside failed too ({keep_error}), so Nubo leaves it as it is and saves no changes to it this time: {error}"
         ),
+        None => format!(
+            "The game library couldn't be read, so Nubo leaves it as it is and saves no changes to it this time: {error}"
+        ),
+    };
+    Unreadable {
+        problem,
+        saving_is_safe,
     }
 }
 

@@ -43,6 +43,10 @@ pub struct GameSession {
     /// listed.
     thumbnails_requested: bool,
     cheats: Vec<Cheat>,
+    /// Whether the game's saved cheats couldn't be read and are still in
+    /// place (they couldn't be kept aside), so saving would write over
+    /// them. Changes to the cheats then work, but aren't saved.
+    cheats_read_only: bool,
     /// Fast forward, and how the emulator was last told to play.
     playback: PlaybackControl,
     /// What each controller was last said to be doing.
@@ -89,6 +93,7 @@ impl GameSession {
             slot_listing: 0,
             thumbnails_requested: false,
             cheats: Vec::new(),
+            cheats_read_only: false,
             playback,
             controller_states: Vec::new(),
         })
@@ -185,12 +190,20 @@ impl GameSession {
         &self.cheats
     }
 
-    /// Replaces the game's cheats and turns on the enabled ones.
-    pub fn set_cheats(&mut self, cheats: Vec<Cheat>) {
+    /// Reads the game's saved cheats and turns on the enabled ones, or says
+    /// why they couldn't be read. Saved cheats that couldn't be read and
+    /// couldn't be kept aside either are never written over: the cheats the
+    /// player adds then work, but saving them fails.
+    pub fn load_cheats(&mut self) -> Result<(), String> {
+        let cheats = cheats::load(&self.rom.path).map_err(|unreadable| {
+            self.cheats_read_only = !unreadable.saving_is_safe;
+            unreadable.problem
+        })?;
         for cheat in &cheats {
             self.session.send(Command::SetCheat(cheat.clone()));
         }
         self.cheats = cheats;
+        Ok(())
     }
 
     /// Turns on `cheat` and keeps it with the game's cheats. A cheat with
@@ -231,8 +244,15 @@ impl GameSession {
         self.save_cheats()
     }
 
-    /// Writes the game's cheats to its cheat list.
+    /// Writes the game's cheats to its cheat list, unless that would write
+    /// over saved cheats that couldn't be read (see
+    /// [`GameSession::load_cheats`]).
     fn save_cheats(&self) -> Result<(), String> {
+        if self.cheats_read_only {
+            return Err(String::from(
+                "The cheats aren't saved, so the saved ones that couldn't be read aren't written over",
+            ));
+        }
         cheats::save(&self.rom.path, &self.cheats)
     }
 

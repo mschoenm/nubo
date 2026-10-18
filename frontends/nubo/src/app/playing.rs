@@ -11,7 +11,6 @@ use crate::views;
 use iced::Task;
 use iced::widget::{self, scrollable::RelativeOffset};
 use nubo_core::{CartridgeHeader, Emulator, Model, SgbBorder};
-use nubo_frontend::cheats;
 use nubo_frontend::controls::Action;
 use nubo_frontend::library::LibrarySnapshot;
 use nubo_frontend::picture::Picture;
@@ -584,11 +583,10 @@ impl App {
             &self.settings.shared,
         )?;
         self.apply_settings(&mut session);
-        if !self.fresh {
-            match cheats::load(&session.rom().path) {
-                Ok(cheats) => session.set_cheats(cheats),
-                Err(error) => self.toasts.error(error),
-            }
+        if !self.fresh
+            && let Err(error) = session.load_cheats()
+        {
+            self.toasts.error(error);
         }
         session.set_controller_states(self.controller_states_for_game());
         Ok(Game::new(session, !self.fresh))

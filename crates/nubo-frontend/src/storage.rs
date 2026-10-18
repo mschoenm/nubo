@@ -15,7 +15,9 @@
 //! wrote, is never written over: it is kept aside under the first free
 //! `<name>.kept-<number>.<extension>` name ([`kept_name`],
 //! [`Storage::keep_aside`]), such as `settings.kept-1.toml`, and the player
-//! is told where. Those names are permanent too.
+//! is told where. Those names are permanent too. One that can't be read at
+//! all, or can't be kept aside, stays where it is and isn't saved over
+//! ([`Unreadable`]).
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -102,6 +104,26 @@ pub fn kept_name(name: &str, number: u32) -> String {
             format!("{stem}.kept-{number}{extension}")
         }
         _ => format!("{name}.kept-{number}"),
+    }
+}
+
+/// Saved data that couldn't be loaded, such as a library or cheats file.
+/// The data is used as if nothing was saved, and this says why, and
+/// whether saving over it is safe.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unreadable {
+    /// Why the saved data couldn't be used, for the player.
+    pub problem: String,
+    /// Whether saving can't lose it: it was kept aside first
+    /// ([`Storage::keep_aside`]). When it is `false`, the data is still
+    /// where it was (it couldn't be read at all, or keeping it aside
+    /// failed), and nothing may be saved over it.
+    pub saving_is_safe: bool,
+}
+
+impl std::fmt::Display for Unreadable {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.problem)
     }
 }
 
