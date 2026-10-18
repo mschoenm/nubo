@@ -86,13 +86,25 @@ pub enum GameMessage {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResumeAnswer {
     /// Continue from the automatic save, on the model it was made on, and
-    /// keep the game on that model from now on.
+    /// keep the game on that model from now on, once it has continued.
     Continue,
     /// Start from the title screen on the model the game is set to start
     /// on; the automatic save is replaced when the player stops.
     StartOver,
     /// Start nothing.
     Cancel,
+}
+
+/// How far [`App::launch`] got with a game.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Launch {
+    /// The game didn't start; a toast says why.
+    Failed,
+    /// The game started from the title screen: there was no state to
+    /// continue from, or it didn't load.
+    Started,
+    /// The game started and continued from where the player left off.
+    Continued,
 }
 
 /// A game whose automatic save was made on another model than the one it is
@@ -385,8 +397,12 @@ impl App {
                 }));
                 self.pending_start = Some(PendingStart { rom, header, state });
             }
-            Some(state) => self.launch(rom, header, state.model, Some(state)),
-            None => self.launch(rom, header, model, None),
+            Some(state) => {
+                self.launch(rom, header, state.model, Some(state));
+            }
+            None => {
+                self.launch(rom, header, model, None);
+            }
         }
     }
 
@@ -394,20 +410,24 @@ impl App {
     /// answered, or drops it. Continuing also sets the game to start on the
     /// save's model from now on (see `App::preference_starting_on`), so the
     /// question doesn't come back, unless a model was picked on the command
-    /// line.
+    /// line. That happens only once the game has continued: a game that
+    /// didn't start, or whose save didn't load, keeps its model, so the
+    /// question comes back at its next start.
     fn answer_resume(&mut self, answer: ResumeAnswer) {
         let Some(PendingStart { rom, header, state }) = self.pending_start.take() else {
             return;
         };
         match answer {
             ResumeAnswer::Continue => {
-                if self.model_override.is_none() {
-                    let preference = self.preference_starting_on(&header, state.model);
-                    if let Err(error) = self.library.set_model(&rom.path, preference) {
-                        self.toasts.error(error);
-                    }
+                let path = rom.path.clone();
+                let model = state.model;
+                let preference = self.preference_starting_on(&header, model);
+                if self.launch(rom, header, model, Some(state)) == Launch::Continued
+                    && self.model_override.is_none()
+                    && let Err(error) = self.library.set_model(&path, preference)
+                {
+                    self.toasts.error(error);
                 }
-                self.launch(rom, header, state.model, Some(state));
             }
             ResumeAnswer::StartOver => {
                 let model = self.model_for(&rom.path, &header);
@@ -419,21 +439,26 @@ impl App {
 
     /// Starts `rom` on `model`, loading `resume_state` (where the player
     /// left off, made on `model`) if there is one, and shows the game.
+    /// Returns how far it got.
     fn launch(
         &mut self,
         rom: Rom,
         header: CartridgeHeader,
         model: Model,
         resume_state: Option<SaveState>,
-    ) {
+    ) -> Launch {
         let path = rom.path.clone();
 
         let running = !self.held_for_scene();
-        match self.start_session(rom, header, model, running) {
+        let launch = match self.start_session(rom, header, model, running) {
             Ok(mut game) => {
+                let mut launch = Launch::Started;
                 if let Some(state) = resume_state {
                     match game.session.load(state.data) {
-                        Ok(()) => self.toasts.info("Continuing where you left off"),
+                        Ok(()) => {
+                            self.toasts.info("Continuing where you left off");
+                            launch = Launch::Continued;
+                        }
                         Err(error) => self.keep_unloadable_state(
                             &path,
                             Slot::Resume,
@@ -463,14 +488,19 @@ impl App {
                 self.pending_start = None;
                 self.search.clear();
                 self.library_selection = None;
+                launch
             }
-            Err(error) => self.toasts.error(format!(
-                "Couldn't start {}: {error}",
-                path.file_stem().unwrap_or_default().to_string_lossy()
-            )),
-        }
+            Err(error) => {
+                self.toasts.error(format!(
+                    "Couldn't start {}: {error}",
+                    path.file_stem().unwrap_or_default().to_string_lossy()
+                ));
+                Launch::Failed
+            }
+        };
 
         self.show_notices();
+        launch
     }
 
     /// Starts an emulator for `rom` with the player's controls, running (or

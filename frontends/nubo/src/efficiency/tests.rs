@@ -23,3 +23,18 @@ fn rates_are_the_counts_between_two_moments_per_second() {
         r#"{"wakeups_per_second":86.0,"buffers_per_second":86.0,"frames_per_second":60.0}"#
     );
 }
+
+#[test]
+fn each_situation_gets_an_empty_folder_that_goes_with_the_measurement() {
+    let folder = TemporaryFolder::new().unwrap();
+    let path = folder.path.clone();
+    let rom_path = Path::new("game.gb");
+
+    folder.empty_saves("playing", rom_path).unwrap();
+    fs::write(path.join("playing").join("left.sav"), [1]).unwrap();
+    folder.empty_saves("paused", rom_path).unwrap();
+
+    assert_eq!(fs::read_dir(path.join("paused")).unwrap().count(), 0);
+    drop(folder);
+    assert!(!path.exists());
+}

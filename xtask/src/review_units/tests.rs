@@ -126,3 +126,30 @@ fn only_a_full_commit_hash_is_taken_as_the_last_commit() {
     }
     assert_eq!(last_commit(&Map::new(), path), None);
 }
+
+#[test]
+fn a_last_commit_git_does_not_know_starts_again_from_tonight() {
+    let state = std::env::temp_dir().join(format!(
+        "nubo-review-units-unknown-commit-{}.json",
+        std::process::id()
+    ));
+    fs::write(
+        &state,
+        r#"{"last_commit": "0123456789abcdef0123456789abcdef01234567", "files": {}}"#,
+    )
+    .unwrap();
+    let tonight_commit = "89abcdef0123456789abcdef0123456789abcdef";
+    let result = next_part(&NextOptions {
+        state: state.clone(),
+        date: String::from("2026-10-16"),
+        commit: String::from(tonight_commit),
+    });
+    let written = fs::read_to_string(&state);
+    fs::remove_file(&state).unwrap();
+
+    let tonight: Value = serde_json::from_str(&result.unwrap()).unwrap();
+    assert_eq!(tonight["changes_since"], Value::Null);
+    assert_eq!(tonight["changed_files"], json!([]));
+    let written: Value = serde_json::from_str(&written.unwrap()).unwrap();
+    assert_eq!(written["last_commit"], Value::from(tonight_commit));
+}

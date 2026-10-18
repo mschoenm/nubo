@@ -863,6 +863,12 @@ impl Library {
         KEEPS_GAMES && self.entry(path).is_some_and(|entry| entry.in_folder)
     }
 
+    /// Whether the library keeps the game at `path` and its file is really
+    /// there: an entry can outlive a file the browser refused to keep.
+    pub fn keeps_file_of(&self, path: &Path) -> bool {
+        self.keeps_game(path) && keeps_file(path)
+    }
+
     /// Takes the game at `path` out of the library, deleting its kept file
     /// and pictures, as the browser build does when the player removes a
     /// game. Its battery saves and save states stay, so adding the game
