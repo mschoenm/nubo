@@ -198,11 +198,14 @@ fn window_settings() -> iced::window::Settings {
         // (`subscriptions::stop_requests`). On
         // macOS, Quit in the app menu (⌘Q) or the Dock ends the process
         // without asking: winit's default menu calls `terminate:`, and
-        // Iced 0.14 doesn't pass winit's `exiting` event on. The battery
-        // saves are on disk by then all the same, unless the game wrote
-        // them in the last quarter of a second (see
-        // `nubo_frontend::battery`), but the Resume slot and the thumbnail
-        // aren't written. This hasn't been checked on a Mac yet.
+        // Iced 0.14 doesn't pass winit's `exiting` event on. So a game also
+        // saves where the player left off, and its thumbnail, every minute
+        // it runs and whenever it stops running (`game::AutosaveTimer`):
+        // quitting that way loses at most the last minute of a running
+        // game, and nothing of a paused one. The battery saves are on disk
+        // by then all the same, unless the game wrote them in the last
+        // quarter of a second (see `nubo_frontend::battery`). This hasn't
+        // been checked on a Mac yet.
         exit_on_close_request: false,
         #[cfg(target_os = "linux")]
         platform_specific: iced::window::settings::PlatformSpecific {

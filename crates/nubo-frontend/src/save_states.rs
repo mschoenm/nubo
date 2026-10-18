@@ -34,7 +34,8 @@ const EARLY_STATE_PREFIX: &[u8] = b"Nubo state ";
 /// A place to keep one save state of a game.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Slot {
-    /// Written when the player leaves a game, and read when it starts again.
+    /// Written as the player plays a game and when they leave it, and read
+    /// when it starts again.
     /// Only used while "Continue games where you left off" is on (see
     /// `Settings::resume_games`).
     Resume,

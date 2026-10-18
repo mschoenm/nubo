@@ -920,7 +920,7 @@ fn playing<'a>(
             setting(
                 "Continue where you left off",
                 Some(String::from(
-                    "Leaving a game saves its state, so it starts there next time.",
+                    "A game's state is saved as you play, so it starts there next time.",
                 )),
                 switch(settings.shared.resume_games, |resume| {
                     Message::Settings(SettingsMessage::ResumeGamesToggled(resume))

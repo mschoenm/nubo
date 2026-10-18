@@ -627,14 +627,22 @@ impl App {
     /// settings say so) and keeps the last frame as the game's thumbnail,
     /// unless it keeps nothing (`--fresh`).
     pub(super) fn stop_game(&mut self) {
-        let Some(mut game) = self.game.take() else {
-            return;
-        };
-        self.undo = None;
-        self.toasts.forget_undo();
-        if !game.keeps_data {
+        self.save_where_left_off();
+        if self.game.take().is_none() {
             return;
         }
+        self.undo = None;
+        self.toasts.forget_undo();
+    }
+
+    /// Saves where the player left off in the running game, unless the
+    /// settings don't continue games, and its picture for the library's
+    /// card, unless it keeps no data (`--fresh`). A pause menu page listing
+    /// the slots is listed again, so it shows the new save.
+    pub(super) fn save_where_left_off(&mut self) {
+        let Some(game) = self.game.as_mut().filter(|game| game.keeps_data) else {
+            return;
+        };
 
         if self.settings.shared.resume_games
             && save_states::AVAILABLE
@@ -647,6 +655,10 @@ impl App {
             && let Err(error) = self.library.set_thumbnail(&game.session.rom().path, pixels)
         {
             self.toasts.error(error);
+        }
+
+        if let page @ Some(PauseMenu::Save | PauseMenu::Load) = game.menu() {
+            game.show_menu(page);
         }
     }
 
@@ -787,8 +799,9 @@ impl App {
     }
 
     /// Reports `message` about the state in `slot` that couldn't be loaded,
-    /// and moves the state aside so the next save to the slot (when the game
-    /// stops, for where the player left off) can't overwrite it.
+    /// and moves the state aside so the next save to the slot (as the game
+    /// runs and when it stops, for where the player left off) can't
+    /// overwrite it.
     fn keep_unloadable_state(&mut self, rom_path: &Path, slot: Slot, message: String) {
         match save_states::keep_aside(rom_path, slot) {
             Ok(kept) => self
