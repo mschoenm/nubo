@@ -7,9 +7,9 @@ use super::window_events::toggle_fullscreen;
 use super::{App, GameMessage, Message};
 use crate::input::{self, KeyInput};
 use iced::Task;
-use iced::keyboard::{self, key::Named};
+use iced::keyboard::{self, Modifiers, key::Named};
 use nubo_core::{ControllerButton, ControllerState, Key};
-use nubo_frontend::controls::{Action, Device, PadButton};
+use nubo_frontend::controls::{Action, Device, KeyCode, PadButton};
 use nubo_frontend::gamepads::ControllerEvent;
 use nubo_frontend::save_states::Slot;
 
@@ -32,12 +32,33 @@ impl App {
         self.settings_tab.is_some() || self.dialog.is_some()
     }
 
+    /// The modifiers the shortcuts see. While the game runs and Ctrl plays
+    /// a Game Boy button, Ctrl doesn't count, so holding it (to run with B,
+    /// say) neither drops the other keys nor turns them into shortcuts such
+    /// as Ctrl+R. The modifiers don't say which Ctrl is held, so either
+    /// one being bound is enough. On macOS the command key is ⌘, and Ctrl
+    /// stays as it is.
+    fn shortcut_modifiers(&self, modifiers: Modifiers) -> Modifiers {
+        let ctrl_plays = [KeyCode::ControlLeft, KeyCode::ControlRight]
+            .into_iter()
+            .filter_map(|key| self.settings.shared.controls.keyboard.action(key))
+            .any(|action| action.game_boy_key().is_some());
+        if cfg!(not(target_os = "macos")) && ctrl_plays && self.is_running() {
+            modifiers.difference(Modifiers::CTRL)
+        } else {
+            modifiers
+        }
+    }
+
     /// Handles a key going down or up: picking a key in the settings, the
     /// fixed shortcuts (pausing and restarting the game wait while the
     /// settings or a dialog cover it), the fixed keys that move through the
     /// menus, and then the player's controls. A window that shows only the
-    /// game (`--scale`) has no shortcuts.
+    /// game (`--scale`) has no shortcuts. Ctrl bound to a Game Boy button
+    /// doesn't count as a modifier while the game runs
+    /// (`shortcut_modifiers`).
     pub(super) fn handle_key(&mut self, input: &KeyInput) -> Task<Message> {
+        let modifiers = self.shortcut_modifiers(input.modifiers);
         if input.pressed && !input.repeat && self.screen_scale.is_none() {
             if let Some((device, action)) = self.capture {
                 match input.key.as_ref() {
@@ -62,13 +83,13 @@ impl App {
 
             #[cfg(not(target_arch = "wasm32"))]
             if self.scene_recorder.is_some()
-                && input.modifiers.command()
+                && modifiers.command()
                 && input.key == keyboard::Key::Named(Named::F12)
             {
                 return self.record_scene();
             }
 
-            if let Some(message) = input::fixed_shortcut(&input.key, input.modifiers) {
+            if let Some(message) = input::fixed_shortcut(&input.key, modifiers) {
                 let acts_on_game = matches!(
                     message,
                     Message::Game(GameMessage::TogglePause | GameMessage::Reset)
@@ -80,14 +101,14 @@ impl App {
             }
         }
 
-        if input.pressed && input.modifiers.command() {
+        if input.pressed && modifiers.command() {
             return Task::none();
         }
 
         if input.pressed
             && self.screen_scale.is_none()
             && self.in_menus()
-            && let Some(action) = input::menu_action(&input.key, input.modifiers)
+            && let Some(action) = input::menu_action(&input.key, modifiers)
         {
             // Holding a direction keeps moving, like in other apps.
             if input.repeat && !action.is_direction() {
