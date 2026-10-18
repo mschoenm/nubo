@@ -117,7 +117,10 @@ impl BlepBuffer {
 
     /// Returns the output level for the current sample and moves to the next.
     pub(super) fn read(&mut self) -> f32 {
-        self.accumulator += self.buffer[self.position];
+        // `position` is always below `BLEP_WIDTH`, so the remainder changes
+        // nothing, but it lets the compiler drop the bounds check this runs
+        // for every sample.
+        self.accumulator += self.buffer[self.position % BLEP_WIDTH];
         self.position += 1;
         if self.position == BLEP_WIDTH {
             self.buffer.copy_within(BLEP_WIDTH.., 0);
