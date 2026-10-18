@@ -98,7 +98,12 @@ pub fn run(command: Command) -> Result {
 /// the review should cover as JSON.
 ///
 /// The state is `{"last_commit": "<sha>", "files": {"<path>": "<date>"}}`.
-/// A missing state file starts the rotation from the beginning.
+/// A missing state file starts the rotation from the beginning. When git
+/// can't compare `last_commit` with tonight's commit, such as after a
+/// force-push removed it from main's history, the night goes on with a
+/// warning as if there were no `last_commit`: no files count as changed,
+/// `changes_since` is null and the state moves on to tonight's commit, so
+/// the next night works again.
 fn next_part(options: &NextOptions) -> Result<String> {
     let state = match fs::read_to_string(&options.state) {
         Ok(text) => serde_json::from_str::<Value>(&text)
@@ -115,9 +120,15 @@ fn next_part(options: &NextOptions) -> Result<String> {
         .cloned()
         .unwrap_or_default();
 
-    let changes = match &last_commit {
-        Some(last) => rust_changes(last, &options.commit)?,
-        None => Vec::new(),
+    let (last_commit, changes) = match last_commit {
+        Some(last) => match rust_changes(&last, &options.commit) {
+            Ok(changes) => (Some(last), changes),
+            Err(error) => {
+                eprintln!("Starting again from tonight's commit: {error}");
+                (None, Vec::new())
+            }
+        },
+        None => (None, Vec::new()),
     };
     carry_over_moves(&mut reviewed, &changes);
     forget_missing(&mut reviewed, |file| workspace_root().join(file).is_file());

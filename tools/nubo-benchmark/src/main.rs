@@ -6,12 +6,13 @@
 //! speed is emulated time divided by the time spent inside the emulator; the
 //! target is at least 20 times real time on both DMG and CGB. The
 //! fingerprints are hashes of every frame (with its border on a Super Game
-//! Boy), every audio sample and the final save state; `--record` writes them
-//! to a file and `--compare` checks a later run against it. Run over the
-//! games and all test ROMs, this shows that an optimization changes nothing
-//! at all, far beyond what the test ROMs' pass/fail results show. Built with
-//! the core's `eager` feature, which runs every M-cycle on its own, it checks
-//! the lazy shortcuts against stepping one M-cycle at a time.
+//! Boy) and the audio buffer it came with, every audio sample and the final
+//! save state; `--record` writes them to a file and `--compare` checks a
+//! later run against it. Run over the games and all test ROMs, this shows
+//! that an optimization changes nothing at all, far beyond what the test
+//! ROMs' pass/fail results show. Built with the core's `eager` feature, which
+//! runs every M-cycle on its own, it checks the lazy shortcuts against
+//! stepping one M-cycle at a time.
 //!
 //! `--check-save-states` also checks that a save state taken halfway through
 //! each run, loaded into a new emulator, goes on exactly like the run it was
@@ -381,6 +382,10 @@ fn run(
         let samples = copy.is_some().then(|| (left.to_vec(), right.to_vec()));
         let new_frame = emulator.take_frame().is_some();
         if new_frame {
+            // Frontends pace themselves by the buffer a frame comes with, and
+            // save states leave out which frame is waiting, so a frame handed
+            // over one buffer later must change the fingerprint too.
+            frame_hasher.add_word(buffer);
             frame_hasher.add_bytes(emulator.frame_buffer());
             if let Some(bordered) = emulator.frame_with_border() {
                 frame_hasher.add_bytes(bordered);

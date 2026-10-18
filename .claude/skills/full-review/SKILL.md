@@ -24,7 +24,6 @@ Ask the maintainer once, in one question each with the default first:
 - **Fixes:** only small, safe ones (default), or larger ones too?
 - **Pull requests:** one per theme (default; the five themes are in step 5)?
 - **Issues:** one for each real finding that isn't fixed, labelled `code-review` (default)?
-- **Codex** on the pull requests: as the `merge` skill says (default), or not?
 
 These are never asked, because they're fixed:
 - **Scope:** the whole repository.
