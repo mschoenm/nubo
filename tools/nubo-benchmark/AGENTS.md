@@ -1,6 +1,6 @@
 # Benchmark
 
-`cargo benchmark` measures speed (the target is at least 20 times real time on both DMG and CGB) and fingerprints every frame, audio sample and end state, so a change can be shown to alter nothing at all. `main.rs` explains how.
+`cargo benchmark` measures speed (the target is at least 20 times real time on both DMG and CGB) and fingerprints every frame (and the audio buffer it arrived with, which frontends pace themselves by), audio sample and end state, so a change can be shown to alter nothing at all. `main.rs` explains how.
 
 ```bash
 cargo xtask benchmark-roms                                   # Download the free benchmark games into target/benchmark-roms
