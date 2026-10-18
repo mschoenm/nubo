@@ -191,7 +191,7 @@ const listed = () => ISSUES.filter((i) => !i.closed && !i.dismissed);
 const areaOf = (i) => (AREAS.includes(i.area) ? i.area : "Overig");
 const issueTitle = (n) => (ISSUES.find((i) => i.n === n) || {}).title || "";
 const waiting = () => pending.filter((r) => r.state === "nieuw");
-const requested = (n) => waiting().some((r) => r.type === "start" && (r.issues || []).some((x) => x.n === n));
+const requested = (n) => waiting().some((r) => (r.type === "start" && (r.issues || []).some((x) => x.n === n)) || (r.type === "close" && r.n === n));
 
 function clock(iso) {
   const t = Date.parse(iso || "");
