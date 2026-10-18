@@ -317,7 +317,8 @@ impl Frontend {
 
 /// The callbacks RetroArch gave, shared by every exported function.
 static FRONTEND: Mutex<Frontend> = Mutex::new(Frontend::NONE);
-/// The loaded game, or `None` when there is none.
+/// The loaded game, or `None` when there is none. RetroArch is called with it
+/// held only while a frame is handed over (see `retro_run`).
 static CORE: Mutex<Option<Core>> = Mutex::new(None);
 /// The picture size RetroArch was last told about, in `retro_get_system_av_info`
 /// or with `RETRO_ENVIRONMENT_SET_GEOMETRY`.
@@ -582,12 +583,13 @@ fn negotiate_pixel_format() -> PixelFormat {
     PixelFormat::Rgb1555
 }
 
-/// Tells RetroArch where the Game Boy's memory is, for RetroAchievements.
-/// The map depends on the model (a Game Boy Color has more work RAM), so it
-/// is set again whenever a restart may have changed the model.
-fn set_memory_maps(core: &mut Core) {
-    let descriptors: Vec<RetroMemoryDescriptor> = core
-        .memory_regions()
+/// Describes where the Game Boy's memory is, for RetroAchievements: one
+/// descriptor per region of `core`'s buffers. The map depends on the model (a
+/// Game Boy Color has more work RAM), so it is built again whenever a restart
+/// may have changed the model. The buffers never move, so the descriptors
+/// stay true after the lock on `core` is released.
+fn memory_descriptors(core: &mut Core) -> Vec<RetroMemoryDescriptor> {
+    core.memory_regions()
         .into_iter()
         .map(|region| RetroMemoryDescriptor {
             flags: match region.kind {
@@ -606,7 +608,13 @@ fn set_memory_maps(core: &mut Core) {
             len: region.length,
             addrspace: ptr::null(),
         })
-        .collect();
+        .collect()
+}
+
+/// Hands RetroArch the memory map `descriptors` describe. Called without the
+/// lock on `CORE` held, since RetroArch may ask for the core's memory
+/// (`retro_get_memory_data`) while it handles the map.
+fn set_memory_maps(descriptors: &[RetroMemoryDescriptor]) {
     let mut map = RetroMemoryMap {
         descriptors: descriptors.as_ptr(),
         num_descriptors: c_uint::try_from(descriptors.len()).unwrap_or(0),
@@ -886,20 +894,32 @@ pub extern "C" fn retro_set_controller_port_device(_port: c_uint, _device: c_uin
 #[unsafe(no_mangle)]
 pub extern "C" fn retro_reset() {
     guard("retro_reset", (), || {
-        if let Some(core) = lock(&CORE).as_mut() {
-            match core.reset() {
-                Ok(()) => set_memory_maps(core),
-                Err(error) => log(
+        let descriptors = {
+            let mut core = lock(&CORE);
+            let Some(core) = core.as_mut() else {
+                return;
+            };
+            if let Err(error) = core.reset() {
+                log(
                     RETRO_LOG_ERROR,
                     &format!("the game didn't start again: {error}"),
-                ),
+                );
+                return;
             }
-        }
+            memory_descriptors(core)
+        };
+        set_memory_maps(&descriptors);
     });
 }
 
 /// Runs one frame: reads the buttons, runs the emulator, and hands over the
 /// frame and its sound.
+///
+/// The lock on `CORE` stays held while `present` calls RetroArch's video,
+/// sound, rumble and geometry callbacks, since the frame and the sound they
+/// read are the core's own buffers. A callback that called back into the core
+/// (such as `retro_get_memory_data`) would wait for that lock forever; no
+/// known RetroArch callback for these does.
 #[unsafe(no_mangle)]
 pub extern "C" fn retro_run() {
     guard("retro_run", (), || {
@@ -1060,7 +1080,7 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
             RETRO_LOG_INFO,
             &format!("{} on {}", core.header().title, core.model().description()),
         );
-        set_memory_maps(&mut core);
+        set_memory_maps(&memory_descriptors(&mut core));
         // Before the first `retro_run`, as libretro.h asks.
         let mut supported = true;
         environment(
