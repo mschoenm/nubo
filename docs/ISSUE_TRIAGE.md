@@ -11,8 +11,10 @@ Write everything the maintainer reads on the page in Dutch (plain, short sentenc
 ## Current setup
 
 - **Page:** https://claude.ai/artifact/66gQtj59G93U3e1aQniuVd ("Nubo issue-triage"), private to the maintainer and pinned in their claude.ai sidebar. Its source is `.claude/skills/issue-triage/page.html`.
-- **Triage session:** `session_017hovkB9Bu8nuZjHRZtezQd` ("Nubo issue-triage"), which the routine wakes.
-- **Routine:** "Nubo issue-triage bijwerken", every hour, firing into the triage session.
+- **Triage session:** one standing cloud session on this repository, titled `Nubo issue-triage (vanaf <date>)`, which the routine wakes. It is replaced once a week (part A, step 8), so no session's context keeps growing for months, and there is still only one in the maintainer's sidebar at a time.
+- **Routine:** "Nubo issue-triage bijwerken", every hour, bound to the triage session. Each triage session makes its own and disables the one before.
+
+The session and its routine change every week: their current ids are in `meta/page` (`session_id`, `trigger_id`), not in this file.
 
 ## The page's database
 
@@ -25,7 +27,7 @@ The page shows what is in its artifact database, which the triage sessions read 
   - `dismissed` (true): set by the page when the maintainer taps "Niet doen", so the card disappears at once.
 - `status/<number>`: the work on an issue, shown under its card and in the page's "Bezig" list until `state` is `Klaar`: `n` (number), `state` (Dutch, such as `Sessie gestart`, `PR open`, `PR klaar voor merge` or `Klaar`), `session_url`, `pr` (number), `pr_state` (`open`, `merged` or `closed`, shown next to the pull request's number), `note`, `updated_at`.
 - `requests/<id>`: written by the page. `type` is `start` (the maintainer tapped Start on a card; `issues` holds `[{n, note}]`), `close` (the maintainer tapped "Niet doen"; `n` and `note`) or `refresh` (the maintainer tapped "Nu bijwerken"), with `created_at` and `state` (`nieuw`). A triage session sets `state` to `verwerkt`, with `processed_at`, once it handled the request.
-- `meta/page`: `asof` (a Dutch date and the short `main` commit, such as `18 oktober 2026 (1a2b3c4)`), `updated_at` (the last change to `issues`) and `checked_at` (the last run, which the page shows).
+- `meta/page`: `asof` (a Dutch date and the short `main` commit, such as `18 oktober 2026 (1a2b3c4)`), `updated_at` (the last change to `issues`), `checked_at` (the last run, which the page shows), and the triage session in use: `session_id`, `trigger_id` (the hourly routine that wakes it) and `session_started_at` (ISO time the session took over).
 
 Every write to an existing document passes `if_version` from the last read; more than a couple of documents go in one `batch` (up to 50 writes).
 
@@ -40,15 +42,23 @@ The routine asks for this every hour; a `refresh` request asks for it too. Most 
    - a `status` document isn't `Klaar`, its issue has no `in progress` label, and its pull request (step 6) changed;
    - or this is the first run since 06:00 Amsterdam time today, which also does the daily steps (marked "daily" below).
 
-   With no work, set `meta/page` `checked_at`, end with the single line "Niets te doen." and stop.
+   With no work, set `meta/page` `checked_at` and stop. End with an empty reply: no closing message, no text for the maintainer.
 2. `git fetch origin main && git checkout -q --detach origin/main`, and read `AGENTS.md`.
 3. Leave every issue labelled `in progress` alone: its session keeps its `status` up to date. Assess every other open issue that has no `issues/<n>` document or whose GitHub `updated_at` is newer than its `github_updated_at`; daily, also those whose code changed on `main` since `assessed_at` (`git log --since` on the files it names). Read the issue in full and the `AGENTS.md` of the folders involved, check every claim against the code, say where the issue or its proposed fix is wrong, and note issues that touch the same code and should be fixed together. With more than three to assess, give groups of about six to `Explore` subagents in parallel, with these instructions and the field list above. Write the documents.
 4. For each `issues/<n>` whose GitHub issue is now closed, set `closed`, `closed_at` and `closed_by` (the pull request that closed it, from the issue's timeline or a `Fixes #<n>` pull request), and set the matching `status/<n>` to `Klaar`. An issue that was opened again loses `closed`, `closed_at`, `closed_by` and `dismissed`, and is assessed again (step 3). Daily, delete `issues/<n>` and `status/<n>` documents closed more than seven days ago, and `requests` that are `verwerkt` and older than seven days. Also daily, for each issue labelled `in progress` whose session (`get_session` on the id in its `status` `session_url`) hasn't changed for more than a day while its pull request isn't merged, set the `status` note to `Lijkt vastgelopen sinds <date>`; do nothing else with it.
 5. An issue the assessment finds already fixed on `main` (`status: opgelost`) stays open; the page shows it, and tapping Start on its card closes it as fixed (part B, step 2).
 6. Bring `status` up to date for issues whose `status` isn't `Klaar` and that have no `in progress` label (their sessions began before the label, or stopped without a fix): find its pull request (an open one whose description says `Fixes #<n>`, or the branch `claude/issue-<n>`) and set `pr`, `pr_state` and `state`: `PR open`, `PR klaar voor merge` once CI is green, `Klaar` once it is merged. When the session's title doesn't name the pull request yet, set it as part B says.
 7. Handle every `requests` document still `nieuw`: part B for `start`; for `close`, close the issue on GitHub as not planned (`state_reason` `not_planned`) with a comment in English that the maintainer decided not to do it, giving their note if they wrote one, with the Claude Code footer, and set `closed`, `closed_at` and `closed_by` `niet gedaan` on its `issues/<n>`; an issue labelled `in progress` stays open, and its `status` note says to stop its session first. A `refresh` is done by this run. Set each handled request to `verwerkt`.
-8. Update `meta/page`: `asof` and `updated_at` when `issues` changed, and `checked_at`.
-9. End with a short Dutch summary: how many issues are new, assessed again or closed, and the requests handled. Don't message the maintainer otherwise; the page is the report.
+8. Daily, when `meta/page` `session_started_at` is more than seven days ago, hand over to a new triage session. Start one successor with `create_session`: this session's environment, `source_url` https://github.com/mschoenm/nubo, title `Nubo issue-triage (vanaf <date>)`, tag `nubo-issue-triage`, and a prompt that says:
+   - it is the standing issue-triage session of Nubo, its instructions are `docs/ISSUE_TRIAGE.md` on `origin/main`, and the page is the URL above;
+   - in its first turn it creates its own hourly routine, bound to itself: `create_trigger` without `persistent_session_id` or `create_new_session_on_fire`, name `Nubo issue-triage bijwerken`, `cron_expression` `CRON_TZ=Europe/Amsterdam 59 * * * *`, `initiation` `human_request`, and the prompt "Issue-triage refresh (every hour). Fetch `origin/main` and follow `docs/ISSUE_TRIAGE.md`, part A. The page is <page URL>.";
+   - then it disables the previous routine (`update_trigger` with `enabled` false on the old `trigger_id`; never delete it), writes its own `session_id`, `trigger_id` and `session_started_at` to `meta/page`, archives the previous session (`archive_session` on the old `session_id`), and does part A. When `meta/page` holds no earlier ids (a new setup), it skips disabling and archiving.
+
+   When `meta/page` has no `session_started_at` yet, write this session's own `session_id`, its routine's `trigger_id` and the current time instead of handing over.
+
+   After starting the successor, this session does nothing more in this run. If the successor fails to take over (the next hourly run finds `meta/page` unchanged), this session keeps running and tries again the next day.
+9. Update `meta/page`: `asof` and `updated_at` when `issues` changed, and `checked_at`.
+10. Only when the run changed something (issues new, assessed again or closed, or requests handled), end with a short Dutch summary of how many. A run that changed nothing ends silently, with an empty reply. Don't message the maintainer otherwise; the page is the report.
 
 ## B. Start the chosen issues
 
