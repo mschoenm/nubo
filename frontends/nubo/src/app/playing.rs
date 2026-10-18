@@ -120,6 +120,15 @@ pub struct PendingStart {
     pub(super) replaced: Option<Dialog>,
 }
 
+/// Why [`App::restore_state`] couldn't load a state. Either way the game is
+/// put back as it was, unless it doesn't start again on its own model.
+enum RestoreError {
+    /// The game didn't start on the state's model; the state may be fine.
+    Start(String),
+    /// The state itself didn't load.
+    State(String),
+}
+
 /// What the Undo button of the newest toast puts back.
 pub enum UndoPoint {
     /// The game as it was before a state was loaded or it restarted.
@@ -701,7 +710,9 @@ impl App {
                 {
                     match self.restore_state(state) {
                         Ok(()) => self.toasts.info("Undone"),
-                        Err(error) => self.toasts.error(format!("Couldn't undo: {error}")),
+                        Err(RestoreError::Start(error) | RestoreError::State(error)) => {
+                            self.toasts.error(format!("Couldn't undo: {error}"));
+                        }
                     }
                 }
             }
@@ -726,28 +737,62 @@ impl App {
     /// state's model if that differs, stopping the running one before the
     /// new one starts so its battery save is written before the new one
     /// reads it. The game resumes, unless the settings are open.
-    fn restore_state(&mut self, state: SaveState) -> Result<(), String> {
-        let Some(game) = self.game.as_ref() else {
+    ///
+    /// If the game doesn't start on the state's model, or the state doesn't
+    /// load into it, the game starts again on its own model from a snapshot
+    /// taken before it stopped, on the pause menu page it was on, so the
+    /// player keeps it as it was.
+    fn restore_state(&mut self, state: SaveState) -> Result<(), RestoreError> {
+        let Some(game) = self.game.as_mut() else {
             return Ok(());
         };
 
-        if state.model != game.session.model() {
-            let (rom, header) = (game.session.rom().clone(), game.session.header().clone());
-            self.game = None;
-            let running = self.settings_tab.is_none();
-            self.game = Some(self.start_session(rom, header, state.model, running)?);
+        if state.model == game.session.model() {
+            game.session.load(state.data).map_err(RestoreError::State)?;
+            game.show_menu(None);
+            return Ok(());
         }
 
-        let Some(game) = &mut self.game else {
-            return Ok(());
+        let rom = game.session.rom().clone();
+        let header = game.session.header().clone();
+        let old_model = game.session.model();
+        let menu = game.menu();
+        let snapshot = game.session.snapshot();
+        let running = self.settings_tab.is_none();
+        self.game = None;
+
+        let error = match self.start_session(rom.clone(), header.clone(), state.model, running) {
+            Ok(mut game) => match game.session.load(state.data) {
+                Ok(()) => {
+                    game.show_menu(None);
+                    self.game = Some(game);
+                    return Ok(());
+                }
+                Err(error) => RestoreError::State(error),
+            },
+            Err(error) => RestoreError::Start(error),
         };
-        game.session.load(state.data)?;
-        game.show_menu(None);
-        Ok(())
+
+        match self.start_session(rom, header, old_model, running) {
+            Ok(mut game) => {
+                if let Err(error) = snapshot.and_then(|snapshot| game.session.load(snapshot.data)) {
+                    self.toasts
+                        .error(format!("Couldn't put the game back as it was: {error}"));
+                }
+                game.show_menu(menu);
+                self.game = Some(game);
+            }
+            Err(start_error) => self.toasts.error(format!(
+                "Couldn't start the game again on {old_model}: {start_error}"
+            )),
+        }
+        Err(error)
     }
 
     /// Loads the state in `slot` and resumes the game (see
-    /// [`App::restore_state`]), offering to undo it.
+    /// [`App::restore_state`]), offering to undo it. Only a state that
+    /// can't be read or loaded is moved aside; when the game doesn't start
+    /// on the state's model the slot stays as it is.
     pub(super) fn load_state(&mut self, slot: Slot) {
         let Some(game) = self.game.as_mut().filter(|game| game.keeps_data) else {
             return;
@@ -776,7 +821,10 @@ impl App {
                     self.toasts.info(format!("Loaded {slot}"));
                 }
             }
-            Err(error) => {
+            Err(RestoreError::Start(error)) => {
+                self.toasts.error(format!("Couldn't load {slot}: {error}"));
+            }
+            Err(RestoreError::State(error)) => {
                 self.keep_unloadable_state(
                     &rom_path,
                     slot,
