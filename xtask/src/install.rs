@@ -122,7 +122,7 @@ fn choose_source(options: &Options) -> Result<Option<Source>> {
         },
     };
 
-    let (reference, name) = resolve(&what)?;
+    let (reference, name) = resolve(&what, &git(&["tag", "--list", "v*"])?)?;
     let commit = git(&["rev-parse", "--verify", &format!("{reference}^{{commit}}")])
         .map_err(|_| format!("there is no tag, branch or commit called {what}"))?;
     if head_is(&commit)? {
@@ -179,20 +179,19 @@ fn ask() -> Result<Option<Choice>> {
 }
 
 /// The git reference `what` names, and the name to show for it: `main` is
-/// `origin/main`, a version is its release's tag, and anything else is
-/// passed on to git as it is.
-fn resolve(what: &str) -> Result<(String, String)> {
+/// `origin/main`, a version is its release's tag among `tags` (the
+/// repository's `v*` tags, one per line), and anything else is passed on to
+/// git as it is. A version without a dot that no release matches, such as a
+/// short commit hash of only digits (`1234567`), is passed on to git too.
+fn resolve(what: &str, tags: &str) -> Result<(String, String)> {
     if what == "main" {
         return Ok((MAIN.to_owned(), MAIN.to_owned()));
     }
-    match parse_version(what) {
-        Some(version) => {
-            let tags = git(&["tag", "--list", "v*"])?;
-            let tag = newest_release(tags.lines(), &version)
-                .ok_or_else(|| format!("there is no release {what}"))?;
-            Ok((format!("refs/tags/{tag}"), tag))
-        }
-        None => Ok((what.to_owned(), what.to_owned())),
+    let release = parse_version(what).map(|version| newest_release(tags.lines(), &version));
+    match release {
+        Some(Some(tag)) => Ok((format!("refs/tags/{tag}"), tag)),
+        Some(None) if what.contains('.') => Err(format!("there is no release {what}")),
+        _ => Ok((what.to_owned(), what.to_owned())),
     }
 }
 
