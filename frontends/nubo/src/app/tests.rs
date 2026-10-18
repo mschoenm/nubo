@@ -1,13 +1,15 @@
 //! Tests for the app's small helpers, for resetting the settings in a
 //! `--fresh` app, which keeps nothing, for shortcuts while the settings
-//! are open, for dialogs whose content is gone, and for the fixed keys and
+//! are open, for dialogs whose content is gone, for a state that fails to
+//! load on another model, and for the fixed keys and
 //! buttons of the menus.
 
-use super::playing::{PendingStart, ResumeAnswer};
+use super::playing::{PendingStart, ResumeAnswer, UndoPoint};
 use super::settings_window::reset_summary;
 use super::{App, CAPTURE_TIMEOUT, GameMessage, LibraryMessage, Message, SettingsMessage, cycle};
 use crate::command_line::Options;
 use crate::dialog::{Dialog, DialogKind, GameMenuPage, ResetChoices};
+use crate::game::PauseMenu;
 use crate::input::KeyInput;
 use crate::settings::Appearance;
 use crate::views::settings::SettingsTab;
@@ -18,6 +20,7 @@ use nubo_frontend::gamepads::{ControllerEvent, Controllers};
 use nubo_frontend::library::{Cache, Library};
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::rom::Rom;
+use nubo_frontend::save_states::SaveState;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -523,6 +526,35 @@ fn continuing_sets_the_saves_model_only_once_the_game_has_continued() {
         assert_eq!(app.library.entry(&rom_path).unwrap().preference(), kept);
     }
     let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn a_state_that_fails_on_another_model_puts_the_game_back() {
+    let mut app = playing_app();
+    let game = app.game.as_mut().unwrap();
+    game.show_menu(Some(PauseMenu::Load));
+    let model = game.session.model();
+    let rom_path = game.session.rom().path.clone();
+    let other = if model == Model::Sgb {
+        Model::Dmg
+    } else {
+        Model::Sgb
+    };
+    app.undo = Some(UndoPoint::Game {
+        rom_path: rom_path.clone(),
+        state: SaveState {
+            model: other,
+            data: vec![1, 2, 3],
+        },
+    });
+
+    let _ = app.update(GameMessage::Undo.into());
+
+    let game = app.game.as_mut().unwrap();
+    assert_eq!(game.session.model(), model);
+    assert_eq!(game.session.rom().path, rom_path);
+    assert_eq!(game.menu(), Some(PauseMenu::Load));
+    assert!(game.session.snapshot().is_ok());
 }
 
 /// A `--fresh` app set to start games on the Game Boy, asking whether to
