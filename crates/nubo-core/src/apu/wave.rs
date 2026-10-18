@@ -223,8 +223,7 @@ impl Apu {
         }
         if self.state.wave.dac_enabled {
             self.state.set_active(Channel::Wave, true);
-            let sample = (self.state.wave.current_sample_byte >> 4) >> self.state.wave.volume_shift;
-            self.update_sample(Channel::Wave, sample);
+            self.update_wave_sample();
         }
 
         let wave = &mut self.state.wave;

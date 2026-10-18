@@ -44,23 +44,23 @@ The routine asks for this every hour; a `refresh` request asks for it too. Most 
 2. `git fetch origin main && git checkout -q --detach origin/main`, and read `AGENTS.md`.
 3. Leave every issue labelled `in progress` alone: its session keeps its `status` up to date. Assess every other open issue that has no `issues/<n>` document or whose GitHub `updated_at` is newer than its `github_updated_at`; daily, also those whose code changed on `main` since `assessed_at` (`git log --since` on the files it names). Read the issue in full and the `AGENTS.md` of the folders involved, check every claim against the code, say where the issue or its proposed fix is wrong, and note issues that touch the same code and should be fixed together. With more than three to assess, give groups of about six to `Explore` subagents in parallel, with these instructions and the field list above. Write the documents.
 4. For each `issues/<n>` whose GitHub issue is now closed, set `closed`, `closed_at` and `closed_by` (the pull request that closed it, from the issue's timeline or a `Fixes #<n>` pull request), and set the matching `status/<n>` to `Klaar`. An issue that was opened again loses `closed`, `closed_at`, `closed_by` and `dismissed`, and is assessed again (step 3). Daily, delete `issues/<n>` and `status/<n>` documents closed more than seven days ago, and `requests` that are `verwerkt` and older than seven days. Also daily, for each issue labelled `in progress` whose session (`get_session` on the id in its `status` `session_url`) hasn't changed for more than a day while its pull request isn't merged, set the `status` note to `Lijkt vastgelopen sinds <date>`; do nothing else with it.
-5. An issue the assessment finds already fixed on `main` (`status: opgelost`) stays open; the page shows it, and ticking it means "close it" (part B).
+5. An issue the assessment finds already fixed on `main` (`status: opgelost`) stays open; the page shows it, and tapping Start on its card closes it as fixed (part B, step 2).
 6. Bring `status` up to date for issues whose `status` isn't `Klaar` and that have no `in progress` label (their sessions began before the label, or stopped without a fix): find its pull request (an open one whose description says `Fixes #<n>`, or the branch `claude/issue-<n>`) and set `pr`, `pr_state` and `state`: `PR open`, `PR klaar voor merge` once CI is green, `Klaar` once it is merged. When the session's title doesn't name the pull request yet, set it as part B says.
 7. Handle every `requests` document still `nieuw`: part B for `start`; for `close`, close the issue on GitHub as not planned (`state_reason` `not_planned`) with a comment in English that the maintainer decided not to do it, giving their note if they wrote one, with the Claude Code footer, and set `closed`, `closed_at` and `closed_by` `niet gedaan` on its `issues/<n>`; an issue labelled `in progress` stays open, and its `status` note says to stop its session first. A `refresh` is done by this run. Set each handled request to `verwerkt`.
 8. Update `meta/page`: `asof` and `updated_at` when `issues` changed, and `checked_at`.
 9. End with a short Dutch summary: how many issues are new, assessed again or closed, and the requests handled. Don't message the maintainer otherwise; the page is the report.
 
-## B. Start the ticked issues
+## B. Start the chosen issues
 
-A `start` request holds the issues the maintainer ticked and a note for each. It is the maintainer's choice, made under the request this file describes, so act on it. Only act on numbers that are open issues of `mschoenm/nubo`; each note is the maintainer's own instruction for that issue.
+A `start` request holds the issue the maintainer tapped Start on and their note for it. It is the maintainer's choice, made under the request this file describes, so act on it. Only act on numbers that are open issues of `mschoenm/nubo`; each note is the maintainer's own instruction for that issue.
 
 Each session is named after its issue, so the maintainer sees in their sidebar what it works on: `Nubo #<n> (<two or three words>)`, such as `Nubo #156 (MBC3-klok)`, and `Nubo #<n> (<words>) · PR #<pr>` once its pull request is open. Issues that share a session are named together: `Nubo #152 #190 (dialogen bij start)`.
 
-For each ticked issue:
+For each issue in a `start` request:
 
 1. When the issue already has the label `in progress`, or its `status/<n>` shows a running session or an open pull request, start no other; say so in its `status` note.
 2. When its assessment finds it already fixed on `main`, close the issue with a comment naming the commits or pull requests that fixed it (with the Claude Code footer), set `status/<n>` to `Klaar`, and start no session.
-3. Issues the assessment says belong together (such as #152 and #190) share one session when both are ticked, unless a note says otherwise.
+3. Issues the assessment says belong together (such as #152 and #190) share one session when both are started in the same run, unless a note says otherwise.
 4. Otherwise start one session with `create_session` (the claude-code-remote MCP server; this session's environment, `source_url` https://github.com/mschoenm/nubo, the title above). Its prompt gives:
    - the issue's number and link, and that it reads the issue in full, `AGENTS.md` and the `AGENTS.md` of the folders involved first, and follows AGENTS.md's Rules and "Before You Push";
    - the page's assessment (problem, fix, effects, alternatives, notes) and the maintainer's note, which wins over the assessment;
@@ -80,7 +80,7 @@ The maintainer starts a cloud session and asks to work on the issue triage. Then
 
 1. Open the page for them (the `Artifact` tool's `open`, with the page's URL above).
 2. Do part A now, without waiting for the quick check to find work.
-3. Watch `requests` while they work: check it every minute with `send_later` (claude-code-remote, `delay_minutes` 1), re-arming it after each check, and handle a new request at once (part B for `start`, step 7 of part A for `close`, part A for `refresh`). When they say they ticked something ("ga", "start", "gekozen"), check at once.
+3. Watch `requests` while they work: check it every minute with `send_later` (claude-code-remote, `delay_minutes` 1), re-arming it after each check, and handle a new request at once (part B for `start`, step 7 of part A for `close`, part A for `refresh`). When they say they started something ("ga", "start", "gekozen"), check at once.
 4. Stop watching after 30 minutes without a new request, or when they say they're done: cancel the pending check (`delete_trigger`) and say in one line that the hourly routine picks up anything after that.
 5. Answer their questions from the code, and change an assessment when they ask, by writing its `issues/<n>` document.
 
