@@ -71,6 +71,24 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.12.0" date="2026-10-18">
+      <description>
+        <p>Nubo keeps where you left off as you play, the library on Linux no longer rescans over and over, and many small fixes make saves, the clock and the menus more dependable.</p>
+        <ul>
+          <li>Where you left off is saved every minute while you play and whenever you pause, so quitting from the macOS menu or Dock, closing the browser tab or a crash loses at most the last minute</li>
+          <li>The library on Linux no longer keeps scanning its folders by itself; it looks again only when a game is added or removed</li>
+          <li>A Ctrl key bound to a Game Boy button no longer blocks the other keys while you hold it; the Ctrl shortcuts work again once the game is paused</li>
+          <li>The clock of MBC3 cartridges, such as Pokémon Gold and Silver, keeps its time after an invalid value and when the computer's clock goes back</li>
+          <li>Frame blending no longer leaves gray pixels in the Green and Pocket palettes</li>
+          <li>Starting a game by dropping it on the window or with Ctrl+O closes the library's and the settings' menus, but keeps the box art and updates questions; the fullscreen and fast forward tooltips name the keys you bound</li>
+          <li>A settings, library or cheats file that can't be read is kept aside instead of being written over, and a save state that fails to load on another Game Boy brings the game back</li>
+          <li>Zip files made on a Mac load their game instead of the hidden ._ file next to it</li>
+          <li>In the browser, a game kept during a nearly full storage no longer disappears from the library</li>
+          <li>The RetroArch core no longer crashes on a damaged clock save, and cartridges without RAM make smaller save states</li>
+          <li>Save states made by Nubo 0.4.0 to 0.11.1 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.11.1" date="2026-10-16">
       <description>
         <p>The controller's menu buttons work like a Nintendo console's, and a game played on another Game Boy than it is set to start on asks before switching.</p>
