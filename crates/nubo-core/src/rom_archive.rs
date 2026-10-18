@@ -39,7 +39,8 @@ fn is_rom_name(name: &str) -> bool {
 
 /// Returns the ROM inside `data`. Plain ROMs are returned as they are; for a
 /// zip archive, the first `.gb` or `.gbc` file in it is unpacked, skipping
-/// the `__MACOSX/` and `._` metadata files macOS adds. Frontends use it to look at the ROM itself, for example to take its checksum.
+/// the `__MACOSX/` and `._` metadata files macOS adds. Frontends use it to
+/// look at the ROM itself, for example to take its checksum.
 pub fn extract_rom(data: &[u8]) -> Result<Vec<u8>, LoadRomError> {
     extract_rom_borrowed(data).map(Cow::into_owned)
 }

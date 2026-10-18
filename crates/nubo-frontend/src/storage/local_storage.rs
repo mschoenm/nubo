@@ -7,8 +7,9 @@
 //! `nubo:cheats/game.gb.toml`, and the last game played as base64 under
 //! `nubo:last-game`. An entry that couldn't be read is kept aside under the
 //! same key with `.kept-<number>` before its extension, such as
-//! `nubo:settings.kept-1.toml` (see [`super::kept_name`]). Bigger things, such as save states and the library, are
-//! in IndexedDB (`super::indexed_db`).
+//! `nubo:settings.kept-1.toml` (see [`super::kept_name`]). Bigger things,
+//! such as save states and the library, are in IndexedDB
+//! (`super::indexed_db`).
 //!
 //! The keys are worked out without the `web` feature too, so their tests run
 //! in every build; only reaching the browser's localStorage needs it.
