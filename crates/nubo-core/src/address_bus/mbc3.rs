@@ -91,9 +91,11 @@ impl RtcState {
     }
 
     /// The state with each register cut to the bits it has, as a game's
-    /// writes are, so a damaged or hand-edited `.rtc` file can't make a
-    /// register hold a value the hardware can't, such as 255 hours.
-    fn within_register_widths(mut self) -> Self {
+    /// writes are, and the milliseconds to under a second, so a damaged or
+    /// hand-edited `.rtc` file can't make a register hold a value the
+    /// hardware can't, such as 255 hours.
+    pub(super) fn within_register_widths(mut self) -> Self {
+        self.milliseconds %= 1000;
         self.seconds &= SECONDS_REGISTER_MAX;
         self.minutes &= MINUTES_REGISTER_MAX;
         self.hours &= HOURS_REGISTER_MAX;
@@ -249,7 +251,7 @@ const DAYS_REGISTER_MAX: u16 = 0x1FF;
 fn count_register(value: u8, ticks: u64, period: u8, register_max: u8) -> (u8, u64) {
     let mut ticks = ticks;
     if value >= period {
-        let to_wrap = u64::from(register_max - value) + 1;
+        let to_wrap = u64::from(register_max.saturating_sub(value)) + 1;
         if ticks < to_wrap {
             return (value + ticks as u8, 0);
         }

@@ -246,7 +246,10 @@ impl Cartridge {
     /// Replaces the state of the cartridge's real-time clock with `state`,
     /// whose `base_timestamp` is a time on `clock`, as if the cartridge had
     /// been inserted with it. Does nothing on a cartridge without a clock.
-    pub fn set_rtc_state(&mut self, mut state: RtcState, clock: RtcClock, elapsed_dots: u64) {
+    /// The registers are cut to their widths before the clock moves over to
+    /// the other [`RtcClock`], since counting on assumes they fit.
+    pub fn set_rtc_state(&mut self, state: RtcState, clock: RtcClock, elapsed_dots: u64) {
+        let mut state = state.within_register_widths();
         let own_clock = self.effects.rtc_clock();
         if clock != own_clock {
             let now = |clock| clock_time(self.effects.as_ref(), clock, elapsed_dots);
