@@ -28,9 +28,7 @@
 
 use crate::time::SystemTime;
 use std::cell::RefCell;
-#[cfg(not(target_arch = "wasm32"))]
-use std::collections::HashMap;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 /// An entry in `files`: its bytes and when they were written.
@@ -61,7 +59,7 @@ thread_local! {
     /// The names of the ROMs in `roms`, read when [`open`] runs and kept up
     /// to date, so the library can tell a game whose file is missing (see
     /// [`has_rom`]).
-    static ROM_NAMES: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
+    static ROM_NAMES: RefCell<RomNames> = RefCell::new(RomNames::default());
     /// Writes the database refused, waiting for the app to show them.
     static ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     /// How many writes are on their way to the database, and how many it
@@ -84,7 +82,7 @@ pub async fn open() -> Result<(), String> {
             .await
             .map_err(|error| format!("The browser's storage couldn't be opened: {error}"))?;
         FILES_IN_MEMORY.with_borrow_mut(|files| files.extend(records));
-        ROM_NAMES.with_borrow_mut(|names| names.extend(rom_names));
+        ROM_NAMES.with_borrow_mut(|names| names.stored.extend(rom_names));
         DATABASE_HANDLE.set(Some(database));
     }
     Ok(())
@@ -197,25 +195,84 @@ pub fn has_rom(name: &str) -> bool {
 /// Keeps `bytes` as the ROM file called `name`, replacing any kept before.
 pub fn write_rom(name: &str, bytes: &[u8]) -> Result<(), String> {
     check_open()?;
-    let replaces = !ROM_NAMES.with_borrow_mut(|names| names.insert(name.to_owned()));
+    ROM_NAMES.with_borrow_mut(|names| names.start(name, true));
     #[cfg(target_arch = "wasm32")]
-    browser::put_rom(name, bytes, replaces);
+    browser::put_rom(name, bytes);
     #[cfg(not(target_arch = "wasm32"))]
-    let _ = replaces;
-    #[cfg(not(target_arch = "wasm32"))]
-    ROMS_IN_MEMORY.with_borrow_mut(|roms| roms.insert(name.to_owned(), Arc::from(bytes)));
+    {
+        ROMS_IN_MEMORY.with_borrow_mut(|roms| roms.insert(name.to_owned(), Arc::from(bytes)));
+        ROM_NAMES.with_borrow_mut(|names| names.finish(name, true, true));
+    }
     Ok(())
 }
 
 /// Deletes the ROM file called `name`. A missing one is fine.
 pub fn remove_rom(name: &str) -> Result<(), String> {
     check_open()?;
-    ROM_NAMES.with_borrow_mut(|names| names.remove(name));
+    ROM_NAMES.with_borrow_mut(|names| names.start(name, false));
     #[cfg(target_arch = "wasm32")]
-    browser::delete(ROMS, name);
+    browser::delete_rom(name);
     #[cfg(not(target_arch = "wasm32"))]
-    ROMS_IN_MEMORY.with_borrow_mut(|roms| roms.remove(name));
+    {
+        ROMS_IN_MEMORY.with_borrow_mut(|roms| roms.remove(name));
+        ROM_NAMES.with_borrow_mut(|names| names.finish(name, false, true));
+    }
     Ok(())
+}
+
+/// The names of the ROMs in `roms`, as the database holds them and as it
+/// will once the writes and deletes on their way reach it.
+///
+/// A name with nothing on its way is kept as the database holds it. One
+/// with changes on its way is kept as the newest change asks, so a game the
+/// player just added shows at once. When the last of them finishes, the
+/// name follows the database again: a refused change leaves what the
+/// changes before it (or [`open`]) put there, whichever of them was
+/// refused, and in whatever order they finished.
+#[derive(Debug, Default)]
+struct RomNames {
+    /// The names the database holds, as far as the changes that committed
+    /// tell.
+    stored: HashSet<String>,
+    /// For each name with changes on their way: how many there are, and
+    /// whether the newest keeps the ROM or deletes it.
+    pending: HashMap<String, (u32, bool)>,
+}
+
+impl RomNames {
+    /// Whether `name` is kept, or will be once the changes on their way
+    /// commit.
+    fn contains(&self, name: &str) -> bool {
+        self.pending
+            .get(name)
+            .map_or_else(|| self.stored.contains(name), |&(_, keeps)| keeps)
+    }
+
+    /// Notes a change of `name` on its way to the database: a write if
+    /// `keeps`, else a delete.
+    fn start(&mut self, name: &str, keeps: bool) {
+        let (count, newest) = self.pending.entry(name.to_owned()).or_default();
+        *count += 1;
+        *newest = keeps;
+    }
+
+    /// Notes that a change [`start`](Self::start)ed for `name` finished,
+    /// `committed` or refused.
+    fn finish(&mut self, name: &str, keeps: bool, committed: bool) {
+        if committed {
+            if keeps {
+                self.stored.insert(name.to_owned());
+            } else {
+                self.stored.remove(name);
+            }
+        }
+        if let Some((count, _)) = self.pending.get_mut(name) {
+            *count -= 1;
+            if *count == 0 {
+                self.pending.remove(name);
+            }
+        }
+    }
 }
 
 /// Waits until every write made so far has reached the database for good
@@ -351,7 +408,7 @@ mod browser {
             FILES,
             key,
             |store| store.put_with_key(&value, &JsValue::from_str(key)),
-            || {},
+            |_| {},
         );
     }
 
@@ -368,7 +425,10 @@ mod browser {
                 store.put_with_key(&value, &JsValue::from_str(to))?;
                 store.delete(&JsValue::from_str(from))
             },
-            move || {
+            move |committed| {
+                if committed {
+                    return;
+                }
                 // Memory goes back to what the database still holds, unless
                 // either name was written again meanwhile.
                 super::FILES_IN_MEMORY.with_borrow_mut(|files| {
@@ -404,20 +464,31 @@ mod browser {
         value
     }
 
-    /// Writes the ROM `bytes` as `name` in `roms`, in the background. If the
-    /// database refuses it, the name stays kept only if it `replaces` a ROM,
-    /// which the database still has.
-    pub fn put_rom(name: &str, bytes: &[u8], replaces: bool) {
+    /// Writes the ROM `bytes` as `name` in `roms`, in the background, and
+    /// tells [`super::RomNames`] how it went.
+    pub fn put_rom(name: &str, bytes: &[u8]) {
         let value = Uint8Array::from(bytes);
-        let refused = name.to_owned();
+        let written = name.to_owned();
         in_background(
             ROMS,
             name,
             |store| store.put_with_key(&value, &JsValue::from_str(name)),
-            move || {
-                if !replaces {
-                    super::ROM_NAMES.with_borrow_mut(|names| names.remove(&refused));
-                }
+            move |committed| {
+                super::ROM_NAMES.with_borrow_mut(|names| names.finish(&written, true, committed));
+            },
+        );
+    }
+
+    /// Deletes the ROM `name` from `roms`, in the background, and tells
+    /// [`super::RomNames`] how it went.
+    pub fn delete_rom(name: &str) {
+        let deleted = name.to_owned();
+        in_background(
+            ROMS,
+            name,
+            |store| store.delete(&JsValue::from_str(name)),
+            move |committed| {
+                super::ROM_NAMES.with_borrow_mut(|names| names.finish(&deleted, false, committed));
             },
         );
     }
@@ -428,20 +499,20 @@ mod browser {
             store_name,
             key,
             |store| store.delete(&JsValue::from_str(key)),
-            || {},
+            |_| {},
         );
     }
 
     /// Starts `change` on the object store `store_name` in a transaction of
-    /// its own, and collects its error for the app and runs `refused` if it
-    /// fails. Transactions
-    /// on the same store run in the order they were made, so the database
-    /// ends up as memory is.
+    /// its own, then runs `finished` with whether it committed, and collects
+    /// its error for the app if it didn't. Transactions on the same store
+    /// run in the order they were made, so the database ends up as memory
+    /// is.
     fn in_background(
         store_name: &'static str,
         key: &str,
         change: impl FnOnce(&IdbObjectStore) -> Result<IdbRequest, JsValue>,
-        refused: impl FnOnce() + 'static,
+        finished: impl FnOnce(bool) + 'static,
     ) {
         let Some(database) = super::DATABASE_HANDLE.with_borrow(Clone::clone) else {
             return;
@@ -460,11 +531,11 @@ mod browser {
                 Err(error) => Err(error),
             };
             let (pending, mut failures) = super::WRITES.get();
-            if let Err(error) = result {
+            if let Err(error) = &result {
                 failures += 1;
                 super::report(format!("{key} couldn't be kept in the browser: {error}"));
-                refused();
             }
+            finished(result.is_ok());
             super::WRITES.set((pending - 1, failures));
         });
     }
