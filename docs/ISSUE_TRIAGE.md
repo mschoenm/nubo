@@ -54,6 +54,8 @@ The routine asks for this every hour; a `refresh` request asks for it too. Most 
    - in its first turn it creates its own hourly routine, bound to itself: `create_trigger` without `persistent_session_id` or `create_new_session_on_fire`, name `Nubo issue-triage bijwerken`, `cron_expression` `CRON_TZ=Europe/Amsterdam 59 * * * *`, `initiation` `human_request`, and the prompt "Issue-triage refresh (every hour). Fetch `origin/main` and follow `docs/ISSUE_TRIAGE.md`, part A. The page is <page URL>.";
    - then it disables the previous routine (`update_trigger` with `enabled` false on the old `trigger_id`; never delete it), writes its own `session_id`, `trigger_id` and `session_started_at` to `meta/page`, archives the previous session (`archive_session` on the old `session_id`), and does part A. When `meta/page` holds no earlier ids (a new setup), it skips disabling and archiving.
 
+   When `meta/page` has no `session_started_at` yet, write this session's own `session_id`, its routine's `trigger_id` and the current time instead of handing over.
+
    After starting the successor, this session does nothing more in this run. If the successor fails to take over (the next hourly run finds `meta/page` unchanged), this session keeps running and tries again the next day.
 9. Update `meta/page`: `asof` and `updated_at` when `issues` changed, and `checked_at`.
 10. Only when the run changed something (issues new, assessed again or closed, or requests handled), end with a short Dutch summary of how many. A run that changed nothing ends silently, with an empty reply. Don't message the maintainer otherwise; the page is the report.
