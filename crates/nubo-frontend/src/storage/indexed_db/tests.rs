@@ -71,3 +71,67 @@ fn roms_are_kept_apart_from_the_files() {
             .is_none()
     );
 }
+
+#[test]
+fn a_refused_write_keeps_the_name_a_later_write_kept() {
+    let mut names = RomNames::default();
+
+    names.start("game.gb", true);
+    names.start("game.gb", true);
+    names.finish("game.gb", true, false);
+    assert!(names.contains("game.gb"));
+    names.finish("game.gb", true, true);
+
+    assert!(names.contains("game.gb"));
+    assert!(names.pending.is_empty());
+}
+
+#[test]
+fn a_name_whose_writes_were_all_refused_is_dropped() {
+    let mut names = RomNames::default();
+
+    names.start("game.gb", true);
+    names.start("game.gb", true);
+    assert!(names.contains("game.gb"));
+    names.finish("game.gb", true, false);
+    names.finish("game.gb", true, false);
+
+    assert!(!names.contains("game.gb"));
+}
+
+#[test]
+fn a_refused_replacement_keeps_the_rom_the_database_has() {
+    let mut names = RomNames::default();
+    names.stored.insert(String::from("game.gb"));
+
+    names.start("game.gb", true);
+    names.finish("game.gb", true, false);
+
+    assert!(names.contains("game.gb"));
+}
+
+#[test]
+fn a_write_refused_after_a_removal_leaves_the_name_removed() {
+    let mut names = RomNames::default();
+    names.stored.insert(String::from("game.gb"));
+
+    names.start("game.gb", false);
+    names.start("game.gb", true);
+    assert!(names.contains("game.gb"));
+    names.finish("game.gb", false, true);
+    names.finish("game.gb", true, false);
+
+    assert!(!names.contains("game.gb"));
+}
+
+#[test]
+fn a_refused_removal_keeps_the_rom_the_database_still_has() {
+    let mut names = RomNames::default();
+    names.stored.insert(String::from("game.gb"));
+
+    names.start("game.gb", false);
+    assert!(!names.contains("game.gb"));
+    names.finish("game.gb", false, false);
+
+    assert!(names.contains("game.gb"));
+}
