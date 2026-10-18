@@ -294,6 +294,9 @@ mod tests {
     fn a_scan_reading_the_folders_doesnt_start_another_but_a_new_game_does() {
         let root = std::env::temp_dir().join(format!("nubo-watcher-reads-{}", std::process::id()));
         std::fs::create_dir_all(root.join("more")).unwrap();
+        // macOS's temporary folder is behind a symbolic link, and its change
+        // notifications name the real path.
+        let root = std::fs::canonicalize(root).unwrap();
         std::fs::write(root.join("Tetris.gb"), [0; 16]).unwrap();
         let folders = [LibraryFolder {
             path: root.clone(),
