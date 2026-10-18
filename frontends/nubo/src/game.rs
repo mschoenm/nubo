@@ -15,6 +15,9 @@ const CONTROLS_TIMEOUT: Duration = Duration::from_millis(2500);
 /// While the mouse is this close to the top of the screen, the bar there
 /// stays.
 const CONTROLS_HOVER_HEIGHT: f32 = 64.0;
+/// How long a game runs before where the player left off is saved again
+/// (see [`AutosaveTimer`]).
+pub const AUTOSAVE_INTERVAL: Duration = Duration::from_secs(60);
 
 /// A page of the pause menu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,6 +81,8 @@ pub struct Game {
     /// thumbnail and where the player left off, which a run started with
     /// `--fresh` doesn't (see `command_line`).
     pub keeps_data: bool,
+    /// When to save where the player left off while the game is open.
+    pub autosave: AutosaveTimer,
 }
 
 impl Game {
@@ -94,6 +99,7 @@ impl Game {
             controls_shown_until: Instant::now() + CONTROLS_TIMEOUT,
             cursor_near_bar: false,
             keeps_data,
+            autosave: AutosaveTimer::default(),
         }
     }
 
@@ -184,6 +190,39 @@ impl Game {
     }
 }
 
+/// Decides when to save where the player left off while a game is open, not
+/// only when it closes: quitting on macOS with ⌘Q, the app menu or the Dock
+/// ends Nubo without closing its window, and so does closing the browser's
+/// tab or a crash. The game is saved once it has run for
+/// [`AUTOSAVE_INTERVAL`] since the last save, and as soon as it stops
+/// running (paused, behind a dialog or the settings, or in a window in the
+/// background) after running since then. A game that doesn't run is never
+/// saved again, so a paused game writes nothing.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct AutosaveTimer {
+    /// When the game started running after the last save, or `None` if it
+    /// hasn't run since.
+    running_since_save: Option<Instant>,
+}
+
+impl AutosaveTimer {
+    /// Whether to save now, told after every message whether the game
+    /// `running` and what time it is. A `true` counts as the save.
+    pub fn due(&mut self, running: bool, now: Instant) -> bool {
+        let Some(since) = self.running_since_save else {
+            if running {
+                self.running_since_save = Some(now);
+            }
+            return false;
+        };
+        let due = !running || now.saturating_duration_since(since) >= AUTOSAVE_INTERVAL;
+        if due {
+            self.running_since_save = running.then_some(now);
+        }
+        due
+    }
+}
+
 /// The new cheat the player is typing on the cheats page, and what was
 /// wrong with the last one they tried to add.
 #[derive(Debug, Clone, Default)]
@@ -192,3 +231,6 @@ pub struct CheatForm {
     pub code: String,
     pub error: Option<String>,
 }
+
+#[cfg(test)]
+mod tests;

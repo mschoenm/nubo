@@ -771,11 +771,17 @@ impl App {
         false
     }
 
-    /// Tells the emulator whether to run, how fast and how loud.
+    /// Tells the emulator whether to run, how fast and how loud, and saves
+    /// where the player left off when it's time (see
+    /// `game::AutosaveTimer`).
     fn apply_to_game(&mut self) {
         let running = self.is_running();
-        if let Some(game) = &mut self.game {
-            game.session.apply(running, &self.settings.shared);
+        let Some(game) = &mut self.game else {
+            return;
+        };
+        game.session.apply(running, &self.settings.shared);
+        if game.keeps_data && game.autosave.due(running, iced::time::Instant::now()) {
+            self.save_where_left_off();
         }
     }
 

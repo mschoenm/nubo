@@ -8,6 +8,7 @@ pub use crate::picture::decode_png;
 use super::{Cache, LibraryEntry, PictureKind};
 use crate::picture::encode_png;
 use crate::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
+use crate::storage::Unreadable;
 use crate::storage::files::{keep_aside, write_atomically};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -22,10 +23,11 @@ struct LibraryFile {
 
 /// Reads the known games, or none if there is no library file yet. A file
 /// that can't be parsed is kept aside first (`library.kept-1.toml`), and the
-/// error says where it went.
-pub fn load_entries(cache: &Cache) -> Result<Vec<LibraryEntry>, String> {
+/// error says where it went; one that can't be read at all stays where it
+/// is, and the error says saving over it isn't safe.
+pub fn load_entries(cache: &Cache) -> Result<Vec<LibraryEntry>, Unreadable> {
     let path = data_directory(cache)
-        .map_err(|error| format!("The game library couldn't be read: {error}"))?
+        .map_err(|error| super::unreadable_library(&error, None))?
         .join("library.toml");
 
     let parsed = match fs::read(&path) {
@@ -35,13 +37,13 @@ pub fn load_entries(cache: &Cache) -> Result<Vec<LibraryEntry>, String> {
                 toml::from_str::<LibraryFile>(&contents).map_err(|error| error.to_string())
             }),
         Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(error) => return Err(format!("The game library couldn't be read: {error}")),
+        Err(error) => return Err(super::unreadable_library(&error.to_string(), None)),
     };
     parsed.map(|file| file.games).map_err(|error| {
         let kept = keep_aside(&path)
             .map(|kept| kept.display().to_string())
             .map_err(|keep_error| keep_error.to_string());
-        super::unreadable_library(&error, kept)
+        super::unreadable_library(&error, Some(kept))
     })
 }
 

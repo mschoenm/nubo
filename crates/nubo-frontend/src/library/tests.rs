@@ -521,3 +521,33 @@ fn an_unreadable_library_file_is_kept_aside_before_a_save_can_replace_it() {
     );
     assert!(data_folder.join("library.toml").exists());
 }
+
+#[cfg(feature = "desktop")]
+#[test]
+fn a_library_file_that_cant_be_read_is_never_written_over() {
+    let data_folder = temporary_folder("unreadable");
+    // A folder where `library.toml` should be can't be read as a file, as
+    // a file without read permission can't.
+    fs::create_dir(data_folder.join("library.toml")).unwrap();
+
+    let (mut library, error) = Library::load_from(Cache::in_folder(data_folder.clone()));
+    let error = error.unwrap();
+    assert!(error.contains("saves no changes"), "{error}");
+    library.reset_games(true, true).unwrap();
+
+    assert!(data_folder.join("library.toml").is_dir());
+    assert!(!data_folder.join("library.toml.tmp").exists());
+}
+
+#[test]
+fn only_a_library_kept_aside_is_safe_to_save_over() {
+    let kept = unreadable_library("bad", Some(Ok(String::from("library.kept-1.toml"))));
+    assert!(kept.saving_is_safe);
+    assert!(kept.problem.contains("library.kept-1.toml"));
+
+    let not_kept = unreadable_library("bad", Some(Err(String::from("the file is in use"))));
+    assert!(!not_kept.saving_is_safe);
+    assert!(not_kept.problem.contains("the file is in use"));
+
+    assert!(!unreadable_library("permission denied", None).saving_is_safe);
+}

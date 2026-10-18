@@ -46,6 +46,9 @@ struct Record {
     variables: Vec<(String, String)>,
     /// Each memory descriptor: flags, start, select, length and where.
     memory_maps: Vec<(u64, usize, usize, usize, usize)>,
+    /// The work RAM's size, which the pretend RetroArch asks the core for
+    /// while it handles the memory map, as rcheevos may.
+    system_ram_size_while_mapping: Option<usize>,
     achievements: Option<bool>,
     /// Each frame: width, height, pitch and the first pixel's bytes.
     frames: Vec<(c_uint, c_uint, usize, Vec<u8>)>,
@@ -220,6 +223,8 @@ unsafe extern "C" fn test_environment(cmd: c_uint, data: *mut c_void) -> bool {
                         })
                         .collect();
                 });
+                let size = retro_get_memory_size(RETRO_MEMORY_SYSTEM_RAM);
+                record(|record| record.system_ram_size_while_mapping = Some(size));
                 true
             }
             RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS => {
@@ -840,10 +845,11 @@ fn a_restart_on_another_model_gives_retroarch_that_models_memory_map() {
     drop(settings);
     retro_run();
     retro_reset();
-    assert!(
-        has_color_work_ram(&take_record().memory_maps),
-        "a Game Boy Color"
-    );
+    let record = take_record();
+    assert!(has_color_work_ram(&record.memory_maps), "a Game Boy Color");
+    // The core is free while RetroArch handles the map, so asking it for
+    // memory then doesn't deadlock.
+    assert_eq!(record.system_ram_size_while_mapping, Some(0x8000));
     assert_eq!(retro_get_memory_size(RETRO_MEMORY_SYSTEM_RAM), 0x8000);
     finish();
 }
