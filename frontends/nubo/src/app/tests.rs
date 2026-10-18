@@ -1,7 +1,7 @@
 //! Tests for the app's small helpers, for resetting the settings in a
 //! `--fresh` app, which keeps nothing, for shortcuts while the settings
-//! are open, for dialogs whose content is gone, and for the fixed keys and
-//! buttons of the menus.
+//! are open or while Ctrl plays a Game Boy button, for dialogs whose
+//! content is gone, and for the fixed keys and buttons of the menus.
 
 use super::playing::{PendingStart, ResumeAnswer};
 use super::settings_window::reset_summary;
@@ -288,6 +288,80 @@ fn pausing_with_the_command_key_waits_while_the_settings_are_open() {
     let _ = app.update(SettingsMessage::Close.into());
     let _ = app.update(command_p);
     assert!(app.game.as_ref().unwrap().is_paused());
+}
+
+/// `key` going down with Ctrl held, as the left Ctrl key reports it.
+#[cfg(not(target_os = "macos"))]
+fn ctrl_press(key: keyboard::Key, code: Option<KeyCode>) -> Message {
+    Message::Key(KeyInput {
+        code,
+        key,
+        modifiers: Modifiers::CTRL,
+        pressed: true,
+        repeat: false,
+    })
+}
+
+/// A game playing with B on the left Ctrl key and Rewind on R.
+#[cfg(not(target_os = "macos"))]
+fn app_with_b_on_ctrl() -> App {
+    let mut app = playing_app();
+    let keyboard = &mut app.settings.shared.controls.keyboard;
+    keyboard.bind(Action::B, Some(KeyCode::ControlLeft));
+    keyboard.bind(Action::Rewind, Some(KeyCode::KeyR));
+    app
+}
+
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn ctrl_bound_to_a_game_boy_button_lets_the_other_keys_through() {
+    let mut app = app_with_b_on_ctrl();
+    let rewinding = |app: &App| app.game.as_ref().unwrap().session.is_rewinding();
+
+    let _ = app.update(ctrl_press(
+        keyboard::Key::Named(keyboard::key::Named::Control),
+        Some(KeyCode::ControlLeft),
+    ));
+    // Ctrl+R rewinds instead of restarting the game.
+    let _ = app.update(ctrl_press(
+        keyboard::Key::Character("r".into()),
+        Some(KeyCode::KeyR),
+    ));
+    assert!(rewinding(&app));
+    // Ctrl+P is P, which isn't bound, so the game keeps running.
+    let _ = app.update(ctrl_press(keyboard::Key::Character("p".into()), None));
+    assert!(!app.game.as_ref().unwrap().is_paused());
+    // Esc still opens the pause menu.
+    let _ = app.update(ctrl_press(
+        keyboard::Key::Named(keyboard::key::Named::Escape),
+        None,
+    ));
+    assert!(app.game.as_ref().unwrap().is_paused());
+}
+
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn ctrl_bound_to_a_game_boy_button_is_a_shortcut_again_in_the_pause_menu() {
+    let mut app = app_with_b_on_ctrl();
+    let _ = app.update(GameMessage::TogglePause.into());
+
+    let _ = app.update(ctrl_press(keyboard::Key::Character("p".into()), None));
+    assert!(!app.game.as_ref().unwrap().is_paused());
+}
+
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn ctrl_bound_to_a_shortcut_still_drops_the_other_keys() {
+    let mut app = playing_app();
+    let keyboard = &mut app.settings.shared.controls.keyboard;
+    keyboard.bind(Action::FastForward, Some(KeyCode::ControlLeft));
+    keyboard.bind(Action::Rewind, Some(KeyCode::KeyX));
+
+    let _ = app.update(ctrl_press(
+        keyboard::Key::Character("x".into()),
+        Some(KeyCode::KeyX),
+    ));
+    assert!(!app.game.as_ref().unwrap().session.is_rewinding());
 }
 
 #[test]
