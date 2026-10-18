@@ -5,7 +5,7 @@ description: Work on Nubo's issue-triage page with the maintainer, or set it up 
 
 # The issue triage
 
-`docs/ISSUE_TRIAGE.md` says what the issue triage does and is the instructions of every session that works on it; its "Current setup" section names the page, the session and the routine in use.
+`docs/ISSUE_TRIAGE.md` says what the issue triage does and is the instructions of every session that works on it; its "Current setup" section names the page, and the page's `meta/page` document holds the ids of the triage session and routine in use (`session_id`, `trigger_id`), which change every week.
 
 **To work on the triage with the maintainer** (they ask to work on it, open it or update it), follow part C of `docs/ISSUE_TRIAGE.md`.
 
@@ -14,22 +14,17 @@ description: Work on Nubo's issue-triage page with the maintainer, or set it up 
 Three parts work together, and each can be made again on its own:
 
 - **The page:** a private claude.ai artifact made from `page.html` in this folder. Its database holds the assessments, the work on each issue and the maintainer's requests.
-- **The triage session:** a Claude cloud session on this repository that the routine wakes every hour to bring the page up to date and start a session for each issue the maintainer starts there.
-- **The routine:** wakes the triage session every hour.
+- **The triage session:** a Claude cloud session on this repository that the routine wakes every hour to bring the page up to date and start a session for each issue the maintainer starts there. Once a week it hands over to a successor (part A, step 8 of `docs/ISSUE_TRIAGE.md`).
+- **The routine:** wakes the triage session every hour. Each triage session makes its own, bound to itself.
 
-First find out what is gone: open the page's URL (the `Artifact` tool's `read`), look the session up (`get_session` of the claude-code-remote MCP server) and list the routines (`list_triggers`). Make again only what is missing, in this order.
+First find out what is gone: open the page's URL (the `Artifact` tool's `read`), read `meta/page` from its database (`ArtifactData`), look its `session_id` up (`get_session` of the claude-code-remote MCP server) and list the routines (`list_triggers`). Make again only what is missing, in this order.
 
 1. **The page,** only when the artifact is gone. Publish `page.html` with the `Artifact` tool, `icon` `checklist`, the description "De open issues van Nubo, elk uur bijgewerkt; druk op Start bij wat Claude in een aparte sessie moet oplossen." and the capabilities `{"db": {}}`. Pin it to the maintainer's sidebar (`pin: true`). Its database starts empty: the triage session's first run assesses every open issue.
-2. **The triage session,** when it is gone. Create it with `create_session`: `source_url` https://github.com/mschoenm/nubo, title `Nubo issue-triage`, tag `nubo-issue-triage`, and this prompt, with the page's URL filled in:
+2. **The triage session and its routine,** when the session is gone. Create it with `create_session` exactly as the weekly handover does (part A, step 8 of `docs/ISSUE_TRIAGE.md`: the same title, tag and prompt). In its first turn it makes its own routine, disables the old one, writes `meta/page` `session_id`, `trigger_id` and `session_started_at`, and archives the old session if it still exists.
+3. **The routine alone,** when the session is there but its routine is gone. Create it with `create_trigger` as step 8 describes, but with `persistent_session_id` the triage session, and write its id to `meta/page` `trigger_id`.
 
-   > You are the standing issue-triage session of the Nubo repository. Your instructions are `docs/ISSUE_TRIAGE.md` on `origin/main`; the page is <page URL>. Read them now and do part A.
-
-3. **The routine,** when it is gone or the session is new. Create it with `create_trigger`: name `Nubo issue-triage bijwerken`, `cron_expression` `CRON_TZ=Europe/Amsterdam 0 * * * *` (every hour), `persistent_session_id` the triage session, `initiation` `human_request`, and this prompt, with the page's URL filled in:
-
-   > Issue-triage refresh (every hour). Fetch `origin/main` and follow `docs/ISSUE_TRIAGE.md`, part A. The page is <page URL>.
-
-   Once it exists, delete every other routine named `Nubo issue-triage bijwerken` (`list_triggers`, then `delete_trigger`), whether or not its session is still there, so only one fires each hour and none updates a page that is gone. When step 2 made a new session, archive the old one if it still exists (`archive_session`).
-4. **The docs:** update "Current setup" in `docs/ISSUE_TRIAGE.md` in a pull request, so the next setup starts from the right names.
+   Then disable every other routine named `Nubo issue-triage bijwerken` (`list_triggers`, then `update_trigger` with `enabled` false), so only one fires each hour and none updates a page that is gone.
+4. **The docs:** when the page's URL changed, update "Current setup" in `docs/ISSUE_TRIAGE.md` in a pull request. The session and routine ids live only in `meta/page`.
 
 ## Changing the page
 
