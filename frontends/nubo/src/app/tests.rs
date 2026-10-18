@@ -325,6 +325,74 @@ fn another_game_starting_replaces_the_one_waiting() {
     );
 }
 
+#[test]
+fn a_question_the_model_question_replaced_comes_back_after_the_answer() {
+    for answer in [
+        ResumeAnswer::Continue,
+        ResumeAnswer::StartOver,
+        ResumeAnswer::Cancel,
+    ] {
+        let mut app = waiting_over_box_art();
+        let _ = app.update(GameMessage::ResumeAnswered(answer).into());
+
+        assert_eq!(
+            app.dialog.map(|dialog| dialog.kind),
+            Some(DialogKind::BoxArt)
+        );
+    }
+}
+
+#[test]
+fn a_library_menu_the_model_question_replaced_comes_back_only_on_cancel() {
+    for (answer, kind) in [
+        (ResumeAnswer::Continue, None),
+        (ResumeAnswer::Cancel, Some(DialogKind::SortMenu)),
+    ] {
+        let mut app = waiting_app();
+        app.pending_start.as_mut().unwrap().replaced = Some(Dialog::new(DialogKind::SortMenu));
+        let _ = app.update(GameMessage::ResumeAnswered(answer).into());
+
+        assert_eq!(app.dialog.map(|dialog| dialog.kind), kind);
+    }
+}
+
+#[test]
+fn another_game_starting_puts_back_what_the_waiting_one_replaced() {
+    let mut app = waiting_over_box_art();
+    start_other_game(&mut app);
+
+    assert_eq!(
+        app.dialog.map(|dialog| dialog.kind),
+        Some(DialogKind::BoxArt)
+    );
+    assert!(app.pending_start.is_none());
+}
+
+#[test]
+fn the_model_question_keeps_the_open_question_through_another_waiting_game() {
+    let mut app = waiting_app();
+    let pending = app.pending_start.take().unwrap();
+    app.dialog = Some(Dialog::new(DialogKind::Updates));
+
+    app.ask_which_model(
+        pending.rom.clone(),
+        pending.header.clone(),
+        pending.state.clone(),
+        Model::Dmg,
+    );
+    app.ask_which_model(pending.rom, pending.header, pending.state, Model::Dmg);
+    assert!(matches!(
+        app.dialog.as_ref().map(|dialog| &dialog.kind),
+        Some(DialogKind::OtherModel { .. })
+    ));
+
+    let _ = app.update(GameMessage::ResumeAnswered(ResumeAnswer::Cancel).into());
+    assert_eq!(
+        app.dialog.map(|dialog| dialog.kind),
+        Some(DialogKind::Updates)
+    );
+}
+
 /// Starts `other.gb`, an empty game, as a dropped file or Ctrl+O would.
 fn start_other_game(app: &mut App) {
     let _ = app.update(
@@ -478,7 +546,15 @@ fn waiting_app() -> App {
         header: Emulator::read_rom_header(&rom.bytes).unwrap(),
         rom,
         state,
+        replaced: None,
     });
+    app
+}
+
+/// `waiting_app`, its question having replaced the box art question.
+fn waiting_over_box_art() -> App {
+    let mut app = waiting_app();
+    app.pending_start.as_mut().unwrap().replaced = Some(Dialog::new(DialogKind::BoxArt));
     app
 }
 

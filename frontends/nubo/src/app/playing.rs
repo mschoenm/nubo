@@ -114,6 +114,10 @@ pub struct PendingStart {
     pub(super) rom: Rom,
     pub(super) header: CartridgeHeader,
     pub(super) state: SaveState,
+    /// The dialog the question replaced, such as the box art question, put
+    /// back once the player answers (even with Cancel) or another game
+    /// starts instead.
+    pub(super) replaced: Option<Dialog>,
 }
 
 /// What the Undo button of the newest toast puts back.
@@ -335,7 +339,8 @@ impl App {
     /// another model than the game is set to start on now, a dialog asks
     /// first whether to continue on the save's model or start over on the
     /// new one (`DialogKind::OtherModel`), and the game waits in
-    /// `App::pending_start`.
+    /// `App::pending_start`. The question takes the place of any dialog
+    /// open then, which comes back once it is answered.
     ///
     /// While a reset deletes saves, the game waits until they are gone (see
     /// `App::deletions_running`), and a reset can't be undone once a game
@@ -390,12 +395,7 @@ impl App {
         let model = self.model_for(&rom.path, &header);
         match resume_state {
             Some(state) if state.model != model && !self.held_for_scene() => {
-                self.dialog = Some(Dialog::new(DialogKind::OtherModel {
-                    saved: state.model,
-                    configured: model,
-                    remembers: self.model_override.is_none(),
-                }));
-                self.pending_start = Some(PendingStart { rom, header, state });
+                self.ask_which_model(rom, header, state, model);
             }
             Some(state) => {
                 self.launch(rom, header, state.model, Some(state));
@@ -406,17 +406,63 @@ impl App {
         }
     }
 
+    /// Asks whether to continue `rom` from `state`, its automatic save, on
+    /// the model the save was made on or start over on `configured`, and
+    /// keeps the game waiting in `App::pending_start` meanwhile. The
+    /// question takes the place of the open dialog, kept to come back after
+    /// the answer; a game already waiting is replaced, handing on the
+    /// dialog its own question replaced.
+    pub(super) fn ask_which_model(
+        &mut self,
+        rom: Rom,
+        header: CartridgeHeader,
+        state: SaveState,
+        configured: Model,
+    ) {
+        let replaced = match self.dialog.take() {
+            Some(Dialog {
+                kind: DialogKind::OtherModel { .. },
+                ..
+            }) => self
+                .pending_start
+                .take()
+                .and_then(|pending| pending.replaced),
+            open => open,
+        };
+        self.dialog = Some(Dialog::new(DialogKind::OtherModel {
+            saved: state.model,
+            configured,
+            remembers: self.model_override.is_none(),
+        }));
+        self.pending_start = Some(PendingStart {
+            rom,
+            header,
+            state,
+            replaced,
+        });
+    }
+
     /// Starts the game waiting in `App::pending_start` as the player
-    /// answered, or drops it. Continuing also sets the game to start on the
-    /// save's model from now on (see `App::preference_starting_on`), so the
-    /// question doesn't come back, unless a model was picked on the command
-    /// line. That happens only once the game has continued: a game that
-    /// didn't start, or whose save didn't load, keeps its model, so the
-    /// question comes back at its next start.
+    /// answered, or drops it, and puts back the dialog the question
+    /// replaced (which the game closes if it starts and the dialog belongs
+    /// to the library or the settings). Continuing also sets the game to
+    /// start on the save's model from now on (see
+    /// `App::preference_starting_on`), so the question doesn't come back,
+    /// unless a model was picked on the command line. That happens only once
+    /// the game has continued: a game that didn't start, or whose save
+    /// didn't load, keeps its model, so the question comes back at its next
+    /// start.
     fn answer_resume(&mut self, answer: ResumeAnswer) {
-        let Some(PendingStart { rom, header, state }) = self.pending_start.take() else {
+        let Some(PendingStart {
+            rom,
+            header,
+            state,
+            replaced,
+        }) = self.pending_start.take()
+        else {
             return;
         };
+        self.dialog = replaced;
         match answer {
             ResumeAnswer::Continue => {
                 let path = rom.path.clone();
@@ -478,6 +524,14 @@ impl App {
                 self.settings_tab = None;
                 self.capture = None;
                 self.settings_focus = None;
+                if let Some(pending) = self.pending_start.take()
+                    && self
+                        .dialog
+                        .as_ref()
+                        .is_some_and(|dialog| matches!(dialog.kind, DialogKind::OtherModel { .. }))
+                {
+                    self.dialog = pending.replaced;
+                }
                 if self
                     .dialog
                     .as_ref()
@@ -485,7 +539,6 @@ impl App {
                 {
                     self.dialog = None;
                 }
-                self.pending_start = None;
                 self.search.clear();
                 self.library_selection = None;
                 launch
