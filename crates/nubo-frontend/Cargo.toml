@@ -18,7 +18,7 @@ desktop = [
     "dep:crc32fast",
     "dep:directories",
     "dep:image",
-    "dep:notify-debouncer-mini",
+    "dep:notify-debouncer-full",
     "dep:opener",
     "dep:sha2",
     "dep:ureq",
@@ -59,7 +59,7 @@ crc32fast = { version = "1.5", optional = true }
 directories = { version = "6", optional = true }
 image = { version = "0.25", default-features = false, features = ["png"], optional = true }
 # The library's folder watcher (src/library/watcher.rs).
-notify-debouncer-mini = { version = "0.7", optional = true }
+notify-debouncer-full = { version = "0.7", optional = true }
 # Opening web pages and folders in the system's own apps (src/links.rs).
 opener = { version = "0.9", default-features = false, optional = true }
 # The checksums scenes name their game's ROM by (src/scenes.rs).

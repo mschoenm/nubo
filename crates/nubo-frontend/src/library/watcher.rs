@@ -2,14 +2,17 @@
 //! them) show up right away, and the files of the recently played games
 //! outside them, so a deleted one leaves "Continue playing" right away too
 //! (the `desktop` feature). It uses the operating system's own change
-//! notifications, through `notify-debouncer-mini`, so it costs nothing
-//! while nothing changes.
+//! notifications, through `notify-debouncer-full`, so it costs nothing
+//! while nothing changes. Linux also reports files and folders that are
+//! only opened or read, as the library's own scans do; those are ignored,
+//! or every scan would start the next one.
 
 use super::WatchEvent;
 use crate::rom::EXTENSIONS;
 use crate::settings::LibraryFolder;
-use notify_debouncer_mini::notify::{RecommendedWatcher, RecursiveMode};
-use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer};
+use notify_debouncer_full::notify::event::{AccessKind, AccessMode};
+use notify_debouncer_full::notify::{self, EventKind, RecommendedWatcher, RecursiveMode};
+use notify_debouncer_full::{DebounceEventResult, Debouncer, NoCache, new_debouncer_opt};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -21,7 +24,7 @@ const QUIET_TIME: Duration = Duration::from_secs(1);
 pub struct Watcher {
     /// Collects the operating system's change notifications on a thread of
     /// its own. Dropping it stops watching.
-    _debouncer: Debouncer<RecommendedWatcher>,
+    _debouncer: Debouncer<RecommendedWatcher, NoCache>,
 }
 
 /// What starting to watch the library folders gave (see [`watch`]).
@@ -52,20 +55,38 @@ pub fn watch(
     report: impl Fn(WatchEvent) + Send + 'static,
 ) -> Watching {
     let (watched_folders, watched_games) = (folders.to_vec(), games.to_vec());
-    let debouncer = new_debouncer(QUIET_TIME, move |result: DebounceEventResult| {
-        let event = match result {
-            Ok(events)
-                if events
-                    .iter()
-                    .any(|event| affects(&event.path, &watched_folders, &watched_games)) =>
-            {
-                WatchEvent::Changed
-            }
-            Ok(_) => return,
-            Err(error) => WatchEvent::Failed(error.to_string()),
-        };
-        report(event);
-    });
+    // No cache of file IDs: it only pairs up renames, and filling it would
+    // read every library folder each time watching starts.
+    let debouncer = new_debouncer_opt(
+        QUIET_TIME,
+        None,
+        move |result: DebounceEventResult| {
+            let event = match result {
+                Ok(events)
+                    if events.iter().any(|event| {
+                        changes(event.kind)
+                            && event
+                                .paths
+                                .iter()
+                                .any(|path| affects(path, &watched_folders, &watched_games))
+                    }) =>
+                {
+                    WatchEvent::Changed
+                }
+                Ok(_) => return,
+                Err(errors) => WatchEvent::Failed(
+                    errors
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                ),
+            };
+            report(event);
+        },
+        NoCache,
+        notify::Config::default(),
+    );
 
     let mut debouncer = match debouncer {
         Ok(debouncer) => debouncer,
@@ -85,16 +106,13 @@ pub fn watch(
             RecursiveMode::NonRecursive
         };
 
-        if let Err(error) = debouncer.watcher().watch(&folder.path, mode) {
+        if let Err(error) = debouncer.watch(&folder.path, mode) {
             failures.push(error.to_string());
         }
     }
 
     for parent in game_folders(folders, games) {
-        if let Err(error) = debouncer
-            .watcher()
-            .watch(&parent, RecursiveMode::NonRecursive)
-        {
+        if let Err(error) = debouncer.watch(&parent, RecursiveMode::NonRecursive) {
             failures.push(error.to_string());
         }
     }
@@ -123,6 +141,18 @@ fn game_folders(folders: &[LibraryFolder], games: &[PathBuf]) -> Vec<PathBuf> {
     }
 
     parents
+}
+
+/// Whether an event of `kind` can mean something changed. Opening a file or
+/// folder, reading it and closing it unchanged change nothing, and the
+/// library's own scans do all three; a file closed after writing does
+/// count, as the end of a game being copied in.
+fn changes(kind: EventKind) -> bool {
+    match kind {
+        EventKind::Access(AccessKind::Close(AccessMode::Write)) => true,
+        EventKind::Access(_) => false,
+        _ => true,
+    }
 }
 
 /// Whether a change at `path` can affect the library: a ROM or folder in a
@@ -168,9 +198,14 @@ fn matters(path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{affects, game_folders, matters};
+    use super::{QUIET_TIME, WatchEvent, affects, changes, game_folders, matters, watch};
     use crate::settings::LibraryFolder;
+    use notify_debouncer_full::notify::EventKind;
+    use notify_debouncer_full::notify::event::{
+        AccessKind, AccessMode, CreateKind, ModifyKind, RemoveKind,
+    };
     use std::path::{Path, PathBuf};
+    use std::sync::mpsc;
 
     #[test]
     fn roms_and_folders_matter() {
@@ -236,5 +271,56 @@ mod tests {
         let watched = game_folders(&folders, &games);
         std::fs::remove_dir_all(&root).unwrap();
         assert_eq!(watched, [elsewhere]);
+    }
+
+    #[test]
+    fn opening_and_reading_change_nothing() {
+        assert!(!changes(EventKind::Access(AccessKind::Open(
+            AccessMode::Any
+        ))));
+        assert!(!changes(EventKind::Access(AccessKind::Read)));
+        assert!(!changes(EventKind::Access(AccessKind::Close(
+            AccessMode::Read
+        ))));
+        assert!(changes(EventKind::Access(AccessKind::Close(
+            AccessMode::Write
+        ))));
+        assert!(changes(EventKind::Create(CreateKind::File)));
+        assert!(changes(EventKind::Modify(ModifyKind::Any)));
+        assert!(changes(EventKind::Remove(RemoveKind::Folder)));
+    }
+
+    #[test]
+    fn a_scan_reading_the_folders_doesnt_start_another_but_a_new_game_does() {
+        let root = std::env::temp_dir().join(format!("nubo-watcher-reads-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("more")).unwrap();
+        std::fs::write(root.join("Tetris.gb"), [0; 16]).unwrap();
+        let folders = [LibraryFolder {
+            path: root.clone(),
+            include_subfolders: true,
+        }];
+        let (sender, events) = mpsc::channel();
+        let watching = watch(&folders, &[], move |event| {
+            let _ = sender.send(event);
+        });
+        assert!(watching.failures.is_empty(), "{:?}", watching.failures);
+        std::thread::sleep(QUIET_TIME / 2);
+
+        for folder in [root.clone(), root.join("more")] {
+            std::fs::read_dir(folder).unwrap().for_each(drop);
+        }
+        std::fs::read(root.join("Tetris.gb")).unwrap();
+        let after_reading = events.recv_timeout(QUIET_TIME * 3);
+
+        std::fs::write(root.join("more").join("Zelda.gb"), [0; 16]).unwrap();
+        let after_writing = events.recv_timeout(QUIET_TIME * 5);
+
+        drop(watching);
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(after_reading.is_err(), "reading reported {after_reading:?}");
+        assert!(
+            matches!(after_writing, Ok(WatchEvent::Changed)),
+            "writing reported {after_writing:?}"
+        );
     }
 }
