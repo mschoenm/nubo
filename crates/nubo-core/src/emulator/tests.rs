@@ -791,6 +791,35 @@ fn a_wall_clock_state_set_on_emulated_time_neither_stands_still_nor_jumps() {
     assert!((0.0..1.0).contains(&behind), "{behind} ms behind");
 }
 
+/// A damaged `.rtc` file, as RetroArch passes it on emulated time, is cut to
+/// the registers' widths before the hour it was away is counted.
+#[test]
+fn a_damaged_wall_clock_state_set_on_emulated_time_is_cut_before_it_counts() {
+    let (mut emulator, _) = clock_game(crate::RtcClock::EmulatedTime);
+    let damaged = crate::RtcState {
+        milliseconds: 0xFFFF,
+        seconds: 0xFF,
+        minutes: 0xFF,
+        hours: 0xFF,
+        days: 0xFFFF,
+        base_timestamp: WALL_CLOCK_NOW - HOUR,
+        ..crate::RtcState::default()
+    };
+    emulator.set_rtc_state(&damaged, crate::RtcClock::WallClock);
+
+    let clock = emulator.rtc_state(crate::RtcClock::EmulatedTime).unwrap();
+    assert_eq!(
+        (
+            clock.days,
+            clock.hours,
+            clock.minutes,
+            clock.seconds,
+            clock.milliseconds
+        ),
+        (0x1FF, 31, 58, 59, 535)
+    );
+}
+
 #[test]
 fn an_emulated_time_state_set_on_the_wall_clock_neither_stands_still_nor_jumps() {
     let (mut emulator, wall_clock) = clock_game(crate::RtcClock::WallClock);
