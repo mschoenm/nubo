@@ -96,7 +96,8 @@ fn an_unreadable_list_is_kept_aside_before_a_new_one_can_replace_it() {
         .unwrap();
 
     let error = load_from(&files, rom_path).unwrap_err();
-    assert!(error.contains("Game.gb.kept-1.toml"), "{error}");
+    assert!(error.problem.contains("Game.gb.kept-1.toml"), "{error}");
+    assert!(error.saving_is_safe);
     assert_eq!(load_from(&files, rom_path), Ok(Vec::new()));
     let cheats = vec![Cheat::new("", "01ff56d0").unwrap()];
     save_to(&files, rom_path, &cheats).unwrap();
@@ -107,4 +108,56 @@ fn an_unreadable_list_is_kept_aside_before_a_new_one_can_replace_it() {
         from_newer_nubo
     );
     let _ = fs::remove_dir_all(&folder);
+}
+
+/// A storage whose cheats list is `contents`, or can't be read when that is
+/// `None`, and can't be kept aside.
+struct Unkeepable {
+    contents: Option<&'static [u8]>,
+}
+
+impl Storage for Unkeepable {
+    fn read(&self, _entry: Entry<'_>) -> Result<Option<Vec<u8>>, String> {
+        self.contents
+            .map(|contents| Some(contents.to_vec()))
+            .ok_or_else(|| String::from("permission denied"))
+    }
+
+    fn write(&self, _entry: Entry<'_>, _contents: &[u8]) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn location(&self, entry: Entry<'_>) -> String {
+        entry.file_name().display().to_string()
+    }
+
+    fn delete_battery_saves(&self) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn keep_aside(&self, _entry: Entry<'_>) -> Result<String, String> {
+        Err(String::from("the file is in use"))
+    }
+}
+
+#[test]
+fn a_list_that_cant_be_kept_aside_is_not_safe_to_save_over() {
+    let storage = Unkeepable {
+        contents: Some(b"cheats = 3"),
+    };
+
+    let error = load_from(&storage, Path::new("Game.gb")).unwrap_err();
+
+    assert!(!error.saving_is_safe);
+    assert!(error.problem.contains("the file is in use"), "{error}");
+}
+
+#[test]
+fn a_list_that_cant_be_read_is_not_safe_to_save_over() {
+    let storage = Unkeepable { contents: None };
+
+    let error = load_from(&storage, Path::new("Game.gb")).unwrap_err();
+
+    assert!(!error.saving_is_safe);
+    assert!(error.problem.contains("permission denied"), "{error}");
 }

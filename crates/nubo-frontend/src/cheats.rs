@@ -3,10 +3,10 @@
 //! `cheats/<rom file name>.toml` in the user's data folder on the desktop and
 //! under `nubo:cheats/<rom file name>.toml` in the browser's localStorage (see
 //! [`Entry::Cheats`]). A list that can't be read is kept aside before an
-//! empty one can replace it, such as `cheats/<rom file name>.kept-1.toml`
-//! (see [`load_from`]).
+//! empty one can replace it, such as `cheats/<rom file name>.kept-1.toml`,
+//! and one that can't be kept aside is never saved over (see [`load_from`]).
 
-use crate::storage::{self, Entry, Storage};
+use crate::storage::{self, Entry, Storage, Unreadable};
 use nubo_core::{Emulator, validate_gamegenie_code, validate_gameshark_code};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -173,8 +173,8 @@ struct CheatsFile {
 }
 
 /// The cheats of the game at `rom_path`, from this build's storage; none if
-/// it has no list yet.
-pub fn load(rom_path: &Path) -> Result<Vec<Cheat>, String> {
+/// it has no list yet (see [`load_from`]).
+pub fn load(rom_path: &Path) -> Result<Vec<Cheat>, Unreadable> {
     load_from(&*storage::platform(), rom_path)
 }
 
@@ -186,23 +186,35 @@ pub fn save(rom_path: &Path, cheats: &[Cheat]) -> Result<(), String> {
 /// The cheats of the game at `rom_path`, from `storage`; none if it has no
 /// list yet. A list that can't be parsed (such as one a newer Nubo wrote) is
 /// kept aside first ([`Storage::keep_aside`]), so saving a new list can't
-/// lose it, and the error says where it went.
-pub fn load_from(storage: &dyn Storage, rom_path: &Path) -> Result<Vec<Cheat>, String> {
+/// lose it, and the error says where it went. A list that can't be read at
+/// all, or can't be kept aside, stays where it is, and the error says that
+/// saving over it isn't safe ([`Unreadable::saving_is_safe`]), so the
+/// caller must not save the game's cheats.
+pub fn load_from(storage: &dyn Storage, rom_path: &Path) -> Result<Vec<Cheat>, Unreadable> {
     let entry = Entry::Cheats(rom_path);
-    let Some(bytes) = storage
-        .read(entry)
-        .map_err(|error| format!("The cheats couldn't be read: {error}"))?
+    let Some(bytes) = storage.read(entry).map_err(|error| Unreadable {
+        problem: format!(
+            "The cheats couldn't be read, so Nubo leaves them as they are and saves no changes to them: {error}"
+        ),
+        saving_is_safe: false,
+    })?
     else {
         return Ok(Vec::new());
     };
 
     parse_list(bytes).map_err(|error| match storage.keep_aside(entry) {
-        Ok(location) => {
-            format!("The cheats couldn't be read, so Nubo kept them as {location}: {error}")
-        }
-        Err(keep_error) => format!(
-            "The cheats couldn't be read (keeping them aside failed too: {keep_error}): {error}"
-        ),
+        Ok(location) => Unreadable {
+            problem: format!(
+                "The cheats couldn't be read, so Nubo kept them as {location}: {error}"
+            ),
+            saving_is_safe: true,
+        },
+        Err(keep_error) => Unreadable {
+            problem: format!(
+                "The cheats couldn't be read, and keeping them aside failed too ({keep_error}), so Nubo leaves them as they are and saves no changes to them: {error}"
+            ),
+            saving_is_safe: false,
+        },
     })
 }
 

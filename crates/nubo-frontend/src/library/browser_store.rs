@@ -10,7 +10,7 @@ pub use crate::picture::decode_png;
 
 use super::{Cache, LibraryEntry, PictureKind};
 use crate::picture::{SCREEN_HEIGHT, SCREEN_WIDTH, encode_png};
-use crate::storage::{indexed_db, kept_name};
+use crate::storage::{Unreadable, indexed_db, kept_name};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -25,8 +25,9 @@ struct LibraryFile {
 
 /// Reads the known games, or none if there is no library entry yet. An
 /// entry that can't be parsed is kept aside first, under the first free
-/// `library.kept-<number>.toml`, and the error says where it went.
-pub fn load_entries(_cache: &Cache) -> Result<Vec<LibraryEntry>, String> {
+/// `library.kept-<number>.toml`, and the error says where it went (or that
+/// saving over it isn't safe, when that failed).
+pub fn load_entries(_cache: &Cache) -> Result<Vec<LibraryEntry>, Unreadable> {
     let Some(record) = indexed_db::read(LIBRARY) else {
         return Ok(Vec::new());
     };
@@ -36,7 +37,7 @@ pub fn load_entries(_cache: &Cache) -> Result<Vec<LibraryEntry>, String> {
             toml::from_str::<LibraryFile>(contents).map_err(|error| error.to_string())
         })
         .map(|file| file.games)
-        .map_err(|error| super::unreadable_library(&error, keep_aside()))
+        .map_err(|error| super::unreadable_library(&error, Some(keep_aside())))
 }
 
 /// Gives the library's entry the first free `library.kept-<number>.toml`
