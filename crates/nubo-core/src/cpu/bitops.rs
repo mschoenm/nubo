@@ -70,11 +70,11 @@ impl Cpu {
         shifted_value
     }
 
-    /// SRA (with `maintain_msb`) or SRL: shifts right, moving bit 0 to the
+    /// SRA (with `keep_sign`) or SRL: shifts right, moving bit 0 to the
     /// carry flag. SRA keeps bit 7 so signed numbers keep their sign; SRL clears it.
-    fn shift_right(&mut self, byte: u8, maintain_msb: bool) -> u8 {
-        let most_significant_bit = if maintain_msb { byte & 0x80 } else { 0 };
-        let shifted_value = byte >> 1 | most_significant_bit;
+    fn shift_right(&mut self, byte: u8, keep_sign: bool) -> u8 {
+        let sign_bit = if keep_sign { byte & 0x80 } else { 0 };
+        let shifted_value = byte >> 1 | sign_bit;
         self.set_shift_flags(shifted_value, byte & 0x01 != 0);
         shifted_value
     }
@@ -141,11 +141,11 @@ impl Cpu {
         self.update_byte_at_hl(Self::shift_left);
     }
 
-    pub(super) fn shift_register_right_maintaining_msb(&mut self, register: Register) {
+    pub(super) fn shift_register_right_keeping_sign(&mut self, register: Register) {
         self.update_register(register, |cpu, byte| cpu.shift_right(byte, true));
     }
 
-    pub(super) fn shift_memory_byte_right_maintaining_msb(&mut self) {
+    pub(super) fn shift_memory_byte_right_keeping_sign(&mut self) {
         self.update_byte_at_hl(|cpu, byte| cpu.shift_right(byte, true));
     }
 
