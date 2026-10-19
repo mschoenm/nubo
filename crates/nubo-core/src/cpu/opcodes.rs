@@ -224,7 +224,7 @@ impl Cpu {
             }
             0x34 => self.increment_memory_byte(),
             0x35 => self.decrement_memory_byte(),
-            0x36 => self.load_immediate_value_in_memory(REGISTER_HL),
+            0x36 => self.load_immediate_value_in_memory(),
             0x37 => self.set_carry_flag(),
             0x38 => self.relative_jump_if(self.is_c_flag_set()),
             0x39 => {
