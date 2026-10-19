@@ -307,7 +307,9 @@ mod tests {
             let _ = sender.send(event);
         });
         assert!(watching.failures.is_empty(), "{:?}", watching.failures);
-        std::thread::sleep(QUIET_TIME / 2);
+        // macOS can report the folders and file made just above, a little
+        // late; wait those out, so only the reads below can count.
+        while events.recv_timeout(QUIET_TIME * 2).is_ok() {}
 
         for folder in [root.clone(), root.join("more")] {
             std::fs::read_dir(folder).unwrap().for_each(drop);
