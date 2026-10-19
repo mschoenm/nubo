@@ -459,10 +459,12 @@ jobs:
   # leaves behind there (a git hook, a changed PATH) could read the token if
   # the push ran on the same machine. It takes only the four files from the
   # metrics job's artifact, and pushes only if the wiki hasn't changed since
-  # the metrics job read it.
+  # the metrics job read it. It runs whatever the other jobs' results, as
+  # the metrics job does, since a night with a failed job is the one most
+  # worth recording.
   wiki:
     name: Push the wiki
-    if: github.event_name == 'schedule'
+    if: always() && github.event_name == 'schedule' && needs.metrics.result == 'success'
     needs: metrics
     runs-on: ubuntu-latest
     timeout-minutes: 10
