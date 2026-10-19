@@ -177,7 +177,8 @@ impl Cpu {
     }
 
     /// INC rr: adds one to a register pair. Takes an extra M-cycle, changes no
-    /// flags and can trigger the OAM bug.
+    /// flags and can trigger the OAM bug (on the DMG, a pair pointing into OAM,
+    /// the sprite table, while the PPU scans it corrupts that table).
     pub(super) fn increment_register_pair(&mut self, register_pair: RegisterPair) {
         let word = self.read_from_register_pair(register_pair);
         let sum = word.wrapping_add(1);
@@ -187,7 +188,7 @@ impl Cpu {
     }
 
     /// DEC rr: subtracts one from a register pair. Takes an extra M-cycle,
-    /// changes no flags and can trigger the OAM bug.
+    /// changes no flags and can trigger the OAM bug (see `increment_register_pair`).
     pub(super) fn decrement_register_pair(&mut self, register_pair: RegisterPair) {
         let word = self.read_from_register_pair(register_pair);
         let difference = word.wrapping_sub(1);
