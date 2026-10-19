@@ -20,10 +20,10 @@ Three parts work together, and each can be made again on its own:
 First find out what is gone: open the page's URL (the `Artifact` tool's `read`), read `meta/page` from its database (`ArtifactData`), look its `session_id` up (`get_session` of the claude-code-remote MCP server) and list the routines (`list_triggers`). Make again only what is missing, in this order.
 
 1. **The page,** only when the artifact is gone. Publish `page.html` with the `Artifact` tool, `icon` `checklist`, the description "De open issues van Nubo, elk uur bijgewerkt; druk op Start bij wat Claude in een aparte sessie moet oplossen." and the capabilities `{"db": {}}`. Pin it to the maintainer's sidebar (`pin: true`). Its database starts empty: the triage session's first run assesses every open issue.
-2. **The triage session and its routine,** when the session is gone. Create it with `create_session` exactly as the weekly handover does (part A, step 8 of `docs/ISSUE_TRIAGE.md`: the same title, tag and prompt). In its first turn it makes its own routine, disables the old one, writes `meta/page` `session_id`, `trigger_id` and `session_started_at`, and archives the old session if it still exists.
+2. **The triage session and its routine,** when the session is gone. Create it with `create_session` exactly as the weekly handover does (part A, step 8 of `docs/ISSUE_TRIAGE.md`: the same title, tag and prompt). In its first turn it makes its own routine, turns the old one off (a daily run deletes it later), writes `meta/page` `session_id`, `trigger_id` and `session_started_at`, and archives the old session if it still exists.
 3. **The routine alone,** when the session is there but its routine is gone. Create it with `create_trigger` as step 8 describes, but with `persistent_session_id` the triage session, and write its id to `meta/page` `trigger_id`.
 
-   Then disable every other routine named `Nubo issue-triage bijwerken` (`list_triggers`, then `update_trigger` with `enabled` false), so only one fires each hour and none updates a page that is gone.
+   Then delete every other routine named `Nubo issue-triage bijwerken` (`list_triggers`, then `delete_trigger`), so only one fires each hour, none updates a page that is gone, and they don't pile up in the maintainer's list. Deleting a routine also deletes the sessions it started, which for a routine bound to a session is none.
 4. **The docs:** when the page's URL changed, update "Current setup" in `docs/ISSUE_TRIAGE.md` in a pull request. The session and routine ids live only in `meta/page`.
 
 ## Changing the page
