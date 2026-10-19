@@ -161,7 +161,8 @@ impl Cpu {
     }
 
     /// Runs one M-cycle of the HALT state and wakes the CPU if an interrupt is pending. When no
-    /// interrupt is pending and none can come for a while, runs that whole stretch at once.
+    /// interrupt is pending and none can come for a while, runs that whole stretch at once. It
+    /// also ends the halt of a CGB speed switch once the clock has settled.
     pub(super) fn halted_step(&mut self) {
         self.address_bus.run_deferred_cycles_before_change();
         let just_halted = self.run_state == RunState::JustHalted;
@@ -181,9 +182,10 @@ impl Cpu {
             self.step_one_machine_cycle_sampling_mid_cycle(Self::has_pending_interrupt)
         };
         if just_halted {
-            // After a speed switch, OAM DMA still runs during the first halted
-            // M-cycle and then stands still, like it does after HALT
-            // (Gambatte's oamdmasrc80_halt tests).
+            // After a speed switch or a STOP with a button held, OAM DMA still
+            // runs during the first halted M-cycle and then stands still, like
+            // it does after HALT, which pauses it itself (Gambatte's
+            // oamdmasrc80_halt tests).
             self.address_bus.dma_halt_started();
         }
         self.run_state = RunState::Halted;

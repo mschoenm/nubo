@@ -53,8 +53,8 @@ pub struct Settings {
     /// it. Only saved once answered.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub check_for_updates: Option<bool>,
-    /// Whether leaving a game saves its state, so it continues there the
-    /// next time it starts. On until the player turns it off, on the
+    /// Whether a game's state is saved as the player plays and when they
+    /// leave it, so it continues there the next time it starts. On until the player turns it off, on the
     /// settings' Playing tab.
     pub resume_games: bool,
     /// How fast fast forward runs.

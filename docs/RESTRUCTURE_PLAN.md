@@ -123,7 +123,7 @@ review and version. It can be split later if a part grows a life of its own.
 
 Feature flags keep platform dependencies out of builds that can't use them:
 
-- **`desktop`:** cpal, directories, notify-debouncer-mini, ureq, image, crc32fast.
+- **`desktop`:** cpal, directories, notify-debouncer-full, ureq, image, crc32fast.
 - **`gamepads`:** gilrs.
 - **`web`:** localStorage and the browser's sound.
 

@@ -4,7 +4,8 @@
 //! under `nubo:cheats/<rom file name>.toml` in the browser's localStorage (see
 //! [`Entry::Cheats`]). A list that can't be read is kept aside before an
 //! empty one can replace it, such as `cheats/<rom file name>.kept-1.toml`,
-//! and one that can't be kept aside is never saved over (see [`load_from`]).
+//! and one that can't be read at all or can't be kept aside is never saved
+//! over (see [`load_from`]).
 
 use crate::storage::{self, Entry, Storage, Unreadable};
 use nubo_core::{Emulator, validate_gamegenie_code, validate_gameshark_code};

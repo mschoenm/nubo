@@ -858,7 +858,7 @@ fn shifts_memory_location_hl_left() {
 }
 
 #[test]
-fn shifts_register_a_right_maintaining_msb() {
+fn shifts_register_a_right_keeping_the_sign() {
     let mut cpu = init_cpu_with_test_instructions(&[0xCB, 0x2F]);
     cpu.registers.a = 0xA7;
     let clock_cycles = step_counting_clock_cycles(&mut cpu);
@@ -868,7 +868,7 @@ fn shifts_register_a_right_maintaining_msb() {
 }
 
 #[test]
-fn shifts_memory_location_hl_right_maintaining_msb() {
+fn shifts_memory_location_hl_right_keeping_the_sign() {
     let mut cpu = init_cpu_with_test_instructions(&[0xCB, 0x2E]);
     cpu.registers.h = 0x9A;
     cpu.registers.l = 0x51;

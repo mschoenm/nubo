@@ -88,7 +88,8 @@ pub enum ResumeAnswer {
     /// keep the game on that model from now on, once it has continued.
     Continue,
     /// Start from the title screen on the model the game is set to start
-    /// on; the automatic save is replaced when the player stops.
+    /// on; the automatic save is replaced once the game has run a minute or
+    /// stops running (see [`AutosaveTimer`](crate::game::AutosaveTimer)).
     StartOver,
     /// Start nothing.
     Cancel,

@@ -1,7 +1,7 @@
 //! Load instructions, which copy values between registers and memory, and the
 //! stack's push and pop.
 
-use crate::cpu::{Cpu, Register, RegisterPair};
+use crate::cpu::{Cpu, REGISTER_HL, Register, RegisterPair};
 
 impl Cpu {
     /// LD r, n: loads the next instruction byte into `register`.
@@ -37,9 +37,9 @@ impl Cpu {
         self.store_byte_in_memory(address, byte);
     }
 
-    /// LD (rr), n: stores the next instruction byte at the address in `register_pair`.
-    pub(super) fn load_immediate_value_in_memory(&mut self, register_pair: RegisterPair) {
-        let address = self.read_from_register_pair(register_pair);
+    /// LD (HL), n: stores the next instruction byte at the address in HL.
+    pub(super) fn load_immediate_value_in_memory(&mut self) {
+        let address = self.read_from_register_pair(REGISTER_HL);
         let immediate_byte = self.read_next_instruction_byte();
         self.store_byte_in_memory(address, immediate_byte);
     }
