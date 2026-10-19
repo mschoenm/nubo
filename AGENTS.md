@@ -2,24 +2,29 @@
 
 Nubo is a cycle-accurate Game Boy (DMG) and Game Boy Color (CGB) emulator in Rust, forked from RetroBoy (smparsons/retroboy). It runs through an Iced app, natively on the desktop and as WebAssembly in the browser. Nubo is GPL-3.0-or-later (`LICENSE`); the code from RetroBoy stays Apache-2.0 (`LICENSE-APACHE`), credited in `NOTICE`.
 
-Folders with their own `AGENTS.md` (listed under Where Things Are) explain their code; read it before you change code there, since not every agent loads it by itself. Facts about a single file are in that file's doc comments.
+This file is for AI coding agents and people alike. Folders with their own `AGENTS.md` (listed under Where Things Are) explain how their code fits together: read it before you change code there, since not every agent loads it by itself (Claude Code does only when it opens a file in that folder with its Read tool). Facts about a single file are in that file's doc comments.
 
 ## Setup and Commands
 
 You need the newest stable Rust, as `rust-toolchain.toml` asks (`rustup update`); the tools download the test ROMs and benchmark games themselves. Linux also needs `libasound2-dev`, `libudev-dev` and `pkg-config`. The browser build's lint needs `rustup target add wasm32-unknown-unknown`, and the license check needs `cargo install cargo-deny --locked`. The `cargo` aliases below are defined in `.cargo/config.toml`; packaging, the web build and the other project tasks are in `xtask/AGENTS.md`.
 
 ```bash
-cargo build / cargo test      # The core crates only (the workspace's default members)
-cargo test --workspace        # Every crate, frontends and xtask included
-cargo test-roms [filter]      # The test ROM suites, compared with tools/nubo-test-rom-runner/passing.txt (about 30 s)
-cargo cpu-tests               # Every CPU opcode, checked cycle by cycle
-cargo save-states             # The kept save states still load, and the stored layout is unchanged
-cargo play [rom] [--cgb | --model cgb-c]   # Run the desktop app (models: dmg-0, dmg, mgb, sgb, sgb2, cgb-0 to cgb-e, agb; more options in frontends/nubo/src/command_line.rs)
-cargo screenshot rom.gb --seconds 10   # Run 10 emulated seconds (5 without it) headless, save a PNG to target/screenshots/ (under the folder it is run from, so run it from the workspace root)
-cargo benchmark <roms> --record a.txt / --compare a.txt   # Speed, and fingerprints of every frame, sample and end state
-cargo xtask install [--build main | checkout | 0.12 | <commit>]   # Build Nubo for this computer and install it; when it stops for --build (not the newest origin/main), ask the user which
-cargo xtask screenshots [--check]     # The README's and Flathub's screenshots, made again from their scenes in a headless GNOME Shell (the `screenshots` skill)
+cargo build / cargo test           # The core crates only (the workspace's default members)
+cargo test --workspace             # Every crate, frontends and xtask included
+cargo test-roms [filter]           # The test ROM suites against tools/nubo-test-rom-runner/passing.txt (about 30 s)
+cargo cpu-tests                    # Every CPU opcode, checked cycle by cycle
+cargo save-states                  # The kept save states still load, and the stored layout is unchanged
+cargo play [rom] [--cgb | --model cgb-c]   # The desktop app; options in frontends/nubo/src/command_line.rs
+cargo screenshot rom.gb --seconds 10       # Headless, 5 emulated seconds by default; PNG in ./target/screenshots/
+cargo benchmark <roms> --record a.txt      # Speed, and fingerprints of every frame, sample and end state (--compare a.txt)
+cargo xtask install [--build main | checkout | 0.12 | <commit>]   # Build Nubo for this computer and install it
+cargo xtask screenshots [--check]  # The README's and Flathub's screenshots, made again from their scenes
 ```
+
+- `cargo play --model` takes `dmg-0`, `dmg`, `mgb`, `sgb`, `sgb2`, `cgb-0` to `cgb-e` and `agb`.
+- Run `cargo screenshot` from the workspace root: it writes under the folder it runs from.
+- `cargo xtask install` without `--build` stops to ask when the working tree isn't the newest `origin/main`. Then ask the maintainer which to build; don't pick for them.
+- `cargo xtask screenshots` runs a headless GNOME Shell; the `screenshots` skill explains when and how.
 
 ## Before You Push
 
@@ -33,24 +38,34 @@ Run what CI runs, so a pull request is green the first time:
 6. If emulation may have changed: `cargo test-roms`. When results change on purpose, run `cargo test-roms --update` and commit `passing.txt`; when a test in `tools/nubo-test-rom-runner/FAILING_TESTS.md` starts passing, update that file too.
 7. If the CPU changed: `cargo cpu-tests`.
 8. If what save states store changed: `cargo save-states` (it needs the benchmark games: `cargo xtask benchmark-roms` once), and keep a new set with `cargo save-states --record` in the same pull request.
-9. If dependencies changed: `cargo deny check licenses bans sources`.
-10. If the change must not alter output (an optimization, a refactor): record fingerprints on a build without it (`git stash -u`, so new files go too), then compare with it. Do this on the benchmark games (`cargo xtask benchmark-roms`, then `cargo benchmark target/benchmark-roms --record before.txt` and later `--compare before.txt`) and on the test ROMs (`cargo benchmark target/test-roms/v7.0 --seconds 4 --jobs <cores>` with the same flags). For a change to the lazy components, also compare a normal build with an `eager` one (`tools/nubo-benchmark/AGENTS.md`).
+9. If dependencies changed: `cargo deny check licenses bans sources`, and commit `Cargo.lock`, since CI builds with `--locked`.
+10. If the change must not alter output (an optimization, a refactor): compare fingerprints, as below.
 
-The slow checks run nightly. What runs where: `docs/CI.md`.
+CI runs steps 1 to 9 on every pull request, whatever changed; the slow checks run nightly. What runs where: `docs/CI.md`.
+
+**Proving that output didn't change.** Record fingerprints on a build without the change (`git stash -u`, so new files go too), then compare with it:
+
+- The benchmark games: `cargo xtask benchmark-roms` once, then `cargo benchmark target/benchmark-roms --record before.txt` and later `--compare before.txt`.
+- The test ROMs: `cargo benchmark target/test-roms/v7.0 --seconds 4 --jobs <cores>` with the same flags.
+- A change to the lazy components: also compare a normal build with an `eager` one (`tools/nubo-benchmark/AGENTS.md`).
 
 ## Rules
 
-These keep Nubo exact, and players' saves safe. Never break them.
+These keep Nubo exact, players' saves safe and the code free to share. Never break them; when a task seems to need it, stop and ask the maintainer.
 
 - **User input never panics the core.** ROMs, zip files, save states and cheat codes return `LoadRomError`, `SaveStateError` or `CheatError`.
 - **Lazy components, exact results.** The PPU and APU run behind the CPU while nothing they do can be seen, then catch up in one go, and plain M-cycles (one CPU step each) run in bulk. The result must be bit for bit what running every component one M-cycle at a time gives. Any new way for the CPU or another component to see or change hardware state must first run the waiting M-cycles and catch the PPU and APU up. How: `crates/nubo-core/AGENTS.md`.
 - **Timing calibration moves only with the test ROMs.** The PPU's dot positions, each model's state after the boot ROM and the other timings are calibrated against test ROMs and other emulators. Change them only together with `cargo test-roms`.
-- **Players never lose a save state to an update.** A field or variant's stored name is permanent: when you rename it in the code, keep the stored name with `#[serializable(name = "...")]` (hand-written implementations and the PPU store names differently; see `crates/nubo-core/AGENTS.md`). A field whose type or meaning changes gets a new stored name. Stored values are fixed-size and little-endian, never `usize`. How: `crates/nubo-core/AGENTS.md`.
-- **Only GPLv3-compatible code and dependencies** (MIT, BSD, ISC, Zlib, Apache-2.0, MPL-2.0 and the like, never GPL-2.0-only). Gambatte is GPL-2.0-only: use it as a reference only (its test ROMs, traces of a local build, its behavior) and never port its code or tables. Its ideas may reach Nubo only through a clean room: one agent reads its source and writes a report of the techniques in its own words (no code, no pseudo-code that mirrors its functions, no tables, constants or identifiers), and whoever writes Nubo's code works from that report alone and never reads Gambatte's source. When you port code, tables or data, credit the project with its link and license at the top of the file, in `NOTICE` and in the README's Credits; SameBoy-derived files point to the Expat notice in `apu.rs`. Projects whose ideas reach Nubo through a clean-room report, or whose behavior Nubo's timing is measured against, are named in the README's Credits too.
-- **Code the browser build shares** takes `Instant`, `SystemTime` and `Duration` from `nubo_frontend::time`, which re-exports the `web-time` crate (std's panic on wasm32; the UI code may use `iced::time`, the same types), and text that sets a font uses `theme::BODY_FONT` or `theme::HEADING_FONT`, never `Font::DEFAULT` or another font of its own, which draw nothing in the browser. Plain `text()` without `.font()` is fine, and so are the icons (`ui::icons`).
-- **No `unsafe`.** The workspace lints forbid it. The one exception is the RetroArch core's exported C functions: they live in `frontends/nubo-libretro/src/ffi.rs` (and its tests), under one `#[expect(unsafe_code)]`, with that crate's own lint table (`unsafe_code = "deny"`) and the `unsafe` in as few places as possible. Any later crate that binds Nubo to another language follows the same rule; every other crate, `nubo-core`, `nubo-frontend` and the apps included, keeps it forbidden.
-- **Newest stable versions** of Rust, crates, GitHub Actions and tools, never a pre-release unless nothing else works; test data stays pinned. Details, and the Flatpak's exception: `docs/CI.md`. The one exception for Rust itself: the fuzz targets in `fuzz/` use the nightly toolchain, which `cargo-fuzz` needs; that folder is outside the Cargo workspace, nothing that ships or that CI builds depends on it, and only a full review runs it.
-- **Merging a pull request:** follow the `merge` skill (CI green; Codex is no longer connected to this repository, so there is no review to wait for). **Making a release:** follow the `release` skill. **Regenerating or collecting screenshots:** follow the `screenshots` skill. **Working on the issue triage, or setting its page or routine up again:** follow the `issue-triage` skill. **A full review of the repository:** only when the maintainer asks for one, never on your own; follow the `full-review` skill.
+- **Players never lose a save state to an update.** A field or variant's stored name is permanent: when you rename it in the code, keep the stored name with `#[serializable(name = "...")]` (hand-written implementations and the PPU store names differently). A field whose type or meaning changes gets a new stored name. Stored values are fixed-size and little-endian, never `usize`. How: `crates/nubo-core/AGENTS.md`.
+- **Only GPLv3-compatible code and dependencies:** MIT, BSD, ISC, Zlib, Apache-2.0, MPL-2.0 and the like, never GPL-2.0-only.
+  - **Gambatte is GPL-2.0-only:** use it as a reference only (its test ROMs, traces of a local build, its behavior), never port its code or tables.
+  - **Its ideas reach Nubo only through a clean room.** One agent reads its source and writes a report of the techniques in its own words: no code, no pseudo-code that mirrors its functions, no tables, constants or identifiers. Whoever writes Nubo's code works from that report alone and never reads Gambatte's source. The reports are in `docs/speed-research/`.
+  - **Credit what you port.** Code, tables or data from another project get its link and license at the top of the file, in `NOTICE` and in the README's Credits; SameBoy-derived files point to the Expat notice in `apu.rs`. Projects whose ideas reach Nubo through a clean-room report, or whose behavior Nubo's timing is measured against, are named in the README's Credits too.
+- **Code the browser build shares works in the browser.**
+  - It takes `Instant`, `SystemTime` and `Duration` from `nubo_frontend::time`, which re-exports the `web-time` crate, since std's panic on wasm32. The UI code may use `iced::time`, the same types.
+  - Text that sets a font uses `theme::BODY_FONT` or `theme::HEADING_FONT`, never `Font::DEFAULT` or a font of its own: those draw nothing in the browser. Plain `text()` without `.font()` is fine, and so are the icons (`ui::icons`).
+- **No `unsafe`.** The workspace lints forbid it. The one exception is the RetroArch core's exported C functions: they live in `frontends/nubo-libretro/src/ffi.rs` (and its tests), under one `#[expect(unsafe_code)]`, with that crate's own lint table (`unsafe_code = "deny"`) and the `unsafe` in as few places as possible. A later crate that binds Nubo to another language follows the same rule; every other crate keeps it forbidden.
+- **Newest stable versions** of Rust, crates, GitHub Actions and tools, never a pre-release unless nothing else works; test data stays pinned. Two exceptions: the Flatpak builds with the freedesktop SDK's Rust (`docs/CI.md`), and the fuzz targets in `fuzz/` use nightly Rust, which `cargo-fuzz` needs. That folder is outside the Cargo workspace, nothing that ships or that CI builds depends on it, and only a full review runs it.
 
 ## Style
 
@@ -59,16 +74,35 @@ These keep Nubo exact, and players' saves safe. Never break them.
 - **Whole words, not abbreviations.** Acronyms are words in type names (`RtcState`, `Mbc1CartridgeMapper`), getters have no `get_` prefix, and Pan Docs register names (`lcdc`, `nr52`, `svbk`) are fine.
 - **Modules are declared at the bottom of the file.**
 - **Docs move with the code.** Facts about a file live in its doc comments, and how files work together in the folder's `AGENTS.md`; update whatever your change makes wrong, in the same commit.
-- **Clippy stays clean.** The workspace enables the default lints and a curated set of pedantic ones (root `Cargo.toml`); every crate opts in with `[lints] workspace = true`, except the RetroArch core, which copies the table to deny `unsafe` instead of forbidding it (keep its copy the same). To silence a lint, put `#[expect(clippy::..., reason = "...")]` on the smallest item possible.
+- **Clippy stays clean.** The workspace enables the default lints and a curated set of pedantic ones (root `Cargo.toml`); every crate opts in with `[lints] workspace = true`, except the RetroArch core, which copies the table to deny `unsafe` instead of forbidding it (keep its copy the same). To silence a lint, put `#[expect(clippy::..., reason = "...")]` on the smallest item possible, never `#[allow]`.
+- **Plain US English** in docs, comments, commits and pull requests: short sentences and everyday words, as in this file.
+
+## Pull Requests
+
+- **Title:** the area, a colon and what changes, in plain words: `Core: give cartridge types without RAM no RAM buffer`, `App: save where you left off as you play`. Areas in use include `Core`, `APU`, `Frontend`, `Library`, `App`, `Browser build`, `RetroArch core`, `Test ROM runner`, `Benchmark`, `xtask`, `CI`, `Nightly`, `Docs` and `Issue triage`. Pull requests are squash-merged, so the title becomes the commit on `main`.
+- **Fixes an open issue:** say `Fixes #<number>` in the description, so GitHub closes the issue when it merges.
+- **See it through.** After opening a pull request, watch it without being asked (in Claude Code on the web, subscribe to its activity) and fix what comes up: red CI, a conflict with `main` and reviewers' comments, until CI is green. No automatic review runs on this repository, so there is none to wait for.
+- **Merging waits for the maintainer's go**, then follows the `merge` skill.
+- **Say what a number is.** When you name a pull request or an issue by its number in a chat message to the maintainer, or in a report such as the nightly review's pull request and comments or a full review's report, add one or two words saying what it is: "#194 (triage setup)", "#156 (MBC3 clock)". Elsewhere on GitHub a bare number is fine, since GitHub shows the title.
+
+## Skills
+
+Some tasks have steps of their own, in `.claude/skills/`. Follow the skill whenever its task comes up:
+
+- `merge`: merging a pull request.
+- `release`: making a release.
+- `screenshots`: regenerating or collecting screenshots.
+- `issue-triage`: working on the issue-triage page, or setting its page or routine up again.
+- `full-review`: a full review of the repository, only when the maintainer asks for one, never on your own.
 
 ## Where Things Are
 
 The root `Cargo.toml` is a virtual workspace whose default members are `nubo-core` and `nubo-serializable-derive`, so `cargo build` and `cargo test` don't build the apps, the tools or xtask. Libraries are in `crates/`, apps players use in `frontends/`, developer programs in `tools/`. Every package's name starts with `nubo` (except `xtask`), and every crate's folder is named after its package.
 
 - `crates/nubo-core/` (`AGENTS.md`): the emulator, a plain library with no platform dependencies. `Emulator` in `emulator.rs` is its API.
-- `crates/nubo-frontend/` (`AGENTS.md`): everything an app needs that isn't drawing, without a UI toolkit: what it keeps between runs (settings, controls, battery saves, save states, cheats, screenshots), the game library, running a game with its sound (`session`, paced by the sound card on the desktop and by the screen's refreshes in the browser), game controllers (`gamepads`), and the palettes, model rule, picture (with the Super Game Boy border) and Super Game Boy menu choices the RetroArch core shares. Its features `desktop`, `web` and `gamepads` bring each platform's storage, sound and controllers.
+- `crates/nubo-frontend/` (`AGENTS.md`): everything an app needs that isn't drawing, without a UI toolkit: what it keeps between runs (settings, controls, battery saves, save states, cheats, screenshots), the game library, running a game with its sound (`session`), game controllers (`gamepads`), and what the RetroArch core shares with the app. Its features `desktop`, `web` and `gamepads` bring each platform's storage, sound and controllers.
 - `crates/nubo-serializable-derive/`: the derive macro behind save states.
-- `crates/nubo-logo/`: the logo, drawn from rounded rectangles, for the app (among them its top bar, the empty library, the About tab and its window, Windows, macOS and Flatpak icons and the Windows installer's banner) and in `nubo-core` for the Super Game Boy's intro, attraction mode and Nubo border.
+- `crates/nubo-logo/`: the logo, drawn from rounded rectangles, for the app, its icons and installers, and in `nubo-core` for the Super Game Boy's intro, attraction mode and Nubo border.
 - `crates/nubo-download/`: downloading test data over HTTPS and checking its SHA-256 checksums, shared by the test ROM runner, the CPU test runner and xtask.
 - `frontends/nubo/` (`AGENTS.md`): the app, desktop and browser.
 - `frontends/nubo-libretro/` (`AGENTS.md`): the RetroArch (libretro) core, a dynamic library; `cargo xtask libretro` packages it.
@@ -84,25 +118,30 @@ The root `Cargo.toml` is a virtual workspace whose default members are `nubo-cor
 
 ## Agent Instructions
 
-Claude Code and Codex both read these `AGENTS.md` files; keep them the only instruction files. Claude Code ignores `AGENTS.md` in a folder that also has a `CLAUDE.md`, so don't add one. The `merge`, `release`, `screenshots`, `full-review` and `issue-triage` skills are written in `.claude/skills/`, where Claude Code reads them; `.agents/skills/` holds pointers to them for Codex, so change the steps only in `.claude/skills/`. Each skill's `name` and `description` appear in both places; keep them the same.
-
-**See your pull requests through.** After opening a pull request, watch it without being asked (in Claude Code on the web, subscribe to its activity) and fix what comes up: red CI, a conflict with `main` and reviewers' comments, until CI is green. Merging still waits until the maintainer asks for it (the `merge` skill). A pull request that fixes an open issue, such as one the nightly review opened, says `Fixes #<number>` in its description, so GitHub closes the issue when it merges.
-
-**Say what a number is.** When you name a pull request or an issue by its number in a chat message to the maintainer, or in a report such as the nightly review's pull request and comments or a full review's report, add one or two words saying what it is: "#194 (triage setup)", "#156 (MBC3 clock)". Keep it that short. Elsewhere on GitHub a bare number is fine, since GitHub shows the title.
+Claude Code and Codex both read these `AGENTS.md` files; keep them the only instruction files. Claude Code stops reading `AGENTS.md` as soon as a `CLAUDE.md` or `CLAUDE.local.md` exists in its working directory or above, so don't add one. The skills are written in `.claude/skills/`, where Claude Code reads them; `.agents/skills/` holds pointers to them for Codex, so change the steps only in `.claude/skills/`. Each skill's `name` and `description` appear in both places; keep them the same.
 
 ## More Documentation
 
-- `BUILDING.md`: building, running and packaging Nubo, and where the code is, for people; the `README.md` is for players first. Keep both true when commands, packages or folders change.
-- `tools/nubo-test-rom-runner/FAILING_TESTS.md`: every test that still fails, what was tried and what to try next.
+For people:
+
+- `README.md`: for players first. `BUILDING.md`: building, running and packaging Nubo, and where the code is. Keep both true when commands, packages or folders change.
+- `docs/RETROARCH.md`: installing and using the RetroArch core; the README keeps the short version.
+
+How things stand:
+
 - `docs/ACCURACY.md`: the test ROM results suite by suite, and the tests that aren't run; the README keeps the summary.
-- `docs/RETROARCH.md`: installing and using the RetroArch core, for players; the README keeps the short version.
-- `docs/ACCURACY_PLAN.md`: the plan towards the most accurate emulator; update it when a phase moves on.
-- `docs/RESTRUCTURE_PLAN.md` (done: the shared `nubo-frontend` crate and the `tools/` folder, why the layout is what it is, and the order of the work) and `docs/SHOOTOUT_PLAN.md` (done but for Nubo appearing in the Shootout's published table): plans whose work is nearly all done; update them when what is left moves on.
-- `docs/RETROARCH_PLAN.md`: the RetroArch core, what was built and what is left (getting it into RetroArch's core downloader).
+- `tools/nubo-test-rom-runner/FAILING_TESTS.md`: every test that still fails, what was tried and what to try next.
+- `docs/EMULATOR_COMPARISON.md`: speed next to other emulators.
 - `docs/CI.md`: CI, the nightly run, nightly builds, toolchain updates.
 - `docs/NIGHTLY_REVIEW.md`: what the nightly review does.
-- `docs/ISSUE_TRIAGE.md`: the issue-triage page, kept up to date every hour, where the maintainer picks the open issues to solve; the `issue-triage` skill works on it with the maintainer and sets it up again.
-- `docs/EMULATOR_COMPARISON.md`: speed next to other emulators.
-- `docs/SCREENSHOTS_PLAN.md`: the tools that make every screenshot in the README and the Flathub listing again from recorded scenes, and the order of the work; update it as parts get done.
-- `docs/reviews/`: the report of each full review (the `full-review` skill), with a list of them in its `README.md`; each report is a record of its day, not kept up to date.
-- `docs/SPEED_PLAN.md`: making Nubo faster without changing any result, what was done and what is left; `docs/speed-research/` holds the clean-room reports on other emulators it draws on. Update it as parts get done.
+- `docs/ISSUE_TRIAGE.md`: the issue-triage page, kept up to date every hour, where the maintainer picks the open issues to solve.
+- `docs/reviews/`: the report of each full review, with a list of them in its `README.md`; each report is a record of its day, not kept up to date.
+
+Plans (update each one as its work moves on):
+
+- `docs/ACCURACY_PLAN.md`: towards the most accurate emulator.
+- `docs/SPEED_PLAN.md`: making Nubo faster without changing any result; `docs/speed-research/` holds the clean-room reports on other emulators it draws on.
+- `docs/SCREENSHOTS_PLAN.md`: making every screenshot in the README and the Flathub listing again from recorded scenes.
+- `docs/RETROARCH_PLAN.md`: the RetroArch core, what was built and what is left (getting it into RetroArch's core downloader).
+- `docs/SHOOTOUT_PLAN.md`: done but for Nubo appearing in the Shootout's published table.
+- `docs/RESTRUCTURE_PLAN.md`: done; why the layout (the shared `nubo-frontend` crate and the `tools/` folder) is what it is.
