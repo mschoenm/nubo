@@ -15,7 +15,10 @@ use crate::gpu::{Gpu, NO_OAM_SCAN_ROW};
 use crate::model::Model;
 use std::ops::Range;
 
+/// The secondary and row-aligned read corruptions only happen while the PPU reads OAM below this
+/// byte offset (SameBoy).
 const CORRUPTION_ROW_LIMIT: usize = 0x98;
+/// The corruption mixes and copies OAM in rows of eight bytes (two objects).
 const OAM_ROW_SIZE: usize = 8;
 
 impl Gpu {
@@ -29,6 +32,7 @@ impl Gpu {
             && (self.oam_scan_row as usize) + 7 < self.object_attribute_memory.len()
     }
 
+    /// Reads the little-endian 16-bit word at `offset` in OAM; the formulas mix words, not bytes.
     fn read_oam_word(&self, offset: usize) -> u16 {
         u16::from_le_bytes([
             self.object_attribute_memory[offset],
@@ -36,12 +40,15 @@ impl Gpu {
         ])
     }
 
+    /// Writes a little-endian 16-bit word at `offset` in OAM.
     fn write_oam_word(&mut self, offset: usize, value: u16) {
         let [low, high] = value.to_le_bytes();
         self.object_attribute_memory[offset] = low;
         self.object_attribute_memory[offset + 1] = high;
     }
 
+    /// Copies the bytes in `byte_range` of the row starting at offset `from_row` to the same bytes
+    /// of the row at `to_row`.
     fn copy_oam_bytes(&mut self, from_row: usize, to_row: usize, byte_range: Range<usize>) {
         self.object_attribute_memory.copy_within(
             from_row + byte_range.start..from_row + byte_range.end,
@@ -92,6 +99,8 @@ impl Gpu {
         }
     }
 
+    /// The read corruption when the PPU's byte offset has `row & 0x18 == 0x10`, which also
+    /// overwrites the eight bytes 16 before it.
     fn secondary_read_corruption(&mut self, row: usize) {
         if row >= CORRUPTION_ROW_LIMIT {
             return;
@@ -106,6 +115,9 @@ impl Gpu {
         self.copy_oam_bytes(row - 8, row - 16, 0..8);
     }
 
+    /// The read corruption when the PPU's byte offset has `row & 0x18 == 0`, which mixes in words
+    /// up to 32 bytes before it, also overwrites the eight bytes 16 and 32 before it, and differs
+    /// between DMG, MGB and SGB2.
     fn row_aligned_read_corruption(&mut self, row: usize) {
         if row >= CORRUPTION_ROW_LIMIT {
             return;
@@ -143,6 +155,8 @@ impl Gpu {
         self.copy_oam_bytes(row - 8, row - 32, 0..8);
     }
 
+    /// Applies one of the five-word read formulas to the words at offset `row` and 4, 8, 16 and 32
+    /// bytes before it.
     fn tertiary_read_glitch(&self, row: usize, glitch: fn(u16, u16, u16, u16, u16) -> u16) -> u16 {
         glitch(
             self.read_oam_word(row),
