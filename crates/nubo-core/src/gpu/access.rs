@@ -1,5 +1,6 @@
 //! What the CPU can reach while the PPU works: when OAM and VRAM are blocked, the VRAM banks,
-//! VBK and OPRI, and how OAM DMA and STOP mode cut the PPU itself off from memory.
+//! VBK (which of the CGB's two VRAM banks the CPU sees) and OPRI (how the CGB orders overlapping
+//! objects), and how OAM DMA and STOP mode cut the PPU itself off from memory.
 
 use crate::gpu::{
     DOTS_PER_LINE, DOUBLE_SPEED_VRAM_BLOCK_DOT, DRAWING_START_DOT, DmaOamWrite,
@@ -225,6 +226,7 @@ impl Gpu {
         self.pending_dma_oam_write = Some(DmaOamWrite { index, value });
     }
 
+    /// Writes the byte OAM DMA copied last into OAM, if one is still waiting.
     pub(super) fn apply_dma_oam_write(&mut self) {
         if let Some(write) = self.pending_dma_oam_write.take() {
             self.object_attribute_memory[usize::from(write.index)] = write.value;

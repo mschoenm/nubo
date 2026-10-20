@@ -42,7 +42,9 @@ pub(crate) struct Palettes {
     obp0: u8,
     /// OBP1 (0xFF49): DMG object palette 1.
     obp1: u8,
+    /// CGB background palette RAM: eight palettes of four little-endian RGB555 colors.
     bg_palette_ram: [u8; CGB_PALETTE_RAM_SIZE],
+    /// CGB object palette RAM, laid out like `bg_palette_ram`.
     object_palette_ram: [u8; CGB_PALETTE_RAM_SIZE],
     /// BCPS (0xFF68): bits 0-5 select a byte of background palette RAM, bit 7 enables
     /// auto-increment after each BCPD write.
@@ -67,13 +69,15 @@ fn object_shade(palette: u8, color_id: u8) -> Option<u8> {
     (color_id != 0).then(|| bg_shade(palette, color_id))
 }
 
+/// The number of a color in CGB palette RAM: palette number * 4 + color ID.
+fn color_number(palette_number: u8, color_id: u8) -> usize {
+    usize::from(palette_number) * COLORS_PER_PALETTE + usize::from(color_id)
+}
+
 /// Reads the little-endian RGB555 color for a palette number and color ID from CGB palette RAM.
 #[cfg(test)]
 fn read_rgb555(palette_ram: &[u8; CGB_PALETTE_RAM_SIZE], palette_number: u8, color_id: u8) -> u16 {
-    color_rgb555(
-        palette_ram,
-        usize::from(palette_number) * COLORS_PER_PALETTE + usize::from(color_id),
-    )
+    color_rgb555(palette_ram, color_number(palette_number, color_id))
 }
 
 /// Reads color number `color` (palette number * 4 + color ID) from CGB palette RAM.
@@ -100,6 +104,12 @@ fn write_palette_ram(
     palette_ram[index] = value;
     let color = index / BYTES_PER_RGB555_COLOR;
     colors[color] = rgb555_to_rgba(color_rgb555(palette_ram, color));
+    advance_palette_index(index_register);
+}
+
+/// Moves a BCPS/OCPS index register on to the next byte after a BCPD/OCPD write, when its
+/// auto-increment bit is set. The write counts even when the PPU blocked it.
+fn advance_palette_index(index_register: &mut u8) {
     if is_bit_set(*index_register, AUTO_INCREMENT_BIT) {
         *index_register = index_register.wrapping_add(1) | 0x80;
     }
@@ -265,7 +275,7 @@ impl Palettes {
         } else {
             color_id
         };
-        self.bg_colors[usize::from(palette_number) * COLORS_PER_PALETTE + usize::from(color_index)]
+        self.bg_colors[color_number(palette_number, color_index)]
     }
 
     /// The color of an object pixel on CGB hardware, or `None` when the pixel is transparent. In
@@ -284,10 +294,7 @@ impl Palettes {
         } else {
             color_id
         };
-        Some(
-            self.object_colors
-                [usize::from(palette_number) * COLORS_PER_PALETTE + usize::from(color_index)],
-        )
+        Some(self.object_colors[color_number(palette_number, color_index)])
     }
 
     /// Reads BCPD (0xFF69): the background palette RAM byte selected by BCPS.
@@ -314,16 +321,12 @@ impl Palettes {
     /// A BCPD write while the PPU blocks palette RAM: the byte is lost but the index still
     /// increments.
     pub(crate) fn skip_cgb_bcpd_write(&mut self) {
-        if is_bit_set(self.cgb_bcps, AUTO_INCREMENT_BIT) {
-            self.cgb_bcps = self.cgb_bcps.wrapping_add(1) | 0x80;
-        }
+        advance_palette_index(&mut self.cgb_bcps);
     }
 
     /// An OCPD write while the PPU blocks palette RAM.
     pub(crate) fn skip_cgb_ocpd_write(&mut self) {
-        if is_bit_set(self.cgb_ocps, AUTO_INCREMENT_BIT) {
-            self.cgb_ocps = self.cgb_ocps.wrapping_add(1) | 0x80;
-        }
+        advance_palette_index(&mut self.cgb_ocps);
     }
 
     /// Reads OCPD (0xFF6B): the object palette RAM byte selected by OCPS.
