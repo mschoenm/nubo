@@ -12,25 +12,25 @@ use crate::model::Model;
 /// On DMG, OAM writes are ignored from this dot of OAM scan (SameBoy).
 const DMG_OAM_WRITE_BLOCK_DOT: u16 = 4;
 /// In double speed OAM reads are still allowed at dot 0 of a line, where writes are already
-/// ignored, except on CGB-E and newer (Gambatte's oam_access preread and prewrite _ds tests;
+/// ignored, except on CGB-E and newer (Gambatte's `oam_access` preread and prewrite `_ds` tests;
 /// AGE's oam-read tests).
 const DOUBLE_SPEED_OAM_READ_BLOCK_DOT: u16 = 1;
 /// The dot of OAM scan from which CPU writes to OAM are ignored on CGB: from the start of the line
-/// (SameBoy; AGE's oam-write test; Gambatte's oam_access tests at both speeds). On DMG it's
+/// (SameBoy; AGE's oam-write test; Gambatte's `oam_access` tests at both speeds). On DMG it's
 /// `DMG_OAM_WRITE_BLOCK_DOT`.
 const CGB_OAM_WRITE_BLOCK_DOT: u16 = 0;
 /// The first line after the LCD is switched on has no OAM scan, but OAM writes are already
 /// ignored two dots before mode 3 (SameBoy; AGE's oam-write test).
 const FIRST_LINE_OAM_WRITE_BLOCK_DOT: u16 = DRAWING_START_DOT - 2;
 /// On CGB at normal speed the CPU can't reach VRAM from this dot of OAM scan, just before mode 3
-/// (fitted to Gambatte's vram_m3 and late_gdma tests); the DMG's reads are blocked from the end of
+/// (fitted to Gambatte's `vram_m3` and `late_gdma` tests); the DMG's reads are blocked from the end of
 /// OAM scan.
 const CGB_VRAM_BLOCK_DOT: u16 = 83;
 
 impl Gpu {
     /// Whether the line was just drawn but STAT still shows mode 3, which happens for a dot in
     /// double speed. OAM and VRAM stay blocked until STAT changes (SameBoy; AGE's vram-read test,
-    /// Gambatte's vram_m3 and vramw_m3end _ds tests).
+    /// Gambatte's `vram_m3` and `vramw_m3end` `_ds` tests).
     fn drawing_just_ended(&self) -> bool {
         self.line_state == LineState::HBlank && self.visible_mode == VRAM_MODE
     }
@@ -159,34 +159,26 @@ impl Gpu {
         self.object_attribute_memory[index as usize] = value;
     }
 
-    /// Reads VBK. Unused bits read as 1, and the whole register reads 0xFF on DMG.
+    /// Reads VBK; unused bits read as 1. On a DMG the address bus answers 0xFF without asking
+    /// the PPU.
     pub(super) fn cgb_vbk(&self) -> u8 {
-        if self.is_cgb() {
-            self.cgb_vbk | 0b1111_1110
-        } else {
-            0xFF
-        }
+        self.cgb_vbk | 0b1111_1110
     }
 
+    /// Writes VBK. On a DMG the address bus drops the write before it reaches the PPU.
     pub(super) fn set_cgb_vbk(&mut self, value: u8) {
-        if self.is_cgb() {
-            self.cgb_vbk = value;
-        }
+        self.cgb_vbk = value;
     }
 
-    /// Reads OPRI. Unused bits read as 1, and the whole register reads 0xFF on DMG.
+    /// Reads OPRI; unused bits read as 1. On a DMG the address bus answers 0xFF without asking
+    /// the PPU.
     pub(super) fn cgb_opri(&self) -> u8 {
-        if self.is_cgb() {
-            self.cgb_opri | 0b1111_1110
-        } else {
-            0xFF
-        }
+        self.cgb_opri | 0b1111_1110
     }
 
+    /// Writes OPRI. On a DMG the address bus drops the write before it reaches the PPU.
     pub(super) fn set_cgb_opri(&mut self, value: u8) {
-        if self.is_cgb() {
-            self.cgb_opri = value & 0b1;
-        }
+        self.cgb_opri = value & 0b1;
     }
 
     /// Whether OAM DMA leaves the PPU's OAM reads alone and has nothing left to apply, so that
@@ -237,7 +229,7 @@ impl Gpu {
     /// white frame is due when the next vblank would have started. The CGB's PPU keeps running
     /// but loses access to whatever the CPU could access at that moment (SameBoy), so STOP
     /// outside mode 3 turns the screen black while STOP in mode 3 leaves the picture alone
-    /// (daid's stop_instr tests).
+    /// (daid's `stop_instr` tests).
     pub(crate) fn enter_stop_mode(&mut self) {
         self.stopped = true;
         if self.is_cgb() {
