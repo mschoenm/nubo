@@ -2279,9 +2279,9 @@ checksum = "7f66e8d5d03f609abc3a39e6f08e4164ebf1447a732906d39eb9b99b7919ef39"
 
 [[package]]
 name = "lucide-icons"
-version = "1.57.0"
+version = "1.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e926a2ffc8cda3ffb6689b0c362cd9e3ded16da82a487c5f4cb9de07e1a8bf96"
+checksum = "5b08b584045b897f3a00f1b4622c1f2db1ba672e9501582357c6a7e46c2ba7bc"
 
 [[package]]
 name = "mach2"
@@ -5736,9 +5736,9 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "9.0.4"
+version = "9.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a954114b47a54df49f83d2722814e86b23d4bb1b54a1b90fb7d92b41619ddc22"
+checksum = "6e04976da629d3b04204ba8105b396a193af8ad2583b2c79bfb3ab8af580a11e"
 dependencies = [
  "crc32fast",
  "flate2",
