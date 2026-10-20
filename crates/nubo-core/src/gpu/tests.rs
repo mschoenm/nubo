@@ -224,22 +224,6 @@ fn should_ignore_all_bits_other_than_bit_0_when_getting_cgb_vbk() {
 }
 
 #[test]
-fn should_not_set_cgb_vbk_if_dmg_mode() {
-    let mut gpu = initialize_test_gpu();
-    gpu.set_model(Model::Dmg);
-    gpu.set_cgb_vbk(1);
-    assert_eq!(gpu.cgb_vbk, 0);
-}
-
-#[test]
-fn should_return_ff_when_getting_cgb_vbk_if_dmg_mode() {
-    let mut gpu = initialize_test_gpu();
-    gpu.set_model(Model::Dmg);
-    gpu.set_cgb_vbk(0);
-    assert_eq!(gpu.cgb_vbk(), 0xFF);
-}
-
-#[test]
 fn should_read_from_bank_1_of_video_ram() {
     let mut gpu = initialize_test_gpu();
     gpu.set_model(Model::CgbE);

@@ -491,6 +491,16 @@ fn address_bus_with_model(model: Model) -> AddressBus {
 }
 
 #[test]
+fn ignores_vbk_and_opri_on_dmg() {
+    let mut address_bus = address_bus_with_model(Model::Dmg);
+    address_bus.poke(0xFF4F, 0x01);
+    address_bus.poke(0xFF6C, 0x01);
+
+    assert_eq!(address_bus.peek(0xFF4F), 0xFF);
+    assert_eq!(address_bus.peek(0xFF6C), 0xFF);
+}
+
+#[test]
 fn reads_zero_from_unusable_oam_on_dmg() {
     let mut address_bus = address_bus_with_model(Model::Dmg);
     address_bus.poke(0xFEA5, 0x12);

@@ -159,34 +159,26 @@ impl Gpu {
         self.object_attribute_memory[index as usize] = value;
     }
 
-    /// Reads VBK. Unused bits read as 1, and the whole register reads 0xFF on DMG.
+    /// Reads VBK; unused bits read as 1. On a DMG the address bus answers 0xFF without asking
+    /// the PPU.
     pub(super) fn cgb_vbk(&self) -> u8 {
-        if self.is_cgb() {
-            self.cgb_vbk | 0b1111_1110
-        } else {
-            0xFF
-        }
+        self.cgb_vbk | 0b1111_1110
     }
 
+    /// Writes VBK. On a DMG the address bus drops the write before it reaches the PPU.
     pub(super) fn set_cgb_vbk(&mut self, value: u8) {
-        if self.is_cgb() {
-            self.cgb_vbk = value;
-        }
+        self.cgb_vbk = value;
     }
 
-    /// Reads OPRI. Unused bits read as 1, and the whole register reads 0xFF on DMG.
+    /// Reads OPRI; unused bits read as 1. On a DMG the address bus answers 0xFF without asking
+    /// the PPU.
     pub(super) fn cgb_opri(&self) -> u8 {
-        if self.is_cgb() {
-            self.cgb_opri | 0b1111_1110
-        } else {
-            0xFF
-        }
+        self.cgb_opri | 0b1111_1110
     }
 
+    /// Writes OPRI. On a DMG the address bus drops the write before it reaches the PPU.
     pub(super) fn set_cgb_opri(&mut self, value: u8) {
-        if self.is_cgb() {
-            self.cgb_opri = value & 0b1;
-        }
+        self.cgb_opri = value & 0b1;
     }
 
     /// Whether OAM DMA leaves the PPU's OAM reads alone and has nothing left to apply, so that
