@@ -15,19 +15,16 @@ use crate::gpu::{Gpu, NO_OAM_SCAN_ROW};
 use crate::model::Model;
 use std::ops::Range;
 
-/// The secondary and row-aligned read corruptions only happen while the PPU reads OAM below this
-/// byte offset (SameBoy).
-const CORRUPTION_ROW_LIMIT: usize = 0x98;
 /// The corruption mixes and copies OAM in rows of eight bytes (two objects).
 const OAM_ROW_SIZE: usize = 8;
 
 impl Gpu {
     /// Whether an access can corrupt OAM right now: the PPU must be scanning OAM on DMG-family
-    /// hardware, at or past `min_row` and not in the first row.
+    /// hardware, at or past byte offset `min_row` (callers pass at least 8, so never in the first
+    /// row).
     fn oam_bug_applies(&self, min_row: usize) -> bool {
         !self.is_cgb()
             && self.oam_scan_row != NO_OAM_SCAN_ROW
-            && self.oam_scan_row >= 8
             && (self.oam_scan_row as usize) >= min_row
             && (self.oam_scan_row as usize) + 7 < self.object_attribute_memory.len()
     }
@@ -79,6 +76,8 @@ impl Gpu {
         }
 
         let row = self.oam_scan_row as usize;
+        // SameBoy limits the first two cases to offsets below 0x98, but the last row, 0x98, always
+        // takes the third.
         match row & 0x18 {
             0x10 => self.secondary_read_corruption(row),
             0x00 => self.row_aligned_read_corruption(row),
@@ -102,9 +101,6 @@ impl Gpu {
     /// The read corruption when the PPU's byte offset has `row & 0x18 == 0x10`, which also
     /// overwrites the eight bytes 16 before it.
     fn secondary_read_corruption(&mut self, row: usize) {
-        if row >= CORRUPTION_ROW_LIMIT {
-            return;
-        }
         let corrupted = glitch_read_secondary(
             self.read_oam_word(row - 16),
             self.read_oam_word(row - 8),
@@ -119,9 +115,6 @@ impl Gpu {
     /// up to 32 bytes before it, also overwrites the eight bytes 16 and 32 before it, and differs
     /// between DMG, MGB and SGB2.
     fn row_aligned_read_corruption(&mut self, row: usize) {
-        if row >= CORRUPTION_ROW_LIMIT {
-            return;
-        }
         let corrupted = if self.model == Model::Mgb {
             self.tertiary_read_glitch(row, glitch_tertiary_read_3)
         } else if row == 0x40 {
