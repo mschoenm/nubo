@@ -85,7 +85,16 @@ These keep Nubo exact, players' saves safe and the code free to share. Never bre
 - **Merging waits for the maintainer's go**, then follows the `merge` skill.
 - **Say what a number is.** When you name a pull request or an issue by its number in a chat message to the maintainer, or in a report such as the nightly review's pull request and comments or a full review's report, add one or two words saying what it is: "#194 (triage setup)", "#156 (MBC3 clock)". Elsewhere on GitHub a bare number is fine, since GitHub shows the title.
 
-## Skills
+## Sessions
+
+Most work runs in Claude Code sessions in the cloud, each on a fresh clone of this repository: what isn't pushed doesn't exist for the next session. In a session with the maintainer (the nightly review and the issue-triage routine follow their own docs):
+
+- **One task per session.** When the maintainer starts an unrelated topic, suggest a new session for it; they decide.
+- **Speak up only when it matters.** Every message reaches the maintainer as a notification: write when something is merged, when you are stuck or when you need a decision, not about routine steps such as a wait on CI.
+- **End every turn with a status line**, the last line of the message, starting with `**Status:**`: the work and where it stands, background tasks or subagents still running (or none), and whether the working tree is clean. Example: `**Status:** #156 (MBC3 clock) open, CI green, waiting on the go to merge · no background tasks · tree clean`.
+- **Keep late results apart.** When a background task or subagent reports back after the conversation has moved on, say so in a message of its own: which task it belongs to, what came out, and whether anything now needs a commit or a merge.
+
+## Skills and Agent Files
 
 Some tasks have steps of their own, in `.claude/skills/`. Follow the skill whenever its task comes up:
 
@@ -95,15 +104,17 @@ Some tasks have steps of their own, in `.claude/skills/`. Follow the skill whene
 - `issue-triage`: working on the issue-triage page, or setting its page or routine up again.
 - `full-review`: a full review of the repository, only when the maintainer asks for one, never on your own.
 
+Claude Code and Codex both read these `AGENTS.md` files; keep them the only instruction files. Claude Code stops reading `AGENTS.md` as soon as a `CLAUDE.md` or `CLAUDE.local.md` exists in its working directory or above, so don't add one. Codex finds the skills through pointers in `.agents/skills/`: change a skill's steps only in `.claude/skills/`, and keep each skill's `name` and `description` the same in both places.
+
 ## Where Things Are
 
 The root `Cargo.toml` is a virtual workspace whose default members are `nubo-core` and `nubo-serializable-derive`, so `cargo build` and `cargo test` don't build the apps, the tools or xtask. Libraries are in `crates/`, apps players use in `frontends/`, developer programs in `tools/`. Every package's name starts with `nubo` (except `xtask`), and every crate's folder is named after its package.
 
 - `crates/nubo-core/` (`AGENTS.md`): the emulator, a plain library with no platform dependencies. `Emulator` in `emulator.rs` is its API.
-- `crates/nubo-frontend/` (`AGENTS.md`): everything an app needs that isn't drawing, without a UI toolkit: what it keeps between runs (settings, controls, battery saves, save states, cheats, screenshots), the game library, running a game with its sound (`session`), game controllers (`gamepads`), and what the RetroArch core shares with the app. Its features `desktop`, `web` and `gamepads` bring each platform's storage, sound and controllers.
+- `crates/nubo-frontend/` (`AGENTS.md`): everything an app needs besides drawing, without a UI toolkit: settings, saves, the game library, running a game with its sound, game controllers, and what the RetroArch core shares with the app.
 - `crates/nubo-serializable-derive/`: the derive macro behind save states.
-- `crates/nubo-logo/`: the logo, drawn from rounded rectangles, for the app, its icons and installers, and in `nubo-core` for the Super Game Boy's intro, attraction mode and Nubo border.
-- `crates/nubo-download/`: downloading test data over HTTPS and checking its SHA-256 checksums, shared by the test ROM runner, the CPU test runner and xtask.
+- `crates/nubo-logo/`: the logo, drawn in code, for the app, its icons and installers, and the Super Game Boy screens in `nubo-core`.
+- `crates/nubo-download/`: downloads test data and checks its checksums, for the tools and xtask.
 - `frontends/nubo/` (`AGENTS.md`): the app, desktop and browser.
 - `frontends/nubo-libretro/` (`AGENTS.md`): the RetroArch (libretro) core, a dynamic library; `cargo xtask libretro` packages it.
 - `tools/nubo-test-rom-runner/` (`AGENTS.md`): `cargo test-roms`.
@@ -114,11 +125,7 @@ The root `Cargo.toml` is a virtual workspace whose default members are `nubo-cor
 - `xtask/` (`AGENTS.md`): the web build, packaging, licenses, the emulator comparison, the nightly review's tools and the screenshots.
 - `.github/shootout/` (`AGENTS.md`): Nubo's class in the GB Emulator Shootout's harness, kept the same as the Shootout's copy.
 - `fuzz/` (`AGENTS.md`): the fuzz targets of the full review, outside the Cargo workspace, on the nightly toolchain.
-- `images/`: the logo and the screenshots; `images/scenes/` holds the scenes the screenshots are made from (`nubo_frontend::scenes`), with `games.toml`, the games they may use, and `images/screenshots.toml` lists the screenshots.
-
-## Agent Instructions
-
-Claude Code and Codex both read these `AGENTS.md` files; keep them the only instruction files. Claude Code stops reading `AGENTS.md` as soon as a `CLAUDE.md` or `CLAUDE.local.md` exists in its working directory or above, so don't add one. The skills are written in `.claude/skills/`, where Claude Code reads them; `.agents/skills/` holds pointers to them for Codex, so change the steps only in `.claude/skills/`. Each skill's `name` and `description` appear in both places; keep them the same.
+- `images/`: the logo and the screenshots (listed in `images/screenshots.toml`), with the scenes they are made from in `images/scenes/`.
 
 ## More Documentation
 
