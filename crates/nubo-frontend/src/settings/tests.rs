@@ -315,11 +315,15 @@ fn the_raw_screen_is_the_look_with_every_effect_off() {
 }
 
 #[test]
-fn a_reset_keeps_only_the_folders_unless_asked_and_asks_the_questions_again() {
+fn a_reset_keeps_only_the_folders_unless_asked_and_the_controls_and_asks_the_questions_again() {
     let folders = vec![LibraryFolder {
         path: PathBuf::from("/games/gb"),
         include_subfolders: false,
     }];
+    let controls = Controls {
+        menu_buttons: crate::controls::MenuButtons::Xbox,
+        ..Controls::default()
+    };
     let settings = Settings {
         model: ModelPreference::Fixed(Model::CgbC),
         library_folders: folders.clone(),
@@ -327,6 +331,7 @@ fn a_reset_keeps_only_the_folders_unless_asked_and_asks_the_questions_again() {
         box_art_asked: true,
         check_for_updates: Some(true),
         volume: 0.5,
+        controls: controls.clone(),
         controls_revision: 1,
         dmg_palette: DmgPalette::Pocket,
         ..Settings::default()
@@ -338,6 +343,7 @@ fn a_reset_keeps_only_the_folders_unless_asked_and_asks_the_questions_again() {
         reset,
         Settings {
             library_folders: folders,
+            controls,
             controls_revision: 1,
             ..Settings::default()
         }

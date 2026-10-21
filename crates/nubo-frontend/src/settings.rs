@@ -172,11 +172,11 @@ impl Default for Settings {
 
 impl Settings {
     /// These settings put back to how they start, as "Start over" leaves
-    /// them: the library folders stay unless `remove_folders`, and
-    /// so does `controls_revision`, since the default controls already have
-    /// every action. The questions about box art and new versions count as
-    /// unanswered again, so nothing is downloaded until the player answers
-    /// them.
+    /// them: the library folders stay unless `remove_folders`, and the
+    /// controls stay with their `controls_revision`, since "Start over"
+    /// resets them only when the player ticks that separately. The
+    /// questions about box art and new versions count as unanswered again,
+    /// so nothing is downloaded until the player answers them.
     #[must_use]
     pub fn reset(&self, remove_folders: bool) -> Settings {
         Settings {
@@ -185,6 +185,7 @@ impl Settings {
             } else {
                 self.library_folders.clone()
             },
+            controls: self.controls.clone(),
             controls_revision: self.controls_revision,
             ..Settings::default()
         }
