@@ -23,8 +23,8 @@
 //! screenshots differ, and leaves the new pictures and their differences in
 //! `target/screenshots/check/`.
 //!
-//! It runs on Linux only, with GNOME Shell, Xwayland, xdotool and D-Bus's
-//! tools installed (it prints the `apt` line when they aren't), as root in
+//! It runs on Linux only, with GNOME Shell, Xwayland, xdotool, D-Bus's
+//! tools and the desktop portal installed (it prints the `apt` line when they aren't), as root in
 //! a container such as a cloud session or as a user on a Linux desktop.
 
 use crate::{Result, cargo, run, target_dir, workspace_root};

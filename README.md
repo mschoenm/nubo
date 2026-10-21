@@ -221,7 +221,7 @@ The work on Nubo's speed drew on ideas from other emulators. [Clean-room reports
 <details>
 <summary><strong>The fonts, icons, box art and the games in the screenshots</strong></summary>
 
-- [Fira Sans](https://github.com/mozilla/Fira): the web version's font, bundled by Iced (SIL Open Font License; see [NOTICE](NOTICE)). The desktop app uses the system's own font.
+- [Fira Sans](https://github.com/mozilla/Fira): the web version's font, bundled by Iced (SIL Open Font License; see [NOTICE](NOTICE)). The desktop app uses the system's own font; on Linux, the one picked for the desktop.
 - The [libretro thumbnail collection](https://github.com/libretro-thumbnails/libretro-thumbnails) and the No-Intro game lists of the [libretro database](https://github.com/libretro/libretro-database): the box art the desktop app can download.
 - [Lucide](https://lucide.dev): the app's icons, on the desktop and in the browser (ISC License, see [NOTICE](NOTICE)).
 - [libretro.h](https://github.com/libretro/libretro-common) by the RetroArch team: the libretro API the RetroArch core's bindings are written from (MIT License, see [NOTICE](NOTICE)). [SameBoy's libretro core](https://github.com/LIJI32/SameBoy) and [rcheevos](https://github.com/RetroAchievements/rcheevos) showed how a Game Boy core lays out its memory for RetroAchievements.

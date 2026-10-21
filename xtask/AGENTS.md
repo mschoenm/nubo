@@ -1,6 +1,6 @@
 # xtask
 
-Project tasks written in Rust, run as `cargo xtask <task>`. Each task's module docs explain it; `cargo xtask help` lists the tasks and `cargo xtask <task> --help` a task's options, read with clap (`Task` in `main.rs`, and the options' types in the tasks' modules). Only Rust is needed, except for the packaging tasks (their platform's tools), `compare-emulators` (git, a C/C++ compiler, make, RGBDS and CMake; Linux and macOS) and `screenshots` (GNOME Shell, Xwayland, xdotool and D-Bus's tools; Linux).
+Project tasks written in Rust, run as `cargo xtask <task>`. Each task's module docs explain it; `cargo xtask help` lists the tasks and `cargo xtask <task> --help` a task's options, read with clap (`Task` in `main.rs`, and the options' types in the tasks' modules). Only Rust is needed, except for the packaging tasks (their platform's tools), `compare-emulators` (git, a C/C++ compiler, make, RGBDS and CMake; Linux and macOS) and `screenshots` (GNOME Shell, Xwayland, xdotool, D-Bus's tools and the desktop portal; Linux).
 
 ```bash
 # Web version (the Iced app built for the browser)
@@ -30,7 +30,7 @@ cargo xtask review-units next --state rotation.json --date <YYYY-MM-DD> --commit
 cargo xtask metrics append metrics.jsonl night.json   # Add a night's measurements to the log
 cargo xtask metrics report metrics.jsonl   # Write the Nightly metrics wiki page from the log
 
-# Screenshots (docs/SCREENSHOTS_PLAN.md; Linux, with GNOME Shell, Xwayland, xdotool and D-Bus's tools)
+# Screenshots (docs/SCREENSHOTS_PLAN.md; Linux, with GNOME Shell, Xwayland, xdotool, D-Bus's tools and the desktop portal)
 cargo xtask screenshots [filter]  # Make the screenshots images/screenshots.toml lists from their scenes in a headless GNOME Shell
 cargo xtask screenshots --check   # Write nothing: say which differ, with the new pictures and their differences in target/screenshots/check/
 cargo xtask scene explore <game | scene> --script "wait 5s; press start; mark" [--every 2s] [--model sgb2]   # Candidate scenes and a contact sheet in target/scenes/

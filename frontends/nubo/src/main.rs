@@ -131,6 +131,8 @@ fn launch(
     window: iced::window::Settings,
     boot: impl Fn() -> (App, iced::Task<app::Message>) + 'static,
 ) -> iced::Result {
+    #[cfg(not(target_arch = "wasm32"))]
+    ui::theme::use_desktop_font();
     iced::application(boot, App::update, App::view)
         .title(App::title)
         .subscription(App::subscription)

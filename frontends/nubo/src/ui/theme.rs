@@ -9,9 +9,10 @@ use iced::widget::{button, container, text, text_input};
 use iced::{Background, Border, Color, Font, Shadow, Theme, Vector};
 use std::sync::LazyLock;
 
-/// The font for body text. The desktop build uses the system's sans-serif
-/// font. The browser has no system fonts, so the browser build bundles Fira
-/// Sans and has to ask for it by name.
+/// The font for body text. The desktop build uses the sans-serif font,
+/// which on Linux `use_desktop_font` makes the desktop's own. The browser
+/// has no system fonts, so the browser build bundles Fira Sans and has to
+/// ask for it by name.
 pub const BODY_FONT: Font = if cfg!(target_arch = "wasm32") {
     Font::with_name("Fira Sans")
 } else {
@@ -28,6 +29,34 @@ pub const HEADING_FONT: Font = if cfg!(target_arch = "wasm32") {
         ..Font::DEFAULT
     }
 };
+
+/// Makes the font the player picked for their desktop the sans-serif font
+/// that [`BODY_FONT`] and [`HEADING_FONT`] draw in, when the desktop names
+/// one (on Linux, see `nubo_frontend::desktop_font`) and it is installed.
+/// Without it, Iced's text library ignores the desktop and takes the first
+/// font of a list of its own (Open Sans, Noto Sans, DejaVu Sans and so on).
+/// It runs before the app draws any text.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn use_desktop_font() {
+    let families = nubo_frontend::desktop_font::families();
+    if families.is_empty() {
+        return;
+    }
+    let Ok(mut font_system) = iced::advanced::graphics::text::font_system().write() else {
+        return;
+    };
+    let database = font_system.raw().db_mut();
+    let installed = families.iter().find_map(|family| {
+        database
+            .faces()
+            .flat_map(|face| &face.families)
+            .find(|(name, _)| name.eq_ignore_ascii_case(family))
+            .map(|(name, _)| name.clone())
+    });
+    if let Some(family) = installed {
+        database.set_sans_serif_family(family);
+    }
+}
 
 const CORNER_RADIUS: f32 = 8.0;
 const PANEL_CORNER_RADIUS: f32 = 14.0;
