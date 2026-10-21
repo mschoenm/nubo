@@ -355,7 +355,8 @@ impl Gpu {
         if self.timing == TimingVariant::Cgb && self.lcd_enabled() {
             // The comparison picks LYC up every `CGB_LYC_WRITE_DELAY_DOTS` dots of the line, at
             // the next pickup after the write (a full period later when the write lands on one).
-            let delay = CGB_LYC_WRITE_DELAY_DOTS - (self.line_dot % 4) as u8;
+            let delay = CGB_LYC_WRITE_DELAY_DOTS
+                - (self.line_dot % u16::from(CGB_LYC_WRITE_DELAY_DOTS)) as u8;
             if self.lyc_flag
                 && self.line < LAST_LINE
                 && self.line_dot >= DOTS_PER_LINE - CGB_LYC_NEXT_LINE_DOTS
