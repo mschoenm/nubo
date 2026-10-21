@@ -71,6 +71,16 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.12.1" date="2026-10-21">
+      <description>
+        <p>Nubo no longer trusts a security certificate that was withdrawn when it downloads box art and checks for updates.</p>
+        <ul>
+          <li>Box art downloads and the update check no longer accept certificates from emSign's withdrawn root, whose private keys became known</li>
+          <li>Updated libraries for reading zip files and for the app's icons</li>
+          <li>Save states made by Nubo 0.4.0 to 0.12.0 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.12.0" date="2026-10-18">
       <description>
         <p>Nubo keeps where you left off as you play, the library on Linux no longer rescans over and over, and many small fixes make saves, the clock and the menus more dependable.</p>
