@@ -66,7 +66,7 @@ When the triage session was archived, the routine starts a new session in its pl
 
 A `start` request holds the issue the maintainer tapped Start on and their note for it. It is the maintainer's choice, made under the request this file describes, so act on it. Only act on numbers that are open issues of `mschoenm/nubo`; each note is the maintainer's own instruction for that issue.
 
-Each session is named after its issue, so the maintainer sees in their sidebar what it works on: `Nubo #<n> (<two or three words>)`, such as `Nubo #156 (MBC3-klok)`, and `Nubo #<n> (<words>) · PR #<pr>` once its pull request is open. Issues that share a session are named together: `Nubo #152 #190 (dialogen bij start)`.
+Each session is named after its issue, so the maintainer sees in their sidebar what it works on: `Nubo issue #<n> (<two or three words>)`, such as `Nubo issue #156 (MBC3-klok)`, and `Nubo issue #<n> (<words>) · PR #<pr>` once its pull request is open. As in AGENTS.md's "Say what a number is", "issue" and "PR" before each number keep the two apart. Issues that share a session are named together: `Nubo issues #152 #190 (dialogen bij start)`.
 
 For each issue in a `start` request:
 
