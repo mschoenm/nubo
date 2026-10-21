@@ -324,8 +324,8 @@ job built: the file a release publishes and the Shootout downloads. It copies th
 class and its `EMULATOR_SPECS` entry, measures the startup time and runs every test. It fails unless
 every Shootout test in `passing.txt` passes there too, counting a test that crashed or never opened a
 window as failed, and keeps `nubo.json` (with each test's last screenshot), the startup measurement and
-the log as its artifact. Pull requests that change the workflow or the class, and runs started by hand
-from the Actions tab, build their own zip with the Windows workflow.
+the log as its artifact. Runs started by hand from the Actions tab build their own zip with the Windows
+workflow; pull requests don't run it.
 
 The first CI run, on 2026-10-14 with a build of `main` before 0.7.0, matched the run above: all 261
 tests passed in about 4.5 minutes, `which.gb` ran to its deadline on both models, and
