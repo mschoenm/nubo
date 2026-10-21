@@ -208,7 +208,7 @@ impl App {
     /// Starts over with what `choices` ticks, as far as this build and run
     /// offer it (see `App::reset_offers`): puts every setting back to how
     /// it started (see `Settings::reset`) and forgets the model picked for
-    /// each game, removes the library folders, clears "Continue playing" and
+    /// each game, puts the controls back, removes the library folders, clears "Continue playing" and
     /// deletes the saves. Saves are deleted in the background, which can
     /// take a while with many games (see `SettingsMessage::SavesDeleted`).
     /// Unless something was deleted, the toast that says what was done
@@ -223,6 +223,9 @@ impl App {
         let mut done = Vec::new();
         if choices.reset_settings {
             done.push("settings reset");
+        }
+        if choices.reset_controls {
+            done.push("controls reset");
         }
         if self.keeps_library()
             && (choices.reset_settings || choices.clear_recently_played)
@@ -247,13 +250,16 @@ impl App {
             });
         }
 
-        if choices.reset_settings || choices.remove_folders {
+        if choices.reset_settings || choices.reset_controls || choices.remove_folders {
             let mut settings = if choices.reset_settings {
                 self.model_override = None;
                 self.settings.reset(false)
             } else {
                 self.settings.clone()
             };
+            if choices.reset_controls {
+                settings.shared.controls = Controls::default();
+            }
             if choices.remove_folders {
                 settings.shared.library_folders.clear();
             }

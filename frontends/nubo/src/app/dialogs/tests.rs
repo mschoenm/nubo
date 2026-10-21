@@ -31,14 +31,20 @@ fn starting_over_ticks_only_the_settings_and_puts_the_boxes_above_the_buttons() 
     let content = reset_question(ResetChoices::default(), EVERYTHING);
 
     let first_button = content.choices.iter().position(|choice| !choice.checkbox);
-    assert_eq!(first_button, Some(5));
-    assert_eq!(labels(&content).0[0], "Reset settings");
+    assert_eq!(first_button, Some(6));
+    assert_eq!(
+        labels(&content).0[..2],
+        ["Reset settings", "Reset controls"]
+    );
     let ticked: Vec<bool> = content
         .choices
         .iter()
         .map(|choice| choice.checked)
         .collect();
-    assert_eq!(ticked, [true, false, false, false, false, false, false]);
+    assert_eq!(
+        ticked,
+        [true, false, false, false, false, false, false, false]
+    );
     assert_eq!(labels(&content).1, ["Cancel", "Reset"]);
     assert!(reset_button(&content).enabled);
     assert!(!content.notice.unwrap().warning);
@@ -58,6 +64,7 @@ fn only_what_is_offered_gets_a_box() {
         labels(&content).0,
         [
             "Reset settings",
+            "Reset controls",
             "Remove game folders",
             "Clear Continue playing"
         ]
@@ -77,18 +84,19 @@ fn an_open_game_greys_out_deleting_saves_and_says_why() {
         labels(&content).0,
         [
             "Reset settings",
+            "Reset controls",
             "Delete in-game saves",
             "Delete save states",
             "Remove game folders",
             "Clear Continue playing"
         ]
     );
-    let enabled: Vec<bool> = content.choices[..5]
+    let enabled: Vec<bool> = content.choices[..6]
         .iter()
         .map(|choice| choice.enabled)
         .collect();
-    assert_eq!(enabled, [true, false, false, true, true]);
-    for choice in &content.choices[1..3] {
+    assert_eq!(enabled, [true, true, false, false, true, true]);
+    for choice in &content.choices[2..4] {
         assert!(!choice.checked);
         assert!(
             choice
@@ -105,7 +113,7 @@ fn ticking_a_box_changes_only_its_choice() {
     let content = reset_question(ResetChoices::default(), EVERYTHING);
 
     let DialogAction::Stay(Message::Dialog(DialogMessage::ResetChoicesChanged(changed))) =
-        &content.choices[3].action
+        &content.choices[4].action
     else {
         panic!("a box should keep the dialog open and change the choices");
     };
@@ -127,7 +135,7 @@ fn deleting_saves_warns_and_names_the_button_after_it() {
 
     let content = reset_question(choices, EVERYTHING);
 
-    assert!(content.choices[1].checked);
+    assert!(content.choices[2].checked);
     assert_eq!(labels(&content).1, ["Cancel", "Reset and delete"]);
     let notice = content.notice.unwrap();
     assert!(notice.warning);
@@ -158,6 +166,22 @@ fn the_button_says_what_it_does_without_the_settings() {
 }
 
 #[test]
+fn the_controls_alone_can_be_reset() {
+    let only_controls = ResetChoices {
+        reset_settings: false,
+        reset_controls: true,
+        ..ResetChoices::default()
+    };
+
+    let content = reset_question(only_controls, EVERYTHING);
+
+    assert!(content.choices[1].checked);
+    assert_eq!(labels(&content).1, ["Cancel", "Reset"]);
+    assert!(reset_button(&content).enabled);
+    assert!(!content.notice.unwrap().warning);
+}
+
+#[test]
 fn nothing_ticked_greys_the_button_out() {
     let nothing = ResetChoices {
         reset_settings: false,
@@ -167,7 +191,7 @@ fn nothing_ticked_greys_the_button_out() {
     let content = reset_question(nothing, EVERYTHING);
 
     assert!(!reset_button(&content).enabled);
-    assert!(content.choices[..6].iter().all(|choice| choice.enabled));
+    assert!(content.choices[..7].iter().all(|choice| choice.enabled));
 }
 
 #[test]
@@ -183,7 +207,7 @@ fn a_ticked_box_no_longer_offered_deletes_nothing() {
 
     let content = reset_question(choices, offers);
 
-    assert!(!content.choices[1].checked);
+    assert!(!content.choices[2].checked);
     assert_eq!(labels(&content).1, ["Cancel", "Reset"]);
     assert!(!content.notice.unwrap().warning);
 }

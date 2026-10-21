@@ -15,7 +15,7 @@ use crate::settings::Appearance;
 use crate::views::settings::SettingsTab;
 use iced::keyboard::{self, Modifiers};
 use nubo_core::{ControllerButton, ControllerState, Emulator, Model};
-use nubo_frontend::controls::{Action, Device, KeyCode, MenuButtons, PadButton};
+use nubo_frontend::controls::{Action, Controls, Device, KeyCode, MenuButtons, PadButton};
 use nubo_frontend::gamepads::{ControllerEvent, Controllers};
 use nubo_frontend::library::{Cache, Library};
 use nubo_frontend::model::{Console, ModelPreference};
@@ -74,6 +74,35 @@ fn a_reset_asks_first_puts_the_settings_back_and_can_be_undone() {
 
     let _ = app.update(GameMessage::Undo.into());
     assert_eq!(app.settings, changed);
+}
+
+#[test]
+fn a_reset_keeps_the_controls_unless_their_box_is_ticked() {
+    let (mut app, _) = App::new(
+        None,
+        &Options {
+            fresh: true,
+            ..Options::default()
+        },
+    );
+    app.settings.shared.controls.menu_buttons = MenuButtons::Xbox;
+    let changed = app.settings.clone();
+
+    let _ = app.update(SettingsMessage::Reset(ResetChoices::default()).into());
+    assert_eq!(app.settings.shared.controls, changed.shared.controls);
+
+    let _ = app.update(
+        SettingsMessage::Reset(ResetChoices {
+            reset_settings: false,
+            reset_controls: true,
+            ..ResetChoices::default()
+        })
+        .into(),
+    );
+    assert_eq!(app.settings.shared.controls, Controls::default());
+
+    let _ = app.update(GameMessage::Undo.into());
+    assert_eq!(app.settings.shared.controls, changed.shared.controls);
 }
 
 #[test]

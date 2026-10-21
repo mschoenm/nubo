@@ -35,7 +35,7 @@ pub enum DialogKind {
     /// library, which deletes the file it keeps.
     RemoveGame(PathBuf),
     /// Asks what to start over with, ticked as so far: the settings, the
-    /// saves, the library's folders and "Continue playing".
+    /// controls, the saves, the library's folders and "Continue playing".
     ResetSettings(ResetChoices),
     /// Asks whether to continue a game on `saved`, the model its automatic
     /// save (where the player left off) was made on, or start it from the
@@ -74,9 +74,13 @@ impl DialogKind {
 /// the settings start ticked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResetChoices {
-    /// Puts every setting back to how it started and forgets the model
-    /// picked for each game.
+    /// Puts every setting but the controls back to how it started and
+    /// forgets the model picked for each game.
     pub reset_settings: bool,
+    /// Puts the keys and controller buttons back to how they started, apart
+    /// from the other settings, since players who set up their controls
+    /// rarely want to do it again.
+    pub reset_controls: bool,
     /// Deletes every game's battery saves: the progress games save
     /// themselves.
     pub delete_battery_saves: bool,
@@ -93,6 +97,7 @@ impl Default for ResetChoices {
     fn default() -> Self {
         ResetChoices {
             reset_settings: true,
+            reset_controls: false,
             delete_battery_saves: false,
             delete_save_states: false,
             remove_folders: false,

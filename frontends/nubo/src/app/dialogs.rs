@@ -691,6 +691,7 @@ impl ResetChoices {
         let can_delete = offers.can_delete_saves();
         ResetChoices {
             reset_settings: self.reset_settings,
+            reset_controls: self.reset_controls,
             delete_battery_saves: self.delete_battery_saves
                 && offers.delete_battery_saves
                 && can_delete,
@@ -710,7 +711,8 @@ impl ResetChoices {
 }
 
 /// The question what to start over with: a box for the settings, ticked at
-/// first, and one for each other thing `offers` lets it reset, ticked as in
+/// first, one for the controls, unticked at first, and one for each other
+/// thing `offers` lets it reset, ticked as in
 /// `choices`. A box ticks or unticks itself with
 /// `DialogMessage::ResetChoicesChanged`. While a game is open, the boxes
 /// that delete saves are greyed out and unticked, and say to close the game
@@ -732,14 +734,24 @@ fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
         DialogAction::Stay(DialogMessage::ResetChoicesChanged(changed).into())
     };
 
-    let mut boxes = vec![Choice::checkbox(
-        "Reset settings",
-        "The theme, colors, model, controls, sound and every other setting, and the console \
-         picked for each game. Nubo asks again about box art and new versions.",
-        choices.reset_settings,
-        ChoiceStyle::Secondary,
-        toggle(|choices| choices.reset_settings = !choices.reset_settings),
-    )];
+    let mut boxes = vec![
+        Choice::checkbox(
+            "Reset settings",
+            "The theme, colors, model, sound and every other setting but the controls, and \
+             the console picked for each game. Nubo asks again about box art and new versions.",
+            choices.reset_settings,
+            ChoiceStyle::Secondary,
+            toggle(|choices| choices.reset_settings = !choices.reset_settings),
+        ),
+        Choice::checkbox(
+            "Reset controls",
+            "The keys and controller buttons for every action, and which buttons pick and go \
+             back in the menus.",
+            choices.reset_controls,
+            ChoiceStyle::Secondary,
+            toggle(|choices| choices.reset_controls = !choices.reset_controls),
+        ),
+    ];
     if offers.delete_battery_saves {
         boxes.push(
             Choice::checkbox(
@@ -809,13 +821,14 @@ fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
             warning: false,
         }
     };
-    let (icon, label) = match (effective.reset_settings, effective.deletes()) {
+    let resets = effective.reset_settings || effective.reset_controls;
+    let (icon, label) = match (resets, effective.deletes()) {
         (true, true) => (Icon::RotateCcw, "Reset and delete"),
         (true, false) => (Icon::RotateCcw, "Reset"),
         (false, true) => (Icon::Trash2, "Delete"),
         (false, false) => (Icon::Eraser, "Clear"),
     };
-    let anything = effective.reset_settings
+    let anything = resets
         || effective.deletes()
         || effective.remove_folders
         || effective.clear_recently_played;
