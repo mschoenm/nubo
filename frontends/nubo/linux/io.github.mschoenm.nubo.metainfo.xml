@@ -71,6 +71,19 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.13.0" date="2026-10-21">
+      <description>
+        <p>A new version is now one click from its download, picking a game's console is simpler, and the app uses your system's font again.</p>
+        <ul>
+          <li>When a new version is out, its button opens Nubo's new download page with the right file for your computer first, and says how to update</li>
+          <li>A game's menu has Console instead of Which Game Boy: all consoles on one page, the one the game was made for marked, revisions unfolded under their console, and Undo after you pick</li>
+          <li>Start over keeps your keys and controller buttons unless you tick Reset controls, which can also reset only the controls</li>
+          <li>The desktop app draws its text in your system's font again, on Linux the font you picked for your desktop</li>
+          <li>The About tab is more compact</li>
+          <li>Save states made by Nubo 0.4.0 to 0.12.1 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.12.1" date="2026-10-21">
       <description>
         <p>Nubo no longer trusts a security certificate that was withdrawn when it downloads box art and checks for updates.</p>
