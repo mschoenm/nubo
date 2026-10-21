@@ -25,6 +25,7 @@ pub fn families() -> Vec<String> {
 /// KDE with its size and other numbers after commas (`Noto Sans,10,-1,5`).
 /// The size goes, and what's left gives every name from the whole of it to
 /// its first word: `Noto Sans Medium`, `Noto Sans`, `Noto`.
+#[cfg(any(target_os = "linux", test))]
 fn family_names(font: &str) -> Vec<String> {
     let family = font.split(',').next().unwrap_or_default();
     let mut words: Vec<&str> = family.split_whitespace().collect();
