@@ -1037,8 +1037,8 @@ fn volume<'a>(settings: &Settings) -> Element<'a, Message> {
 /// from), links to what's new in it and to its source code (and this
 /// build's commit on GitHub), the switch that looks for new versions, how
 /// Nubo is made, and the license, where to read it and the copyright, which
-/// the GPL asks every copy to show. Plain text rather than cards, since
-/// this page is about Nubo, not settings.
+/// the GPL asks every copy to show. Text in cards rather than rows of
+/// settings, since this page is about Nubo.
 fn about<'a>(
     settings: &'a Settings,
     newer_version: Option<&'a str>,
@@ -1170,17 +1170,21 @@ fn about<'a>(
     .into()
 }
 
-/// A part of the About tab: a heading over paragraphs of plain text.
+/// A part of the About tab: paragraphs of plain text in a titled card.
 fn about_section<'a>(
     title: &'a str,
     paragraphs: Vec<Element<'a, Message>>,
 ) -> Element<'a, Message> {
-    column![
-        text(title).size(15).font(theme::HEADING_FONT),
-        Column::with_children(paragraphs).spacing(8),
-    ]
-    .spacing(8)
-    .into()
+    group(
+        title,
+        None,
+        vec![group_row(
+            Column::with_children(paragraphs).spacing(8),
+            ROW_PADDING,
+            false,
+        )],
+        None,
+    )
 }
 
 /// A paragraph of the About tab's text.
