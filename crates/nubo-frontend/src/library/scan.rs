@@ -60,7 +60,9 @@ pub struct FileCheck {
 }
 
 /// Looks for ROMs in `folders` and returns an entry for each, reusing the
-/// `known` entry of files that didn't change. Recently played games outside
+/// `known` entry of files that didn't change (reading such a file only to
+/// learn whether it uses the Super Game Boy, when an earlier version didn't
+/// keep that). Recently played games outside
 /// the folders stay in the library as long as their file exists. Files that
 /// aren't valid ROMs are left out.
 ///
@@ -106,7 +108,13 @@ pub fn scan(generation: u64, folders: &[LibraryFolder], known: Vec<LibraryEntry>
             let (size, modified) = file_stamp(&path)?;
             let unchanged = |entry: &LibraryEntry| entry.size == size && entry.modified == modified;
             let mut entry = match known.remove(&path) {
-                Some(entry) if unchanged(&entry) => entry,
+                Some(mut entry) if unchanged(&entry) => {
+                    if entry.supports_sgb.is_none() {
+                        entry.supports_sgb =
+                            read_entry(&path, size).and_then(|read| read.supports_sgb);
+                    }
+                    entry
+                }
                 previous => {
                     let mut entry = read_entry(&path, size)?;
                     match previous {

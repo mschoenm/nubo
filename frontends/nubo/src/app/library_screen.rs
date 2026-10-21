@@ -1,6 +1,8 @@
 //! The game library: its folders, scans, pictures and box art, searching
 //! it, and moving through its cards with the D-pad.
 
+use super::dialogs::model_label;
+use super::playing::UndoPoint;
 use super::playing::read_rom;
 use super::{App, Message};
 use crate::dialog::{DialogKind, GameMenuPage};
@@ -10,6 +12,7 @@ use crate::views;
 use iced::Task;
 use iced::widget;
 use iced::widget::scrollable::AbsoluteOffset;
+use nubo_core::Model;
 use nubo_frontend::controls::Action;
 use nubo_frontend::library::box_art::{self, GameList};
 use nubo_frontend::library::{
@@ -65,9 +68,8 @@ pub enum LibraryMessage {
     FilterPicked(LibraryFilter),
     /// Opens the folder this game is in.
     ShowInFolder(PathBuf),
-    /// The player picked Automatic or a model for this game in its menu, or
-    /// `None` to follow the settings again.
-    GameModelPicked(PathBuf, Option<ModelPreference>),
+    /// The player picked the model this game starts on in its menu.
+    GameModelPicked(PathBuf, Model),
     /// Asks whether to delete this game's save states.
     AskDeleteSaveStates(PathBuf),
     /// Deletes this game's save states, as the player confirmed.
@@ -194,12 +196,7 @@ impl App {
                     self.toasts.error(error);
                 }
             }
-            LibraryMessage::GameModelPicked(path, model) => {
-                if let Err(error) = self.library.set_model(&path, model) {
-                    self.toasts.error(error);
-                }
-                self.show_game_menu(path, GameMenuPage::Main);
-            }
+            LibraryMessage::GameModelPicked(path, model) => self.pick_game_model(path, model),
             LibraryMessage::AskDeleteSaveStates(path) => {
                 self.open_dialog(DialogKind::DeleteSaveStates(path));
             }
@@ -377,6 +374,36 @@ impl App {
                 move |pixels| LibraryMessage::TitleScreenCaptured(path, pixels).into(),
             )
         }))
+    }
+
+    /// Starts the game at `path` on `model` from now on, as picked in its
+    /// menu, with a toast offering Undo. The game keeps no pick of its own
+    /// when the settings start it on `model` anyway, so it follows them again.
+    fn pick_game_model(&mut self, path: PathBuf, model: Model) {
+        let Some(entry) = self.library.entry(&path) else {
+            return;
+        };
+        let before = entry.preference();
+        let from_settings = match self.settings.shared.model {
+            ModelPreference::Fixed(model) => Some(model),
+            ModelPreference::Automatic => entry.made_for(),
+        };
+        let preference = (from_settings != Some(model)).then_some(ModelPreference::Fixed(model));
+        if preference == before {
+            return;
+        }
+        let name = entry.name();
+        match self.library.set_model(&path, preference) {
+            Ok(()) => {
+                self.undo = Some(UndoPoint::GameModel {
+                    path,
+                    preference: before,
+                });
+                self.toasts
+                    .info_with_undo(format!("{name} plays on {}", model_label(model)));
+            }
+            Err(error) => self.toasts.error(error),
+        }
     }
 
     /// Keeps `roms` in the browser's library (see

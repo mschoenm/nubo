@@ -13,6 +13,7 @@ use iced::widget::{self, scrollable::RelativeOffset};
 use nubo_core::{CartridgeHeader, Emulator, Model, SgbBorder};
 use nubo_frontend::controls::Action;
 use nubo_frontend::library::LibrarySnapshot;
+use nubo_frontend::model::ModelPreference;
 use nubo_frontend::picture::Picture;
 use nubo_frontend::rom::{self, Rom};
 use nubo_frontend::save_states::{self, SaveState, Slot};
@@ -145,6 +146,12 @@ pub enum UndoPoint {
     Settings {
         settings: Box<Settings>,
         library: Option<LibrarySnapshot>,
+    },
+    /// What a library game's menu had picked for the game at `path` before
+    /// the player picked another console (`None` to follow the settings).
+    GameModel {
+        path: PathBuf,
+        preference: Option<ModelPreference>,
     },
 }
 
@@ -708,8 +715,9 @@ impl App {
     }
 
     /// Puts back what the newest toast's Undo button offers: the game as it
-    /// was before a load or a restart, a slot as it was before a save, or
-    /// the settings as they were before a reset.
+    /// was before a load or a restart, a slot as it was before a save, the
+    /// settings as they were before a reset, or the console a library game
+    /// was set to start on before the player picked another.
     fn undo(&mut self) -> Task<Message> {
         self.toasts.forget_undo();
         match self.undo.take() {
@@ -738,6 +746,12 @@ impl App {
             },
             Some(UndoPoint::Settings { settings, library }) => {
                 return self.restore_settings(*settings, library);
+            }
+            Some(UndoPoint::GameModel { path, preference }) => {
+                match self.library.set_model(&path, preference) {
+                    Ok(()) => self.toasts.info("Undone"),
+                    Err(error) => self.toasts.error(format!("Couldn't undo: {error}")),
+                }
             }
             None => {}
         }

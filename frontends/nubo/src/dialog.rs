@@ -3,7 +3,8 @@
 //! is a title, maybe a short text, and a few choices; a question can also
 //! have checkboxes above its buttons, such as what else a reset of the
 //! settings deletes. The D-pad moves between the choices, checkboxes
-//! included, A picks one (or ticks it) and B or Esc dismisses the dialog (or
+//! included (Left and Right fold and unfold a menu's nested rows where it
+//! has them), A picks one (or ticks it) and B or Esc dismisses the dialog (or
 //! goes back a page in a menu). What each dialog says and offers is worked
 //! out by the app (`app/dialogs.rs`), so the view and the D-pad handling see
 //! the same choices.
@@ -103,12 +104,11 @@ impl Default for ResetChoices {
 /// A page of a library game's menu.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameMenuPage {
-    /// Play, Which Game Boy…, Show in folder and the like.
+    /// Play, Console, Show in folder and the like.
     Main,
-    /// The consoles the game can start on.
-    Consoles,
-    /// The revisions of a console the game can start on.
-    Revisions(Console),
+    /// The consoles the game can start on, with the revisions of the one
+    /// given unfolded under it.
+    Consoles(Option<Console>),
 }
 
 /// An open dialog and the choice the D-pad is on.
@@ -180,6 +180,35 @@ pub struct Choice {
     /// nothing is greyed out.
     pub enabled: bool,
     pub action: DialogAction,
+    /// Whether this is what is in use, among choices that show it with a
+    /// bolder label rather than a check mark, such as the console a game
+    /// starts on.
+    pub current: bool,
+    /// A short line in the accent color under a row's label, with a star,
+    /// such as that the game was made for this console.
+    pub note: Option<String>,
+    /// A small label just after a row's label, such as "Most common".
+    pub badge: Option<String>,
+    /// Whether the row sits under the one above it, indented and without an
+    /// icon, such as a revision under its console.
+    pub nested: bool,
+    /// A small button at the right of a row that unfolds or folds the rows
+    /// nested under it.
+    pub fold: Option<Fold>,
+    /// What Left and Right do on this row of a menu, where they otherwise
+    /// move between the rows as Up and Down do.
+    pub left: Option<DialogAction>,
+    pub right: Option<DialogAction>,
+}
+
+/// The button at the right of a menu row that unfolds the rows under it,
+/// showing the one in use among them, such as a console's revision.
+#[derive(Debug, Clone)]
+pub struct Fold {
+    pub label: String,
+    /// Whether the rows are unfolded now, so the button folds them.
+    pub unfolded: bool,
+    pub action: DialogAction,
 }
 
 impl Choice {
@@ -201,6 +230,13 @@ impl Choice {
             description: None,
             enabled: true,
             action,
+            current: false,
+            note: None,
+            badge: None,
+            nested: false,
+            fold: None,
+            left: None,
+            right: None,
         }
     }
 
@@ -239,6 +275,47 @@ impl Choice {
         self.starts_group = true;
         self
     }
+
+    pub fn current(mut self, current: bool) -> Choice {
+        self.current = current;
+        self
+    }
+
+    /// A line under the row's label, in small grey print.
+    pub fn description(mut self, description: impl Into<String>) -> Choice {
+        self.description = Some(description.into());
+        self
+    }
+
+    pub fn note(mut self, note: impl Into<String>) -> Choice {
+        self.note = Some(note.into());
+        self
+    }
+
+    pub fn badge(mut self, badge: impl Into<String>) -> Choice {
+        self.badge = Some(badge.into());
+        self
+    }
+
+    pub fn nested(mut self) -> Choice {
+        self.nested = true;
+        self
+    }
+
+    pub fn fold(mut self, fold: Fold) -> Choice {
+        self.fold = Some(fold);
+        self
+    }
+
+    pub fn left(mut self, action: DialogAction) -> Choice {
+        self.left = Some(action);
+        self
+    }
+
+    pub fn right(mut self, action: DialogAction) -> Choice {
+        self.right = Some(action);
+        self
+    }
 }
 
 /// What an open dialog shows and does.
@@ -255,6 +332,9 @@ pub struct DialogContent {
     /// Whether a click outside the dialog dismisses it too. Questions whose
     /// answer is kept leave it off, so a stray click doesn't answer them.
     pub click_outside_dismisses: bool,
+    /// Whether an arrow before the title goes back, as dismissing does, for
+    /// a page of a menu that has one before it.
+    pub back_button: bool,
 }
 
 /// A short line under a question's text and checkboxes, in a row of its

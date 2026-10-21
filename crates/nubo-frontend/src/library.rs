@@ -81,14 +81,15 @@ pub struct LibraryEntry {
     pub box_art_checked: bool,
     /// Whether the game uses the Super Game Boy's colors and border (the
     /// cartridge header says so). `None` for a game read by a version that
-    /// didn't keep it, until the game is played or its file changes: scans
-    /// don't read unchanged files again.
+    /// didn't keep it, until the next scan reads it (scans read unchanged
+    /// files again only for this) or the game is played.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub supports_sgb: Option<bool>,
-    /// What the player picked for this game in its menu, which it starts
-    /// on instead of the model in the settings: Automatic (which picks by
-    /// the cartridge even when the settings pick one model for every game)
-    /// or a model. `None` follows the settings.
+    /// The model the player picked for this game in its menu, which it
+    /// starts on instead of the model in the settings. `None` follows the
+    /// settings. Earlier versions could also pick Automatic, which picks by
+    /// the cartridge even when the settings pick one model for every game;
+    /// such a game keeps doing so until the player picks again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<ModelPreference>,
     /// When the library first found the game, in seconds since 1970, for
@@ -132,6 +133,29 @@ impl LibraryEntry {
         match self.model {
             Some(ModelPreference::Fixed(model)) => Some(model),
             Some(ModelPreference::Automatic) | None => None,
+        }
+    }
+
+    /// The model the game was made for, as its cartridge header says (see
+    /// [`crate::model::made_for`]), or `None` while the library doesn't know
+    /// whether it uses the Super Game Boy.
+    pub fn made_for(&self) -> Option<Model> {
+        if self.supports_cgb {
+            Some(Model::CgbE)
+        } else {
+            self.supports_sgb
+                .map(|supports_sgb| crate::model::made_for(false, supports_sgb))
+        }
+    }
+
+    /// The model the game starts on when the settings pick `settings`: the
+    /// one picked in its menu, else the one the settings pick for it. `None`
+    /// while that depends on what the library doesn't know yet (see
+    /// [`LibraryEntry::made_for`]).
+    pub fn starts_on(&self, settings: ModelPreference) -> Option<Model> {
+        match self.model.unwrap_or(settings) {
+            ModelPreference::Fixed(model) => Some(model),
+            ModelPreference::Automatic => self.made_for(),
         }
     }
 

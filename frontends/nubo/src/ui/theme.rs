@@ -457,6 +457,22 @@ pub fn badge(badge: Badge) -> impl Fn(&Theme) -> container::Style {
     }
 }
 
+/// A small rounded label tinted with the accent color, such as "Most
+/// common" after the most common revision of a console.
+pub fn pill(theme: &Theme) -> container::Style {
+    let palette = theme.extended_palette();
+
+    container::Style {
+        text_color: Some(palette.primary.base.color),
+        background: Some(palette.primary.weak.color.scale_alpha(0.3).into()),
+        border: Border::default()
+            .rounded(999)
+            .width(1)
+            .color(palette.primary.weak.color),
+        ..container::Style::default()
+    }
+}
+
 /// A box for messages such as "No games found".
 pub fn notice(theme: &Theme) -> container::Style {
     let palette = theme.extended_palette();

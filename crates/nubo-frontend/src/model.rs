@@ -4,7 +4,8 @@
 //! unless the player picked one model for every game.
 //!
 //! Apps let the player pick a model as a [`Console`] and then one of its
-//! revisions, with [`about`] saying what each one is.
+//! revisions, with [`about`] saying what each one is, and [`made_for`] says
+//! which console a game was made for.
 
 use nubo_core::{CartridgeHeader, Model};
 use serde::{Deserialize, Serialize};
@@ -28,11 +29,22 @@ impl ModelPreference {
     /// The model to start the game with this header on.
     pub fn model_for(self, header: &CartridgeHeader) -> Model {
         match self {
-            ModelPreference::Automatic if header.supports_cgb => Model::CgbE,
-            ModelPreference::Automatic if header.supports_sgb => Model::Sgb,
-            ModelPreference::Automatic => Model::Dmg,
+            ModelPreference::Automatic => made_for(header.supports_cgb, header.supports_sgb),
             ModelPreference::Fixed(model) => model,
         }
+    }
+}
+
+/// The model a game was made for, which Automatic starts it on, from what
+/// its cartridge header says: whether it uses the Game Boy Color's and the
+/// Super Game Boy's features.
+pub fn made_for(supports_cgb: bool, supports_sgb: bool) -> Model {
+    if supports_cgb {
+        Model::CgbE
+    } else if supports_sgb {
+        Model::Sgb
+    } else {
+        Model::Dmg
     }
 }
 

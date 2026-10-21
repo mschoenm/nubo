@@ -2,9 +2,9 @@
 //! text, and its choices, as buttons along the bottom for a question (under
 //! its checkboxes and notice, if it has them; stacked, each as wide as the
 //! question, when their labels are too long for one line) or as rows for a
-//! menu, with
-//! the one the D-pad is on outlined. A question that doesn't fit the window
-//! scrolls.
+//! menu, with the one the D-pad is on outlined, and an arrow before the
+//! title of a menu's page that goes back. A question that doesn't fit the
+//! window scrolls.
 
 use crate::app::Message;
 use crate::dialog::{Choice, ChoiceStyle, Dialog, DialogContent, Layout, Notice};
@@ -45,7 +45,17 @@ pub fn view<'a>(dialog: &Dialog, content: DialogContent) -> Element<'a, Message>
     let selection = dialog.selection;
     let layout = content.layout;
 
-    let mut panel = column![text(content.title).size(19).font(theme::HEADING_FONT)].spacing(12);
+    let title = text(content.title).size(19).font(theme::HEADING_FONT);
+    let mut panel = if content.back_button {
+        let back = button(icon(Icon::ArrowLeft))
+            .padding(6)
+            .style(theme::icon_button)
+            .on_press(content.dismiss.clone().into_message());
+        column![row![back, title].spacing(8).align_y(Alignment::Center)]
+    } else {
+        column![title]
+    }
+    .spacing(12);
     if let Some(body) = content.text {
         panel = panel.push(text(body).size(14).style(theme::muted_text));
     }
@@ -96,35 +106,15 @@ pub fn view<'a>(dialog: &Dialog, content: DialogContent) -> Element<'a, Message>
             QUESTION_WIDTH
         }
         Layout::List => {
+            // A menu that shows what is in use in bold has no check marks,
+            // so its rows keep no room for one.
+            let checks = !content.choices.iter().any(|choice| choice.current);
             let mut rows = Column::new().spacing(2);
             for (index, choice) in content.choices.into_iter().enumerate() {
                 if choice.starts_group {
                     rows = rows.push(menu_separator());
                 }
-                rows = rows.push({
-                    let check: Element<'a, Message> = if choice.checked {
-                        icon(Icon::Check).style(theme::accent_text).into()
-                    } else {
-                        space().width(18).into()
-                    };
-                    let label = text(choice.label).width(Fill);
-                    let label = if choice.style == ChoiceStyle::Danger {
-                        label.style(theme::danger_text)
-                    } else {
-                        label
-                    };
-                    let mut content = row![icon(choice.icon), label]
-                        .spacing(12)
-                        .align_y(Alignment::Center);
-                    if let Some(hint) = choice.hint {
-                        content = content.push(text(hint).size(12).style(theme::muted_text));
-                    }
-                    button(content.push(check))
-                        .padding([9, 12])
-                        .width(Fill)
-                        .style(theme::segment(index == selection))
-                        .on_press(choice.action.into_message())
-                });
+                rows = rows.push(list_row(choice, index == selection, checks));
             }
             panel = panel.push(scrollable(rows).spacing(8));
             MENU_WIDTH
@@ -140,6 +130,94 @@ pub fn view<'a>(dialog: &Dialog, content: DialogContent) -> Element<'a, Message>
         panel.into()
     };
     container(panel).max_width(width).style(theme::panel).into()
+}
+
+/// A row of a menu, outlined while the D-pad is on it: the choice's icon
+/// (or, for a nested row, room for one), its label, in bold while it is in
+/// use (in the accent color too where the bold font is the body font, as in
+/// the browser), with its badge, note and description under it, its hint,
+/// the button that unfolds or folds the rows under it, and, with `checks`,
+/// a check mark while it is checked.
+fn list_row<'a>(choice: Choice, focused: bool, checks: bool) -> Element<'a, Message> {
+    let font = if choice.current {
+        theme::HEADING_FONT
+    } else {
+        theme::BODY_FONT
+    };
+    let label = text(choice.label).font(font);
+    let label = if choice.style == ChoiceStyle::Danger {
+        label.style(theme::danger_text)
+    } else if choice.current && theme::HEADING_FONT == theme::BODY_FONT {
+        label.style(theme::accent_text)
+    } else {
+        label
+    };
+    let mut first_line = row![label].spacing(8).align_y(Alignment::Center);
+    if let Some(badge) = choice.badge {
+        first_line = first_line.push(
+            container(text(badge).size(11))
+                .padding([1, 7])
+                .style(theme::pill),
+        );
+    }
+    let mut words = column![first_line].spacing(3).width(Fill);
+    if let Some(note) = choice.note {
+        words = words.push(
+            row![
+                icon(Icon::Sparkles).size(12).style(theme::accent_text),
+                text(note)
+                    .size(12)
+                    .font(theme::HEADING_FONT)
+                    .style(theme::accent_text),
+            ]
+            .spacing(5)
+            .align_y(Alignment::Center),
+        );
+    }
+    if let Some(description) = choice.description {
+        words = words.push(text(description).size(12).style(theme::muted_text));
+    }
+
+    let start: Element<'a, Message> = if choice.nested {
+        space().width(18).into()
+    } else {
+        icon(choice.icon).into()
+    };
+    let mut content = row![start, words].spacing(12).align_y(Alignment::Center);
+    if let Some(hint) = choice.hint {
+        content = content.push(text(hint).size(12).style(theme::muted_text));
+    }
+    if let Some(fold) = choice.fold {
+        let chevron = if fold.unfolded {
+            Icon::ChevronUp
+        } else {
+            Icon::ChevronDown
+        };
+        content = content.push(
+            button(
+                row![text(fold.label).size(12), icon(chevron).size(14)]
+                    .spacing(4)
+                    .align_y(Alignment::Center),
+            )
+            .padding([4, 8])
+            .style(theme::secondary_button)
+            .on_press(fold.action.into_message()),
+        );
+    }
+    if checks {
+        let check: Element<'a, Message> = if choice.checked {
+            icon(Icon::Check).style(theme::accent_text).into()
+        } else {
+            space().width(18).into()
+        };
+        content = content.push(check);
+    }
+    button(content)
+        .padding([9, 12])
+        .width(Fill)
+        .style(theme::segment(focused))
+        .on_press(choice.action.into_message())
+        .into()
 }
 
 /// The scrolling area of a question, so the app can keep the choice the
