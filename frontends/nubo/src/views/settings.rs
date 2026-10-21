@@ -1119,7 +1119,7 @@ fn about<'a>(
             "Reset settings and data",
             Some(String::from(
                 "Reset the settings, clear Continue playing or delete saves. You pick what \
-                 goes. Only the keys or buttons: Controls › Reset.",
+                 goes.",
             )),
             small_button(
                 Icon::RotateCcw,
