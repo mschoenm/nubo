@@ -11,15 +11,9 @@ name: Shootout
 # kept between tests, and the start-up time. The run's results, with a
 # screenshot of each test, are kept as its artifact. The nightly run, which
 # releases run too, tests the zip its Windows job built, the one a release
-# publishes and the Shootout downloads; pull requests that change this
-# workflow or the harness class, and runs started by hand, build their own
-# with the Windows workflow. It isn't one of the checks that pull requests
-# wait for.
+# publishes and the Shootout downloads; runs started by hand build their own
+# with the Windows workflow. Pull requests don't run it.
 on:
-  pull_request:
-    paths:
-      - .github/workflows/shootout.yml
-      - .github/shootout/**
   workflow_call:
     inputs:
       windows-artifact:

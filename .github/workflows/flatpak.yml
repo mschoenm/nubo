@@ -1,20 +1,11 @@
 name: Flatpak
 
 # Builds the Linux app as a Flatpak for x86_64 and ARM with `cargo xtask
-# flatpak`, plays a game in it and checks it with Flathub's linter. Runs on
-# pull requests that change how it is built or the crates it is built from
-# (Dependabot's updates), every night, and for releases, which attach the
-# .flatpak files it makes. It isn't one of the checks that pull requests
-# wait for.
+# flatpak`, plays a game in it and checks it with Flathub's linter. Runs
+# every night and for releases, which attach the .flatpak files it makes, and
+# by hand when a change needs it sooner. Pull requests don't run it: it
+# rarely fails, and the nightly run catches a failure before a release can.
 on:
-  pull_request:
-    paths:
-      - .github/workflows/flatpak.yml
-      - Cargo.toml
-      - Cargo.lock
-      - xtask/src/flatpak.rs
-      - xtask/src/licenses.rs
-      - frontends/nubo/linux/**
   workflow_call:
   workflow_dispatch:
 

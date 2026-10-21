@@ -2,20 +2,11 @@ name: Windows
 
 # Builds the Windows installer (an MSI, with the WiX Toolset) and zip with
 # `cargo xtask windows`, plays a game from each and tests installing,
-# updating, downgrading and uninstalling. Runs on pull requests that change
-# how they are built or the crates they are built from (Dependabot's
-# updates), every night, and for releases, which attach the files it makes.
-# It isn't one of the checks that pull requests wait for.
+# updating, downgrading and uninstalling. Runs every night and for releases,
+# which attach the files it makes, and by hand when a change needs it
+# sooner. Pull requests don't run it: it rarely fails, and the nightly run
+# catches a failure before a release can.
 on:
-  pull_request:
-    paths:
-      - .github/workflows/windows.yml
-      - Cargo.lock
-      - xtask/src/windows.rs
-      - xtask/src/licenses.rs
-      - frontends/nubo/windows/**
-      - frontends/nubo/build.rs
-      - crates/nubo-logo/**
   workflow_call:
     inputs:
       nightly:
