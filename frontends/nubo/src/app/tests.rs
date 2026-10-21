@@ -18,7 +18,7 @@ use nubo_core::{ControllerButton, ControllerState, Emulator, Model};
 use nubo_frontend::controls::{Action, Device, KeyCode, MenuButtons, PadButton};
 use nubo_frontend::gamepads::{ControllerEvent, Controllers};
 use nubo_frontend::library::{Cache, Library};
-use nubo_frontend::model::ModelPreference;
+use nubo_frontend::model::{Console, ModelPreference};
 use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states::SaveState;
 use std::path::PathBuf;
@@ -536,7 +536,7 @@ fn a_game_continuing_after_the_model_question_stops_waiting_for_a_key() {
 }
 
 #[test]
-fn continuing_keeps_a_game_on_automatic_when_automatic_picks_its_model() {
+fn continuing_keeps_a_game_on_the_settings_when_they_pick_its_model() {
     let (mut app, _) = App::new(
         None,
         &Options {
@@ -557,8 +557,9 @@ fn continuing_keeps_a_game_on_automatic_when_automatic_picks_its_model() {
     app.settings.shared.model = ModelPreference::Fixed(Model::Sgb);
     assert_eq!(
         preference(&app, Model::Dmg),
-        Some(ModelPreference::Automatic)
+        Some(ModelPreference::Fixed(Model::Dmg))
     );
+    assert_eq!(preference(&app, Model::Sgb), None);
     assert_eq!(
         preference(&app, Model::CgbE),
         Some(ModelPreference::Fixed(Model::CgbE))
@@ -793,4 +794,150 @@ fn waiting_for_a_button_gives_up_after_a_while() {
     app.capture_started -= CAPTURE_TIMEOUT;
     let _ = app.update(Message::Tick);
     assert_eq!(app.capture, None);
+}
+
+/// An app that keeps nothing else, with a Game Boy Color game in a library
+/// kept in a temporary folder named after `name`. Returns the app, the
+/// game's path and the folder, for the test to remove.
+fn app_with_color_game(name: &str) -> (App, PathBuf, PathBuf) {
+    let folder = std::env::temp_dir().join(format!("nubo-console-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&folder);
+    let (mut app, _) = App::new(
+        None,
+        &Options {
+            fresh: true,
+            ..Options::default()
+        },
+    );
+    let mut rom = vec![0; 0x8000];
+    rom[0x143] = 0x80;
+    let header = Emulator::read_rom_header(&rom).unwrap();
+    let path = PathBuf::from("Color Game.gbc");
+    let (mut library, _) = Library::load_from(Cache::in_folder(folder.clone()));
+    library.record_played(&path, &header).unwrap();
+    app.library = library;
+    (app, path, folder)
+}
+
+/// The label of the choice the D-pad is on in the open dialog.
+fn selected_label(app: &App) -> String {
+    let selection = app.dialog.as_ref().unwrap().selection;
+    app.dialog_content().unwrap().choices[selection]
+        .label
+        .clone()
+}
+
+#[test]
+fn picking_a_console_closes_the_menu_and_can_be_undone() {
+    let (mut app, path, folder) = app_with_color_game("pick");
+    app.show_game_menu(path.clone(), GameMenuPage::Main);
+    assert_eq!(selected_label(&app), "Play");
+    let _ = app.navigate_dialog(Action::Down, false);
+    let _ = app.navigate_dialog(Action::A, false);
+
+    assert_eq!(
+        app.dialog.as_ref().map(|dialog| &dialog.kind),
+        Some(&DialogKind::GameMenu(
+            path.clone(),
+            GameMenuPage::Consoles(None)
+        ))
+    );
+    let content = app.dialog_content().unwrap();
+    let color = &content.choices[app.dialog.as_ref().unwrap().selection];
+    assert_eq!(color.label, "Game Boy Color");
+    assert!(color.current);
+    assert_eq!(color.note.as_deref(), Some("Made for this console"));
+    assert_eq!(color.fold.as_ref().unwrap().label, "CGB-E");
+
+    let _ = app.navigate_dialog(Action::Up, false);
+    let _ = app.navigate_dialog(Action::Up, false);
+    assert_eq!(selected_label(&app), "Game Boy Pocket");
+    let _ = app.navigate_dialog(Action::A, false);
+
+    assert!(app.dialog.is_none());
+    let preference = |app: &App| app.library.entry(&path).unwrap().preference();
+    assert_eq!(preference(&app), Some(ModelPreference::Fixed(Model::Mgb)));
+    let _ = app.update(GameMessage::Undo.into());
+    assert_eq!(preference(&app), None);
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn picking_the_console_the_settings_pick_follows_them_again() {
+    let (mut app, path, folder) = app_with_color_game("settings");
+    let preference = |app: &App| app.library.entry(&path).unwrap().preference();
+    let pick = |app: &mut App, model| {
+        let _ = app.update(LibraryMessage::GameModelPicked(path.clone(), model).into());
+    };
+
+    pick(&mut app, Model::CgbC);
+    assert_eq!(preference(&app), Some(ModelPreference::Fixed(Model::CgbC)));
+    pick(&mut app, Model::CgbE);
+    assert_eq!(preference(&app), None);
+
+    app.settings.shared.model = ModelPreference::Fixed(Model::Mgb);
+    pick(&mut app, Model::CgbE);
+    assert_eq!(preference(&app), Some(ModelPreference::Fixed(Model::CgbE)));
+    pick(&mut app, Model::Mgb);
+    assert_eq!(preference(&app), None);
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn right_and_left_unfold_and_fold_a_consoles_revisions() {
+    let (mut app, path, folder) = app_with_color_game("fold");
+    app.show_game_menu(path.clone(), GameMenuPage::Consoles(None));
+    assert_eq!(selected_label(&app), "Game Boy Color");
+
+    let _ = app.navigate_dialog(Action::Right, false);
+    assert_eq!(
+        app.dialog.as_ref().map(|dialog| &dialog.kind),
+        Some(&DialogKind::GameMenu(
+            path.clone(),
+            GameMenuPage::Consoles(Some(Console::Color))
+        ))
+    );
+    assert_eq!(selected_label(&app), "Game Boy Color");
+    let _ = app.navigate_dialog(Action::Down, false);
+    assert_eq!(selected_label(&app), "CGB-0");
+
+    let _ = app.navigate_dialog(Action::Left, false);
+    assert_eq!(
+        app.dialog.as_ref().map(|dialog| &dialog.kind),
+        Some(&DialogKind::GameMenu(
+            path.clone(),
+            GameMenuPage::Consoles(None)
+        ))
+    );
+    assert_eq!(selected_label(&app), "Game Boy Color");
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn a_revision_other_than_the_most_common_shows_unfolded_and_b_goes_back() {
+    let (mut app, path, folder) = app_with_color_game("revision");
+    app.library
+        .set_model(&path, Some(ModelPreference::Fixed(Model::CgbC)))
+        .unwrap();
+    app.show_game_menu(path.clone(), GameMenuPage::Main);
+    let _ = app.navigate_dialog(Action::Down, false);
+    let _ = app.navigate_dialog(Action::A, false);
+
+    assert_eq!(selected_label(&app), "CGB-C");
+    let content = app.dialog_content().unwrap();
+    let common = content
+        .choices
+        .iter()
+        .find(|choice| choice.label == "CGB-E")
+        .unwrap();
+    assert_eq!(common.badge.as_deref(), Some("Most common"));
+    assert!(!common.current);
+
+    let _ = app.navigate_dialog(Action::B, false);
+    assert_eq!(
+        app.dialog.as_ref().map(|dialog| &dialog.kind),
+        Some(&DialogKind::GameMenu(path.clone(), GameMenuPage::Main))
+    );
+    assert_eq!(selected_label(&app), "Console");
+    let _ = std::fs::remove_dir_all(&folder);
 }

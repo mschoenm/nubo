@@ -324,7 +324,8 @@ fn a_file_check_older_than_the_last_scan_is_ignored() {
 /// before the library moved to this crate. Its games are put at new paths,
 /// with the size and modification time the file has for them but a header
 /// that says something else: a scan that read them again would see that,
-/// so the scan must keep what the file knows.
+/// so the scan must keep what the file knows. The file doesn't say whether
+/// they use the Super Game Boy, which is all the scan reads from them.
 #[cfg(feature = "desktop")]
 #[test]
 fn a_scan_keeps_what_an_existing_library_file_knows_about_unchanged_games() {
@@ -358,6 +359,7 @@ fn a_scan_keeps_what_an_existing_library_file_knows_about_unchanged_games() {
         .into_iter()
         .map(|entry| LibraryEntry {
             in_folder: true,
+            supports_sgb: Some(false),
             ..entry
         })
         .collect();
@@ -489,18 +491,52 @@ fn a_library_that_keeps_its_games_finds_those_whose_file_it_keeps() {
     assert!(result.missing_folders.is_empty());
 }
 
+#[test]
+fn a_game_starts_on_its_own_pick_else_on_what_the_settings_pick_for_it() {
+    let mut entry = LibraryEntry::example("/games/Tetris.gb");
+    let pocket = ModelPreference::Fixed(Model::Mgb);
+    assert_eq!(entry.made_for(), Some(Model::Dmg));
+    assert_eq!(
+        entry.starts_on(ModelPreference::Automatic),
+        Some(Model::Dmg)
+    );
+    assert_eq!(entry.starts_on(pocket), Some(Model::Mgb));
+
+    entry.supports_sgb = Some(true);
+    assert_eq!(
+        entry.starts_on(ModelPreference::Automatic),
+        Some(Model::Sgb)
+    );
+    entry.supports_cgb = true;
+    assert_eq!(entry.made_for(), Some(Model::CgbE));
+
+    // Automatic, which earlier versions could pick for a game, still picks
+    // by the cartridge whatever the settings pick.
+    entry.model = Some(ModelPreference::Automatic);
+    assert_eq!(entry.starts_on(pocket), Some(Model::CgbE));
+    entry.model = Some(ModelPreference::Fixed(Model::Agb));
+    assert_eq!(entry.starts_on(pocket), Some(Model::Agb));
+
+    entry.model = None;
+    entry.supports_cgb = false;
+    entry.supports_sgb = None;
+    assert_eq!(entry.made_for(), None);
+    assert_eq!(entry.starts_on(ModelPreference::Automatic), None);
+    assert_eq!(entry.starts_on(pocket), Some(Model::Mgb));
+}
+
 #[cfg(feature = "desktop")]
 #[test]
-fn a_game_set_to_automatic_keeps_automatic_rather_than_the_settings() {
-    let mut library = library_with_two_played_games("automatic");
-    let path = Path::new("/games/Tetris.gb");
-    library
-        .set_model(path, Some(ModelPreference::Automatic))
-        .unwrap();
+fn a_scan_reads_whether_an_unchanged_game_uses_the_super_game_boy_once() {
+    let root = temporary_folder("sgb-unknown");
+    write_rom(&root.join("Tetris.gb"), "TETRIS", false);
+    let mut first = scan::scan(1, &[folder(&root, false)], Vec::new()).entries;
+    assert_eq!(first[0].supports_sgb, Some(false));
+    first[0].supports_sgb = None;
 
-    let entry = library.entry(path).unwrap();
-    assert_eq!(entry.preference(), Some(ModelPreference::Automatic));
-    assert_eq!(entry.model(), None);
+    let second = scan::scan(2, &[folder(&root, false)], first).entries;
+
+    assert_eq!(second[0].supports_sgb, Some(false));
 }
 
 #[cfg(feature = "desktop")]

@@ -5,8 +5,8 @@
 use super::playing::ResumeAnswer;
 use super::{App, GameMessage, LibraryMessage, Message, SettingsMessage, scroll_in_proportion};
 use crate::dialog::{
-    Choice, ChoiceStyle, Dialog, DialogAction, DialogContent, DialogKind, GameMenuPage, Layout,
-    Notice, ResetChoices,
+    Choice, ChoiceStyle, Dialog, DialogAction, DialogContent, DialogKind, Fold, GameMenuPage,
+    Layout, Notice, ResetChoices,
 };
 use crate::selection;
 use crate::settings::{LibraryFilter, LibrarySort, Settings};
@@ -31,6 +31,14 @@ pub enum DialogMessage {
     Closed(Option<Box<Message>>),
     /// Shows another page of a library game's menu.
     ShowGameMenu(PathBuf, GameMenuPage),
+    /// Unfolds the revisions of a console on the page of a library game's
+    /// menu that picks its console, or folds them with `None`, with the
+    /// D-pad on the row of the console `on`.
+    UnfoldConsole {
+        path: PathBuf,
+        unfolded: Option<Console>,
+        on: Console,
+    },
     /// The player ticked or unticked a box of the question whether to reset
     /// the settings, leaving these ticked.
     ResetChoicesChanged(ResetChoices),
@@ -55,6 +63,20 @@ impl DialogAction {
     }
 }
 
+/// Where the Console row is on the first page of a game's menu, after Play.
+const CONSOLE_ROW: usize = 1;
+
+/// How a game's menu names `model`: the console, with the revision when it
+/// isn't the most common one, as "Game Boy Color (CGB-C)".
+pub(super) fn model_label(model: Model) -> String {
+    let console = Console::of(model);
+    if model == console.recommended() {
+        String::from(console.label())
+    } else {
+        format!("{} ({})", console.label(), model.name())
+    }
+}
+
 impl App {
     /// Handles a message about the open dialog: closing it after a choice,
     /// turning to another page of a game's menu, or ticking a box.
@@ -67,6 +89,21 @@ impl App {
                 }
             }
             DialogMessage::ShowGameMenu(path, page) => self.show_game_menu(path, page),
+            DialogMessage::UnfoldConsole { path, unfolded, on } => {
+                self.dialog = Some(Dialog::new(DialogKind::GameMenu(
+                    path,
+                    GameMenuPage::Consoles(unfolded),
+                )));
+                let row = self.dialog_content().and_then(|content| {
+                    content
+                        .choices
+                        .iter()
+                        .position(|choice| !choice.nested && choice.label == on.label())
+                });
+                if let (Some(dialog), Some(row)) = (&mut self.dialog, row) {
+                    dialog.selection = row;
+                }
+            }
             DialogMessage::ResetChoicesChanged(choices) => {
                 if let Some(dialog) = &mut self.dialog
                     && matches!(dialog.kind, DialogKind::ResetSettings(_))
@@ -133,23 +170,30 @@ impl App {
     }
 
     /// Opens (or turns to) `page` of the menu of the game at `path`, with the
-    /// D-pad on the choice in use, or on the recommended revision on a page
-    /// of revisions.
+    /// D-pad on the choice in use (the revision rather than its console when
+    /// its revisions are unfolded), or on the Console row when going back
+    /// from the page that picks it.
     pub(super) fn show_game_menu(&mut self, path: PathBuf, page: GameMenuPage) {
+        let from_consoles = matches!(
+            &self.dialog,
+            Some(Dialog {
+                kind: DialogKind::GameMenu(_, GameMenuPage::Consoles(_)),
+                ..
+            })
+        );
         self.dialog = Some(Dialog::new(DialogKind::GameMenu(path, page)));
-        let recommended = match page {
-            GameMenuPage::Revisions(console) => console
-                .revisions()
-                .iter()
-                .position(|&model| model == console.recommended()),
-            GameMenuPage::Main | GameMenuPage::Consoles => None,
+        let selection = if page == GameMenuPage::Main && from_consoles {
+            Some(CONSOLE_ROW)
+        } else {
+            self.dialog_content().and_then(|content| {
+                content
+                    .choices
+                    .iter()
+                    .rposition(|choice| choice.checked || choice.current)
+            })
         };
-        let checked = self
-            .dialog_content()
-            .and_then(|content| content.choices.iter().position(|choice| choice.checked))
-            .or(recommended);
-        if let (Some(dialog), Some(checked)) = (&mut self.dialog, checked) {
-            dialog.selection = checked;
+        if let (Some(dialog), Some(selection)) = (&mut self.dialog, selection) {
+            dialog.selection = selection;
         }
     }
 
@@ -168,8 +212,7 @@ impl App {
                 let entry = self.library.entry(path)?;
                 Some(match *page {
                     GameMenuPage::Main => self.game_menu(entry),
-                    GameMenuPage::Consoles => self.consoles_page(entry),
-                    GameMenuPage::Revisions(console) => revisions_page(entry, console),
+                    GameMenuPage::Consoles(unfolded) => self.consoles_page(entry, unfolded),
                 })
             }
             DialogKind::DeleteSaveStates(path) => {
@@ -190,6 +233,11 @@ impl App {
     /// The first page of a library game's menu.
     fn game_menu(&self, entry: &LibraryEntry) -> DialogContent {
         let path = &entry.path;
+        let starts_on = entry.starts_on(self.settings.shared.model);
+        // A revision other than the most common one shows unfolded.
+        let unfolded = starts_on
+            .map(Console::of)
+            .filter(|console| starts_on != Some(console.recommended()));
         let mut choices = vec![
             Choice::new(
                 Icon::Play,
@@ -199,16 +247,16 @@ impl App {
             ),
             Choice::new(
                 Icon::Gamepad2,
-                "Which Game Boy…",
+                "Console",
                 ChoiceStyle::Secondary,
                 DialogAction::Stay(
-                    DialogMessage::ShowGameMenu(path.clone(), GameMenuPage::Consoles).into(),
+                    DialogMessage::ShowGameMenu(path.clone(), GameMenuPage::Consoles(unfolded))
+                        .into(),
                 ),
             )
-            .hint(match entry.preference() {
-                Some(ModelPreference::Fixed(model)) => String::from(Console::of(model).label()),
-                Some(ModelPreference::Automatic) => String::from("Automatic"),
-                None => format!("Default ({})", self.default_model_label()),
+            .hint(match starts_on {
+                Some(model) => format!("{} ›", model_label(model)),
+                None => String::from("Automatic ›"),
             }),
         ];
         if links::CAN_SHOW_FOLDERS {
@@ -252,61 +300,89 @@ impl App {
             choices,
             dismiss: DialogAction::Close,
             click_outside_dismisses: true,
+            back_button: false,
         }
     }
 
-    /// The page of a game's menu that picks the console it starts on.
-    fn consoles_page(&self, entry: &LibraryEntry) -> DialogContent {
+    /// The page of a game's menu that picks the console it starts on, with
+    /// the revisions of `unfolded` under it. The console the game starts on
+    /// shows in bold, with its revision on the button that unfolds the
+    /// revisions (the Console row of the first page unfolds them when it
+    /// isn't the most common one), and the console it was made for says so.
+    /// Picking a console starts the game on its revision in use, or else the
+    /// most common one, and closes the menu.
+    fn consoles_page(&self, entry: &LibraryEntry, unfolded: Option<Console>) -> DialogContent {
         let path = &entry.path;
-        let picked = entry.model();
-        let pick = |preference| {
-            DialogAction::Stay(LibraryMessage::GameModelPicked(path.clone(), preference).into())
+        let settings = self.settings.shared.model;
+        let current = entry.starts_on(settings);
+        let made_for = entry.made_for().map(Console::of);
+        let from_settings = entry.preference().is_none() && settings != ModelPreference::Automatic;
+        let pick = |model| {
+            DialogAction::CloseThen(LibraryMessage::GameModelPicked(path.clone(), model).into())
+        };
+        let unfold = |unfolded, on| {
+            DialogAction::Stay(
+                DialogMessage::UnfoldConsole {
+                    path: path.clone(),
+                    unfolded,
+                    on,
+                }
+                .into(),
+            )
         };
 
-        let mut choices = vec![
-            Choice::new(
-                Icon::Settings,
-                "Default",
-                ChoiceStyle::Secondary,
-                pick(None),
-            )
-            .hint(self.default_model_label())
-            .checked(entry.preference().is_none()),
-            Choice::new(
-                Icon::Sparkles,
-                "Automatic",
-                ChoiceStyle::Secondary,
-                pick(Some(ModelPreference::Automatic)),
-            )
-            .checked(entry.preference() == Some(ModelPreference::Automatic)),
-        ];
-        choices.extend(Console::ALL.map(|console| {
-            let in_use = picked.filter(|&model| Console::of(model) == console);
-            let action = if console.revisions().len() > 1 {
-                DialogMessage::ShowGameMenu(path.clone(), GameMenuPage::Revisions(console)).into()
-            } else {
-                LibraryMessage::GameModelPicked(
-                    path.clone(),
-                    Some(ModelPreference::Fixed(console.recommended())),
-                )
-                .into()
-            };
-            let choice = Choice::new(
+        let mut choices = Vec::new();
+        for console in Console::ALL {
+            let in_use = current.filter(|&model| Console::of(model) == console);
+            let revision = in_use.unwrap_or(console.recommended());
+            let is_unfolded = unfolded == Some(console);
+            let mut choice = Choice::new(
                 Icon::Gamepad2,
                 console.label(),
                 ChoiceStyle::Secondary,
-                DialogAction::Stay(action),
+                pick(revision),
             )
-            .checked(in_use.is_some());
-            match in_use {
-                Some(model) if console.revisions().len() > 1 => choice.hint(model.name()),
-                _ => choice,
+            .current(in_use.is_some());
+            if made_for == Some(console) {
+                choice = choice.note("Made for this console");
             }
-        }));
+            if in_use.is_some() && from_settings {
+                choice = choice.description("Settings › Playing picks it for every game");
+            }
+            if console.revisions().len() > 1 {
+                choice = choice.fold(Fold {
+                    label: String::from(revision.name()),
+                    unfolded: is_unfolded,
+                    action: unfold((!is_unfolded).then_some(console), console),
+                });
+                choice = if is_unfolded {
+                    choice.left(unfold(None, console))
+                } else {
+                    choice.right(unfold(Some(console), console))
+                };
+            }
+            choices.push(choice);
+
+            if is_unfolded {
+                choices.extend(console.revisions().iter().map(|&model| {
+                    let choice =
+                        Choice::new(Icon::Cpu, model.name(), ChoiceStyle::Secondary, pick(model))
+                            .description(model::about(model))
+                            .current(current == Some(model))
+                            .nested()
+                            .left(unfold(None, console));
+                    if model == console.recommended() {
+                        choice.badge("Most common")
+                    } else {
+                        choice
+                    }
+                }));
+            }
+        }
 
         DialogContent {
-            title: format!("Which Game Boy for {}?", entry.name()),
-            text: None,
+            title: String::from("Console"),
+            text: Some(entry.name()),
             notice: None,
             layout: Layout::List,
             choices,
@@ -314,15 +390,7 @@ impl App {
                 DialogMessage::ShowGameMenu(path.clone(), GameMenuPage::Main).into(),
             ),
             click_outside_dismisses: true,
-        }
-    }
-
-    /// The Game Boy the settings start games on, which a game whose menu
-    /// picked none uses: "Automatic", or the console's name.
-    fn default_model_label(&self) -> &'static str {
-        match self.settings.shared.model {
-            ModelPreference::Automatic => "Automatic",
-            ModelPreference::Fixed(model) => Console::of(model).label(),
+            back_button: true,
         }
     }
 
@@ -355,7 +423,9 @@ impl App {
 
     /// Moves between the open dialog's choices with a direction, around the
     /// ends unless the key is `held` (see `crate::selection`), picks one
-    /// with A or Start, and dismisses the dialog with B.
+    /// with A or Start, and dismisses the dialog with B. Left and Right do
+    /// what the choice the D-pad is on gives them to do instead, if anything,
+    /// such as unfolding a console's revisions.
     pub(super) fn navigate_dialog(&mut self, action: Action, held: bool) -> Task<Message> {
         let Some(content) = self.dialog_content() else {
             return Task::none();
@@ -364,6 +434,17 @@ impl App {
             return Task::none();
         };
         let choices = content.choices.len();
+        let sideways = content
+            .choices
+            .get(dialog.selection)
+            .and_then(|choice| match action {
+                Action::Left => choice.left.clone(),
+                Action::Right => choice.right.clone(),
+                _ => None,
+            });
+        if let Some(sideways) = sideways {
+            return self.update(sideways.into_message());
+        }
 
         match action {
             Action::Up | Action::Left | Action::Down | Action::Right => {
@@ -446,6 +527,7 @@ fn updates_question() -> DialogContent {
         ],
         dismiss: DialogAction::CloseThen(SettingsMessage::CheckForUpdatesToggled(false).into()),
         click_outside_dismisses: false,
+        back_button: false,
     }
 }
 
@@ -480,6 +562,7 @@ fn box_art_question() -> DialogContent {
         ],
         dismiss: DialogAction::CloseThen(LibraryMessage::BoxArtAnswered(false).into()),
         click_outside_dismisses: false,
+        back_button: false,
     }
 }
 
@@ -520,6 +603,7 @@ fn sort_menu(settings: &Settings) -> DialogContent {
         choices: sorts.into_iter().chain(filters).collect(),
         dismiss: DialogAction::Close,
         click_outside_dismisses: true,
+        back_button: false,
     }
 }
 
@@ -575,52 +659,7 @@ fn folder_menu(index: usize, folder: &LibraryFolder) -> DialogContent {
         choices,
         dismiss: DialogAction::Close,
         click_outside_dismisses: true,
-    }
-}
-
-/// The page of a game's menu that picks a revision of `console`.
-fn revisions_page(entry: &LibraryEntry, console: Console) -> DialogContent {
-    let path = &entry.path;
-    let choices = console
-        .revisions()
-        .iter()
-        .map(|&revision| {
-            let choice = Choice::new(
-                Icon::Cpu,
-                revision.name(),
-                ChoiceStyle::Secondary,
-                DialogAction::Stay(
-                    LibraryMessage::GameModelPicked(
-                        path.clone(),
-                        Some(ModelPreference::Fixed(revision)),
-                    )
-                    .into(),
-                ),
-            )
-            .checked(entry.model() == Some(revision));
-            if revision == console.recommended() {
-                choice.hint("Recommended")
-            } else {
-                choice
-            }
-        })
-        .collect();
-
-    DialogContent {
-        title: format!("Which Game Boy for {}?", entry.name()),
-        text: Some(String::from(model::about(
-            entry
-                .model()
-                .filter(|&model| Console::of(model) == console)
-                .unwrap_or(console.recommended()),
-        ))),
-        notice: None,
-        layout: Layout::List,
-        choices,
-        dismiss: DialogAction::Stay(
-            DialogMessage::ShowGameMenu(path.clone(), GameMenuPage::Consoles).into(),
-        ),
-        click_outside_dismisses: true,
+        back_button: false,
     }
 }
 
@@ -805,6 +844,7 @@ fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
         choices: boxes,
         dismiss: DialogAction::Close,
         click_outside_dismisses: true,
+        back_button: false,
     }
 }
 
@@ -840,6 +880,7 @@ fn delete_question(path: &Path, entry: Option<&LibraryEntry>) -> DialogContent {
         ],
         dismiss: DialogAction::Close,
         click_outside_dismisses: true,
+        back_button: false,
     }
 }
 
@@ -888,6 +929,7 @@ fn other_model_question(saved: Model, configured: Model, remembers: bool) -> Dia
         ],
         dismiss: answer(ResumeAnswer::Cancel),
         click_outside_dismisses: true,
+        back_button: false,
     }
 }
 
@@ -922,6 +964,7 @@ fn remove_question(path: &Path, entry: Option<&LibraryEntry>) -> DialogContent {
         ],
         dismiss: DialogAction::Close,
         click_outside_dismisses: true,
+        back_button: false,
     }
 }
 

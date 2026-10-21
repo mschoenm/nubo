@@ -648,22 +648,15 @@ impl App {
     }
 
     /// What to pick for a game with this header in its menu so it starts on
-    /// `model` from now on: Automatic when that picks `model` (left to the
-    /// settings when they are on Automatic too), else nothing when the
-    /// settings pick `model`, else `model` itself.
+    /// `model` from now on: nothing when the settings pick `model` for it,
+    /// else `model` itself.
     fn preference_starting_on(
         &self,
         header: &CartridgeHeader,
         model: Model,
     ) -> Option<ModelPreference> {
-        let settings = self.settings.shared.model;
-        if ModelPreference::Automatic.model_for(header) == model {
-            (settings != ModelPreference::Automatic).then_some(ModelPreference::Automatic)
-        } else if settings.model_for(header) == model {
-            None
-        } else {
-            Some(ModelPreference::Fixed(model))
-        }
+        (self.settings.shared.model.model_for(header) != model)
+            .then_some(ModelPreference::Fixed(model))
     }
 
     /// Whether the running game uses another model than the settings pick,
