@@ -2,8 +2,10 @@
 //! release. Release notes are written once, in the `<releases>` list of the
 //! AppStream description (the metainfo file that Linux software centers and
 //! Flathub show them from), and the newest entry there must be the version in
-//! the root `Cargo.toml`.
+//! the root `Cargo.toml`. The GitHub release shows them between a table of its
+//! downloads, which links to the download page too, and how to install them.
 
+use super::download_page::DOWNLOAD_PAGE;
 use super::{APP_ID, LINUX_FILES, Result, workspace_root};
 use roxmltree::{Document, Node};
 use std::fmt::Write;
@@ -12,6 +14,12 @@ use std::fs;
 /// The version every crate of the workspace shares, from the root
 /// `Cargo.toml`.
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Where GitHub keeps each release's files, under its tag.
+const RELEASE_FILES: &str = "https://github.com/mschoenm/nubo/releases/download";
+
+/// The web version, which always runs the newest Nubo.
+const WEB_VERSION: &str = "https://mschoenm.github.io/nubo/";
 
 /// Checks that the newest release in the metainfo file is the workspace's
 /// version (and, when given, that `tag` names it, as in `v1.2.3`), and returns
@@ -32,7 +40,8 @@ pub fn release_notes(tag: Option<&str>) -> Result<String> {
 }
 
 /// The notes of the newest `<release>` in `metainfo`, which must be
-/// `version`, followed by how to install the release.
+/// `version`, after a table of the release's downloads and before how to
+/// install them.
 fn notes_for(metainfo: &str, version: &str) -> Result<String> {
     let document = Document::parse(metainfo)
         .map_err(|error| format!("the metainfo file is invalid: {error}"))?;
@@ -67,7 +76,9 @@ fn notes_for(metainfo: &str, version: &str) -> Result<String> {
             format!("the release {version} in the metainfo file has no <description>")
         })?;
 
-    let mut notes = markdown(description);
+    let mut notes = downloads(version);
+    notes.push_str("\n## What's new\n\n");
+    notes.push_str(&markdown(description));
     notes.push_str(
         "\n## Install\n\
          \n\
@@ -92,6 +103,35 @@ fn notes_for(metainfo: &str, version: &str) -> Result<String> {
          `info` folder. The README's RetroArch Core section has the details.\n",
     );
     Ok(notes)
+}
+
+/// A table with a link to each of the files the release of `version`
+/// publishes (named as `release.yml` names them), and to the download page,
+/// which picks the right one for the reader's computer.
+fn downloads(version: &str) -> String {
+    let file = |name: &str| format!("{RELEASE_FILES}/v{version}/{name}");
+    format!(
+        "## Download\n\
+         \n\
+         Not sure which file you need? The [download page]({DOWNLOAD_PAGE}) picks the right one \
+         for your computer.\n\
+         \n\
+         | System | Download |\n\
+         | ------ | -------- |\n\
+         | Windows | [Installer]({}) · [Zip]({}) (runs without installing) |\n\
+         | Linux | [Flatpak for x86_64]({}) (most PCs) · [Flatpak for ARM]({}) |\n\
+         | Browser | [Play in your browser]({WEB_VERSION}), nothing to install |\n\
+         | RetroArch | The core for [Windows]({}), [macOS]({}), [Linux x86_64]({}) and \
+         [Linux ARM]({}) |\n",
+        file("Nubo-windows-x64.msi"),
+        file("Nubo-windows-x64.zip"),
+        file("Nubo-linux-x86_64.flatpak"),
+        file("Nubo-linux-aarch64.flatpak"),
+        file("Nubo-libretro-windows-x64.zip"),
+        file("Nubo-libretro-macos-universal.zip"),
+        file("Nubo-libretro-linux-x86_64.zip"),
+        file("Nubo-libretro-linux-aarch64.zip"),
+    )
 }
 
 /// Whether `text` looks like an AppStream date, `YYYY-MM-DD`.
@@ -183,14 +223,30 @@ mod tests {
     #[test]
     fn the_newest_release_becomes_markdown_with_install_instructions() {
         let notes = notes_for(METAINFO, "0.2.0").unwrap();
-        assert!(notes.starts_with(
-            "Faster, with a `--model` option.\n\n\
+        assert!(notes.starts_with("## Download\n"));
+        assert!(notes.contains(
+            "\n## What's new\n\n\
+             Faster, with a `--model` option.\n\n\
              - Save states load twice as fast\n\
              - Fixes *Pokémon* crashing\n\n## Install\n"
         ));
         assert!(notes.contains("flatpak install --user Nubo-linux-x86_64.flatpak"));
         assert!(notes.contains("`Nubo-windows-x64.msi`"));
         assert!(notes.contains("`Nubo-libretro-<system>.zip`"));
+    }
+
+    #[test]
+    fn the_download_table_links_to_this_release_and_the_download_page() {
+        let notes = notes_for(METAINFO, "0.2.0").unwrap();
+        assert!(notes.contains(
+            "[Installer](https://github.com/mschoenm/nubo/releases/download/v0.2.0/\
+             Nubo-windows-x64.msi)"
+        ));
+        assert!(notes.contains(
+            "[Linux ARM](https://github.com/mschoenm/nubo/releases/download/v0.2.0/\
+             Nubo-libretro-linux-aarch64.zip)"
+        ));
+        assert!(notes.contains("[download page](https://mschoenm.github.io/nubo/download/)"));
     }
 
     #[test]

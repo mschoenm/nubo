@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Download Nubo, the Game Boy and Game Boy Color emulator</title>
+    <meta
+      name="description"
+      content="Nubo is a free Game Boy and Game Boy Color emulator for Windows and Linux, with a game library, save states, controller support and Super Game Boy borders. Download it, or play in your browser."
+    />
+    <link rel="canonical" href="https://mschoenm.github.io/nubo/download/" />
+    <link rel="icon" href="images/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="images/icon.png" type="image/png" />
+    <meta name="theme-color" content="#17181f" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f7f7fa" media="(prefers-color-scheme: light)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Nubo" />
+    <meta property="og:title" content="Nubo, a Game Boy and Game Boy Color emulator" />
+    <meta
+      property="og:description"
+      content="Play your Game Boy and Game Boy Color games the way you remember them. Free, for Windows and Linux, and in your browser."
+    />
+    <meta property="og:url" content="https://mschoenm.github.io/nubo/download/" />
+    <meta
+      property="og:image"
+      content="https://mschoenm.github.io/nubo/download/images/screenshots/super-game-boy.png"
+    />
+    <meta property="og:image:width" content="1028" />
+    <meta property="og:image:height" content="865" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Nubo",
+        "description": "A Game Boy and Game Boy Color emulator that runs games as the real consoles do, cycle by cycle.",
+        "applicationCategory": "GameApplication",
+        "applicationSubCategory": "Emulator",
+        "operatingSystem": "Windows, Linux, Web browser",
+        "url": "https://mschoenm.github.io/nubo/download/",
+        "downloadUrl": "https://github.com/mschoenm/nubo/releases/latest",
+        "image": "https://mschoenm.github.io/nubo/download/images/screenshots/super-game-boy.png",
+        "screenshot": "https://mschoenm.github.io/nubo/download/images/screenshots/library.png",
+        "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
+    <style>
+      /* The app's own colors (frontends/nubo/src/ui/theme.rs), light and
+         dark, following the system. */
+      :root {
+        color-scheme: light dark;
+        --background: #f7f7fa;
+        --surface: #ffffff;
+        --surface-raised: #efeff5;
+        --border: #dcdce6;
+        --text: #1c1d25;
+        --muted: #5d5f6e;
+        --primary: #6552e0;
+        --primary-hover: #5442c9;
+        --on-primary: #ffffff;
+        --primary-soft: #ebe8fd;
+        --code: #ececf3;
+        --shadow: 0 18px 50px rgba(36, 30, 90, 0.16);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --background: #17181f;
+          --surface: #1f2029;
+          --surface-raised: #272833;
+          --border: #32343f;
+          --text: #e7e8ef;
+          --muted: #a3a5b5;
+          --primary: #8b7cf6;
+          --primary-hover: #9d90f8;
+          --on-primary: #14121f;
+          --primary-soft: #2a2747;
+          --code: #12131a;
+          --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: var(--background);
+        color: var(--text);
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Ubuntu,
+          Cantarell, "Helvetica Neue", Arial, sans-serif;
+        font-size: 17px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+      a {
+        color: var(--primary);
+      }
+      a:hover {
+        color: var(--primary-hover);
+      }
+      img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+      }
+      code {
+        font-family: ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", Menlo, Consolas,
+          monospace;
+        font-size: 0.88em;
+        background: var(--code);
+        border-radius: 5px;
+        padding: 0.1em 0.35em;
+      }
+      .wrap {
+        max-width: 1120px;
+        margin-left: auto;
+        margin-right: auto;
+        padding-left: 20px;
+        padding-right: 20px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+
+      /* The bar at the top. */
+      .top {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding-top: 18px;
+        padding-bottom: 18px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 20px;
+        color: var(--text);
+        text-decoration: none;
+        margin-right: auto;
+      }
+      .brand img {
+        width: 34px;
+        height: 34px;
+      }
+      .top nav {
+        display: flex;
+        gap: 20px;
+        font-size: 15px;
+      }
+      .top nav a {
+        color: var(--muted);
+        text-decoration: none;
+      }
+      .top nav a:hover {
+        color: var(--text);
+      }
+
+      /* The download, first and largest. */
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+        gap: 48px;
+        align-items: center;
+        padding-top: 28px;
+        padding-bottom: 56px;
+      }
+      h1 {
+        font-size: clamp(32px, 4.4vw, 50px);
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+        margin: 0 0 16px;
+      }
+      .lead {
+        font-size: 19px;
+        color: var(--muted);
+        margin: 0 0 28px;
+        max-width: 34em;
+      }
+      .notice {
+        background: var(--primary-soft);
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin: 0 0 20px;
+        font-size: 16px;
+      }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        border-radius: 12px;
+        padding: 12px 20px;
+        font: inherit;
+        font-weight: 650;
+        text-decoration: none;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition:
+          background-color 0.15s,
+          transform 0.15s;
+      }
+      .button svg {
+        flex: none;
+      }
+      .button.primary {
+        background: var(--primary);
+        color: var(--on-primary);
+      }
+      .button.primary:hover {
+        background: var(--primary-hover);
+        color: var(--on-primary);
+        transform: translateY(-1px);
+      }
+      .button.secondary {
+        background: var(--surface);
+        color: var(--text);
+        border-color: var(--border);
+      }
+      .button.secondary:hover {
+        background: var(--surface-raised);
+        color: var(--text);
+      }
+      .button.big {
+        font-size: 20px;
+        padding: 16px 28px;
+        min-width: 300px;
+        box-shadow: 0 10px 28px rgba(101, 82, 224, 0.35);
+      }
+      .choice {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .download-details {
+        color: var(--muted);
+        font-size: 15px;
+        margin: 12px 0 0;
+      }
+      .browser-only {
+        color: var(--muted);
+        margin: 0 0 16px;
+      }
+      .download-other {
+        font-size: 15px;
+        margin: 6px 0 0;
+      }
+      .play-instead {
+        margin-top: 26px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+      .shot {
+        margin: 0;
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+      }
+
+      section {
+        padding-top: 56px;
+        padding-bottom: 8px;
+      }
+      h2 {
+        font-size: 30px;
+        letter-spacing: -0.01em;
+        margin: 0 0 8px;
+      }
+      .section-lead {
+        color: var(--muted);
+        margin: 0 0 28px;
+      }
+
+      /* Every download, in cards. */
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 18px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .card.mine {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 1px var(--primary);
+      }
+      .card h3 {
+        margin: 0;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .card .yours {
+        font-size: 12px;
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--primary);
+        background: var(--primary-soft);
+        border-radius: 999px;
+        padding: 2px 9px;
+      }
+      .card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+      }
+      .files {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .files a {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        background: var(--surface-raised);
+        color: var(--text);
+        text-decoration: none;
+        font-size: 15px;
+      }
+      .files a:hover {
+        background: var(--primary-soft);
+      }
+      .files .label {
+        font-weight: 600;
+      }
+      .files .size {
+        color: var(--muted);
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      /* Getting started. */
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 18px;
+      }
+      .steps .card ol {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+      .steps .card li + li {
+        margin-top: 6px;
+      }
+      .command {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--code);
+        border-radius: 10px;
+        padding: 8px 8px 8px 12px;
+      }
+      .command code {
+        background: none;
+        padding: 0;
+        flex: 1;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+      .copy {
+        font: inherit;
+        font-size: 13px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 4px 10px;
+        cursor: pointer;
+      }
+
+      /* What Nubo does, with pictures. */
+      .features {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 36px 30px;
+      }
+      .feature figure {
+        margin: 0 0 14px;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+        aspect-ratio: 1028 / 845;
+      }
+      .feature figure img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: top;
+      }
+      .feature h3 {
+        margin: 0 0 4px;
+        font-size: 19px;
+      }
+      .feature p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+      }
+      .more-features {
+        columns: 2 320px;
+        column-gap: 32px;
+        padding-left: 20px;
+        color: var(--muted);
+        font-size: 15px;
+        margin: 30px 0 0;
+      }
+      .more-features li {
+        break-inside: avoid;
+        margin-bottom: 8px;
+      }
+      .more-features strong {
+        color: var(--text);
+      }
+      .aside {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 24px 26px;
+      }
+      .aside p {
+        margin: 0 0 10px;
+        color: var(--muted);
+      }
+      .aside p:last-child {
+        margin-bottom: 0;
+      }
+      .split {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 18px;
+      }
+      .split h2 {
+        font-size: 24px;
+      }
+
+      footer {
+        margin-top: 64px;
+        border-top: 1px solid var(--border);
+        padding-top: 26px;
+        padding-bottom: 40px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      footer nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 22px;
+        margin-bottom: 14px;
+      }
+      footer p {
+        margin: 0 0 6px;
+      }
+
+      @media (max-width: 860px) {
+        .hero {
+          grid-template-columns: 1fr;
+          gap: 32px;
+          padding-top: 8px;
+        }
+        .top nav a.wide {
+          display: none;
+        }
+        .features {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 520px) {
+        body {
+          font-size: 16px;
+        }
+        .wrap {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+        .button.big {
+          min-width: 0;
+          width: 100%;
+        }
+        .choice .button {
+          width: 100%;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        .button {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Icons drawn for this page: a download arrow and a play triangle. -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="icon-download" viewBox="0 0 24 24">
+        <path
+          d="M12 3v12M6.5 10l5.5 5.5 5.5-5.5M4 20h16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24">
+        <path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+      </symbol>
+    </svg>
+
+    <header class="top wrap">
+      <a class="brand" href="./"><img src="images/icon.svg" width="34" height="34" alt="" />Nubo</a>
+      <nav aria-label="Page">
+        <a class="wide" href="#features">Features</a>
+        <a href="#downloads">All downloads</a>
+        <a href="https://github.com/mschoenm/nubo">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <div class="hero wrap">
+        <div>
+          <h1>Play your Game Boy games the way you remember them</h1>
+          <p class="lead">
+            Nubo is a free Game Boy and Game Boy Color emulator. It recreates the console one
+            cycle at a time, so the picture, the sound and every trick games play come out just as
+            they did on the real thing.
+          </p>
+
+          <!-- Filled in for the visitor's computer by the script below; without
+               it, the two desktop downloads. -->
+          <p class="notice" id="update-notice" hidden></p>
+          <div id="primary">
+            <div class="choice">
+              <a class="button primary big" href="https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.msi">
+                <svg width="22" height="22"><use href="#icon-download" /></svg>Download for Windows
+              </a>
+              <a class="button secondary" href="#linux">Download for Linux</a>
+            </div>
+            <p class="download-details">Free and open source · 64-bit Windows · Linux on x86_64 and ARM</p>
+          </div>
+
+          <div class="play-instead">
+            <a class="button secondary" href="../">
+              <svg width="18" height="18"><use href="#icon-play" /></svg>Play in your browser
+            </a>
+            <span>Nothing to install</span>
+          </div>
+        </div>
+        <figure class="shot">
+          <img
+            src="images/screenshots/super-game-boy.png"
+            width="1028"
+            height="865"
+            alt="Tobu Tobu Girl Deluxe being played in Nubo: the girl jumps toward a crab over pink mountains, inside the game's own illustrated Super Game Boy border"
+          />
+        </figure>
+      </div>
+
+      <section id="downloads" class="wrap">
+        <h2>All downloads</h2>
+        <p class="section-lead" id="release-line">
+          The newest version of Nubo.
+          <a href="https://github.com/mschoenm/nubo/releases/latest">What's new</a>
+        </p>
+        <div class="cards">
+          <div class="card" id="windows" data-platforms="windows-x64">
+            <h3>Windows</h3>
+            <p>For 64-bit Windows. The installer adds Nubo to the Start menu and updates an installed Nubo. The zip runs without installing.</p>
+            <ul class="files">
+              <li>
+                <a href="https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.msi" data-file="Nubo-windows-x64.msi">
+                  <span class="label">Installer (.msi)</span><span class="size"></span>
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.zip" data-file="Nubo-windows-x64.zip">
+                  <span class="label">Zip, runs without installing</span><span class="size"></span>
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div class="card" id="linux" data-platforms="linux-x86_64 linux-aarch64">
+            <h3>Linux</h3>
+            <p>A Flatpak, which works on almost every Linux. Most PCs need x86_64; ARM computers, such as a Raspberry Pi, need ARM.</p>
+            <ul class="files">
+              <li>
+                <a href="https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-x86_64.flatpak" data-file="Nubo-linux-x86_64.flatpak">
+                  <span class="label">Flatpak for x86_64 (most PCs)</span><span class="size"></span>
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/mschoenm/nubo/releases/latest/download/Nubo-linux-aarch64.flatpak" data-file="Nubo-linux-aarch64.flatpak">
+                  <span class="label">Flatpak for ARM (aarch64)</span><span class="size"></span>
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div class="card" id="browser" data-platforms="macos mobile">
+            <h3>Browser</h3>
+            <p>Everything the desktop app has, on any computer with a modern browser. Your games and saves stay in the browser.</p>
+            <ul class="files">
+              <li>
+                <a href="../"><span class="label">Play in your browser</span><span class="size">Nothing to install</span></a>
+              </li>
+            </ul>
+          </div>
+          <div class="card" id="macos">
+            <h3>macOS</h3>
+            <p>
+              There is no Mac app to download yet. Play in your browser, use the RetroArch core, or
+              <a href="https://github.com/mschoenm/nubo/blob/main/BUILDING.md#macos">build Nubo yourself</a>.
+            </p>
+          </div>
+          <div class="card" id="retroarch">
+            <h3>RetroArch</h3>
+            <p>
+              Nubo as a core for RetroArch.
+              <a href="https://github.com/mschoenm/nubo/blob/main/docs/RETROARCH.md">How to install it</a>
+            </p>
+            <ul class="files">
+              <li>
+                <a href="https://github.com/mschoenm/nubo/releases/latest/download/Nubo-libretro-windows-x64.zip" data-file="Nubo-libretro-windows-x64.zip">
+                  <span class="label">Windows</span><span class="size"></span>
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/mschoenm/nubo/releases/latest/download/Nubo-libretro-macos-universal.zip" data-file="Nubo-libretro-macos-universal.zip">
+                  <span class="label">macOS (Apple silicon and Intel)</span><span class="size"></span>
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/mschoenm/nubo/releases/latest/download/Nubo-libretro-linux-x86_64.zip" data-file="Nubo-libretro-linux-x86_64.zip">
+                  <span class="label">Linux x86_64</span><span class="size"></span>
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/mschoenm/nubo/releases/latest/download/Nubo-libretro-linux-aarch64.zip" data-file="Nubo-libretro-linux-aarch64.zip">
+                  <span class="label">Linux ARM (aarch64)</span><span class="size"></span>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="install" class="wrap">
+        <h2>Installing</h2>
+        <p class="section-lead">A minute, and your saves and settings stay when you update.</p>
+        <div class="steps">
+          <div class="card" id="install-windows">
+            <h3>Windows</h3>
+            <ol>
+              <li>Open the downloaded <code>Nubo-windows-x64.msi</code>. It installs Nubo for you alone, without asking for administrator rights.</li>
+              <li>Nubo isn't signed yet, so Windows may say it protected your PC. Choose <strong>More info</strong>, then <strong>Run anyway</strong>.</li>
+              <li>To update, run the newer installer. It replaces the old Nubo and keeps your choices.</li>
+            </ol>
+          </div>
+          <div class="card" id="install-linux">
+            <h3>Linux</h3>
+            <ol>
+              <li>Open the downloaded <code>.flatpak</code> file with your software center, or install it from a terminal:</li>
+            </ol>
+            <div class="command">
+              <code id="flatpak-install">flatpak install --user Nubo-linux-x86_64.flatpak</code>
+              <button class="copy" type="button" data-copy="flatpak-install">Copy</button>
+            </div>
+            <ol start="2">
+              <li>The first time, Flatpak also downloads what Nubo needs from Flathub.</li>
+              <li>To update, install the newer file over the old one:</li>
+            </ol>
+            <div class="command">
+              <code id="flatpak-update">flatpak install --user --reinstall Nubo-linux-x86_64.flatpak</code>
+              <button class="copy" type="button" data-copy="flatpak-update">Copy</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="wrap">
+        <h2>Made for playing</h2>
+        <p class="section-lead">Everything you need to sit back and play, with nothing to set up first.</p>
+        <div class="features">
+          <div class="feature">
+            <figure>
+              <img src="images/screenshots/library.png" width="1308" height="865" loading="lazy" alt="Nubo's library: a Continue playing row with four games, and all games below it, each with its title screen" />
+            </figure>
+            <h3>Your games in a library</h3>
+            <p>Point Nubo at your games folder and every game shows up with its title screen, the ones you played last up front.</p>
+          </div>
+          <div class="feature">
+            <figure>
+              <img src="images/screenshots/pause-menu.png" width="1028" height="845" loading="lazy" alt="Nubo's pause menu over Tobu Tobu Girl Deluxe: resume, save state, load state, cheats, screenshot, fullscreen and settings" />
+            </figure>
+            <h3>Save anywhere</h3>
+            <p>Save states with a picture, quick save and load, rewind a few seconds, and pick up right where you left off.</p>
+          </div>
+          <div class="feature">
+            <figure>
+              <img src="images/screenshots/nubo-border.png" width="1028" height="865" loading="lazy" alt="El Dueloroso's saloon on the Super Game Boy, inside Nubo's own border: a purple frame under a night sky, with a cloud peeking over it" />
+            </figure>
+            <h3>Super Game Boy colors and borders</h3>
+            <p>Games made for it show their own colors and border, as they looked on a TV. Up to four players can join in.</p>
+          </div>
+          <div class="feature">
+            <figure>
+              <img src="images/screenshots/big2small.png" width="1028" height="845" loading="lazy" alt="Big2Small's colorful forest map" />
+            </figure>
+            <h3>True to the real console</h3>
+            <p>Nubo runs games as the hardware does, cycle by cycle, with the soft colors of the Game Boy Color's own screen.</p>
+          </div>
+        </div>
+        <ul class="more-features">
+          <li><strong>Keyboard or controller:</strong> change any button, and the menus work with a controller too.</li>
+          <li><strong>Every Game Boy:</strong> the original, the Pocket, the Super Game Boy 1 and 2, the Game Boy Color and the Game Boy Advance playing Game Boy games.</li>
+          <li><strong>Colors:</strong> gray, green or Pocket screens, Super Game Boy palettes with an editor, and light and dark themes.</li>
+          <li><strong>Cheats:</strong> GameShark and Game Genie codes, kept for each game.</li>
+          <li><strong>Fast forward, rewind, fullscreen and screenshots</strong>, a key or a button away.</li>
+          <li><strong>Your saves move along:</strong> in-game saves are plain <code>.sav</code> files that work in the RetroArch core too.</li>
+        </ul>
+      </section>
+
+      <section class="wrap">
+        <div class="split">
+          <div class="aside">
+            <h2>Where to get games</h2>
+            <p>
+              Nubo doesn't come with any games. Play the games you own, or the many free ones made by
+              fans today, such as
+              <a href="https://tangramgames.itch.io/tobu-tobu-girl-deluxe">Tobu Tobu Girl Deluxe</a>,
+              <a href="https://github.com/AntonioND/ucity">µCity</a> or those on
+              <a href="https://hh.gbdev.io">Homebrew Hub</a>.
+            </p>
+          </div>
+          <div class="aside">
+            <h2>Made with AI</h2>
+            <p>
+              Nubo is made almost entirely by AI: nearly all of its code and documentation were written
+              by Claude, Anthropic's AI model. Its maintainer decides what Nubo does and chooses what
+              goes in.
+            </p>
+            <p>
+              If you'd rather not use software made this way, that's a fair choice.
+              <a href="https://github.com/mschoenm/nubo#made-with-ai">Read more</a>
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="wrap">
+      <nav aria-label="More">
+        <a href="https://github.com/mschoenm/nubo">Source code</a>
+        <a href="https://github.com/mschoenm/nubo/releases">Every release</a>
+        <a href="https://github.com/mschoenm/nubo/releases/tag/nightly">Nightly build</a>
+        <a href="https://github.com/mschoenm/nubo/issues">Report a problem</a>
+        <a href="https://github.com/mschoenm/nubo#credits">Credits</a>
+      </nav>
+      <p>Nubo is free software under the GNU General Public License, version 3 or later.</p>
+      <p>Nubo isn't made or endorsed by Nintendo. Game Boy, Game Boy Color and Super Game Boy are trademarks of Nintendo.</p>
+    </footer>
+
+    <script>
+      // Puts the download for the visitor's computer first. The app names its
+      // computer in the address (?for=linux-aarch64, and &from=<its version>);
+      // otherwise the browser's own description is used. Everything the
+      // script changes is also on the page without it.
+      (function () {
+        const RELEASES = "https://github.com/mschoenm/nubo/releases";
+        const LATEST = RELEASES + "/latest/download/";
+        const PLATFORMS = {
+          "windows-x64": {
+            title: "Download for Windows",
+            file: "Nubo-windows-x64.msi",
+            details: "Installer for 64-bit Windows",
+            other: { text: "the zip, which runs without installing", file: "Nubo-windows-x64.zip" },
+            update: "Run the installer: it replaces your Nubo and keeps your saves and settings.",
+          },
+          "linux-x86_64": {
+            title: "Download for Linux",
+            file: "Nubo-linux-x86_64.flatpak",
+            details: "Flatpak for x86_64, which most PCs are",
+            other: { text: "the Flatpak for ARM computers", file: "Nubo-linux-aarch64.flatpak" },
+            update: "Install the new file over the old one, as shown under Installing; your saves and settings stay.",
+          },
+          "linux-aarch64": {
+            title: "Download for Linux on ARM",
+            file: "Nubo-linux-aarch64.flatpak",
+            details: "Flatpak for ARM (aarch64)",
+            other: { text: "the Flatpak for x86_64, which most PCs are", file: "Nubo-linux-x86_64.flatpak" },
+            update: "Install the new file over the old one, as shown under Installing; your saves and settings stay.",
+          },
+          macos: { browser: "There's no Mac app to download yet, but Nubo plays in your browser." },
+          mobile: { browser: "Nubo is made for computers, with a keyboard or a controller. On a phone or tablet, try it in your browser." },
+        };
+
+        const parameters = new URLSearchParams(location.search);
+        const fromApp = PLATFORMS[parameters.get("for")] ? parameters.get("for") : null;
+        const running = /^\d+(\.\d+)*$/.test(parameters.get("from") || "") ? parameters.get("from") : null;
+        let platform = fromApp || guess();
+        let release = null;
+
+        // The computer from what the browser says about itself.
+        function guess() {
+          const agent = navigator.userAgent || "";
+          const data = navigator.userAgentData;
+          const system = ((data && data.platform) || navigator.platform || "") + " " + agent;
+          if ((data && data.mobile) || /Android|iPhone|iPad|iPod/i.test(agent)) return "mobile";
+          // iPads ask for the desktop page and say they are Macs.
+          if (/Mac/i.test(system)) return navigator.maxTouchPoints > 1 ? "mobile" : "macos";
+          if (/Win/i.test(system)) return "windows-x64";
+          if (/Linux|X11|CrOS/i.test(system)) return /aarch64|arm/i.test(agent) ? "linux-aarch64" : "linux-x86_64";
+          return null;
+        }
+
+        function element(tag, attributes, children) {
+          const node = document.createElement(tag);
+          for (const [name, value] of Object.entries(attributes || {})) node.setAttribute(name, value);
+          for (const child of children || []) node.append(child);
+          return node;
+        }
+
+        function icon(name, size) {
+          const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          svg.setAttribute("width", size);
+          svg.setAttribute("height", size);
+          svg.setAttribute("aria-hidden", "true");
+          const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+          use.setAttribute("href", "#icon-" + name);
+          svg.append(use);
+          return svg;
+        }
+
+        function megabytes(bytes) {
+          return (bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0) + " MB";
+        }
+
+        function size(file) {
+          const asset = release && release.assets.find((asset) => asset.name === file);
+          return asset ? megabytes(asset.size) : null;
+        }
+
+        function show() {
+          const choice = PLATFORMS[platform];
+          if (!choice) return;
+          const primary = document.getElementById("primary");
+          primary.replaceChildren();
+
+          if (choice.browser) {
+            primary.append(
+              element("p", { class: "browser-only" }, [choice.browser]),
+              element("div", { class: "choice" }, [
+                element("a", { class: "button primary big", href: "../" }, [icon("play", 22), "Play in your browser"]),
+              ]),
+              element("p", { class: "download-other" }, [
+                element("a", { href: "#downloads" }, ["Every download"]),
+                " · the RetroArch core runs on Macs too",
+              ]),
+            );
+            document.querySelector(".play-instead").hidden = true;
+          } else {
+            const details = [choice.details];
+            if (release) details.push("Version " + release.version);
+            if (size(choice.file)) details.push(size(choice.file));
+            primary.append(
+              element("div", { class: "choice" }, [
+                element("a", { class: "button primary big", href: LATEST + choice.file }, [icon("download", 22), choice.title]),
+              ]),
+              element("p", { class: "download-details" }, [details.join(" · ")]),
+              element("p", { class: "download-other" }, [
+                "Or ",
+                element("a", { href: LATEST + choice.other.file }, [choice.other.text]),
+                " · ",
+                element("a", { href: "#downloads" }, ["other systems"]),
+              ]),
+            );
+          }
+
+          for (const card of document.querySelectorAll("[data-platforms]")) {
+            const mine = card.dataset.platforms.split(" ").includes(platform);
+            card.classList.toggle("mine", mine);
+            const heading = card.querySelector("h3");
+            const badge = heading.querySelector(".yours");
+            if (mine && !badge) heading.append(element("span", { class: "yours" }, [fromApp ? "This computer" : "Yours"]));
+            if (!mine && badge) badge.remove();
+          }
+          if (platform === "linux-aarch64") {
+            for (const id of ["flatpak-install", "flatpak-update"]) {
+              const code = document.getElementById(id);
+              code.textContent = code.textContent.replace("x86_64", "aarch64");
+            }
+          }
+          if (platform === "linux-x86_64" || platform === "linux-aarch64") {
+            const steps = document.querySelector(".steps");
+            steps.prepend(document.getElementById("install-linux"));
+          }
+
+          const notice = document.getElementById("update-notice");
+          if (fromApp && choice.update && release && running && release.version !== running) {
+            notice.replaceChildren(
+              element("strong", {}, ["Nubo " + release.version + " is out."]),
+              " You have " + running + ". " + choice.update + " ",
+              element("a", { href: release.page }, ["What's new"]),
+            );
+            notice.hidden = false;
+          }
+        }
+
+        // The version and the files' sizes, from GitHub; the links work without them.
+        function fill() {
+          const line = document.getElementById("release-line");
+          line.replaceChildren(
+            "Nubo " + release.version + ", released " + release.date + ". ",
+            element("a", { href: release.page }, ["What's new"]),
+          );
+          for (const link of document.querySelectorAll("[data-file]")) {
+            const found = size(link.dataset.file);
+            if (found) link.querySelector(".size").textContent = found;
+          }
+          show();
+        }
+
+        for (const button of document.querySelectorAll("[data-copy]")) {
+          button.addEventListener("click", () => {
+            const text = document.getElementById(button.dataset.copy).textContent;
+            navigator.clipboard.writeText(text).then(() => {
+              button.textContent = "Copied";
+              setTimeout(() => (button.textContent = "Copy"), 1500);
+            });
+          });
+        }
+
+        show();
+
+        // Chromium-based browsers only say an ARM Linux is ARM when asked.
+        if (!fromApp && platform === "linux-x86_64" && navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+          navigator.userAgentData.getHighEntropyValues(["architecture"]).then((values) => {
+            if (values.architecture === "arm") {
+              platform = "linux-aarch64";
+              show();
+            }
+          }, () => {});
+        }
+
+        fetch("https://api.github.com/repos/mschoenm/nubo/releases/latest", {
+          headers: { Accept: "application/vnd.github+json" },
+        })
+          .then((response) => (response.ok ? response.json() : Promise.reject(response.status)))
+          .then((answer) => {
+            release = {
+              version: String(answer.tag_name).replace(/^v/, ""),
+              date: new Date(answer.published_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
+              page: answer.html_url,
+              assets: answer.assets || [],
+            };
+            fill();
+          })
+          .catch(() => {});
+      })();
+    </script>
+  </body>
+</html>

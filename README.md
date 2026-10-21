@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="#download"><img src="images/buttons/download.svg" width="210" alt="Download"></a>
+  <a href="https://mschoenm.github.io/nubo/download/"><img src="images/buttons/download.svg" width="210" alt="Download"></a>
   &nbsp;
   <a href="https://mschoenm.github.io/nubo/"><img src="images/buttons/play-in-your-browser.svg" width="210" alt="Play in your browser"></a>
 </p>
@@ -39,6 +39,8 @@ If you'd rather not use software made this way, that's a fair choice, and it's w
 
 ## Download
 
+The [download page](https://mschoenm.github.io/nubo/download/) offers the right file for your computer. Or pick one here:
+
 | Platform | Download |
 | -------- | -------- |
 | Windows | [Installer](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.msi) · [Zip](https://github.com/mschoenm/nubo/releases/latest/download/Nubo-windows-x64.zip) (runs without installing) |
@@ -50,7 +52,7 @@ If you'd rather not use software made this way, that's a fair choice, and it's w
 - **Windows:** the files aren't signed yet, so SmartScreen may warn you the first time. Choose More info, then Run anyway.
 - **Linux:** open the `.flatpak` file with your software center, or run `flatpak install --user Nubo-linux-x86_64.flatpak` (`Nubo-linux-aarch64.flatpak` on ARM). Flatpak fetches the runtime Nubo needs from Flathub the first time.
 - **Browser:** has what the desktop app has: the library, save states, cheats, screenshots (as downloads) and box art. Browsers have no game folders, so you add games (or open one) and Nubo keeps them in the browser, with their saves, until you remove them from the library. Clearing the site's data in your browser deletes them.
-- **New versions:** the desktop app can tell you when a new version is out. It asks first, since it looks on GitHub.
+- **New versions:** the desktop app can tell you when a new version is out, and take you to the download for your computer. It asks first, since it looks on GitHub.
 - **Nightly build:** the [nightly build](https://github.com/mschoenm/nubo/releases/tag/nightly) has the newest changes that passed every check.
 
 ## Features
