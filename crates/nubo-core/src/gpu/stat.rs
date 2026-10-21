@@ -14,10 +14,10 @@ use crate::utils::is_bit_set;
 
 /// How many dots late a CGB LYC write at normal speed reaches the LY=LYC comparison, which picks
 /// LYC up every four dots of the line: four dots for a write in step with the LCD, fewer when the
-/// LCD runs out of step with the CPU (Gambatte's lycEnable lycwirq_trigger_ly00_stat50_lcdoffset1
-/// tests). Like `CGB_LYC_INTERRUPT_DELAY_DOTS` and `CGB_STAT_CLEAR_DELAY_DOTS`, fitted to
-/// Gambatte's lycEnable, m0enable and miscmstatirq tests, whose DMG and CGB results differ because
-/// these writes take effect later on CGB.
+/// LCD runs out of step with the CPU (Gambatte's `lycEnable`
+/// `lycwirq_trigger_ly00_stat50_lcdoffset1` tests). Like `CGB_LYC_INTERRUPT_DELAY_DOTS` and
+/// `CGB_STAT_CLEAR_DELAY_DOTS`, fitted to Gambatte's `lycEnable`, `m0enable` and `miscmstatirq`
+/// tests, whose DMG and CGB results differ because these writes take effect later on CGB.
 const CGB_LYC_WRITE_DELAY_DOTS: u8 = 4;
 /// LY=LYC compares against the new line from this dot of lines 1-152, after a gap in which it
 /// compares against nothing. In double speed dot 0 still compares against the previous line.
@@ -26,16 +26,17 @@ const LYC_COMPARE_DOT: u16 = 2;
 /// length of the old mode change (SameBoy; GBMicrotest), on CGB at both speeds only as long as a
 /// STAT write enabling it requests an interrupt (measured against Gambatte).
 const DMG_OAM_SOURCE_LAST_DOT: u16 = 4;
+/// Like `DMG_OAM_SOURCE_LAST_DOT`, on CGB.
 const CGB_OAM_SOURCE_LAST_DOT: u16 = 2;
 /// The previous line's mode 0 (hblank) STAT interrupt source stays active until this dot of the
 /// next line on DMG, one dot before LY=LYC compares against the new line, as in SameBoy. On CGB it
 /// ends as the line starts, at both speeds, even though STAT shows mode 0 for another dot in
-/// double speed (measured against Gambatte; Gambatte's miscmstatirq lycstatwirq_trigger_m0 and
-/// m0enable late_enable_ds tests).
+/// double speed (measured against Gambatte; Gambatte's `miscmstatirq` `lycstatwirq_trigger_m0` and
+/// `m0enable` `late_enable_ds` tests).
 const DMG_HBLANK_SOURCE_END_DOT: u16 = 1;
 /// A delayed CGB LYC write that starts a match requests its interrupt this many dots after it
 /// reaches the comparison, too late for the CPU to see it in the M-cycle where the comparison
-/// changes (measured against Gambatte; Gambatte's lycEnable lyc_ff45_trigger_delay tests).
+/// changes (measured against Gambatte; Gambatte's `lycEnable` `lyc_ff45_trigger_delay` tests).
 const CGB_LYC_INTERRUPT_DELAY_DOTS: u8 = 1;
 /// The STAT interrupt sources a CGB STAT write at normal speed keeps active for
 /// `CGB_STAT_CLEAR_DELAY_DOTS` more dots when it disables them (see
@@ -44,44 +45,49 @@ const CGB_LATE_CLEARED_STAT_SOURCES: u8 =
     (1 << LYC_STAT_SOURCE_BIT) | (1 << HBLANK_MODE_STAT_SOURCE_BIT);
 /// On CGB at normal speed an LYC write in the last dots of a line that moves a match on to the
 /// next line keeps the LY=LYC interrupt source active through the change of line, so no new
-/// interrupt is requested (measured against Gambatte; Gambatte's lycEnable lyc153_late_ff45_enable
-/// and ff45_enable_weirdpoint tests).
+/// interrupt is requested (measured against Gambatte; Gambatte's `lycEnable`
+/// `lyc153_late_ff45_enable` and `ff45_enable_weirdpoint` tests).
 const CGB_LYC_NEXT_LINE_DOTS: u16 = 4;
 /// An LYC write that ends an LY=LYC match leaves the interrupt source active for this many more
 /// dots in double speed and on DMG, so it still blocks a mode 2 or mode 0 interrupt due right
-/// after it (measured against Gambatte; Gambatte's m2enable lyc1_m2irq_late_lyc255 and m0enable
-/// lycdisable_ff45 tests).
+/// after it (measured against Gambatte; Gambatte's `m2enable` `lyc1_m2irq_late_lyc255` and
+/// `m0enable` `lycdisable_ff45` tests).
 const DOUBLE_SPEED_LYC_SOURCE_HOLD_DOTS: u8 = 2;
+/// Like `DOUBLE_SPEED_LYC_SOURCE_HOLD_DOTS`, on DMG.
 const DMG_LYC_SOURCE_HOLD_DOTS: u8 = 1;
 /// On CGB at normal speed the source stays this many dots more after a delayed LYC write reaches
-/// the comparison, six dots after the write (measured against Gambatte; Gambatte's m0enable
-/// lycdisable_ff45 tests).
+/// the comparison, six dots after the write (measured against Gambatte; Gambatte's `m0enable`
+/// `lycdisable_ff45` tests).
 const CGB_LYC_SOURCE_HOLD_DOTS: u8 = 2;
 /// An LYC write in this many last dots of a line is compared with the next line for interrupts,
-/// in double speed and on DMG (measured against Gambatte; Gambatte's lycEnable late_ff45_enable
-/// tests). STAT's flag still compares it with the current line.
+/// in double speed and on DMG (measured against Gambatte; Gambatte's `lycEnable`
+/// `late_ff45_enable` tests). STAT's flag still compares it with the current line.
 const DOUBLE_SPEED_LYC_NEXT_LINE_DOTS: u16 = 3;
+/// Like `DOUBLE_SPEED_LYC_NEXT_LINE_DOTS`, on DMG.
 const DMG_LYC_NEXT_LINE_DOTS: u16 = 2;
 /// The mode 0 interrupt source starts this many dots after the second to last pixel of a line is
 /// drawn, even when an object or window fetch for the last pixel keeps mode 3 going longer: STAT
-/// still shows mode 3 until the line is done (Gambatte's 10spritesPrLine_10xposA7, m2int_wxA6 and
-/// enable_wxA6_2x_spxA7 tests). Without such a fetch this is the same dot as
+/// still shows mode 3 until the line is done (Gambatte's `10spritesPrLine_10xposA7`, `m2int_wxA6`
+/// and `enable_wxA6_2x_spxA7` tests). Without such a fetch this is the same dot as
 /// `MODE_0_INTERRUPT_DELAY_DOTS` after mode 3.
 const EARLY_HBLANK_INTERRUPT_DOTS: u8 = 2;
 /// The dot of line 153 at which LY=LYC stops comparing against 153, a dot later in double speed.
 /// It then compares against nothing until `LAST_LINE_ZERO_COMPARE_DOT`, from which it compares
-/// against 0 at both speeds (Gambatte's ly0 and lyc153 tests).
+/// against 0 at both speeds (Gambatte's `ly0` and `lyc153` tests).
 const LAST_LINE_COMPARE_END_DOT: u16 = 8;
+/// Like `LAST_LINE_COMPARE_END_DOT`, in double speed.
 const DOUBLE_SPEED_LAST_LINE_COMPARE_END_DOT: u16 = 9;
-/// On line 153, LY already reads 0 from this dot.
+/// On line 153, LY already reads 0 from this dot (see `Gpu::last_line_ly_reset_dot`).
 const LAST_LINE_LY_RESET_DOT: u16 = 4;
+/// Like `LAST_LINE_LY_RESET_DOT`, on CGB-D and newer at normal speed.
 const LATE_LAST_LINE_LY_RESET_DOT: u16 = 5;
+/// Like `LAST_LINE_LY_RESET_DOT`, in double speed.
 const DOUBLE_SPEED_LAST_LINE_LY_RESET_DOT: u16 = 5;
 
 impl Gpu {
     /// The mode shown in STAT bits 0-1. It reads 0 while the LCD is off, and on DMG and CGB-C
     /// and older at normal speed also in the first dots of line 0, though the vblank interrupt
-    /// source lasts until mode 2 (SameBoy; GBMicrotest's poweron_stat tests, AGE's stat-mode
+    /// source lasts until mode 2 (SameBoy; GBMicrotest's `poweron_stat` tests, AGE's stat-mode
     /// tests).
     pub(crate) fn mode(&self) -> u8 {
         let shows_hblank_at_line_0 = self.model <= Model::CgbC && !self.in_double_speed();
@@ -136,7 +142,7 @@ impl Gpu {
     /// Reads LY. As a CGB's LY counts up at the end of a line, its bits change one after the
     /// other, so for a moment it reads `LY & (LY + 1)`: in the last dot of the line, and at normal
     /// speed on CGB-C and older also in the dot before (AGE's lcd-align-ly tests; Gambatte's
-    /// lcd_offset ly_count tests).
+    /// `lcd_offset` `ly_count` tests).
     pub(super) fn ly_value(&self) -> u8 {
         let glitch_start_dot = if !self.in_double_speed() && self.model <= Model::CgbC {
             DOTS_PER_LINE - 2
@@ -155,7 +161,7 @@ impl Gpu {
     }
 
     /// The dot of line 153 from which LY reads 0: a dot later on CGB-D and newer (AGE's ly and
-    /// lcd-align-ly tests) and in double speed (Gambatte's ly0 _ds tests).
+    /// lcd-align-ly tests) and in double speed (Gambatte's `ly0` `_ds` tests).
     pub(super) fn last_line_ly_reset_dot(&self) -> u16 {
         if self.in_double_speed() {
             DOUBLE_SPEED_LAST_LINE_LY_RESET_DOT
@@ -182,8 +188,8 @@ impl Gpu {
         match self.lyc_source_line {
             Some(line) => line == self.compared_lyc,
             // On DMG the previous line's match still holds the interrupt line at dot 0, while
-            // STAT's flag already reads clear (measured against Gambatte; Gambatte's m1 lyc143
-            // and m2enable lycint tests).
+            // STAT's flag already reads clear (measured against Gambatte; Gambatte's `m1` `lyc143`
+            // and `m2enable` `lycint` tests).
             None if !self.is_cgb() && self.line > 0 && self.line_dot == 0 => {
                 self.compared_lyc == self.line - 1
             }
@@ -223,7 +229,7 @@ impl Gpu {
         }
         if self.is_cgb() && self.line == VBLANK_START_LINE {
             // STAT shows mode 0 in line 144's first dots, but on CGB only a source that was
-            // already enabled counts (Gambatte's m1 ly143_late_m0enable and m1irq_m0disable
+            // already enabled counts (Gambatte's `m1` `ly143_late_m0enable` and `m1irq_m0disable`
             // tests).
             return self.visible_mode == HBLANK_MODE
                 && self.enabled_at_line_start(HBLANK_MODE_STAT_SOURCE_BIT);
@@ -243,7 +249,7 @@ impl Gpu {
 
     /// Whether the mode 1 (VBlank) interrupt source is active. On CGB at normal speed STAT still
     /// shows mode 1 at dot 0 of line 0, but only a source that was already enabled counts there
-    /// (Gambatte's m1irq_late_enable tests).
+    /// (Gambatte's `m1irq_late_enable` tests).
     fn vblank_source_active(&self) -> bool {
         self.visible_mode == VBLANK_MODE
             && !(self.timing == TimingVariant::Cgb
@@ -258,11 +264,11 @@ impl Gpu {
 
     /// Whether the mode 2 (OAM scan) interrupt source is active. It is only a pulse as a line
     /// starts, not a level that lasts through mode 2, so enabling the source later in mode 2
-    /// doesn't request an interrupt (SameBoy; Gambatte's m2enable, miscmstatirq and lyc tests).
-    /// Two more cases were measured against Gambatte: line 0's pulse is lost when the vblank
-    /// interrupt was enabled too, and on DMG a STAT write can't bring back a pulse that wasn't
-    /// enabled when the line started. Line 144 starts with the source active,
-    /// until vblank begins on DMG (GBMicrotest's line_144_oam_int tests) and for its first dot on
+    /// doesn't request an interrupt (SameBoy; Gambatte's `m2enable`, `miscmstatirq` and `lyc`
+    /// tests). Two more cases were measured against Gambatte: line 0's pulse is lost when the
+    /// vblank interrupt was enabled too, and on DMG a STAT write can't bring back a pulse that
+    /// wasn't enabled when the line started. Line 144 starts with the source active,
+    /// until vblank begins on DMG (GBMicrotest's `line_144_oam_int` tests) and for its first dot on
     /// CGB.
     fn oam_source_active(&self) -> bool {
         if self.first_line_after_lcd_on {
@@ -287,8 +293,8 @@ impl Gpu {
 
     /// Whether the mode 2 source stays active even though STAT no longer enables it: on CGB, after
     /// line 144's first dot the source only depends on whether it was enabled when the line
-    /// started, so a STAT write disabling it there doesn't end it (Gambatte's m1
-    /// m1irq_m2disable_lycdisable tests).
+    /// started, so a STAT write disabling it there doesn't end it (Gambatte's `m1`
+    /// `m1irq_m2disable_lycdisable` tests).
     fn oam_source_kept_from_line_start(&self) -> bool {
         self.is_cgb() && self.line == VBLANK_START_LINE && self.line_dot > 0
     }
@@ -324,6 +330,7 @@ impl Gpu {
         self.write_stat(value);
     }
 
+    /// The STAT interrupt sources the CPU enabled (STAT bits 3-6).
     pub(crate) fn stat_sources(&self) -> u8 {
         self.stat
     }
@@ -331,7 +338,7 @@ impl Gpu {
     /// The STAT interrupt sources a CGB STAT write at normal speed keeps active for
     /// `CGB_STAT_CLEAR_DELAY_DOTS` more dots when it disables them: LY=LYC and mode 0, and mode 1
     /// while STAT shows it, so it still blocks an LY=LYC interrupt due right after the write
-    /// (Gambatte's lycEnable m1disable tests).
+    /// (Gambatte's `lycEnable` `m1disable` tests).
     pub(crate) fn cgb_late_cleared_stat_sources(&self) -> u8 {
         if self.mode() == VBLANK_MODE {
             CGB_LATE_CLEARED_STAT_SOURCES | (1 << VBLANK_MODE_STAT_SOURCE_BIT)
@@ -340,6 +347,9 @@ impl Gpu {
         }
     }
 
+    /// Writes LYC. On CGB at normal speed with the LCD on, the comparison sees the new value a few
+    /// dots later (`CGB_LYC_WRITE_DELAY_DOTS`, applied by `finish_late_register_writes`);
+    /// otherwise it sees it at once, and the STAT line is updated right away.
     pub(super) fn write_lyc(&mut self, value: u8) {
         self.lyc = value;
         if self.timing == TimingVariant::Cgb && self.lcd_enabled() {
@@ -375,8 +385,8 @@ impl Gpu {
     /// next line's comparison starts, is compared with the next line instead, unless it starts a
     /// match with that line from no match, which then rises as the comparison reaches the line.
     /// A DMG match that still holds the source at a line's first dot counts as a match, so moving
-    /// LYC on to the new line there doesn't request another interrupt (Gambatte's lycEnable
-    /// ff45_enable_weirdpoint and lyc153_late_ff45_enable tests).
+    /// LYC on to the new line there doesn't request another interrupt (Gambatte's `lycEnable`
+    /// `ff45_enable_weirdpoint` and `lyc153_late_ff45_enable` tests).
     fn adjust_lyc_source_after_write(&mut self, value: u8, old_match: bool) {
         let next_line_dots = if self.in_double_speed() {
             if old_match && !self.lyc_flag {
@@ -391,7 +401,7 @@ impl Gpu {
         };
         // Line 153 starts comparing against 0 a few dots in. A write in the same number of dots
         // before that as before a line's comparison starts is compared with 0 the same way
-        // (Gambatte's lycEnable lyc153_late_ff45_enable_ds tests).
+        // (Gambatte's `lycEnable` `lyc153_late_ff45_enable_ds` tests).
         let zero_compare_dot = if self.in_double_speed() {
             DOUBLE_SPEED_LAST_LINE_COMPARE_END_DOT
         } else {
