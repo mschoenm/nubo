@@ -83,7 +83,7 @@ These keep Nubo exact, players' saves safe and the code free to share. Never bre
 - **Fixes an open issue:** say `Fixes #<number>` in the description, so GitHub closes the issue when it merges.
 - **See it through.** After opening a pull request, watch it without being asked (in Claude Code on the web, subscribe to its activity) and fix what comes up: red CI, a conflict with `main` and reviewers' comments, until CI is green. No automatic review runs on this repository, so there is none to wait for.
 - **Merging waits for the maintainer's go**, then follows the `merge` skill.
-- **Say what a number is.** When you name a pull request or an issue by its number in a chat message to the maintainer, or in a report such as the nightly review's pull request and comments or a full review's report, add one or two words saying what it is: "#194 (triage setup)", "#156 (MBC3 clock)". Elsewhere on GitHub a bare number is fine, since GitHub shows the title.
+- **Say what a number is.** When you name a pull request or an issue by its number in a chat message to the maintainer, or in a report such as the nightly review's pull request and comments or a full review's report, put "PR" or "issue" before the number and one or two words after it saying what it is: "PR #194 (triage setup)", "issue #156 (MBC3 clock)". Elsewhere on GitHub a bare number is fine, since GitHub shows the title.
 
 ## Sessions
 
@@ -91,7 +91,7 @@ Most work runs in Claude Code sessions in the cloud, each on a fresh clone of th
 
 - **One task per session.** When the maintainer starts an unrelated topic, suggest a new session for it; they decide.
 - **Speak up only when it matters.** Every message reaches the maintainer as a notification: write when something is merged, when you are stuck or when you need a decision, not about routine steps such as a wait on CI.
-- **End every turn with a status line**, the last line of the message, starting with `**Status:**`: the work and where it stands, background tasks or subagents still running (or none), and whether the working tree is clean. Example: `**Status:** #156 (MBC3 clock) open, CI green, waiting on the go to merge · no background tasks · tree clean`.
+- **End every turn with a status line**, the last line of the message, starting with `**Status:**`: the work and where it stands, background tasks or subagents still running (or none), and whether the working tree is clean. Example: `**Status:** PR #194 (triage setup) open, CI green, waiting on the go to merge · no background tasks · tree clean`.
 - **Keep late results apart.** When a background task or subagent reports back after the conversation has moved on, say so in a message of its own: which task it belongs to, what came out, and whether anything now needs a commit or a merge.
 
 ## Skills and Agent Files
