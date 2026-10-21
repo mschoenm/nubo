@@ -18,7 +18,7 @@ cargo play path/to/rom.gb           # Run a specific ROM (.gb, .gbc, or a .zip c
 cargo play path/to/rom.gbc --cgb    # Run in Game Boy Color mode
 cargo play path/to/rom.gb --model mgb  # Run on another model: dmg-0, dmg, mgb, sgb, sgb2, cgb-0 to cgb-e, agb
 cargo play path/to/rom.gb --scale 2 --fresh --speed 4 --raw-screen  # Only the screen at 2×, keeping nothing, fast forwarding at 4×, without color correction (for test harnesses)
-cargo xtask web                     # Build the app for the browser and serve it at http://127.0.0.1:8080
+cargo xtask web                     # Build the app for the browser and serve it at http://127.0.0.1:8080 (the download page at /download/)
 cargo screenshot path/to/rom.gb --seconds 10  # Run headless for 10 emulated seconds (5 without --seconds) and save a screenshot to target/screenshots/
 ```
 

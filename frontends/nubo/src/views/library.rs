@@ -450,8 +450,9 @@ pub struct TopBar<'a> {
 
 /// The top bar: with games to search, a search field and Open game; on the
 /// welcome screen, whose own buttons open games, only the settings on the
-/// right. With a newer version out, a small note says so and opens its page,
-/// and a fullscreen window gets a button back to a window.
+/// right. With a newer version out, a small note says so and opens the
+/// download page, with this computer's download first, and a fullscreen
+/// window gets a button back to a window.
 fn bar<'a>(search: Option<&'a str>, top: TopBar<'a>) -> Element<'a, Message> {
     let mut bar = row![brand()];
     bar = match search {
@@ -476,7 +477,7 @@ fn bar<'a>(search: Option<&'a str>, top: TopBar<'a>) -> Element<'a, Message> {
             )
             .padding([4, 10])
             .style(theme::chip(true))
-            .on_press(Message::OpenLink(updates::RELEASES_PAGE)),
+            .on_press(Message::OpenLink(updates::DOWNLOAD_PAGE)),
         );
     }
 

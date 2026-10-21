@@ -1,5 +1,6 @@
 //! Finding out whether a newer Nubo is out, from the newest release on
-//! GitHub, so an app can say so. Only the desktop build looks (the
+//! GitHub, so an app can say so and offer the download for this computer
+//! (`DOWNLOAD_PAGE`). Only the desktop build looks (the
 //! `desktop` feature, with `ureq`), and only once the player said yes to it:
 //! looking tells GitHub that someone runs Nubo. The browser always runs the
 //! newest version.
@@ -8,8 +9,56 @@
 /// can.
 pub const AVAILABLE: bool = cfg!(feature = "desktop");
 
-/// The page of the newest release, for a player to read about it.
-pub const RELEASES_PAGE: &str = concat!(env!("CARGO_PKG_REPOSITORY"), "/releases/latest");
+/// This computer as the download page names it, or nothing when no download
+/// is made for it, so the page guesses from the browser.
+#[cfg(target_os = "windows")]
+macro_rules! platform {
+    () => {
+        "windows-x64"
+    };
+}
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+macro_rules! platform {
+    () => {
+        "linux-x86_64"
+    };
+}
+#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+macro_rules! platform {
+    () => {
+        "linux-aarch64"
+    };
+}
+#[cfg(target_os = "macos")]
+macro_rules! platform {
+    () => {
+        "macos"
+    };
+}
+#[cfg(not(any(
+    target_os = "windows",
+    all(
+        target_os = "linux",
+        any(target_arch = "x86_64", target_arch = "aarch64")
+    ),
+    target_os = "macos"
+)))]
+macro_rules! platform {
+    () => {
+        ""
+    };
+}
+
+/// Nubo's download page, which puts the download for this computer first:
+/// the address names this computer (`for`) and the version that runs
+/// (`from`), so the page can also say how to update it. The page itself is
+/// `frontends/nubo/web/download/index.html`.
+pub const DOWNLOAD_PAGE: &str = concat!(
+    "https://mschoenm.github.io/nubo/download/?for=",
+    platform!(),
+    "&from=",
+    env!("CARGO_PKG_VERSION")
+);
 
 /// The newest release's version, such as "0.9.0", or why it couldn't be
 /// found out. It waits for the network, so apps run it with

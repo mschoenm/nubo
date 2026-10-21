@@ -1104,9 +1104,9 @@ fn about<'a>(
                     "A new version is out",
                     Some(format!("Nubo {version} is ready to download.")),
                     small_button(
-                        Icon::ExternalLink,
-                        "Open",
-                        Message::OpenLink(updates::RELEASES_PAGE),
+                        Icon::Download,
+                        "Download",
+                        Message::OpenLink(updates::DOWNLOAD_PAGE),
                     ),
                 ),
                 ROW_PADDING,

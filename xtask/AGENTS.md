@@ -4,8 +4,8 @@ Project tasks written in Rust, run as `cargo xtask <task>`. Each task's module d
 
 ```bash
 # Web version (the Iced app built for the browser)
-cargo xtask web               # Build it and serve it at http://127.0.0.1:8080
-cargo xtask build-web         # Build it into target/web/ (what deploy.yml publishes to GitHub Pages)
+cargo xtask web               # Build it and serve it at http://127.0.0.1:8080, with the download page at /download/
+cargo xtask build-web         # Build it and the download page into target/web/ (what deploy.yml publishes to GitHub Pages)
 cargo xtask build-web --quick # Much faster to build, bigger and slower to run (what CI checks)
 
 # Packages and the logo
@@ -50,4 +50,5 @@ cargo xtask shootout-scoreboard <commit>   # Read its gh-pages branch at <commit
 - The RetroArch core's zip (`libretro.rs`) holds the core under the file name RetroArch looks for, `nubo_libretro.<so|dll|dylib>`, next to `nubo_libretro.info`; `.github/workflows/libretro.yml` builds it on every platform for the nightly build and releases.
 - The other emulators of `compare-emulators` are only built and run locally, never distributed or ported from (Gambatte is GPL-2.0-only).
 - The screenshots are made by the app itself: `screenshots.rs` runs its hidden `capture` command (`frontends/nubo/src/app/scenes.rs`) for each picture, in a headless GNOME Shell (`screenshots/gnome.rs`) that it starts as root in a mount namespace of its own, so a container without systemd or a screen can run it. The app draws with Iced's software renderer there, which makes every picture the same every time; `--check` relies on that. Pictures with GNOME's border depend on GNOME's version too (46 on Ubuntu 24.04). They aren't made in CI: the `screenshots` skill says when and how.
+- The download page (`download_page.rs`) is one hand-written file, `frontends/nubo/web/download/index.html`, published at `download/` next to the web version. Its script puts the download for the visitor's computer first: the app names it in the address (`?for=windows-x64`, `linux-x86_64`, `linux-aarch64` or `macos`, and `&from=<version>`), otherwise the browser's description is used. It reads the version and the file sizes from GitHub's API, and links to the files of the latest release by the names `release.yml` gives them, so it needs no new build for a release; renaming a release file means changing the page, the release notes' table in `release.rs` and the README. The build copies each `images/` file the page names next to it and fails when one is missing.
 - Releases: the `release` skill. CI and nightly runs: `docs/CI.md`.

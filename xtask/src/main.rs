@@ -1,5 +1,5 @@
 //! Project tasks run with `cargo xtask <command>`: building the Iced frontend
-//! for the browser and serving it locally, building the macOS app bundle, the
+//! for the browser, with the download page, and serving it locally, building the macOS app bundle, the
 //! Flatpak, the Windows installer and the RetroArch core, installing Nubo on
 //! this computer, writing the logo
 //! and the license files that go with them, checking a release's version and
@@ -59,13 +59,15 @@ struct Arguments {
 /// The tasks `cargo xtask` runs.
 #[derive(Subcommand)]
 enum Task {
-    /// Build the Iced frontend for the browser and serve it at http://127.0.0.1:8080
+    /// Build the Iced frontend for the browser and serve it at http://127.0.0.1:8080, with the
+    /// download page at /download/
     Web {
         /// Build much faster, but bigger and slower to run
         #[arg(long)]
         quick: bool,
     },
-    /// Build the Iced frontend for the browser into target/web, ready to publish
+    /// Build the Iced frontend for the browser and the download page into target/web, ready to
+    /// publish
     BuildWeb {
         /// Build much faster, but bigger and slower to run
         #[arg(long)]
@@ -284,8 +286,9 @@ fn build_wasm_package(package: &str, artifact: &str, profile: &str) -> Result<Pa
     Ok(target_dir().join(WASM_TARGET).join(profile).join(artifact))
 }
 
-/// Builds the Iced frontend for WebAssembly next to its `index.html` and the
-/// license files, and returns the directory to serve. `quick` (`--quick`)
+/// Builds the Iced frontend for WebAssembly next to its `index.html`, the
+/// license files and the download page (`download_page`), and returns the
+/// directory to serve. `quick` (`--quick`)
 /// builds with `QUICK_WASM_PROFILE`.
 ///
 /// The JavaScript glue is generated with the `wasm-bindgen-cli-support`
@@ -326,6 +329,7 @@ fn build_iced_web(quick: bool) -> Result<PathBuf> {
     fs::copy(&index, output_dir.join("index.html"))
         .map_err(|error| format!("failed to copy {}: {}", index.display(), error))?;
     licenses::write_license_files(&output_dir, ICED_PACKAGE, WASM_TARGET)?;
+    download_page::write_download_page(&output_dir)?;
 
     Ok(output_dir)
 }
@@ -346,10 +350,10 @@ fn serve(root: &Path) -> Result {
     Ok(())
 }
 
-/// Answers one HTTP request with a file from `root`, or 404 if it doesn't
-/// exist or the path tries to leave `root` (with `..`, or an absolute path
-/// such as `C:/` on Windows, which `Path::join` would put in place of
-/// `root`).
+/// Answers one HTTP request with a file from `root` (a folder's
+/// `index.html` for a folder), or 404 if it doesn't exist or the path tries
+/// to leave `root` (with `..`, or an absolute path such as `C:/` on Windows,
+/// which `Path::join` would put in place of `root`).
 fn respond(mut stream: TcpStream, root: &Path) -> std::io::Result<()> {
     let mut request_line = String::new();
     BufReader::new(&stream).read_line(&mut request_line)?;
@@ -371,6 +375,13 @@ fn respond(mut stream: TcpStream, root: &Path) -> std::io::Result<()> {
         .all(|component| matches!(component, Component::Normal(_)));
     let file = stays_in_root
         .then(|| root.join(requested))
+        .map(|path| {
+            if path.is_dir() {
+                path.join("index.html")
+            } else {
+                path
+            }
+        })
         .and_then(|path| fs::read(&path).ok().map(|body| (path, body)));
 
     let (status, content_type, body) = match file {
@@ -388,13 +399,15 @@ fn respond(mut stream: TcpStream, root: &Path) -> std::io::Result<()> {
     stream.write_all(&body)
 }
 
-/// The MIME type for the files the Iced web build contains.
+/// The MIME type for the files the web build contains.
 fn content_type(path: &Path) -> &'static str {
     match path.extension().and_then(|extension| extension.to_str()) {
         Some("html") => "text/html; charset=utf-8",
         Some("js") => "text/javascript",
         Some("wasm") => "application/wasm",
         Some("txt") => "text/plain; charset=utf-8",
+        Some("png") => "image/png",
+        Some("svg") => "image/svg+xml",
         _ => "application/octet-stream",
     }
 }
@@ -505,6 +518,7 @@ mod tests {
 
 mod benchmark_roms;
 mod compare_emulators;
+mod download_page;
 mod flatpak;
 mod icon;
 mod install;
