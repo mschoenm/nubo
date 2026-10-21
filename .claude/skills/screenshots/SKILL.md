@@ -10,7 +10,7 @@ Every screenshot in the README and the Flathub listing is made from a scene: a r
 Install what the task needs first, once per machine (it prints this line when something is missing; leave out `sudo` as root):
 
 ```bash
-sudo apt-get install --no-install-recommends gnome-shell xwayland xdotool dbus-daemon libglib2.0-bin fonts-cantarell adwaita-icon-theme
+sudo apt-get install --no-install-recommends gnome-shell xwayland xdotool dbus-daemon libglib2.0-bin xdg-desktop-portal xdg-desktop-portal-gnome fonts-cantarell adwaita-icon-theme
 ```
 
 ## Regenerate the screenshots and update the docs

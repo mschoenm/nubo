@@ -7,7 +7,8 @@
 //!   games ([`palettes`]), the Super Game Boy menu's choices ([`sgb_menu`])
 //!   and the rule that picks the hardware a game starts on ([`model`]);
 //! - neutral building blocks: clocks that work in the browser too ([`time`]),
-//!   opening web pages and folders ([`links`]), the looks of the Game Boy's
+//!   opening web pages and folders ([`links`]), the font the player picked
+//!   for their desktop (`desktop_font`), the looks of the Game Boy's
 //!   own screen ([`lcd`]), whether a newer Nubo is out ([`updates`]),
 //!   pictures as plain RGBA pixels ([`picture`]), slow work on a thread of
 //!   its own ([`background`]) and problems for the app to show
@@ -51,6 +52,8 @@ pub mod background;
 pub mod battery;
 pub mod cheats;
 pub mod controls;
+#[cfg(feature = "desktop")]
+pub mod desktop_font;
 #[cfg(feature = "gamepads")]
 pub mod gamepads;
 pub mod lcd;

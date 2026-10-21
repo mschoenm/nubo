@@ -131,15 +131,13 @@ fn launch(
     window: iced::window::Settings,
     boot: impl Fn() -> (App, iced::Task<app::Message>) + 'static,
 ) -> iced::Result {
-    let application = iced::application(boot, App::update, App::view)
+    #[cfg(not(target_arch = "wasm32"))]
+    ui::theme::use_desktop_font();
+    iced::application(boot, App::update, App::view)
         .title(App::title)
         .subscription(App::subscription)
         .theme(App::theme)
-        .font(ui::icons::FONT_BYTES);
-    ui::theme::FONT_BYTES
-        .into_iter()
-        .fold(application, iced::Application::font)
-        .default_font(ui::theme::BODY_FONT)
+        .font(ui::icons::FONT_BYTES)
         .window(window)
         .run()
 }

@@ -2598,6 +2598,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
+ "zbus",
 ]
 
 [[package]]

@@ -22,7 +22,13 @@
 //! own apps and newer versions of GNOME draw libadwaita's: the window's
 //! color with round buttons. A stylesheet in the session's GTK settings
 //! folder ([`TITLE_BAR_STYLE`]) gives the border libadwaita's look, so the
-//! pictures look like GNOME on a desktop today. Before each picture
+//! pictures look like GNOME on a desktop today. The app draws its text in
+//! the font the desktop names through the desktop portal, which D-Bus
+//! starts when the app first asks: the session hands the portal its
+//! display and folders, as GNOME's session manager does on a desktop, and
+//! a `gnome-portals.conf` of its own ([`PORTALS`]) has GNOME's part of the
+//! portal answer. GNOME's settings are their defaults, so the font is
+//! GNOME's own, Cantarell, as in the title bar. Before each picture
 //! the X pointer goes to the screen's bottom-right corner (with xdotool),
 //! so it hovers over nothing in the window: an X server starts with its
 //! pointer in the middle of the screen. Each picture is then either taken
@@ -50,6 +56,21 @@ const TOOLS: [(&str, &str); 6] = [
     ("dbus-run-session", "dbus-daemon"),
     ("dbus-daemon", "dbus-daemon"),
 ];
+/// The D-Bus services the session needs, as files in D-Bus's folder of
+/// services, with the Ubuntu package of each: the desktop portal and
+/// GNOME's part of it, which name GNOME's font to the app.
+const SERVICES: [(&str, &str); 2] = [
+    (
+        "org.freedesktop.portal.Desktop.service",
+        "xdg-desktop-portal",
+    ),
+    (
+        "org.freedesktop.impl.portal.desktop.gnome.service",
+        "xdg-desktop-portal-gnome",
+    ),
+];
+/// Where D-Bus looks for the [`SERVICES`] it starts on request.
+const SERVICES_FOLDER: &str = "/usr/share/dbus-1/services";
 /// What else GNOME's border needs to look as it does on a desktop: the
 /// title's font and the icons of its buttons.
 const LOOKS: [&str; 2] = ["fonts-cantarell", "adwaita-icon-theme"];
@@ -82,6 +103,11 @@ windowcontrols button > image {
   background-color: alpha(currentColor, 0.1);
 }
 ";
+/// Which programs answer for the desktop portal in GNOME, as GNOME's own
+/// `gnome-portals.conf` says, which Ubuntu 24.04 doesn't install: GNOME's,
+/// then GTK's. The portal reads it from `xdg-desktop-portal` in
+/// `XDG_CONFIG_HOME`.
+const PORTALS: &str = "[preferred]\ndefault=gnome;gtk;\n";
 /// How long GNOME Shell may take to start.
 const SHELL_START: Duration = Duration::from_secs(60);
 /// How long the app may take to show a scene and take its picture, which
@@ -149,6 +175,12 @@ pub fn check_tools() -> Result {
         .iter()
         .filter(|(program, _)| !on_path(program))
         .map(|&(_, package)| package)
+        .chain(
+            SERVICES
+                .iter()
+                .filter(|(service, _)| !Path::new(SERVICES_FOLDER).join(service).exists())
+                .map(|&(_, package)| package),
+        )
         .collect();
     if is_root() && !on_path("unshare") {
         missing.push("util-linux");
@@ -302,6 +334,13 @@ impl Session {
         fs::write(&stylesheet, title_bar_style(dark))
             .map_err(|error| format!("couldn't write {}: {error}", stylesheet.display()))?;
 
+        let portals = folder.join("config").join("xdg-desktop-portal");
+        fs::create_dir_all(&portals)
+            .map_err(|error| format!("couldn't create {}: {error}", portals.display()))?;
+        let portals_file = portals.join("gnome-portals.conf");
+        fs::write(&portals_file, PORTALS)
+            .map_err(|error| format!("couldn't write {}: {error}", portals_file.display()))?;
+
         let log = folder.join("gnome-shell.log");
         let output = File::create(&log)
             .map_err(|error| format!("couldn't create {}: {error}", log.display()))?;
@@ -376,7 +415,43 @@ impl Session {
             }
             thread::sleep(Duration::from_millis(250));
         }
+        session.share_with_portal()?;
         Ok(session)
+    }
+
+    /// Gives the desktop portal, which D-Bus starts when the app first asks
+    /// it for the desktop's font, this session's display, folders and
+    /// desktop, as GNOME's session manager does on a desktop, and checks
+    /// that it answers.
+    fn share_with_portal(&self) -> Result {
+        let variables: Vec<String> = self
+            .environment
+            .iter()
+            .map(|(name, value)| (name.as_str(), value.as_str()))
+            .chain([("XDG_CURRENT_DESKTOP", "GNOME")])
+            .map(|(name, value)| format!("'{name}': '{}'", value.replace('\'', "\\'")))
+            .collect();
+        gdbus(&[
+            "--dest",
+            "org.freedesktop.DBus",
+            "--object-path",
+            "/org/freedesktop/DBus",
+            "--method",
+            "org.freedesktop.DBus.UpdateActivationEnvironment",
+            &format!("{{{}}}", variables.join(", ")),
+        ])?;
+        gdbus(&[
+            "--dest",
+            "org.freedesktop.portal.Desktop",
+            "--object-path",
+            "/org/freedesktop/portal/desktop",
+            "--method",
+            "org.freedesktop.portal.Settings.Read",
+            "org.gnome.desktop.interface",
+            "font-name",
+        ])
+        .map(|_| ())
+        .map_err(|error| format!("the desktop portal didn't name GNOME's font: {error}"))
     }
 
     /// Runs xdotool on the session's X display, returning whether it

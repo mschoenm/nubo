@@ -11,8 +11,9 @@ rust-version.workspace = true
 # Files in the user's folders: settings, battery saves, save states, cheats,
 # screenshots and the game library (see src/storage/files.rs), with the
 # library's folder watcher and box art downloads; the desktop's sound for
-# running a game (src/session/audio.rs); and the checksums scenes name their
-# game by (src/scenes.rs).
+# running a game (src/session/audio.rs); the checksums scenes name their
+# game by (src/scenes.rs); and the desktop's font, read from the desktop
+# portal on Linux (src/desktop_font.rs).
 desktop = [
     "dep:cpal",
     "dep:crc32fast",
@@ -22,6 +23,7 @@ desktop = [
     "dep:opener",
     "dep:sha2",
     "dep:ureq",
+    "dep:zbus",
 ]
 # Game controllers, read with gilrs (src/gamepads.rs). On the desktop a
 # thread reads them and waits on the app's channel (futures' executor).
@@ -98,6 +100,12 @@ web-sys = { version = "0.3", features = [
     "Url",
     "Window",
 ], optional = true }
+
+# The desktop portal, which names the desktop's font (src/desktop_font.rs).
+# Iced already uses zbus to read the light or dark style, with the same
+# features.
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "5", default-features = false, features = ["async-io", "blocking-api"], optional = true }
 
 [dev-dependencies]
 futures = { version = "0.3", default-features = false, features = ["std", "executor"] }
