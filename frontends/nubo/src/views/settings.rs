@@ -1033,9 +1033,9 @@ fn volume<'a>(settings: &Settings) -> Element<'a, Message> {
     .into()
 }
 
-/// The version (with the commit a packaged build was made from), new
-/// versions and what's new in this one, the button that starts over, the
-/// note that Nubo is made almost entirely by AI, and the copyright, the
+/// The version (with the commit a packaged build was made from) and a
+/// link to what's new in it, new versions and the button that starts over,
+/// the note that Nubo is made almost entirely by AI, and the copyright, the
 /// license, where to read it and where to get the source code (and this
 /// build's commit on GitHub), which the GPL asks every copy to show.
 fn about<'a>(
@@ -1044,21 +1044,30 @@ fn about<'a>(
     rings: &Rings,
 ) -> Element<'a, Message> {
     let title = row![
-        logo(48.0),
+        logo(40.0),
         column![
-            text(format!("Nubo {}", *version::VERSION))
-                .size(20)
-                .font(theme::HEADING_FONT),
+            row![
+                text(format!("Nubo {}", *version::VERSION))
+                    .size(20)
+                    .font(theme::HEADING_FONT),
+                small_button(
+                    Icon::ExternalLink,
+                    "What's new",
+                    Message::OpenLink(RELEASE_NOTES)
+                ),
+            ]
+            .spacing(12)
+            .align_y(Alignment::Center),
             note_text("A Game Boy and Game Boy Color emulator").size(13),
         ]
         .spacing(2),
     ]
-    .spacing(16)
+    .spacing(14)
     .align_y(Alignment::Center);
 
-    let mut versions = Vec::new();
+    let mut general = Vec::new();
     if updates::AVAILABLE {
-        versions.push(rings.row(
+        general.push(rings.row(
             setting(
                 "Tell me when a new Nubo is out",
                 Some(String::from(
@@ -1071,7 +1080,7 @@ fn about<'a>(
             SettingsRow::CheckForUpdates,
         ));
         if let Some(version) = newer_version {
-            versions.push(group_row(
+            general.push(group_row(
                 setting(
                     "A new version is out",
                     Some(format!("Nubo {version} is ready to download.")),
@@ -1086,37 +1095,64 @@ fn about<'a>(
             ));
         }
     }
+    general.push(rings.row(
+        setting(
+            "Reset settings and data",
+            Some(String::from(
+                "Reset the settings, clear Continue playing or delete saves. You pick what \
+                 goes. Only the keys or buttons: Controls › Reset.",
+            )),
+            small_button(
+                Icon::RotateCcw,
+                "Start over…",
+                Message::Settings(SettingsMessage::AskReset),
+            ),
+        ),
+        SettingsRow::ResetSettings,
+    ));
 
-    let mut rows = vec![
-        group_row(
-            setting(
-                "What's new",
-                Some(String::from(concat!(
-                    "The changes in Nubo ",
-                    env!("CARGO_PKG_VERSION"),
-                    ", on GitHub."
-                ))),
-                small_button(Icon::ExternalLink, "Open", Message::OpenLink(RELEASE_NOTES)),
+    let made_with_ai = group_row(
+        column![
+            label(
+                "Written almost entirely by AI",
+                Some(String::from(
+                    "Nearly all of Nubo's code and documentation, and even its name, were \
+                     written by Claude, Anthropic's AI model, working in Claude Code. Its \
+                     developer decides what Nubo should do and chooses what goes in. It \
+                     started as an experiment: how good an emulator could be made using \
+                     only AI, and how well would the quality of the code hold up?",
+                )),
             ),
-            ROW_PADDING,
-            false,
-        ),
-        group_row(
-            setting(
-                "Source code",
-                Some(String::from(env!("CARGO_PKG_REPOSITORY"))),
-                small_button(
-                    Icon::ExternalLink,
-                    "Open",
-                    Message::OpenLink(env!("CARGO_PKG_REPOSITORY")),
-                ),
+            label(
+                "Built on the work of others",
+                Some(String::from(
+                    "Nubo has very few original ideas. It rests on the clever ideas and \
+                     hard work of many others, from other emulators to the people who \
+                     wrote the test ROMs and documented the hardware, all credited in its \
+                     README.",
+                )),
             ),
-            ROW_PADDING,
-            false,
+        ]
+        .spacing(10),
+        ROW_PADDING,
+        false,
+    );
+
+    let mut sources = vec![group_row(
+        setting(
+            "Source code",
+            Some(String::from(env!("CARGO_PKG_REPOSITORY"))),
+            small_button(
+                Icon::ExternalLink,
+                "Open",
+                Message::OpenLink(env!("CARGO_PKG_REPOSITORY")),
+            ),
         ),
-    ];
+        ROW_PADDING,
+        false,
+    )];
     if let Some(commit) = &*version::COMMIT {
-        rows.push(group_row(
+        sources.push(group_row(
             setting(
                 "This build's source code",
                 Some(build_description(commit)),
@@ -1126,102 +1162,44 @@ fn about<'a>(
             false,
         ));
     }
-    rows.extend([
-        group_row(
-            label(
-                "License: GNU General Public License, version 3 or later",
-                Some(String::from(
-                    "At https://www.gnu.org/licenses/gpl-3.0.html, and in every copy of \
-                     Nubo as LICENSE.txt.",
-                )),
-            ),
-            ROW_PADDING,
-            false,
+    sources.push(group_row(
+        label(
+            "License: GNU General Public License, version 3 or later",
+            Some(String::from(
+                "At https://www.gnu.org/licenses/gpl-3.0.html, and in every copy of Nubo as \
+                 LICENSE.txt. Code from other projects is listed with its license in \
+                 NOTICE.txt and THIRD_PARTY_LICENSES.txt.",
+            )),
         ),
-        group_row(
-            label(
-                "Code from other projects",
-                Some(String::from(
-                    "Listed with their licenses in NOTICE.txt and THIRD_PARTY_LICENSES.txt.",
-                )),
-            ),
-            ROW_PADDING,
-            false,
-        ),
-    ]);
+        ROW_PADDING,
+        false,
+    ));
 
-    let mut page = column![container(title).padding([4, 2])].spacing(20);
-    if !versions.is_empty() {
-        page = page.push(group("New versions", None, versions, None));
-    }
-    page.push(group(
-        "Start over",
-        None,
-        vec![rings.row(
-            setting(
-                "Reset settings and data",
-                Some(String::from(
-                    "Reset the settings, clear Continue playing or delete saves. You pick \
-                     what goes.",
-                )),
-                small_button(
-                    Icon::RotateCcw,
-                    "Start over…",
-                    Message::Settings(SettingsMessage::AskReset),
-                ),
+    column![
+        container(title).padding([2, 2]),
+        group("Updates and starting over", None, general, None),
+        group(
+            "Made with AI",
+            None,
+            vec![made_with_ai],
+            Some(
+                "If you'd rather not use software made this way, that's a fair choice, and \
+                 it's why this is said up front.",
             ),
-            SettingsRow::ResetSettings,
-        )],
-        Some("Only the keys or buttons: Controls › Reset."),
-    ))
-    .push(group(
-        "Made with AI",
-        None,
-        vec![
-            group_row(
-                label(
-                    "Written almost entirely by AI",
-                    Some(String::from(
-                        "Nearly all of Nubo's code and documentation, and even its name, were \
-                         written by Claude, Anthropic's AI model, working in Claude Code. Its \
-                         developer decides what Nubo should do and chooses what goes in. It \
-                         started as an experiment: how good an emulator could be made using \
-                         only AI, and how well would the quality of the code hold up?",
-                    )),
-                ),
-                ROW_PADDING,
-                false,
-            ),
-            group_row(
-                label(
-                    "Built on the work of others",
-                    Some(String::from(
-                        "Nubo has very few original ideas. It rests on the clever ideas and \
-                         hard work of many others, from other emulators to the people who \
-                         wrote the test ROMs and documented the hardware, all credited in its \
-                         README.",
-                    )),
-                ),
-                ROW_PADDING,
-                false,
-            ),
-        ],
-        Some(
-            "If you'd rather not use software made this way, that's a fair choice, and it's \
-             why this is said up front.",
         ),
-    ))
-    .push(group(
-        "Source and license",
-        None,
-        rows,
-        Some(
-            "Copyright 2026 Michel Schoenmakers. Based on RetroBoy, copyright 2023-2026 \
+        group(
+            "Source and license",
+            None,
+            sources,
+            Some(
+                "Copyright 2026 Michel Schoenmakers. Based on RetroBoy, copyright 2023-2026 \
                  Samuel Parsons. Nubo is free software: you can share and change it under \
                  the GNU General Public License, version 3 or later. It comes with no \
                  warranty.",
+            ),
         ),
-    ))
+    ]
+    .spacing(14)
     .into()
 }
 
