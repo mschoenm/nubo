@@ -1162,16 +1162,28 @@ fn about<'a>(
     );
 
     let license = group_row(
-        label(
-            "License: GNU General Public License, version 3 or later",
-            Some(String::from(concat!(
-                "At https://www.gnu.org/licenses/gpl-3.0.html, and in every copy of Nubo as \
-                 LICENSE.txt. Code from other projects is listed with its license in \
-                 NOTICE.txt and THIRD_PARTY_LICENSES.txt. The source code is at ",
-                env!("CARGO_PKG_REPOSITORY"),
-                "."
-            ))),
-        ),
+        column![
+            label(
+                "License: GNU General Public License, version 3 or later",
+                Some(String::from(
+                    "Nubo is free software: you can share and change it under the GNU \
+                     General Public License, version 3 or later. It comes with no warranty. \
+                     Every copy of Nubo holds the license as LICENSE.txt, and lists the code \
+                     from other projects with its license in NOTICE.txt and \
+                     THIRD_PARTY_LICENSES.txt.",
+                )),
+            ),
+            column![
+                note_text("License: https://www.gnu.org/licenses/gpl-3.0.html"),
+                note_text(concat!("Source code: ", env!("CARGO_PKG_REPOSITORY"))),
+                note_text(
+                    "Copyright 2026 Michel Schoenmakers. Based on RetroBoy, copyright \
+                     2023-2026 Samuel Parsons.",
+                ),
+            ]
+            .spacing(2),
+        ]
+        .spacing(10),
         ROW_PADDING,
         false,
     );
@@ -1180,17 +1192,7 @@ fn about<'a>(
         container(title).padding([2, 2]),
         group("Updates and starting over", None, general, None),
         group("Made with AI", None, vec![made_with_ai], None,),
-        group(
-            "Source and license",
-            None,
-            vec![license],
-            Some(
-                "Copyright 2026 Michel Schoenmakers. Based on RetroBoy, copyright 2023-2026 \
-                 Samuel Parsons. Nubo is free software: you can share and change it under \
-                 the GNU General Public License, version 3 or later. It comes with no \
-                 warranty.",
-            ),
-        ),
+        group("Source and license", None, vec![license], None,),
     ]
     .spacing(14)
     .into()
