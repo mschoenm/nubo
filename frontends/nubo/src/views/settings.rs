@@ -299,12 +299,12 @@ pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec
                     rows.push(SettingsRow::RetryBoxArt);
                 }
             }
-            rows.push(SettingsRow::ResetSettings);
         }
         SettingsTab::About => {
             if updates::AVAILABLE {
                 rows.push(SettingsRow::CheckForUpdates);
             }
+            rows.push(SettingsRow::ResetSettings);
         }
     }
 
@@ -1035,10 +1035,9 @@ fn volume<'a>(settings: &Settings) -> Element<'a, Message> {
 
 /// What Nubo is: the version (with the commit a packaged build was made
 /// from), links to what's new in it and to its source code (and this
-/// build's commit on GitHub), the switch that looks for new versions, how
-/// Nubo is made, and the license, where to read it and the copyright, which
-/// the GPL asks every copy to show. Text in cards rather than rows of
-/// settings, since this page is about Nubo.
+/// build's commit on GitHub), the switch that looks for new versions and
+/// the button that starts over, how Nubo is made, and the license, where to
+/// read it and the copyright, which the GPL asks every copy to show.
 fn about<'a>(
     settings: &'a Settings,
     newer_version: Option<&'a str>,
@@ -1069,7 +1068,7 @@ fn about<'a>(
         ));
     }
 
-    let mut version = column![
+    let version = column![
         text(format!("Nubo {}", *version::VERSION))
             .size(20)
             .font(theme::HEADING_FONT),
@@ -1081,50 +1080,56 @@ fn about<'a>(
     ]
     .spacing(2)
     .width(Fill);
+
+    let mut general = Vec::new();
     if updates::AVAILABLE {
-        let check = row![
-            switch(settings.shared.check_for_updates == Some(true), |check| {
-                Message::Settings(SettingsMessage::CheckForUpdatesToggled(check))
-            }),
-            label(
+        general.push(rings.row(
+            setting(
                 "Tell me when a new Nubo is out",
                 Some(String::from(
                     "When Nubo starts, it asks GitHub for the newest version.",
                 )),
+                switch(settings.shared.check_for_updates == Some(true), |check| {
+                    Message::Settings(SettingsMessage::CheckForUpdatesToggled(check))
+                }),
             ),
-        ]
-        .spacing(12)
-        .align_y(Alignment::Center);
-        version = version.push(
-            container(rings.around(
-                container(check).padding([6, 8]),
-                SettingsRow::CheckForUpdates,
-            ))
-            .padding(Padding {
-                top: 6.0,
-                ..Padding::ZERO
-            }),
-        );
+            SettingsRow::CheckForUpdates,
+        ));
         if let Some(newer) = newer_version {
-            version = version.push(
-                row![
-                    text(format!("Nubo {newer} is out and ready to download."))
-                        .size(13)
-                        .width(Fill),
+            general.push(group_row(
+                setting(
+                    "A new version is out",
+                    Some(format!("Nubo {newer} is ready to download.")),
                     small_button(
                         Icon::ExternalLink,
-                        "Download",
+                        "Open",
                         Message::OpenLink(updates::RELEASES_PAGE),
                     ),
-                ]
-                .spacing(12)
-                .align_y(Alignment::Center),
-            );
+                ),
+                ROW_PADDING,
+                false,
+            ));
         }
     }
+    general.push(rings.row(
+        setting(
+            "Reset settings and data",
+            Some(String::from(
+                "Reset the settings, clear Continue playing or delete saves. You pick what \
+                 goes. Only the keys or buttons: Controls › Reset.",
+            )),
+            small_button(
+                Icon::RotateCcw,
+                "Start over…",
+                Message::Settings(SettingsMessage::AskReset),
+            ),
+        ),
+        SettingsRow::ResetSettings,
+    ));
 
     column![
         row![logo(56.0), version].spacing(16),
+        group("Updates and starting over", None, general, None),
         about_section(
             "Made with AI",
             vec![
@@ -1152,20 +1157,24 @@ fn about<'a>(
                 paragraph(
                     "Nubo is free software: you can share and change it under the GNU \
                      General Public License, version 3 or later. It comes with no warranty. \
-                     The license is at gnu.org/licenses/gpl-3.0.html, and in every copy of \
-                     Nubo as LICENSE.txt. Code from other projects is listed with its license \
-                     in NOTICE.txt and THIRD_PARTY_LICENSES.txt.",
+                     Every copy of Nubo holds the license as LICENSE.txt, and lists the code \
+                     from other projects with its license in NOTICE.txt and \
+                     THIRD_PARTY_LICENSES.txt.",
                 ),
-                note_text(concat!("Source code: ", env!("CARGO_PKG_REPOSITORY"))).into(),
-                note_text(
-                    "Copyright 2026 Michel Schoenmakers. Based on RetroBoy, copyright \
-                     2023-2026 Samuel Parsons.",
-                )
+                column![
+                    note_text("License: https://www.gnu.org/licenses/gpl-3.0.html"),
+                    note_text(concat!("Source code: ", env!("CARGO_PKG_REPOSITORY"))),
+                    note_text(
+                        "Copyright 2026 Michel Schoenmakers. Based on RetroBoy, copyright \
+                         2023-2026 Samuel Parsons.",
+                    ),
+                ]
+                .spacing(2)
                 .into(),
             ],
         ),
     ]
-    .spacing(24)
+    .spacing(12)
     .padding([4, 2])
     .into()
 }
@@ -1179,7 +1188,7 @@ fn about_section<'a>(
         title,
         None,
         vec![group_row(
-            Column::with_children(paragraphs).spacing(8),
+            Column::with_children(paragraphs).spacing(6),
             ROW_PADDING,
             false,
         )],
@@ -1435,8 +1444,8 @@ fn binding_row(
 }
 
 /// The library's folders, each with a menu, and a row that adds one (in the
-/// browser, the games it keeps and a row that adds some), the box art
-/// switch, and the button that starts over.
+/// browser, the games it keeps and a row that adds some), and the box art
+/// switch.
 fn library_page<'a>(
     settings: &'a Settings,
     library: &'a Library,
@@ -1485,27 +1494,7 @@ fn library_page<'a>(
         ));
     }
 
-    page.push(group(
-        "Start over",
-        None,
-        vec![rings.row(
-            setting(
-                "Reset settings and data",
-                Some(String::from(
-                    "Reset the settings, clear Continue playing or delete saves. You pick \
-                     what goes.",
-                )),
-                small_button(
-                    Icon::RotateCcw,
-                    "Start over…",
-                    Message::Settings(SettingsMessage::AskReset),
-                ),
-            ),
-            SettingsRow::ResetSettings,
-        )],
-        Some("Only the keys or buttons: Controls › Reset."),
-    ))
-    .into()
+    page.into()
 }
 
 /// The library's folders, each with a menu, and a row that adds one.
