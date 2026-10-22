@@ -1,7 +1,8 @@
 name: Flatpak
 
 # Builds the Linux app as a Flatpak for x86_64 and ARM with `cargo xtask
-# flatpak`, plays a game in it and checks it with Flathub's linter. Runs
+# flatpak`, plays a game in it and checks it with Flathub's linter, and
+# builds the manifest `cargo xtask flathub` writes as Flathub would. Runs
 # every night and for releases, which attach the .flatpak files it makes, and
 # by hand when a change needs it sooner. Pull requests don't run it: it
 # rarely fails, and the nightly run catches a failure before a release can.
@@ -67,19 +68,58 @@ jobs:
           docker run --rm -v "$PWD:/mnt" ghcr.io/flathub/flatpak-builder-lint:latest
           appstream /mnt/frontends/nubo/linux/io.github.mschoenm.nubo.metainfo.xml
 
-      # Lists what Flathub's linter would still flag in the build, such as
-      # its permissions, without failing: the Flathub submission will have a
-      # manifest of its own.
-      - name: Report what Flathub's linter would flag in the build
-        if: matrix.arch == 'x86_64'
-        continue-on-error: true
-        run: >-
-          docker run --rm -v "$PWD:/mnt" ghcr.io/flathub/flatpak-builder-lint:latest
-          repo /mnt/target/flatpak/repo
-
       - name: Upload the Flatpak
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: flatpak-${{ matrix.arch }}
           path: target/bundle/*.flatpak
           if-no-files-found: error
+
+  # Builds the manifest for Flathub (docs/FLATHUB.md) the way Flathub's
+  # build does: the commit from GitHub, with the screenshots mirrored, then
+  # checks the manifest and the build with Flathub's linter. The linter isn't
+  # pinned, so a new Flathub check fails the nightly run before a release
+  # goes to Flathub.
+  flathub:
+    name: Flathub manifest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install flatpak-builder
+        run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder ostree
+
+      - name: Install Rust
+        run: rustup toolchain install
+
+      - name: Write the Flathub manifest
+        run: cargo xtask flathub
+
+      # Read access to home folders needs an exception from Flathub's
+      # reviewers (docs/FLATHUB.md says why Nubo asks for one). Once Flathub
+      # grants it, the linter stops reporting it; until then it is the one
+      # error allowed here.
+      - name: Check the manifest with Flathub's linter
+        run: |
+          docker run --rm -v "$PWD/target/flathub:/mnt" ghcr.io/flathub/flatpak-builder-lint:latest \
+            --exceptions manifest /mnt/io.github.mschoenm.nubo.json | tee "$RUNNER_TEMP/manifest-lint.json" || true
+          jq -e '[.errors // [] | .[] | select(. != "finish-args-home-ro-filesystem-access")] | length == 0' \
+            "$RUNNER_TEMP/manifest-lint.json"
+
+      - name: Build it as Flathub would
+        working-directory: target/flathub
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak-builder --user --install-deps-from=flathub --force-clean --repo=repo \
+            --compose-url-policy=full --mirror-screenshots-url=https://dl.flathub.org/media \
+            build io.github.mschoenm.nubo.json
+          ostree commit --repo=repo --canonical-permissions --branch=screenshots/x86_64 \
+            build/files/share/app-info/media
+
+      - name: Check the build with Flathub's linter
+        run: |
+          docker run --rm -v "$PWD/target/flathub:/mnt" ghcr.io/flathub/flatpak-builder-lint:latest \
+            --exceptions repo /mnt/repo | tee "$RUNNER_TEMP/repo-lint.json" || true
+          jq -e '[.errors // [] | .[] | select(. != "finish-args-home-ro-filesystem-access")] | length == 0' \
+            "$RUNNER_TEMP/repo-lint.json"

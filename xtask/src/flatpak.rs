@@ -11,6 +11,10 @@
 //! like Flathub's flatpak-cargo-generator does. The manifest, that list, the
 //! icon and the license files are written to `target/flatpak/`; the menu entry
 //! and the AppStream description come from the repository.
+//!
+//! `write_flathub_files` writes the same manifest for Flathub into
+//! `target/flathub/`, building a commit on GitHub instead of the working tree:
+//! the files that go into Nubo's repository on Flathub (`docs/FLATHUB.md`).
 
 use super::{
     APP_ID, LINUX_FILES, Result, build_commit, build_commit_date, licenses, run, target_dir,
@@ -35,9 +39,15 @@ const FLATHUB_REPO: &str = "https://dl.flathub.org/repo/flathub.flatpakrepo";
 const CRATES_IO: &str = "registry+https://github.com/rust-lang/crates.io-index";
 /// The folder inside the build that holds the files written here.
 const GENERATED_FILES: &str = "flatpak-files";
+/// Where Flathub's build gets Nubo's source from.
+const REPOSITORY_URL: &str = "https://github.com/mschoenm/nubo.git";
+/// The target the Flathub build's license files are written for. Flathub
+/// builds for x86_64 and ARM from the same files, and the app uses the same
+/// crates on both.
+const FLATHUB_LICENSE_TARGET: &str = "x86_64-unknown-linux-gnu";
 
 /// What the app may reach outside its sandbox.
-const FINISH_ARGS: [&str; 11] = [
+const FINISH_ARGS: [&str; 12] = [
     // The window, drawn with the graphics card.
     "--share=ipc",
     "--socket=wayland",
@@ -46,7 +56,10 @@ const FINISH_ARGS: [&str; 11] = [
     // Sound, which goes from ALSA through the sound server.
     "--socket=pulseaudio",
     // Controllers, which gilrs finds by watching /dev/input inside a Flatpak.
+    // Flatpak before 1.15.6 doesn't know the input device and reads every
+    // device instead, which is what Flathub's linter asks for.
     "--device=input",
+    "--device-if=all:!has-input-device",
     // Box art downloads.
     "--share=network",
     // ROM folders anywhere in the home folder or on external drives, which
@@ -76,28 +89,16 @@ pub fn build_flatpak() -> Result<PathBuf> {
     }
 
     let work_dir = target_dir().join("flatpak");
-    let files_dir = work_dir.join(GENERATED_FILES);
-    if files_dir.exists() {
-        fs::remove_dir_all(&files_dir).map_err(|error| error.to_string())?;
-    }
-    fs::create_dir_all(&files_dir).map_err(|error| error.to_string())?;
-
-    let icon = files_dir.join(format!("{APP_ID}.svg"));
-    fs::write(&icon, nubo_logo::svg())
-        .map_err(|error| format!("failed to write {}: {error}", icon.display()))?;
-    licenses::write_license_files(
-        &files_dir.join("licenses"),
-        EXECUTABLE,
-        &licenses::host_target()?,
-    )?;
-    write_json(
-        &work_dir.join("cargo-sources.json"),
-        &Value::Array(cargo_sources()?),
-    )?;
+    let generated_files = write_build_files(&work_dir, &licenses::host_target()?)?;
     let manifest = format!("{APP_ID}.json");
+    let source = json!({
+        "type": "dir",
+        "path": workspace_root(),
+        "skip": ["target", ".git"],
+    });
     write_json(
         &work_dir.join(&manifest),
-        &manifest_contents(&rust_version()?),
+        &manifest_contents(source, generated_files, Some(&rust_version()?)),
     )?;
 
     // flatpak-builder installs the runtime for this user, from a Flathub
@@ -139,6 +140,103 @@ pub fn build_flatpak() -> Result<PathBuf> {
         .arg(APP_ID))?;
 
     Ok(bundle)
+}
+
+/// Writes the Flatpak manifest for Flathub into `target/flathub/`, returning
+/// that folder: the manifest, the crate list and the files the build
+/// installs, all of which go into Nubo's repository on Flathub. The manifest
+/// builds the commit checked out here from GitHub, with its release tag when
+/// it has one, so the working tree must have no changes and the commit must
+/// be pushed.
+pub fn write_flathub_files() -> Result<PathBuf> {
+    let commit = build_commit();
+    if commit.is_empty() || commit.ends_with("-dirty") {
+        return Err(String::from(
+            "Flathub builds a commit from GitHub: commit and push the changes first",
+        ));
+    }
+    let tag = format!("v{}", env!("CARGO_PKG_VERSION"));
+    let tagged = Command::new("git")
+        .args(["tag", "--points-at", "HEAD"])
+        .current_dir(workspace_root())
+        .output()
+        .is_ok_and(|output| {
+            String::from_utf8_lossy(&output.stdout)
+                .lines()
+                .any(|line| line == tag)
+        });
+
+    let flathub_dir = target_dir().join("flathub");
+    if flathub_dir.exists() {
+        fs::remove_dir_all(&flathub_dir).map_err(|error| error.to_string())?;
+    }
+    let generated_files = write_build_files(&flathub_dir, FLATHUB_LICENSE_TARGET)?;
+    let source = git_source(&commit, tagged.then_some(tag.as_str()));
+    write_json(
+        &flathub_dir.join(format!("{APP_ID}.json")),
+        &manifest_contents(source, generated_files, None),
+    )?;
+    if !tagged {
+        println!(
+            "warning: {commit} isn't tagged {tag}; submit a release to Flathub, not a commit \
+             between releases"
+        );
+    }
+    Ok(flathub_dir)
+}
+
+/// The source of a commit on GitHub, with its tag when it has one: what
+/// Flathub builds.
+fn git_source(commit: &str, tag: Option<&str>) -> Value {
+    let mut source = json!({ "type": "git", "url": REPOSITORY_URL });
+    if let Some(tag) = tag {
+        source["tag"] = json!(tag);
+    }
+    source["commit"] = json!(commit);
+    source
+}
+
+/// Writes what the manifest takes besides Nubo's source into `work_dir`: the
+/// icon and the license files for `target` in `GENERATED_FILES`, and the
+/// crate list in `cargo-sources.json`. Returns the files in
+/// `GENERATED_FILES` as flatpak-builder sources, one for each file, since
+/// Flathub doesn't take folders as sources.
+fn write_build_files(work_dir: &Path, target: &str) -> Result<Vec<Value>> {
+    let files_dir = work_dir.join(GENERATED_FILES);
+    if files_dir.exists() {
+        fs::remove_dir_all(&files_dir).map_err(|error| error.to_string())?;
+    }
+    fs::create_dir_all(&files_dir).map_err(|error| error.to_string())?;
+
+    let icon = files_dir.join(format!("{APP_ID}.svg"));
+    fs::write(&icon, nubo_logo::svg())
+        .map_err(|error| format!("failed to write {}: {error}", icon.display()))?;
+    licenses::write_license_files(&files_dir.join("licenses"), EXECUTABLE, target)?;
+    write_json(
+        &work_dir.join("cargo-sources.json"),
+        &Value::Array(cargo_sources()?),
+    )?;
+    let mut files = Vec::new();
+    for folder in [
+        GENERATED_FILES.to_owned(),
+        format!("{GENERATED_FILES}/licenses"),
+    ] {
+        let mut names: Vec<String> = fs::read_dir(work_dir.join(&folder))
+            .map_err(|error| error.to_string())?
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.path().is_file())
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        files.extend(names.iter().map(|name| file_source(&folder, name)));
+    }
+    Ok(files)
+}
+
+/// The flatpak-builder source of the file `name` in `folder`, both relative
+/// to the manifest, which the build finds at the same place.
+fn file_source(folder: &str, name: &str) -> Value {
+    json!({ "type": "file", "path": format!("{folder}/{name}"), "dest": folder })
 }
 
 /// Fails when Flathub has a newer freedesktop runtime than `RUNTIME_VERSION`,
@@ -227,10 +325,44 @@ fn check_rust_version_command(rust_version: &str) -> String {
 }
 
 /// The Flatpak manifest: the runtime, the sandbox's permissions and how to
-/// build and install the app with the SDK's Rust, which must be
-/// `rust_version`.
-fn manifest_contents(rust_version: &str) -> Value {
+/// build and install the app from `source` (Nubo's source, as a
+/// flatpak-builder source) and `generated_files` (from `write_build_files`)
+/// with the SDK's Rust. With `rust_version`, the build
+/// fails unless the SDK's Rust is that version; Flathub's build leaves that
+/// check out, since a newer Rust in the SDK still builds Nubo.
+fn manifest_contents(
+    source: Value,
+    generated_files: Vec<Value>,
+    rust_version: Option<&str>,
+) -> Value {
     let linux_files = format!("{LINUX_FILES}/{APP_ID}");
+    let mut build_commands: Vec<String> = rust_version
+        .map(check_rust_version_command)
+        .into_iter()
+        .collect();
+    build_commands.extend([
+        format!("cargo build --release --locked --package {EXECUTABLE}"),
+        format!("install -D --mode 755 target/release/{EXECUTABLE} /app/bin/{EXECUTABLE}"),
+        format!(
+            "install -D --mode 644 {linux_files}.desktop \
+             /app/share/applications/{APP_ID}.desktop"
+        ),
+        format!(
+            "install -D --mode 644 {linux_files}.metainfo.xml \
+             /app/share/metainfo/{APP_ID}.metainfo.xml"
+        ),
+        format!(
+            "install -D --mode 644 {GENERATED_FILES}/{APP_ID}.svg \
+             /app/share/icons/hicolor/scalable/apps/{APP_ID}.svg"
+        ),
+        format!(
+            "install -D --mode 644 --target-directory /app/share/licenses/{APP_ID} \
+             {GENERATED_FILES}/licenses/*"
+        ),
+    ]);
+    let mut sources = vec![source];
+    sources.extend(generated_files);
+    sources.push(json!("cargo-sources.json"));
     json!({
         "id": APP_ID,
         "runtime": RUNTIME,
@@ -251,40 +383,8 @@ fn manifest_contents(rust_version: &str) -> Value {
                     "NUBO_COMMIT_DATE": build_commit_date(),
                 },
             },
-            "build-commands": [
-                check_rust_version_command(rust_version),
-                format!("cargo build --release --locked --package {EXECUTABLE}"),
-                format!("install -D --mode 755 target/release/{EXECUTABLE} /app/bin/{EXECUTABLE}"),
-                format!(
-                    "install -D --mode 644 {linux_files}.desktop \
-                     /app/share/applications/{APP_ID}.desktop"
-                ),
-                format!(
-                    "install -D --mode 644 {linux_files}.metainfo.xml \
-                     /app/share/metainfo/{APP_ID}.metainfo.xml"
-                ),
-                format!(
-                    "install -D --mode 644 {GENERATED_FILES}/{APP_ID}.svg \
-                     /app/share/icons/hicolor/scalable/apps/{APP_ID}.svg"
-                ),
-                format!(
-                    "install -D --mode 644 --target-directory /app/share/licenses/{APP_ID} \
-                     {GENERATED_FILES}/licenses/*"
-                ),
-            ],
-            "sources": [
-                {
-                    "type": "dir",
-                    "path": workspace_root(),
-                    "skip": ["target", ".git"],
-                },
-                {
-                    "type": "dir",
-                    "path": GENERATED_FILES,
-                    "dest": GENERATED_FILES,
-                },
-                "cargo-sources.json",
-            ],
+            "build-commands": build_commands,
+            "sources": sources,
         }],
     })
 }

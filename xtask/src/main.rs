@@ -1,6 +1,6 @@
 //! Project tasks run with `cargo xtask <command>`: building the Iced frontend
 //! for the browser, with the download page, and serving it locally, building the macOS app bundle, the
-//! Flatpak, the Windows installer and the RetroArch core, installing Nubo on
+//! Flatpak and its manifest for Flathub, the Windows installer and the RetroArch core, installing Nubo on
 //! this computer, writing the logo
 //! and the license files that go with them, checking a release's version and
 //! notes, timing Nubo next to other emulators, the nightly review's tooling,
@@ -78,6 +78,9 @@ enum Task {
     /// Build the desktop app as a Flatpak, install it for this user and write it into
     /// target/bundle as a .flatpak file to share (Linux with flatpak-builder only)
     Flatpak,
+    /// Write the Flatpak manifest for Flathub, building the commit checked out here from
+    /// GitHub, with the files it needs, into target/flathub (docs/FLATHUB.md)
+    Flathub,
     /// Build the Windows installer (an MSI, with the WiX Toolset) and a zip to run without
     /// installing into target/bundle (Windows only)
     Windows(windows::Options),
@@ -469,6 +472,13 @@ fn main() -> ExitCode {
                  `flatpak run {APP_ID}`, and `flatpak uninstall --user {APP_ID}` removes it. \
                  Built {} too, which others install by opening it.",
                 bundle.display()
+            );
+        }),
+        Task::Flathub => flatpak::write_flathub_files().map(|folder| {
+            println!(
+                "Wrote the Flathub manifest and its files into {}: copy them into Nubo's \
+                 repository on Flathub (docs/FLATHUB.md).",
+                folder.display()
             );
         }),
         Task::Windows(options) => {
