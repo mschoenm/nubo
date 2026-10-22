@@ -359,8 +359,8 @@ impl App {
     /// open then, which comes back once it is answered.
     ///
     /// While a reset deletes saves, the game waits until they are gone (see
-    /// `App::deletions_running`), and a reset can't be undone once a game
-    /// starts.
+    /// `App::deletions_running`), and neither a reset nor a console picked
+    /// in a game's menu can be undone once a game starts.
     ///
     /// A game that starts, however it was started (a dropped file and
     /// Ctrl+O included), closes the settings, stops waiting for a key to
@@ -377,8 +377,13 @@ impl App {
             return;
         }
         // Undoing a reset puts the library back as it was, which would
-        // forget that this game was just played.
-        if matches!(self.undo, Some(UndoPoint::Settings { .. })) {
+        // forget that this game was just played, and undoing a console pick
+        // would overwrite the model the game now starts on (such as the
+        // one its automatic save asks for).
+        if matches!(
+            self.undo,
+            Some(UndoPoint::Settings { .. } | UndoPoint::GameModel { .. })
+        ) {
             self.undo = None;
             self.toasts.forget_undo();
         }

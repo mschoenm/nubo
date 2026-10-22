@@ -892,6 +892,24 @@ fn picking_a_console_closes_the_menu_and_can_be_undone() {
 }
 
 #[test]
+fn starting_a_game_takes_away_a_console_picks_undo() {
+    let (mut app, path, folder) = app_with_color_game("start");
+    let _ = app.update(LibraryMessage::GameModelPicked(path.clone(), Model::Mgb).into());
+    assert!(matches!(app.undo, Some(UndoPoint::GameModel { .. })));
+
+    let _ = app.update(
+        GameMessage::RomPicked(Some(Rom {
+            path: PathBuf::from("game.gb"),
+            bytes: Arc::from(vec![0; 3]),
+        }))
+        .into(),
+    );
+
+    assert!(app.undo.is_none());
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
 fn picking_the_console_the_settings_pick_follows_them_again() {
     let (mut app, path, folder) = app_with_color_game("settings");
     let preference = |app: &App| app.library.entry(&path).unwrap().preference();
