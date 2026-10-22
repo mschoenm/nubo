@@ -24,8 +24,9 @@
 //! `target/screenshots/check/`.
 //!
 //! It runs on Linux only, with GNOME Shell, Xwayland, xdotool, D-Bus's
-//! tools and the desktop portal installed (it prints the `apt` line when they aren't), as root in
-//! a container such as a cloud session or as a user on a Linux desktop.
+//! tools and the desktop portal installed (it prints the `apt` line when
+//! they aren't), as root in a container such as a cloud session or as a user
+//! on a Linux desktop.
 
 use crate::{Result, cargo, run, target_dir, workspace_root};
 use lists::{Frame, Game, GameList, ScreenshotList, Tile};

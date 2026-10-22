@@ -1,11 +1,11 @@
 //! Project tasks run with `cargo xtask <command>`: building the Iced frontend
-//! for the browser, with the download page, and serving it locally, building the macOS app bundle, the
-//! Flatpak, the Windows installer and the RetroArch core, installing Nubo on
-//! this computer, writing the logo
-//! and the license files that go with them, checking a release's version and
-//! notes, timing Nubo next to other emulators, the nightly review's tooling,
-//! reading the GB Emulator Shootout's published table, and making the
-//! documentation's screenshots from recorded scenes.
+//! for the browser, with the download page, and serving it locally, building
+//! the macOS app bundle, the Flatpak, the Windows installer and the RetroArch
+//! core, installing Nubo on this computer, writing the logo and the license
+//! files that go with them, checking a release's version and notes, timing
+//! Nubo next to other emulators, the nightly review's tooling, reading the
+//! GB Emulator Shootout's published table, and making the documentation's
+//! screenshots from recorded scenes.
 //!
 //! The packaging tasks need their platform's tools, and `compare-emulators`
 //! builds other emulators from their C and C++ sources; nothing else needs

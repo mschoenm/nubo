@@ -5,7 +5,7 @@
 //!
 //! Apps let the player pick a model as a [`Console`] and then one of its
 //! revisions, with [`about`] saying what each one is, and [`made_for`] says
-//! which console a game was made for.
+//! which model a game was made for.
 
 use nubo_core::{CartridgeHeader, Model};
 use serde::{Deserialize, Serialize};

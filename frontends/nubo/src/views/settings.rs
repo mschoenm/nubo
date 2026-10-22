@@ -1191,8 +1191,8 @@ fn about<'a>(
     column![
         container(title).padding([2, 2]),
         group("Updates and starting over", None, general, None),
-        group("Made with AI", None, vec![made_with_ai], None,),
-        group("Source and license", None, vec![license], None,),
+        group("Made with AI", None, vec![made_with_ai], None),
+        group("Source and license", None, vec![license], None),
     ]
     .spacing(14)
     .into()

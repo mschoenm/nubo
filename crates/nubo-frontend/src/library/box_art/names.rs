@@ -10,10 +10,10 @@ use std::collections::{HashMap, HashSet};
 #[cfg(any(feature = "desktop", feature = "web"))]
 use std::io::Cursor;
 
-/// The systems the libretro collections are split into, by their names
-/// there.
+/// The libretro collection of original Game Boy games, by its name there.
 #[cfg(any(feature = "desktop", feature = "web", test))]
 pub const GAME_BOY: &str = "Nintendo - Game Boy";
+/// The libretro collection of Game Boy Color games, by its name there.
 #[cfg(any(feature = "desktop", feature = "web", test))]
 pub const GAME_BOY_COLOR: &str = "Nintendo - Game Boy Color";
 
@@ -26,6 +26,8 @@ const REPLACED_CHARACTERS: &[char] = &['&', '*', '/', ':', '`', '<', '>', '?', '
 pub struct GameList {
     /// Every game's official name.
     names: HashSet<String>,
+    /// Official names by the CRC32 checksum of the ROM, for files named
+    /// neither like the game nor like the file in the list.
     by_checksum: HashMap<u32, String>,
     /// Official names by ROM file name without extension, which can differ
     /// from the game's name, such as "(Unl)" added at the end.
@@ -161,7 +163,7 @@ fn picture_name(name: &str) -> String {
 /// Writes every byte that isn't a letter, digit or one of `-._~` as `%XX`,
 /// as a URL path needs.
 #[cfg(any(feature = "desktop", feature = "web", test))]
-pub fn percent_encode(text: &str) -> String {
+fn percent_encode(text: &str) -> String {
     text.bytes()
         .map(|byte| {
             if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) {

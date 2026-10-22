@@ -206,10 +206,10 @@ impl App {
     }
 
     /// Starts over with what `choices` ticks, as far as this build and run
-    /// offer it (see `App::reset_offers`): puts every setting back to how
-    /// it started (see `Settings::reset`) and forgets the model picked for
-    /// each game, puts the controls back, removes the library folders, clears "Continue playing" and
-    /// deletes the saves. Saves are deleted in the background, which can
+    /// offer it (see `App::reset_offers`): puts every setting but the
+    /// controls back to how it started (see `Settings::reset`) and forgets
+    /// the model picked for each game, puts the controls back, removes the
+    /// library folders, clears "Continue playing" and deletes the saves. Saves are deleted in the background, which can
     /// take a while with many games (see `SettingsMessage::SavesDeleted`).
     /// Unless something was deleted, the toast that says what was done
     /// offers to undo it all.

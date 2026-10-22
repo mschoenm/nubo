@@ -34,8 +34,9 @@
 //! Each platform's storage and sound, and the controllers, are behind
 //! features, so a build only takes the dependencies it can use:
 //!
-//! - **`desktop`**: files in the user's folders (`storage::files`) and the
-//!   desktop's sound (cpal). Only it watches the library folders.
+//! - **`desktop`**: files in the user's folders (`storage::files`), the
+//!   desktop's sound (cpal) and, on Linux, the desktop's font, read from the
+//!   desktop portal (`desktop_font`). Only it watches the library folders.
 //! - **`web`**: the browser's localStorage (`storage::local_storage`), which
 //!   keeps the settings, battery saves and cheats, its IndexedDB
 //!   (`storage::indexed_db`), which keeps save states, the library and the
