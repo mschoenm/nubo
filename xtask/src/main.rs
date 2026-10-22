@@ -350,53 +350,92 @@ fn serve(root: &Path) -> Result {
     Ok(())
 }
 
-/// Answers one HTTP request with a file from `root` (a folder's
-/// `index.html` for a folder), or 404 if it doesn't exist or the path tries
-/// to leave `root` (with `..`, or an absolute path such as `C:/` on Windows,
-/// which `Path::join` would put in place of `root`).
+/// What the local server answers to one request.
+#[derive(Debug, PartialEq)]
+enum Response {
+    /// A file's contents, typed by its path.
+    File(PathBuf, Vec<u8>),
+    /// A folder addressed without its final `/`: the browser is sent to this
+    /// address, which has it, as GitHub Pages does. Otherwise the browser
+    /// would resolve the page's relative links against the folder above.
+    Redirect(String),
+    /// Nothing at that address.
+    NotFound,
+}
+
+/// Answers one HTTP request with [`response`].
 fn respond(mut stream: TcpStream, root: &Path) -> std::io::Result<()> {
     let mut request_line = String::new();
     BufReader::new(&stream).read_line(&mut request_line)?;
+    let target = request_line.split_whitespace().nth(1).unwrap_or("/");
 
-    let requested = request_line.split_whitespace().nth(1).unwrap_or("/");
-    let requested = requested
-        .split('?')
-        .next()
-        .unwrap_or("/")
-        .trim_start_matches('/');
-    let requested = if requested.is_empty() {
-        "index.html"
-    } else {
-        requested
-    };
-
-    let stays_in_root = Path::new(requested)
-        .components()
-        .all(|component| matches!(component, Component::Normal(_)));
-    let file = stays_in_root
-        .then(|| root.join(requested))
-        .map(|path| {
-            if path.is_dir() {
-                path.join("index.html")
-            } else {
-                path
-            }
-        })
-        .and_then(|path| fs::read(&path).ok().map(|body| (path, body)));
-
-    let (status, content_type, body) = match file {
-        Some((path, body)) => ("200 OK", content_type(&path), body),
-        None => ("404 Not Found", "text/plain", b"Not found".to_vec()),
+    let (status, headers, body) = match response(target, root) {
+        Response::File(path, body) => (
+            "200 OK",
+            format!("Content-Type: {}\r\n", content_type(&path)),
+            body,
+        ),
+        Response::Redirect(location) => (
+            "301 Moved Permanently",
+            format!("Location: {location}\r\n"),
+            Vec::new(),
+        ),
+        Response::NotFound => (
+            "404 Not Found",
+            "Content-Type: text/plain\r\n".to_string(),
+            b"Not found".to_vec(),
+        ),
     };
 
     write!(
         stream,
-        "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {}\r\n{}Content-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
         status,
-        content_type,
+        headers,
         body.len()
     )?;
     stream.write_all(&body)
+}
+
+/// Decides the answer to a request for `target` (the address's path and
+/// query): a file from `root` (a folder's `index.html` for a folder), a
+/// redirect for a folder addressed without its final `/` (keeping the
+/// query), or not found if nothing is there or the path tries to leave
+/// `root` (with `..`, or an absolute path such as `C:/` on Windows, which
+/// `Path::join` would put in place of `root`).
+fn response(target: &str, root: &Path) -> Response {
+    let (path, query) = target
+        .split_once('?')
+        .map_or((target, None), |(path, query)| (path, Some(query)));
+    let requested = path.trim_start_matches('/');
+    if requested.is_empty() {
+        return read_file(root.join("index.html"));
+    }
+
+    let stays_in_root = Path::new(requested)
+        .components()
+        .all(|component| matches!(component, Component::Normal(_)));
+    if !stays_in_root {
+        return Response::NotFound;
+    }
+
+    let file = root.join(requested);
+    if !file.is_dir() {
+        read_file(file)
+    } else if requested.ends_with('/') {
+        read_file(file.join("index.html"))
+    } else {
+        let query = query.map(|query| format!("?{query}")).unwrap_or_default();
+        Response::Redirect(format!("/{requested}/{query}"))
+    }
+}
+
+/// Reads the file at `path` for [`response`], or not found if it can't.
+fn read_file(path: PathBuf) -> Response {
+    match fs::read(&path) {
+        Ok(body) => Response::File(path, body),
+        Err(_) => Response::NotFound,
+    }
 }
 
 /// The MIME type for the files the web build contains.
@@ -479,8 +518,9 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_commit, build_commit_date, git};
+    use super::{Response, build_commit, build_commit_date, git, response};
     use std::env;
+    use std::fs;
 
     /// Checks the commit git gives. `NUBO_COMMIT` is passed on as it is, and
     /// outside a git checkout, such as a source archive, there is no commit
@@ -513,6 +553,40 @@ mod tests {
             date.chars().all(|c| c.is_ascii_digit() || c == '-'),
             "{date}"
         );
+    }
+
+    /// Checks that the local server serves files and folders as GitHub
+    /// Pages does: a folder's `index.html` at its address with a final `/`,
+    /// a redirect to that address without it, and nothing outside its root.
+    #[test]
+    fn the_local_server_redirects_folders_to_their_final_slash() {
+        let root = env::temp_dir().join(format!("nubo-xtask-serve-{}", std::process::id()));
+        let download = root.join("download");
+        fs::create_dir_all(&download).unwrap();
+        fs::write(root.join("index.html"), "app").unwrap();
+        fs::write(download.join("index.html"), "download").unwrap();
+
+        let body = |target| match response(target, &root) {
+            Response::File(_, body) => String::from_utf8(body).unwrap(),
+            other => panic!("{target}: {other:?}"),
+        };
+        assert_eq!(body("/"), "app");
+        assert_eq!(body("/?for=macos"), "app");
+        assert_eq!(body("/index.html"), "app");
+        assert_eq!(body("/download/"), "download");
+        assert_eq!(body("/download/?for=macos"), "download");
+        assert_eq!(
+            response("/download", &root),
+            Response::Redirect("/download/".to_string())
+        );
+        assert_eq!(
+            response("/download?for=macos&from=0.12.0", &root),
+            Response::Redirect("/download/?for=macos&from=0.12.0".to_string())
+        );
+        assert_eq!(response("/missing.js", &root), Response::NotFound);
+        assert_eq!(response("/../index.html", &root), Response::NotFound);
+
+        fs::remove_dir_all(&root).unwrap();
     }
 }
 
