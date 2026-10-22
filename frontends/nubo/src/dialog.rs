@@ -179,7 +179,8 @@ pub struct Choice {
     /// Whether this is a checkbox above a question's buttons, ticked when
     /// `checked`, rather than a button.
     pub checkbox: bool,
-    /// What a checkbox does, in small print under its label.
+    /// A line in small print under the label: what a checkbox does, or
+    /// more about a menu row, such as what a console's revision is.
     pub description: Option<String>,
     /// Whether the choice can be picked; a question's button that would do
     /// nothing is greyed out.
@@ -200,9 +201,11 @@ pub struct Choice {
     /// A small button at the right of a row that unfolds or folds the rows
     /// nested under it.
     pub fold: Option<Fold>,
-    /// What Left and Right do on this row of a menu, where they otherwise
-    /// move between the rows as Up and Down do.
+    /// What Left does on this row of a menu, where it otherwise moves
+    /// between the rows as Up does.
     pub left: Option<DialogAction>,
+    /// What Right does on this row of a menu, where it otherwise moves
+    /// between the rows as Down does.
     pub right: Option<DialogAction>,
 }
 

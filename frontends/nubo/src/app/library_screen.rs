@@ -2,8 +2,7 @@
 //! it, and moving through its cards with the D-pad.
 
 use super::dialogs::model_label;
-use super::playing::UndoPoint;
-use super::playing::read_rom;
+use super::playing::{UndoPoint, read_rom};
 use super::{App, Message};
 use crate::dialog::{DialogKind, GameMenuPage};
 use crate::rom_picker;
