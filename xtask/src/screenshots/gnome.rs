@@ -429,7 +429,7 @@ impl Session {
             .iter()
             .map(|(name, value)| (name.as_str(), value.as_str()))
             .chain([("XDG_CURRENT_DESKTOP", "GNOME")])
-            .map(|(name, value)| format!("'{name}': '{}'", value.replace('\'', "\\'")))
+            .map(|(name, value)| format!("'{name}': {}", gvariant_string(value)))
             .collect();
         gdbus(&[
             "--dest",
@@ -639,6 +639,14 @@ fn is_root() -> bool {
         .is_ok_and(|output| String::from_utf8_lossy(&output.stdout).trim() == "0")
 }
 
+/// Writes `value` as a string in GVariant's text format, the form `gdbus
+/// call` reads its arguments in: between single quotes, with each `\` and
+/// `'` escaped by a `\`. Backslashes go first, so the `\` that escapes a
+/// quote isn't doubled.
+fn gvariant_string(value: &str) -> String {
+    format!("'{}'", value.replace('\\', "\\\\").replace('\'', "\\'"))
+}
+
 /// Lets only its owner into `folder`, as the folder of a session's sockets
 /// must be.
 #[cfg(unix)]
@@ -652,4 +660,16 @@ fn restrict_to_owner(folder: &Path) -> Result {
 #[cfg(not(unix))]
 fn restrict_to_owner(_folder: &Path) -> Result {
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::gvariant_string;
+
+    /// Checks that backslashes and quotes are both escaped, each once.
+    #[test]
+    fn gvariant_strings_escape_backslashes_and_quotes() {
+        assert_eq!(gvariant_string("plain"), "'plain'");
+        assert_eq!(gvariant_string(r"a\b'c"), r"'a\\b\'c'");
+    }
 }
