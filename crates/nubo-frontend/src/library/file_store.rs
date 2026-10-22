@@ -6,8 +6,7 @@
 pub use crate::picture::decode_png;
 
 use super::{Cache, LibraryEntry, PictureKind};
-use crate::picture::encode_png;
-use crate::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
+use crate::picture::{SCREEN_HEIGHT, SCREEN_WIDTH, encode_png};
 use crate::storage::Unreadable;
 use crate::storage::files::{keep_aside, write_atomically};
 use serde::{Deserialize, Serialize};
@@ -65,15 +64,18 @@ pub fn save_entries(cache: &Cache, entries: &[LibraryEntry]) -> Result<(), Strin
 pub fn save_thumbnail(cache: &Cache, rom_path: &Path, pixels: &[u8]) -> Result<(), String> {
     let png = encode_png(SCREEN_WIDTH, SCREEN_HEIGHT, pixels)?;
 
-    write_atomically(&thumbnail_path(cache, rom_path)?, &png)
-        .map_err(|error| format!("The game's thumbnail couldn't be saved: {error}"))
+    write_atomically(
+        &picture_path(cache, PictureKind::LastScreen, rom_path)?,
+        &png,
+    )
+    .map_err(|error| format!("The game's thumbnail couldn't be saved: {error}"))
 }
 
 /// Saves the title screen of the game at `rom_path`, as the emulator drew
 /// it (in gray for original Game Boy games).
 pub fn save_title_screen(cache: &Cache, rom_path: &Path, pixels: &[u8]) -> Result<(), String> {
     write_atomically(
-        &title_screen_path(cache, rom_path)?,
+        &picture_path(cache, PictureKind::TitleScreen, rom_path)?,
         &encode_png(SCREEN_WIDTH, SCREEN_HEIGHT, pixels)?,
     )
     .map_err(|error| format!("A title screen couldn't be saved: {error}"))
@@ -89,13 +91,18 @@ pub fn read_picture(
     decode_png(&fs::read(picture_path(cache, kind, rom_path).ok()?).ok()?)
 }
 
-/// Where the picture of `kind` of the game at `rom_path` is kept.
+/// Where the picture of `kind` of the game at `rom_path` is kept: named
+/// after the ROM's file name, like battery saves, such as `Tetris.gb.png`,
+/// in the `box_art`, `title_screens` or `thumbnails` folder.
 fn picture_path(cache: &Cache, kind: PictureKind, rom_path: &Path) -> Result<PathBuf, String> {
-    match kind {
-        PictureKind::BoxArt => box_art_path(cache, rom_path),
-        PictureKind::TitleScreen => title_screen_path(cache, rom_path),
-        PictureKind::LastScreen => thumbnail_path(cache, rom_path),
-    }
+    let folder = match kind {
+        PictureKind::BoxArt => "box_art",
+        PictureKind::TitleScreen => "title_screens",
+        PictureKind::LastScreen => "thumbnails",
+    };
+    let mut file_name = rom_path.file_name().unwrap_or_default().to_os_string();
+    file_name.push(".png");
+    Ok(data_directory(cache)?.join(folder).join(file_name))
 }
 
 /// The saved picture of the game at `rom_path` as a PNG, if there is one
@@ -117,30 +124,8 @@ pub fn current_picture(cache: &Cache, kind: PictureKind, rom_path: &Path) -> Opt
 
 /// Saves the box art (a PNG) of the game at `rom_path`.
 pub fn save_box_art(cache: &Cache, rom_path: &Path, png: &[u8]) -> Result<(), String> {
-    write_atomically(&box_art_path(cache, rom_path)?, png)
+    write_atomically(&picture_path(cache, PictureKind::BoxArt, rom_path)?, png)
         .map_err(|error| format!("Box art couldn't be saved: {error}"))
-}
-
-/// Box art is named like thumbnails, in the `box_art` folder.
-fn box_art_path(cache: &Cache, rom_path: &Path) -> Result<PathBuf, String> {
-    let mut file_name = rom_path.file_name().unwrap_or_default().to_os_string();
-    file_name.push(".png");
-    Ok(data_directory(cache)?.join("box_art").join(file_name))
-}
-
-/// Title screens are named like thumbnails, in the `title_screens` folder.
-fn title_screen_path(cache: &Cache, rom_path: &Path) -> Result<PathBuf, String> {
-    let mut file_name = rom_path.file_name().unwrap_or_default().to_os_string();
-    file_name.push(".png");
-    Ok(data_directory(cache)?.join("title_screens").join(file_name))
-}
-
-/// Thumbnails are named after the ROM's file name, like battery saves, such
-/// as `Tetris.gb.png`.
-fn thumbnail_path(cache: &Cache, rom_path: &Path) -> Result<PathBuf, String> {
-    let mut file_name = rom_path.file_name().unwrap_or_default().to_os_string();
-    file_name.push(".png");
-    Ok(data_directory(cache)?.join("thumbnails").join(file_name))
 }
 
 /// The cache's data folder, or why there is none.
