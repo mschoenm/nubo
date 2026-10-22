@@ -223,7 +223,7 @@ fn write_build_files(work_dir: &Path, target: &str) -> Result<Vec<Value>> {
     ] {
         let mut names: Vec<String> = fs::read_dir(work_dir.join(&folder))
             .map_err(|error| error.to_string())?
-            .filter_map(Result::ok)
+            .filter_map(std::result::Result::ok)
             .filter(|entry| entry.path().is_file())
             .map(|entry| entry.file_name().to_string_lossy().into_owned())
             .collect();
