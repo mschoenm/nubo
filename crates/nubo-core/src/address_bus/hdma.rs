@@ -359,6 +359,69 @@ mod tests {
     use crate::address_bus::constants::*;
     use crate::address_bus::effects::empty_cartridge_effects;
     use crate::address_bus::test_utils::*;
+    use crate::model::Model;
+
+    /// A CGB address bus running an HBlank-mode transfer, stepped dot by dot to `dots` dots after
+    /// mode 3 ends on line 1: STAT shows mode 0 from then on, while HDMA hears of the HBlank only
+    /// two dots later.
+    fn hblank_transfer_after_mode_3(dots: u8) -> AddressBus {
+        let mut address_bus = AddressBus::new(false);
+        address_bus.set_model(Model::CgbE);
+        address_bus.gpu.set_lcdc(0x80);
+        let mut mode_3_ends = 0;
+        let mut previous_mode = address_bus.gpu.mode();
+        while mode_3_ends < 2 {
+            address_bus.gpu.step_dots(1, &mut address_bus.hdma);
+            let mode = address_bus.gpu.mode();
+            if previous_mode == 3 && mode == 0 {
+                mode_3_ends += 1;
+            } else if previous_mode != 3 && mode == 3 && mode_3_ends == 1 {
+                address_bus.hdma.set_hdma5(0x81);
+            }
+            previous_mode = mode;
+        }
+        address_bus.gpu.step_dots(dots, &mut address_bus.hdma);
+        address_bus
+    }
+
+    #[test]
+    fn hblank_dma_hears_of_no_hblank_when_the_lcd_goes_off_before_its_trigger() {
+        for dots in 0..2 {
+            let mut address_bus = hblank_transfer_after_mode_3(dots);
+            assert_eq!(address_bus.gpu.mode(), 0);
+            assert!(!address_bus.hdma.hblank_started());
+
+            address_bus.gpu.set_lcdc(0);
+            address_bus.gpu.step_dots(4, &mut address_bus.hdma);
+            assert!(!address_bus.hdma.hblank_started(), "{dots} dots in");
+
+            // Halting while the LCD is off is halting inside HBlank (SameBoy's `halt`).
+            address_bus.hdma_halt_started();
+            assert!(!address_bus.hdma.halted_outside_hblank, "{dots} dots in");
+            address_bus.hdma_halt_ended();
+
+            // So is halting on the first line after the LCD is turned on, before its mode 3: the
+            // block that line's HBlank asks for while the CPU is halted is dropped.
+            address_bus.gpu.set_lcdc(0x80);
+            address_bus.hdma_halt_started();
+            assert!(!address_bus.hdma.halted_outside_hblank, "{dots} dots in");
+            for _ in 0..456 {
+                if address_bus.hdma.hblank_started() {
+                    break;
+                }
+                address_bus.gpu.step_dots(1, &mut address_bus.hdma);
+            }
+            assert!(address_bus.hdma.hblank_started());
+            address_bus.hdma_halt_ended();
+            assert!(!address_bus.hdma.hblank_started(), "{dots} dots in");
+        }
+    }
+
+    #[test]
+    fn hblank_dma_hears_of_the_hblank_two_dots_after_mode_3() {
+        let address_bus = hblank_transfer_after_mode_3(2);
+        assert!(address_bus.hdma.hblank_started());
+    }
 
     #[test]
     fn should_calculate_vram_dma_source() {
