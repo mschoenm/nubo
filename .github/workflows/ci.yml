@@ -24,6 +24,12 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  # No debug info in the dev and test profiles: nobody runs a debugger in
+  # CI, a panic's message still gives its file and line, and debug info was
+  # most of the size of the Rust caches. rust-cache puts these variables in
+  # its keys, so every workflow sets the same values (docs/CI.md, "Caches").
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_PROFILE_TEST_DEBUG: 0
 
 # `rustup toolchain install` installs the newest stable Rust, which
 # rust-toolchain.toml asks for, and taiki-e/install-action the newest

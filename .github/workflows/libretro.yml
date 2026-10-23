@@ -17,6 +17,9 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # No debug info, as in ci.yml (see there).
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_PROFILE_TEST_DEBUG: 0
 
 jobs:
   build:
@@ -53,14 +56,44 @@ jobs:
       - name: Build the core's zip
         run: cargo xtask libretro
 
-      # Without the packages RetroArch's only recommend (video acceleration
-      # drivers, GameMode, Qt extras), which the test doesn't use. FFmpeg's
-      # codecs are hard dependencies and still come. A slow Ubuntu mirror
-      # once took 27 minutes here, so the step has a limit of its own.
+      # RetroArch's packages come from the cache, under a key made from the
+      # version of RetroArch that Ubuntu offers today, so the test keeps
+      # running against Ubuntu's RetroArch: a new version (an update, or a
+      # new runner image) downloads them once and saves a new cache. A slow
+      # Ubuntu mirror once kept this step from finishing in 30 minutes. The
+      # key ends in a hash of the version, so the Caches workflow deletes the
+      # older ones (docs/CI.md, "Caches").
+      - name: Find the version of RetroArch Ubuntu offers
+        id: retroarch
+        if: matrix.platform == 'linux-x86_64'
+        run: |
+          sudo apt-get update
+          version=$(apt-cache policy retroarch | awk '/Candidate:/ { print $2 }')
+          echo "RetroArch $version"
+          echo "hash=$(echo "$version" | sha256sum | cut -c 1-16)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: matrix.platform == 'linux-x86_64'
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: retroarch-debs-${{ runner.os }}-${{ runner.arch }}-${{ steps.retroarch.outputs.hash }}
+
+      # apt downloads into the cached folder only what isn't there yet, and
+      # checks every file there against the package lists, so a damaged or
+      # changed one is downloaded again. Without the packages RetroArch's
+      # only recommend (video acceleration drivers, GameMode, Qt extras),
+      # which the test doesn't use; FFmpeg's codecs are hard dependencies
+      # and still come. apt's lock and download folders are root's own, so
+      # they go before the cache is saved.
       - name: Install RetroArch
         if: matrix.platform == 'linux-x86_64'
         timeout-minutes: 15
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends retroarch dbus
+        run: |
+          archives="$RUNNER_TEMP/apt-archives"
+          mkdir -p "$archives/partial"
+          sudo apt-get install -y --no-install-recommends -o Dir::Cache::Archives="$archives" retroarch dbus
+          sudo rm -rf "$archives/partial" "$archives/lock"
+          du -sh "$archives"
 
       # The zip is what players install, so the core in it plays a game in
       # the RetroArch Ubuntu packages, headless: the null video and sound
