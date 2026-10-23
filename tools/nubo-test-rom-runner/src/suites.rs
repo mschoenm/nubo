@@ -80,7 +80,7 @@ pub(crate) enum Check {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Deadline {
     /// Seconds from power-on, so the boot ROM's time (1.7 seconds on DMG, 3.1
-    /// on CGB) counts too.
+    /// on CGB, 3.5 on SGB) counts too.
     FromPowerOn(u32),
     /// Seconds after the boot ROM hands over to the cartridge.
     AfterBoot(u32),
@@ -216,8 +216,8 @@ const GBMICROTEST_SECONDS_AFTER_BOOT: u32 = 1;
 /// The CGB revision Gambatte's results were recorded on.
 const GAMBATTE_CGB: Model = Model::CgbC;
 /// Extra time added to each Blargg, rtc3test and smaller screenshot test's
-/// timeout to cover the boot ROM, which takes 1.7 seconds on DMG and 3.1 on
-/// CGB.
+/// timeout to cover the boot ROM, which takes 1.7 seconds on DMG, 3.1 on CGB
+/// and 3.5 on SGB.
 const BOOT_ROM_SECONDS: u32 = 10;
 /// Extra time added to rtc3test's timeouts for picking a subtest from its
 /// menu, which takes up to a second.
