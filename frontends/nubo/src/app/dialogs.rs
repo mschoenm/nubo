@@ -230,7 +230,10 @@ impl App {
         }
     }
 
-    /// The first page of a library game's menu.
+    /// The first page of a library game's menu. Its Console row shows the
+    /// console the game itself is set to start on, which later runs use;
+    /// with `--model`, a line under it says this run starts every game on
+    /// that model instead (see `App::model_for`).
     fn game_menu(&self, entry: &LibraryEntry) -> DialogContent {
         let path = &entry.path;
         let starts_on = entry.starts_on(self.settings.shared.model);
@@ -238,6 +241,24 @@ impl App {
         let unfolded = starts_on
             .map(Console::of)
             .filter(|console| starts_on != Some(console.recommended()));
+        let mut console = Choice::new(
+            Icon::Gamepad2,
+            "Console",
+            ChoiceStyle::Secondary,
+            DialogAction::Stay(
+                DialogMessage::ShowGameMenu(path.clone(), GameMenuPage::Consoles(unfolded)).into(),
+            ),
+        )
+        .hint(match starts_on {
+            Some(model) => format!("{} ›", model_label(model)),
+            None => String::from("Automatic ›"),
+        });
+        if let Some(model) = self.model_override {
+            console = console.description(format!(
+                "This run starts every game on the {} (--model)",
+                model_label(model)
+            ));
+        }
         let mut choices = vec![
             Choice::new(
                 Icon::Play,
@@ -245,19 +266,7 @@ impl App {
                 ChoiceStyle::Secondary,
                 DialogAction::CloseThen(GameMessage::PlayGame(path.clone()).into()),
             ),
-            Choice::new(
-                Icon::Gamepad2,
-                "Console",
-                ChoiceStyle::Secondary,
-                DialogAction::Stay(
-                    DialogMessage::ShowGameMenu(path.clone(), GameMenuPage::Consoles(unfolded))
-                        .into(),
-                ),
-            )
-            .hint(match starts_on {
-                Some(model) => format!("{} ›", model_label(model)),
-                None => String::from("Automatic ›"),
-            }),
+            console,
         ];
         if links::CAN_SHOW_FOLDERS {
             choices.push(Choice::new(

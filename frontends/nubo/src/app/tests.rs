@@ -78,6 +78,24 @@ fn a_reset_asks_first_puts_the_settings_back_and_can_be_undone() {
 }
 
 #[test]
+fn undoing_a_reset_puts_back_the_model_picked_on_the_command_line() {
+    let (mut app, _) = App::new(
+        None,
+        &Options {
+            fresh: true,
+            model: Some(Model::Sgb),
+            ..Options::default()
+        },
+    );
+
+    let _ = app.update(SettingsMessage::Reset(ResetChoices::default()).into());
+    assert_eq!(app.model_override, None);
+
+    let _ = app.update(GameMessage::Undo.into());
+    assert_eq!(app.model_override, Some(Model::Sgb));
+}
+
+#[test]
 fn a_reset_keeps_the_controls_unless_their_box_is_ticked() {
     let (mut app, _) = App::new(
         None,
@@ -903,6 +921,38 @@ fn picking_a_console_closes_the_menu_and_can_be_undone() {
     assert_eq!(preference(&app), Some(ModelPreference::Fixed(Model::Mgb)));
     let _ = app.update(GameMessage::Undo.into());
     assert_eq!(preference(&app), None);
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn the_console_row_says_when_the_command_line_picks_the_console() {
+    let (mut app, path, folder) = app_with_color_game("override");
+    let console_row = |app: &mut App| {
+        app.show_game_menu(path.clone(), GameMenuPage::Main);
+        let content = app.dialog_content().unwrap();
+        let row = content
+            .choices
+            .into_iter()
+            .find(|choice| choice.label == "Console")
+            .unwrap();
+        (row.hint, row.description)
+    };
+
+    assert_eq!(
+        console_row(&mut app),
+        (Some(String::from("Game Boy Color ›")), None)
+    );
+
+    app.model_override = Some(Model::Sgb);
+    assert_eq!(
+        console_row(&mut app),
+        (
+            Some(String::from("Game Boy Color ›")),
+            Some(String::from(
+                "This run starts every game on the Super Game Boy (--model)"
+            ))
+        )
+    );
     let _ = std::fs::remove_dir_all(&folder);
 }
 
