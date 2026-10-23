@@ -993,13 +993,24 @@ pub unsafe extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> 
         }
         // SAFETY: RetroArch passes a buffer of `size` bytes to read.
         let state = unsafe { std::slice::from_raw_parts(data.cast::<u8>(), size) };
-        let loaded = lock(&CORE)
-            .as_mut()
-            .is_some_and(|core| core.unserialize(state));
-        if !loaded {
-            log(RETRO_LOG_WARN, "the save state isn't one of this game's");
+        let loaded = lock(&CORE).as_mut().map(|core| core.unserialize(state));
+        match loaded {
+            Some(Ok(())) => true,
+            Some(Err(error)) => {
+                log(
+                    RETRO_LOG_WARN,
+                    &format!("the save state didn't load: {error}"),
+                );
+                false
+            }
+            None => {
+                log(
+                    RETRO_LOG_WARN,
+                    "no game is loaded to load the save state into",
+                );
+                false
+            }
         }
-        loaded
     })
 }
 

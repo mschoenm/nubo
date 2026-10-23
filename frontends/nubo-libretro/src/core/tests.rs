@@ -268,11 +268,11 @@ fn a_button_held_across_a_loaded_state_stays_pressed() {
     let mut state = vec![0; core.serialize_size()];
     assert!(core.serialize(&mut state), "saved with A released");
     run_holding(&mut core, 1, buttons(&[A]));
-    assert!(core.unserialize(&state));
+    assert!(core.unserialize(&state).is_ok());
     run_holding(&mut core, 2, buttons(&[A]));
     assert_eq!(work_ram(&mut core, 0xC001) & 0x0F, 0b1110, "A");
 
-    assert!(core.unserialize(&state));
+    assert!(core.unserialize(&state).is_ok());
     run(&mut core, 2);
     assert_eq!(work_ram(&mut core, 0xC001) & 0x0F, 0x0F, "released");
 }
@@ -339,7 +339,7 @@ fn loading_a_state_puts_its_ram_in_the_buffer_and_keeps_it_there() {
     run(&mut core, 2);
     assert_eq!(work_ram(&mut core, 0xC000), 0x33);
 
-    assert!(core.unserialize(&state));
+    assert!(core.unserialize(&state).is_ok());
     assert_eq!(core.save_ram()[0], 0x5A);
     let cartridge_ram = core.emulator().cartridge_ram().to_vec();
     assert_eq!(core.save_ram(), cartridge_ram);
@@ -459,7 +459,7 @@ fn loading_a_state_puts_its_clock_in_the_buffer_and_keeps_it_there() {
     run(&mut core, 2);
     assert_eq!(game_time(&mut core).0, 20);
 
-    assert!(core.unserialize(&state));
+    assert!(core.unserialize(&state).is_ok());
     let loaded_clock = RtcState::from_bytes(core.rtc_memory()).unwrap();
     assert_eq!(
         (
@@ -554,7 +554,7 @@ fn a_loaded_state_goes_on_exactly_like_the_run_it_was_saved_from() {
         assert!(core.serialize(&mut state));
         let first = record(&mut core, 100);
 
-        assert!(core.unserialize(&state));
+        assert!(core.unserialize(&state).is_ok());
         let second = record(&mut core, 100);
         assert!(
             first == second,
@@ -590,7 +590,7 @@ fn a_restart_onto_a_super_game_boy_still_saves_states() {
         assert_eq!(core.serialize_size(), size, "RetroArch's size stays");
         let mut state = vec![0; size];
         assert!(core.serialize(&mut state), "a state on the {model:?} fits");
-        assert!(core.unserialize(&state));
+        assert!(core.unserialize(&state).is_ok());
     }
 }
 
@@ -646,11 +646,30 @@ fn damaged_or_foreign_states_do_not_load_and_change_nothing() {
         &other_state,
     ] {
         assert!(core.serialize(&mut before));
-        assert!(!core.unserialize(bad));
+        assert!(core.unserialize(bad).is_err());
         let mut after = vec![0; core.serialize_size()];
         assert!(core.serialize(&mut after));
         assert!(before == after, "a failed load changed the game");
     }
+}
+
+#[test]
+fn a_state_from_another_model_says_so() {
+    let mut core = booted(MBC1_RAM_BATTERY, RAM_8_KIB, RAM);
+    let mut state = vec![0; core.serialize_size()];
+    assert!(core.serialize(&mut state));
+    core.set_options(Options {
+        model: ModelPreference::Fixed(Model::CgbC),
+        ..Options::default()
+    });
+    core.reset().unwrap();
+    assert_eq!(
+        core.unserialize(&state),
+        Err(SaveStateError::DifferentModel {
+            found: Model::Dmg,
+            expected: Model::CgbC,
+        })
+    );
 }
 
 /// How much a state's length can change while a game runs: every program
@@ -909,7 +928,7 @@ fn a_state_saved_after_retroarch_wrote_memory_holds_the_write() {
     assert!(core.serialize(&mut state));
     core.system_ram()[0x100] = 0x00;
     run(&mut core, 2);
-    assert!(core.unserialize(&state));
+    assert!(core.unserialize(&state).is_ok());
     assert_eq!(core.system_ram()[0x100], 0x42);
     run(&mut core, 2);
     assert_eq!(cheated(&mut core).0, 0x42);
