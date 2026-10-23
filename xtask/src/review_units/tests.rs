@@ -171,3 +171,28 @@ fn a_state_that_cannot_be_read_is_an_error_and_is_kept() {
     assert!(result.unwrap_err().contains("failed to read"));
     assert_eq!(kept.unwrap(), b"{\"files\": {\"\xff\": \"2026-10-16\"}}");
 }
+
+#[test]
+fn next_takes_only_a_full_date_and_commit_hash() {
+    /// A command line that is only the options of `review-units next`.
+    #[derive(clap::Parser)]
+    struct Command {
+        #[command(flatten)]
+        options: NextOptions,
+    }
+    let parse = |date: &str, commit: &str| {
+        <Command as clap::Parser>::try_parse_from([
+            "next",
+            "--state",
+            "rotation.json",
+            "--date",
+            date,
+            "--commit",
+            commit,
+        ])
+    };
+    let hash = "0123456789abcdef0123456789abcdef01234567";
+    assert!(parse("2026-10-23", hash).is_ok());
+    assert!(parse("2026-10-23", "0123456").is_err());
+    assert!(parse("23-10-2026", hash).is_err());
+}

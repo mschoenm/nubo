@@ -33,21 +33,12 @@ const BANNER_LOGO_MARGIN: u32 = 7;
 pub struct Options {
     /// Name the downloads as the nightly build of this date (YYYY-MM-DD), in the files' names
     /// and in the name Windows shows for the installed app
-    #[arg(long, value_name = "DATE", value_parser = parse_date)]
+    #[arg(long, value_name = "DATE", value_parser = release::parse_date)]
     nightly: Option<String>,
     /// Build them as another version than Cargo.toml's (x.y.z), to make older and newer
     /// installers that test updates and downgrades
     #[arg(long = "as-version", value_name = "VERSION")]
     version: Option<String>,
-}
-
-/// Reads the value of `--nightly`: a YYYY-MM-DD date.
-fn parse_date(text: &str) -> Result<String> {
-    if release::is_date(text) {
-        Ok(text.to_owned())
-    } else {
-        Err(String::from("expected a YYYY-MM-DD date"))
-    }
 }
 
 /// The names one build of the downloads goes by.

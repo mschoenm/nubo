@@ -12,6 +12,7 @@
 //! moved without changes keeps its date under its new path, so moving
 //! folders doesn't send their files to the front or back of the rotation.
 
+use crate::release::parse_date;
 use crate::shootout_scoreboard::parse_commit;
 use crate::{Result, workspace_root};
 use clap::{Args, Subcommand};
@@ -67,10 +68,10 @@ pub struct NextOptions {
     #[arg(long, value_name = "ROTATION.JSON")]
     state: PathBuf,
     /// Tonight's date, YYYY-MM-DD
-    #[arg(long)]
+    #[arg(long, value_parser = parse_date)]
     date: String,
-    /// The commit tonight's review reads, as a hash
-    #[arg(long, value_name = "SHA")]
+    /// The commit tonight's review reads, as a full hash
+    #[arg(long, value_name = "SHA", value_parser = parse_commit)]
     commit: String,
 }
 

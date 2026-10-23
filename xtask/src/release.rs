@@ -134,6 +134,16 @@ fn downloads(version: &str) -> String {
     )
 }
 
+/// Reads a YYYY-MM-DD date given on the command line, such as the value of
+/// `cargo xtask windows --nightly`.
+pub(crate) fn parse_date(text: &str) -> Result<String> {
+    if is_date(text) {
+        Ok(text.to_owned())
+    } else {
+        Err(String::from("expected a YYYY-MM-DD date"))
+    }
+}
+
 /// Whether `text` looks like an AppStream date, `YYYY-MM-DD`.
 pub(crate) fn is_date(text: &str) -> bool {
     let bytes = text.as_bytes();
