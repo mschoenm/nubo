@@ -956,11 +956,10 @@ const SHOOTOUT_SECONDS_AFTER_BOOT: u32 = 1;
 /// STOP and speed switch tests and CasualPokePlayer's MBC3 tests, checked
 /// for what the emulator does. Each runs on the model the shootout uses and
 /// passes if it matches one of its screenshots (several where hardware units
-/// differ) in the screenshots' own grays (see `screen::normalize`). The
-/// Shootout's own judgement of them, in the colors the app shows with
-/// `--raw-screen`, is in
-/// `shootout.rs`. Left out are
-/// `daid/rom_and_ram.gb`, which has no expected result, and
+/// differ) in grayscale, as the Shootout compares ([`Check::GrayscaleScreen`],
+/// after `screen::normalize`). The Shootout's own judgment of them, in the
+/// colors the app shows with `--raw-screen`, is in `shootout.rs`. Left out
+/// are `daid/rom_and_ram.gb`, which has no expected result, and
 /// `cpp/sgb-ext-test.gb`, which takes longer and runs in `super_game_boy`.
 const SHOOTOUT_ROM_CHECKS: [(&str, Model, &[&str]); 11] = [
     (
