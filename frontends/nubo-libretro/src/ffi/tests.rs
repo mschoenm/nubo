@@ -503,6 +503,7 @@ fn a_game_plays_in_retroarchs_order_with_one_frame_and_its_sound_per_run() {
     );
     assert_eq!(record.achievements, Some(true));
     assert!(!record.memory_maps.is_empty());
+    assert_eq!(record.system_ram_size_while_mapping, Some(0x2000));
 
     for frame in 0..300 {
         retro_run();

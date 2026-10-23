@@ -611,9 +611,9 @@ fn memory_descriptors(core: &mut Core) -> Vec<RetroMemoryDescriptor> {
         .collect()
 }
 
-/// Hands RetroArch the memory map `descriptors` describe. Called without the
-/// lock on `CORE` held, since RetroArch may ask for the core's memory
-/// (`retro_get_memory_data`) while it handles the map.
+/// Hands RetroArch the memory map `descriptors` describe. Called with the
+/// core already in `CORE` but without its lock held, since RetroArch may ask
+/// for the core's memory (`retro_get_memory_data`) while it handles the map.
 fn set_memory_maps(descriptors: &[RetroMemoryDescriptor]) {
     let mut map = RetroMemoryMap {
         descriptors: descriptors.as_ptr(),
@@ -1076,7 +1076,10 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
             RETRO_LOG_INFO,
             &format!("{} on {}", core.header().title, core.model().description()),
         );
-        set_memory_maps(&memory_descriptors(&mut core));
+        let descriptors = memory_descriptors(&mut core);
+        let has_rumble = core.has_rumble();
+        *lock(&CORE) = Some(core);
+        set_memory_maps(&descriptors);
         // Before the first `retro_run`, as libretro.h asks.
         let mut supported = true;
         environment(
@@ -1092,7 +1095,7 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
         if environment(RETRO_ENVIRONMENT_GET_INPUT_BITMASKS, ptr::null_mut()) {
             lock(&FRONTEND).input_bitmasks = true;
         }
-        if core.has_rumble() {
+        if has_rumble {
             let mut rumble = RetroRumbleInterface {
                 set_rumble_state: None,
             };
@@ -1103,7 +1106,6 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
                 lock(&FRONTEND).set_rumble_state = rumble.set_rumble_state;
             }
         }
-        *lock(&CORE) = Some(core);
         true
     })
 }
