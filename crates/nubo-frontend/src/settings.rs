@@ -347,7 +347,7 @@ pub fn load<T: Default>(
                     "Your settings couldn't be read, so Nubo starts with the defaults and kept them as {location}: {error}"
                 ),
                 Err(keep_error) => format!(
-                    "Your settings couldn't be read and were reset (keeping them aside failed too: {keep_error}): {error}"
+                    "Your settings couldn't be read, and keeping them aside failed too ({keep_error}), so Nubo starts with the defaults and saves only what you change: {error}"
                 ),
             };
             Loaded {
