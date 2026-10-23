@@ -234,6 +234,15 @@ impl Emulator {
     /// what it shows (see [`Emulator::rtc_state`]). The clock of a state
     /// from before Nubo noted which one it follows loads as it is.
     ///
+    /// The state holds the buttons each player held as the game saw them,
+    /// but not the keys the keyboard, the controllers and the frontend hold
+    /// now, which belong to the player. Those take over from the state's
+    /// buttons at the next button change, or when the emulator next runs,
+    /// requesting the joypad interrupt if that pulls a joypad line low: just
+    /// as the same change of buttons does in the run the state was saved
+    /// from. A state from before Nubo stored the buttons keeps the keys held
+    /// now, without an interrupt.
+    ///
     /// [`RtcClock`]: crate::RtcClock
     pub fn load_state(&mut self, data: &[u8]) -> Result<(), SaveStateError> {
         self.load_state_with_report(data).map(|_| ())

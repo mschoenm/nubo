@@ -225,10 +225,9 @@ pub struct Core {
     right: Vec<f32>,
     /// The latest frame's sound, left and right samples in turn.
     audio: Vec<i16>,
-    /// The libretro buttons held during the last frame, one bit each.
-    held_buttons: u16,
-    /// The libretro buttons the second to fourth players held during the
-    /// last frame, one bit each (see [`Core::set_other_players`]).
+    /// The libretro buttons the second to fourth players hold, one bit
+    /// each, which the next [`Core::run`] hands over (see
+    /// [`Core::set_other_players`]).
     other_players_held: [u16; 3],
     /// The codes of each RetroArch cheat that are on, by its index.
     cheats: BTreeMap<u32, Vec<Cheat>>,
@@ -273,7 +272,6 @@ impl Core {
             left: Vec::new(),
             right: Vec::new(),
             audio: Vec::new(),
-            held_buttons: 0,
             other_players_held: [0; 3],
             cheats: BTreeMap::new(),
             state_size: 0,
@@ -340,6 +338,12 @@ impl Core {
     /// libretro button number, see [`BUTTONS`]), then leaves the frame in
     /// [`Core::video`], the sound in [`Core::audio`] and the rumble in
     /// [`Core::rumble`].
+    ///
+    /// Every player's buttons go to the emulator in one go before each
+    /// frame (`Emulator::set_held_keys`), so a frame goes the same way
+    /// whatever was held before it: a loaded state's next frame starts from
+    /// the buttons the state stores, never from the ones held before the
+    /// load, as run-ahead and netplay's rollback need.
     pub fn run(&mut self, buttons: u16) {
         self.take_frontend_changes();
         self.press_buttons(buttons);
@@ -373,7 +377,6 @@ impl Core {
         }
         self.emulator = emulator;
         self.reregister_cheats();
-        self.held_buttons = 0;
         self.other_players_held = [0; 3];
         self.sync_saves_from_emulator();
         self.draw_frame();
@@ -452,23 +455,11 @@ impl Core {
     }
 
     /// Holds the buttons of the second to fourth players, RetroArch's ports
-    /// 2 to 4 (one bit per libretro button number, see [`BUTTONS`]). A Super
-    /// Game Boy game reads them once it asks for more than one player;
-    /// otherwise they do nothing.
+    /// 2 to 4 (one bit per libretro button number, see [`BUTTONS`]), from
+    /// the next [`Core::run`] on. A Super Game Boy game reads them once it
+    /// asks for more than one player; otherwise they do nothing.
     pub fn set_other_players(&mut self, buttons: [u16; 3]) {
-        for (player, (&held, before)) in (2..).zip(buttons.iter().zip(&mut self.other_players_held))
-        {
-            if held == *before {
-                continue;
-            }
-            let keys: Vec<Key> = BUTTONS
-                .iter()
-                .filter(|(id, _, _)| held & 1 << id != 0)
-                .map(|&(_, key, _)| key)
-                .collect();
-            self.emulator.set_player_keys(player, &keys);
-            *before = held;
-        }
+        self.other_players_held = buttons;
     }
 
     /// The buttons last handed over for the second to fourth players.
@@ -477,22 +468,19 @@ impl Core {
         self.other_players_held
     }
 
-    /// Presses and releases the Game Boy buttons whose libretro buttons
-    /// changed since the last frame.
+    /// Holds the Game Boy buttons of the first player's libretro
+    /// `buttons` and of the other players', all at once.
     fn press_buttons(&mut self, buttons: u16) {
-        let changed = buttons ^ self.held_buttons;
-        for (id, key, _) in BUTTONS {
-            let bit = 1 << id;
-            if changed & bit == 0 {
-                continue;
-            }
-            if buttons & bit == 0 {
-                self.emulator.release_key(key);
-            } else {
-                self.emulator.press_key(key);
-            }
-        }
-        self.held_buttons = buttons;
+        let keys = |held: u16| -> Vec<Key> {
+            BUTTONS
+                .iter()
+                .filter(|(id, _, _)| held & 1 << id != 0)
+                .map(|&(_, key, _)| key)
+                .collect()
+        };
+        let [second, third, fourth] = self.other_players_held.map(keys);
+        self.emulator
+            .set_held_keys(&[&keys(buttons), &second, &third, &fourth]);
     }
 
     /// Converts the latest frame to RetroArch's pixel format, in the

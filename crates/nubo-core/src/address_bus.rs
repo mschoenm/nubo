@@ -1043,8 +1043,26 @@ impl AddressBus {
         self.show_sgb_buttons_held();
     }
 
-    /// Tells a Super Game Boy whether the player holds a button, which keeps
-    /// its attraction mode away.
+    /// Replaces the keys a frontend holds for every player at once (see
+    /// `Emulator::set_held_keys`), and tells a Super Game Boy whether any
+    /// button is held.
+    pub(crate) fn set_held_keys(&mut self, players: &[&[Key]]) {
+        self.joypad.set_held_keys(players);
+        self.show_sgb_buttons_held();
+    }
+
+    /// Lets the keys held now take over from the buttons of a save state
+    /// loaded since the last button change (see `Joypad`), and tells a
+    /// Super Game Boy whether any button is held. The emulator calls this
+    /// before it runs.
+    pub(crate) fn apply_held_keys_after_load(&mut self) {
+        if self.joypad.apply_held_keys_after_load() {
+            self.show_sgb_buttons_held();
+        }
+    }
+
+    /// Tells a Super Game Boy whether the player holds a button, as the game
+    /// sees the buttons, which keeps its attraction mode away.
     fn show_sgb_buttons_held(&mut self) {
         let held = self.joypad.any_button_held();
         if let Some(sgb) = self.gpu.sgb_mut() {
@@ -1392,8 +1410,9 @@ impl AddressBus {
     }
 
     /// Sets up what a loaded save state doesn't hold: the views of the
-    /// cartridge's ROM, which player holds which controller's buttons, and
-    /// the PPU and M-cycles caught up (see above). First rejects a state
+    /// cartridge's ROM, the buttons of a state from before they were stored,
+    /// whether a Super Game Boy sees a button held, and the PPU and M-cycles
+    /// caught up (see above). First rejects a state
     /// whose components disagree on the copies they keep of the address
     /// bus's state (see `check_loaded_copies`).
     pub(crate) fn finish_loading_save_state(&mut self) -> std::io::Result<()> {

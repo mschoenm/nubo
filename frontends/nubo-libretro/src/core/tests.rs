@@ -1,7 +1,8 @@
 use super::*;
 use crate::test_roms::{
-    CHEATS, CLOCK, JOYPAD, MBC1_RAM_BATTERY, MBC3_TIMER_RAM_BATTERY, MBC5_RUMBLE, RAM, RAM_2_KIB,
-    RAM_8_KIB, RAM_32_KIB, ROM_BYTE_AT_0200, ROM_ONLY, RUMBLE, TONE, cartridge,
+    CHEATS, CLOCK, JOYPAD, JOYPAD_INTERRUPTS, MBC1_RAM_BATTERY, MBC3_TIMER_RAM_BATTERY,
+    MBC5_RUMBLE, RAM, RAM_2_KIB, RAM_8_KIB, RAM_32_KIB, ROM_BYTE_AT_0200, ROM_ONLY, RUMBLE, TONE,
+    cartridge,
 };
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::palettes::DmgPalette;
@@ -260,8 +261,9 @@ fn held_buttons_reach_the_game() {
     assert_eq!(work_ram(&mut core, 0xC001) & 0x0F, 0x0F);
 }
 
-/// Save states leave out the buttons the player holds, so a button held
-/// across a load, as run-ahead and rewind do every frame, stays pressed.
+/// The buttons held now take over from a loaded state's at its first
+/// frame, so a button held across a load, as run-ahead and rewind do every
+/// frame, stays pressed.
 #[test]
 fn a_button_held_across_a_loaded_state_stays_pressed() {
     let mut core = booted(ROM_ONLY, 0, JOYPAD);
@@ -275,6 +277,29 @@ fn a_button_held_across_a_loaded_state_stays_pressed() {
     assert!(core.unserialize(&state).is_ok());
     run(&mut core, 2);
     assert_eq!(work_ram(&mut core, 0xC001) & 0x0F, 0x0F, "released");
+}
+
+/// Save states store the buttons the game saw, so a state saved with A held
+/// and loaded while A is released goes on with A held exactly like the run
+/// it was saved from, as netplay's rollback needs: A isn't pressed anew.
+#[test]
+fn a_state_saved_with_a_held_goes_on_the_same_when_loaded_with_a_released() {
+    let mut core = booted(ROM_ONLY, 0, JOYPAD_INTERRUPTS);
+    run_holding(&mut core, 2, buttons(&[A]));
+    assert_eq!(work_ram(&mut core, 0xC000), 1, "pressing A requests it");
+    let mut state = vec![0; core.serialize_size()];
+    assert!(core.serialize(&mut state), "saved with A held");
+    run_holding(&mut core, 2, buttons(&[A]));
+    let mut original = vec![0; core.serialize_size()];
+    assert!(core.serialize(&mut original));
+
+    run(&mut core, 1);
+    assert!(core.unserialize(&state).is_ok(), "loaded with A released");
+    run_holding(&mut core, 2, buttons(&[A]));
+    assert_eq!(work_ram(&mut core, 0xC000), 1, "A was held already");
+    let mut replayed = vec![0; core.serialize_size()];
+    assert!(core.serialize(&mut replayed));
+    assert!(replayed == original, "went on differently");
 }
 
 #[test]

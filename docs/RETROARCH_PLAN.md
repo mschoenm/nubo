@@ -285,8 +285,11 @@ before.
      as Phase 3 describes; a test resets an MBC3 game and checks that its save and clock survive), `retro_get_region` (NTSC), `retro_load_game_special` (false) and
      `retro_set_controller_port_device`.
    - **`retro_run`:**
-     1. Poll input once and press or release changed buttons: A, B, Start, Select and the D-pad.
-        Libretro's B and A are the bottom and right face buttons, which match the Game Boy's B and A.
+     1. Poll input once and hand every port's buttons to the emulator in one go
+        (`Emulator::set_held_keys`): A, B, Start, Select and the D-pad. Save states store the buttons
+        the game saw, so a frame after a loaded state (rewind, run-ahead, a netplay rollback) starts
+        from the state's buttons, not from the ones held before the load. Libretro's B and A are the
+        bottom and right face buttons, which match the Game Boy's B and A.
      2. Run one frame.
      3. Apply the palette to original Game Boy games.
      4. Send the frame.

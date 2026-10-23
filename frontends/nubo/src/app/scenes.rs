@@ -545,8 +545,8 @@ impl App {
 
         view.pause_menu = game.menu().map(|page| pause_menu_name(page).to_owned());
         game.session.apply(false, &self.settings.shared);
-        // Save states don't keep the buttons held, and a capture starts with
-        // none, so the scene's frames run without any too.
+        // A capture starts with no buttons held, so the scene's state holds
+        // none and its frames run without any too.
         game.session.release_held_keys();
         game.session.set_controller_states(Vec::new());
         let state = game.session.snapshot()?;
