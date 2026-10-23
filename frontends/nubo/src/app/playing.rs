@@ -420,8 +420,9 @@ impl App {
     /// start on (see `App::ask_which_model`). A scene doesn't ask, and
     /// continues on the save's model. A `--scale` window, which shows only
     /// the game's picture and so can't show the question, doesn't ask
-    /// either: it starts over on the model set, as the answer Start over
-    /// does.
+    /// either: it continues on the save's model too, for this run only, so
+    /// where the player left off is never replaced without asking
+    /// (`--fresh` starts over on the model asked for).
     pub(super) fn start_or_ask(
         &mut self,
         rom: Rom,
@@ -430,10 +431,11 @@ impl App {
     ) {
         let model = self.model_for(&rom.path, &header);
         match resume_state {
-            Some(state) if state.model != model && self.screen_scale.is_some() => {
-                self.launch(rom, header, model, None);
-            }
-            Some(state) if state.model != model && !self.held_for_scene() => {
+            Some(state)
+                if state.model != model
+                    && self.screen_scale.is_none()
+                    && !self.held_for_scene() =>
+            {
                 self.ask_which_model(rom, header, state, model);
             }
             Some(state) => {

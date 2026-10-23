@@ -688,7 +688,7 @@ fn waiting_app() -> App {
 }
 
 #[test]
-fn a_scale_window_which_cant_ask_starts_a_save_from_another_model_over() {
+fn a_scale_window_which_cant_ask_continues_on_the_saves_model() {
     let mut app = waiting_app();
     let pending = app.pending_start.take().unwrap();
     app.dialog = None;
@@ -698,7 +698,7 @@ fn a_scale_window_which_cant_ask_starts_a_save_from_another_model_over() {
 
     assert!(app.dialog.is_none());
     assert!(app.pending_start.is_none());
-    assert_eq!(app.game.as_ref().unwrap().session.model(), Model::Dmg);
+    assert_eq!(app.game.as_ref().unwrap().session.model(), Model::Sgb);
 }
 
 /// `waiting_app`, its question having replaced the box art question.
