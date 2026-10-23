@@ -21,6 +21,11 @@
 //!
 //! Registers such as SCX, LCDC and the palettes are read on the same dots as in SameBoy, so a
 //! write in the middle of mode 3 takes effect in the middle of the line, like on hardware.
+//!
+//! Runs of plain dots, whole background tiles and the line's start take shortcuts in
+//! `plain_pixels.rs` (Nubo's own, not part of the SameBoy port). They must give exactly what
+//! `Gpu::tick_drawing` gives, so a change to a phase or a fetcher step here needs the same change
+//! there, and `gpu/tests/random_scenes.rs` checks it.
 
 use crate::gpu::constants::{GB_SCREEN_HEIGHT, GB_SCREEN_WIDTH};
 use crate::gpu::lcdc::{
@@ -783,8 +788,9 @@ impl Gpu {
     /// Fills the rest of the line by repeating the last pixel written, for lines where the
     /// renderer ended before writing all 160 pixels. A guard: the LCD's pixel count (`lcd_x`)
     /// moves on screen together with `position_in_line`, and a line only ends at position 160, so
-    /// in a real run `lcd_x` is already 160 here and nothing is filled. A damaged save state can
-    /// still leave the two apart.
+    /// in a real run `lcd_x` is already 160 here and nothing is filled. Loaded save states can't
+    /// leave the two apart either (`Pipeline::is_consistent` checks it), so this only guards
+    /// against a future change that lets them drift.
     fn fill_rest_of_desynced_line(&mut self) {
         let line_start = usize::from(self.ly) * GB_SCREEN_WIDTH as usize;
         if line_start >= self.frame_buffer.len() {

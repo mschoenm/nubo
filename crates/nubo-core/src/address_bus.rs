@@ -652,7 +652,9 @@ impl AddressBus {
     }
 
     /// Replaces the cartridge's RAM, for example with a battery save. A buffer
-    /// of any size is accepted; reads and writes wrap around its length.
+    /// of any size is accepted; reads and writes wrap around its length (MBC2
+    /// uses the first 512 bytes; cells past the end of a shorter buffer read
+    /// 0xFF and ignore writes).
     pub(crate) fn set_cartridge_ram(&mut self, buffer: Vec<u8>) {
         self.cartridge.set_ram(buffer);
     }

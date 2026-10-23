@@ -8,8 +8,8 @@ and with real GNOME window borders where a listing wants them.
 
 ## Status
 
-Steps 1 to 7 are built (see Order of work), and the new screenshots are made; step 8, the full nightly
-run after merging, is left. Checked in a cloud session: every kind of picture (`none`, `gnome`, `fullscreen`,
+All eight steps are done (see Order of work), and the new screenshots are made; step 8's full nightly run
+has passed many times since the merge (run 39706355095 on 2026-10-22, for example). Checked in a cloud session: every kind of picture (`none`, `gnome`, `fullscreen`,
 `game`, variants side by side, a scene of the library) comes out the same pixel for pixel when made again,
 a scene recorded with Ctrl+F12 renders exactly like its preview, and a scene from `explore` renders exactly
 like its preview at 1×. Every screenshot in the README and the Flathub listing is now made from a scene:
@@ -148,7 +148,8 @@ night before, so nothing changed while staying green.
 6. Settings variants and side-by-side layouts.
 7. The `screenshots` skill and the docs (`xtask/AGENTS.md`, `BUILDING.md`, `AGENTS.md`).
 8. After merging: the full nightly run on `main`, the Shootout's screenshots and score looked at, and
-   anything that broke fixed.
+   anything that broke fixed. Done: the nightly run has passed many times since (run 39706355095 on
+   2026-10-22, for example).
 
 Then a new session collects screenshots with the skill, the maintainer picks from its gallery, and the README
 and Flathub images are replaced (done: the README's and Flathub's pictures were made again from scenes, and six

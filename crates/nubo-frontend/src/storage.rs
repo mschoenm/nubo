@@ -17,7 +17,8 @@
 //! [`Storage::keep_aside`]), such as `settings.kept-1.toml`, and the player
 //! is told where. Those names are permanent too. One that can't be read at
 //! all, or can't be kept aside, stays where it is and isn't saved over
-//! ([`Unreadable`]).
+//! ([`Unreadable`]), except settings: then an app saves only what the player
+//! changes ([`crate::settings::Loaded::saving_is_safe`]).
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

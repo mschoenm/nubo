@@ -44,7 +44,7 @@ Read the last report in `docs/reviews/` (the list is `docs/reviews/README.md`), 
 3. Record the fingerprints of `main` in the work folder's `baseline/`:
    - `cargo benchmark target/benchmark-roms --record baseline/games.txt`;
    - `cargo benchmark target/test-roms/v7.0 --seconds 4 --jobs 4 --record baseline/testroms.txt`.
-4. In `fuzz/`, `cargo update`.
+4. In `fuzz/`, `cargo update`, and commit the updated `fuzz/Cargo.lock` on the tooling branch.
 
 Record the baseline again whenever `main` moves under the review and the fixes are rebased onto it.
 

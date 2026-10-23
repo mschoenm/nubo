@@ -79,7 +79,8 @@ pub(crate) enum Check {
 /// starts counting.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Deadline {
-    /// Seconds from power-on, so the boot ROM's 2 to 3 seconds count too.
+    /// Seconds from power-on, so the boot ROM's time (1.7 seconds on DMG, 3.1
+    /// on CGB, 3.5 on SGB) counts too.
     FromPowerOn(u32),
     /// Seconds after the boot ROM hands over to the cartridge.
     AfterBoot(u32),
@@ -215,8 +216,8 @@ const GBMICROTEST_SECONDS_AFTER_BOOT: u32 = 1;
 /// The CGB revision Gambatte's results were recorded on.
 const GAMBATTE_CGB: Model = Model::CgbC;
 /// Extra time added to each Blargg, rtc3test and smaller screenshot test's
-/// timeout to cover the boot ROM, which takes 1.7 seconds on DMG and 3.1 on
-/// CGB.
+/// timeout to cover the boot ROM, which takes 1.7 seconds on DMG, 3.1 on CGB
+/// and 3.5 on SGB.
 const BOOT_ROM_SECONDS: u32 = 10;
 /// Extra time added to rtc3test's timeouts for picking a subtest from its
 /// menu, which takes up to a second.
@@ -955,11 +956,10 @@ const SHOOTOUT_SECONDS_AFTER_BOOT: u32 = 1;
 /// STOP and speed switch tests and CasualPokePlayer's MBC3 tests, checked
 /// for what the emulator does. Each runs on the model the shootout uses and
 /// passes if it matches one of its screenshots (several where hardware units
-/// differ) in the screenshots' own grays (see `screen::normalize`). The
-/// Shootout's own judgement of them, in the colors the app shows with
-/// `--raw-screen`, is in
-/// `shootout.rs`. Left out are
-/// `daid/rom_and_ram.gb`, which has no expected result, and
+/// differ) in grayscale, as the Shootout compares ([`Check::GrayscaleScreen`],
+/// after `screen::normalize`). The Shootout's own judgment of them, in the
+/// colors the app shows with `--raw-screen`, is in `shootout.rs`. Left out
+/// are `daid/rom_and_ram.gb`, which has no expected result, and
 /// `cpp/sgb-ext-test.gb`, which takes longer and runs in `super_game_boy`.
 const SHOOTOUT_ROM_CHECKS: [(&str, Model, &[&str]); 11] = [
     (

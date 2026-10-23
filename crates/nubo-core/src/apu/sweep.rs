@@ -105,9 +105,9 @@ impl Apu {
         }
     }
 
-    /// Runs on a frame sequencer sweep step once the sweep pace has elapsed:
-    /// applies the previous result to channel 1's period and starts the next
-    /// calculation.
+    /// Once the sweep pace has elapsed (checked on each frame sequencer sweep
+    /// step and after every NR10 write, as SameBoy does): applies the previous
+    /// result to channel 1's period and starts the next calculation.
     pub(super) fn trigger_sweep_calculation(&mut self, during_div_write: bool) {
         if !self.sweep_pace_elapsed(self.state.sweep_pace_counter) {
             return;

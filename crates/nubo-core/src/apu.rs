@@ -363,8 +363,8 @@ struct ApuState {
     /// counters, every fourth step the sweep, and every eighth step counts down
     /// the envelopes.
     frame_sequencer_step: u8,
-    /// Flips on every odd number of 2 MHz ticks, so it tells which half of a
-    /// 1 MHz cycle the APU is in (SameBoy calls this `lf_div`).
+    /// Flips with every 2 MHz tick (1 right after power-on), so it tells which
+    /// half of a 1 MHz cycle the APU is in (SameBoy calls this `lf_div`).
     tick_parity: u8,
     div_event_skip: DivEventSkip,
     /// An envelope tick delayed to the start of the next M-cycle, which happens

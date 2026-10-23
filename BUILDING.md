@@ -66,7 +66,7 @@ Every package (the macOS app, the Windows installer and zip, the Flatpak, the we
 cargo test                          # The emulator's own tests
 cargo test --workspace              # Every crate, the apps and tools included
 cargo test-roms                     # Download and run the test ROM suites (about 30 s)
-cargo cpu-tests                     # Every CPU instruction, checked cycle by cycle
+cargo cpu-tests                     # Every CPU instruction but STOP, HALT, DI and EI, checked cycle by cycle
 ```
 
 [docs/ACCURACY.md](docs/ACCURACY.md) lists the test ROM suites, the results and the tests that aren't run.
@@ -87,11 +87,14 @@ cargo play rom.gb --record-scenes path/to/folder   # Play by hand; Ctrl+F12 save
 
 - `crates/nubo-core`: the emulator itself, a plain library with no platform dependencies.
 - `crates/nubo-frontend`: everything an app needs besides drawing: settings, saves, the game library and running a game with its sound.
+- `crates/nubo-serializable-derive`: the derive macro behind save states.
+- `crates/nubo-logo`: the logo, drawn in code.
 - `frontends/nubo`: the desktop and browser app, drawn with [Iced](https://iced.rs).
 - `frontends/nubo-libretro`: the RetroArch core.
 - `tools/`: the developer tools, such as the test ROM runner and the benchmark, with `crates/nubo-download`, which downloads their test data.
 - `xtask/`: the web build, packaging and the other project tasks ([`xtask/AGENTS.md`](xtask/AGENTS.md) lists them all).
-- `images/`: the logo and the screenshots, with the scenes the screenshots are made from in `images/scenes/`.
+- `fuzz/`: the fuzz targets, on nightly Rust, outside the Cargo workspace.
+- `images/`: the logo, the README's buttons and the screenshots, with the scenes the screenshots are made from in `images/scenes/`.
 
 ## Contributing
 
