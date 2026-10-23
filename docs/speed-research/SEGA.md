@@ -198,7 +198,7 @@ About 1 to 3% on the benchmark games, much more for the CGB boot and for polling
 
 BlastEm's newer Z80 interpreter is generated from a description of each instruction as a bit pattern with register fields:
 
-- The generator makes one specialised handler per concrete opcode, with register choices and constants folded in.
+- The generator makes one specialized handler per concrete opcode, with register choices and constants folded in.
 - Dispatch goes through a table of handlers, or a computed jump.
 - The loop does one comparison per instruction against the next deadline (section 3). Interrupts are checked only when that deadline is crossed.
 - Flags are kept in separate fields where they are cheapest to produce: the last result for sign and zero, a carry field, a parity or overflow field, and so on. The flag byte is assembled only when an instruction reads it as a whole, for example when pushing AF.
@@ -220,7 +220,7 @@ Nubo's `Cpu::step` is 4 to 9% of all instructions. Per instruction it checks:
 - the opcode after HALT;
 - whether an interrupt is pending.
 
-Flags are set one at a time through branches. Rust's `match` on the opcode already compiles to a jump table, and the register helpers inline to constants, so BlastEm's per-opcode specialisation brings little to Nubo.
+Flags are set one at a time through branches. Rust's `match` on the opcode already compiles to a jump table, and the register helpers inline to constants, so BlastEm's per-opcode specialization brings little to Nubo.
 
 ### How it fits the rule
 
