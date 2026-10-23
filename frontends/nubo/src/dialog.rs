@@ -183,7 +183,7 @@ pub struct Choice {
     /// more about a menu row, such as what a console's revision is.
     pub description: Option<String>,
     /// Whether the choice can be picked; a question's button that would do
-    /// nothing is greyed out.
+    /// nothing is grayed out.
     pub enabled: bool,
     pub action: DialogAction,
     /// Whether this is what is in use, among choices that show it with a
@@ -289,7 +289,7 @@ impl Choice {
         self
     }
 
-    /// A line under the row's label, in small grey print.
+    /// A line under the row's label, in small gray print.
     pub fn description(mut self, description: impl Into<String>) -> Choice {
         self.description = Some(description.into());
         self

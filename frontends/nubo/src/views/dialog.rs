@@ -226,7 +226,7 @@ pub fn scroll_id() -> widget::Id {
 /// choices, in a card with thin lines between them. Each is a row that
 /// ticks or unticks it, highlighted while the D-pad is on it, and a ticked
 /// box that deletes something shows its label in red. A box that can't be
-/// ticked is greyed out, with its description, which says why, readable.
+/// ticked is grayed out, with its description, which says why, readable.
 fn checkboxes<'a>(boxes: Vec<(usize, Choice)>, selection: usize) -> Element<'a, Message> {
     let mut card = Column::new();
     for (place, (index, choice)) in boxes.into_iter().enumerate() {
