@@ -69,10 +69,10 @@ pub(crate) struct Cartridge {
     rom: Arc<[u8]>,
     #[serializable(skip)]
     header: CartridgeHeader,
-    /// The cartridge RAM. It is at least as large as the header says, but can
-    /// be larger, or any size at all once a save state or
-    /// `Cartridge::set_ram` replaced it; reads and writes wrap around its
-    /// length.
+    /// The cartridge RAM. It is at least as large as the header says (empty
+    /// for a cartridge type without RAM, see `lacks_ram`), but can be larger,
+    /// or any size at all once a save state or `Cartridge::set_ram` replaced
+    /// it; reads and writes wrap around its length.
     ram: Vec<u8>,
     mapper: CartridgeMapper,
     /// Lets the cartridge save its RAM and clock through the frontend.
@@ -668,22 +668,23 @@ pub(crate) fn read_header(rom: &[u8]) -> Result<CartridgeHeader, LoadRomError> {
 /// zeroed. A save shorter than the RAM the header announces fills its start
 /// and the rest starts zeroed, so even an empty save file leaves the game
 /// RAM to save to. A longer one is kept whole. A cartridge type without RAM
-/// gets none, even when its header announces some; the header's size still
-/// decides whether an MBC3 is an MBC30.
+/// gets none, even when its header announces some or the frontend has a save
+/// for it (which stays as it is, since nothing is written to it); the
+/// header's size still decides whether an MBC3 is an MBC30.
 pub(super) fn load_cartridge(
     mut rom: Vec<u8>,
     effects: Box<dyn CartridgeEffects>,
 ) -> Result<Cartridge, LoadRomError> {
     let (header, kind, ram_size) = parse_header(&rom)?;
-    let usable_ram_size = if lacks_ram(header.cartridge_type) {
-        0
+    let ram = if lacks_ram(header.cartridge_type) {
+        Vec::new()
     } else {
-        ram_size
+        let mut ram = effects.load_ram().unwrap_or_default();
+        if ram.len() < ram_size {
+            ram.resize(ram_size, 0);
+        }
+        ram
     };
-    let mut ram = effects.load_ram().unwrap_or_default();
-    if ram.len() < usable_ram_size {
-        ram.resize(usable_ram_size, 0);
-    }
 
     if rom.len() < MINIMUM_ROM_SIZE {
         rom.resize(MINIMUM_ROM_SIZE, 0xFF);
@@ -958,7 +959,10 @@ mod tests {
 
     #[test]
     fn a_short_save_file_fills_the_start_of_the_ram() {
-        for cartridge_type in SUPPORTED_CARTRIDGE_TYPES {
+        for cartridge_type in SUPPORTED_CARTRIDGE_TYPES
+            .into_iter()
+            .filter(|&cartridge_type| !lacks_ram(cartridge_type))
+        {
             let rom = build_rom(cartridge_type, 0x01, 0x03);
             let header_ram_size = load_cartridge(rom.clone(), empty_cartridge_effects())
                 .unwrap()
@@ -988,6 +992,13 @@ mod tests {
         let rom = build_rom(CARTRIDGE_TYPE_MBC1_RAM, 0x01, 0x04);
         let cartridge = load_cartridge(rom, empty_cartridge_effects()).unwrap();
         assert_eq!(cartridge.ram().len(), 0x20000);
+    }
+
+    #[test]
+    fn a_cartridge_without_ram_leaves_a_save_file_out() {
+        let rom = build_rom(CARTRIDGE_TYPE_MBC3_TIMER_BATTERY, 0x01, 0x00);
+        let cartridge = load_cartridge(rom, Box::new(SavedRam(vec![0x5A; 48]))).unwrap();
+        assert!(cartridge.ram().is_empty());
     }
 
     #[test]
