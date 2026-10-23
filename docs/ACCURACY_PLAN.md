@@ -54,7 +54,9 @@ What is missing or unproven:
   SameSuite's `sgb` tests and CasualPokePlayer's `sgb-ext-test`, with controllers for up to four
   players and the startup's reset hold behind an intro of Nubo's own. The menu's palette
   and border choices are emulated in Nubo's own design (Phase 4). Not emulated yet: a boot ROM of the
-  Super Game Boy's own (Phase 4, step 1). Not planned: see that step. None of this is checked on hardware yet.
+  Super Game Boy's own (Phase 4, step 1). Not planned: anything that needs the Super Nintendo itself,
+  and Nintendo's artwork and data (see "Decided against" in that step). None of this is checked on
+  hardware yet.
 - **Link cable.** The serial port always behaves as if no cable is plugged in. Two Nubo instances can't
   be linked, and the Game Boy Printer isn't emulated.
 - **Infrared.** The CGB's RP register (0xFF56) isn't emulated. HuC1's infrared port always sees no light.
@@ -231,7 +233,9 @@ need them run.
 
 1. Publish the Phase 1 table in the README with its method, versions and date, and rerun it for each
    release.
-2. Add Nubo to the GB Emulator Shootout ([SHOOTOUT_PLAN.md](SHOOTOUT_PLAN.md)).
+2. Add Nubo to the GB Emulator Shootout ([SHOOTOUT_PLAN.md](SHOOTOUT_PLAN.md)): open as
+   [gbdev/GBEmulatorShootout#102](https://github.com/gbdev/GBEmulatorShootout/pull/102), done once Nubo
+   is in the published table.
 3. Report wrong expectations to test suite authors, and publish Nubo's own hardware-verified test ROMs
    (Phase 3) for other emulators to use.
 4. Keep `cargo test-roms` and `cargo cpu-tests` running in CI on every pull request (and
