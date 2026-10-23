@@ -285,7 +285,8 @@ the same settings and writes back byte for byte.
   `picture`, for the PNG pictures.
 - **An existing data folder:** `crates/nubo-frontend/tests/existing_data_folder/` was written by the
   step 3 build through the app's own save functions, and the tests read all of it back and write it
-  again byte for byte. The hand test on the desktop and in the browser is still to do.
+  again byte for byte. The maintainer's own data folders kept working, on the desktop and in the
+  browser, through every release since (confirmed 2026-10-23), which is the hand test.
 
 Move `storage`, `settings`, `controls`, `cheats`, `battery`, `save_states`, `screenshots`, `rom`, `notices`
 and `background` into `nubo-frontend`, with their tests. Split `settings.rs` so the two Iced-only
@@ -326,8 +327,9 @@ with the new build. Test this by hand on the desktop and in the browser.
   thumbnails, two title screens and a box art, written by the step 4 build through the library's own
   functions. The tests read them back, write them again byte for byte, check that only the game never
   looked at is queued for a title screen and box art, and that a scan keeps the cached entries of
-  files whose size and time didn't change instead of reading them again. The hand test on the desktop
-  is still to do.
+  files whose size and time didn't change instead of reading them again. The maintainer's own
+  library kept working on the desktop through every release since (confirmed 2026-10-23), which is
+  the hand test.
 
 Move `library` (scan, cache, watcher, jobs), `title_screens` and `box_art` into `nubo-frontend`. The
 watcher reports through a callback, and the Iced crate wraps it in a subscription.
