@@ -30,10 +30,6 @@ fn buttons_fit<'a>(buttons: impl Iterator<Item = &'a Choice>) -> bool {
     // the space after it, and the space between buttons.
     const CHARACTER: f32 = 8.5;
     const AROUND_LABEL: f32 = 6.0 + 32.0 + 18.0 + 8.0 + 6.0;
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "labels are a few dozen characters long"
-    )]
     let width: f32 = buttons
         .map(|choice| choice.label.chars().count() as f32 * CHARACTER + AROUND_LABEL)
         .sum();
