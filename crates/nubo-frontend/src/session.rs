@@ -40,6 +40,10 @@ use std::sync::Arc;
 use std::sync::mpsc::{self, Sender};
 
 pub use game::{GameSession, StartOptions};
+#[cfg(target_arch = "wasm32")]
+pub use screen_refresh::Session;
+#[cfg(not(target_arch = "wasm32"))]
+pub use sound_card::{ActivityCount, FrameListener, Session};
 
 /// How many times faster than play rewinding goes back.
 const REWIND_SPEED: f64 = 2.0;
@@ -47,10 +51,6 @@ const REWIND_SPEED: f64 = 2.0;
 const REWIND_BUFFER_SAMPLES: usize = 512;
 /// The buffer of silence played while rewinding.
 const REWIND_SILENCE: [f32; REWIND_BUFFER_SAMPLES] = [0.0; REWIND_BUFFER_SAMPLES];
-#[cfg(target_arch = "wasm32")]
-pub use screen_refresh::Session;
-#[cfg(not(target_arch = "wasm32"))]
-pub use sound_card::{ActivityCount, FrameListener, Session};
 
 /// Whether the game runs, how fast and how loud.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -310,7 +310,7 @@ impl Machine {
     /// and whether a frame finished meanwhile.
     fn skip_buffer(&mut self) -> (Duration, bool) {
         let samples = self.emulator.step_until_next_audio_buffer().0.len();
-        let emulated_time = self.samples_time(samples);
+        let emulated_time = self.audio.playing_time(samples);
         (emulated_time, self.frame_finished())
     }
 
@@ -326,11 +326,6 @@ impl Machine {
             self.border_clock.frame_finished(&mut self.emulator);
         }
         finished
-    }
-
-    /// How long `samples` take to play at the sound card's rate.
-    fn samples_time(&self, samples: usize) -> Duration {
-        Duration::from_secs_f64(samples as f64 / f64::from(self.audio.sample_rate()))
     }
 
     /// Plays one buffer of silence while rewinding, and when it is time,

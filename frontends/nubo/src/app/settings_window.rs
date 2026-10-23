@@ -209,10 +209,10 @@ impl App {
     /// offer it (see `App::reset_offers`): puts every setting but the
     /// controls back to how it started (see `Settings::reset`) and forgets
     /// the model picked for each game, puts the controls back, removes the
-    /// library folders, clears "Continue playing" and deletes the saves. Saves are deleted in the background, which can
-    /// take a while with many games (see `SettingsMessage::SavesDeleted`).
-    /// Unless something was deleted, the toast that says what was done
-    /// offers to undo it all.
+    /// library folders, clears "Continue playing" and deletes the saves.
+    /// Saves are deleted in the background, which can take a while with many
+    /// games (see `SettingsMessage::SavesDeleted`). Unless something was
+    /// deleted, the toast that says what was done offers to undo it all.
     fn reset_settings(&mut self, choices: ResetChoices) -> Task<Message> {
         let choices = choices.within(self.reset_offers());
         let before = UndoPoint::Settings {
