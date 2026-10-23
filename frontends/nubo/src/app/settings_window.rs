@@ -12,6 +12,7 @@ use crate::views::settings::{SettingsFocus, SettingsRow, SettingsTab};
 use iced::Task;
 use iced::widget::operation;
 use iced::widget::scrollable::RelativeOffset;
+use nubo_core::Model;
 use nubo_frontend::background;
 use nubo_frontend::battery;
 use nubo_frontend::controls::{Action, Controls, Device, MenuButtons};
@@ -219,6 +220,7 @@ impl App {
         let before = UndoPoint::Settings {
             settings: Box::new(self.settings.clone()),
             library: self.keeps_library().then(|| self.library.snapshot()),
+            model_override: self.model_override,
         };
 
         let mut done = Vec::new();
@@ -304,13 +306,15 @@ impl App {
         Task::batch([deletion, self.settings_replaced()])
     }
 
-    /// Puts back the settings and the library's games as they were before a
-    /// reset, for its Undo button.
+    /// Puts back the settings, the library's games and the model `--model`
+    /// picked as they were before a reset, for its Undo button.
     pub(super) fn restore_settings(
         &mut self,
         settings: Settings,
         library: Option<LibrarySnapshot>,
+        model_override: Option<Model>,
     ) -> Task<Message> {
+        self.model_override = model_override;
         self.change_settings(|current| *current = settings);
         if let Some(snapshot) = library
             && let Err(error) = self.library.restore(snapshot)
