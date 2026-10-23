@@ -134,19 +134,18 @@ impl App {
         self.scroll_to_selection()
     }
 
-    /// Scrolls a question so the choice the D-pad is on is in view, in a
-    /// window too short for all of it. A menu scrolls its rows by itself.
+    /// Scrolls a question, or a menu's rows, so the choice the D-pad is on
+    /// is in view, in a window too short for all of it. Iced doesn't scroll
+    /// to the app's own highlight by itself.
     fn scroll_to_selection(&self) -> Task<Message> {
-        match (&self.dialog, self.dialog_content()) {
-            (Some(dialog), Some(content)) if content.layout == Layout::Buttons => {
-                scroll_in_proportion(
-                    views::dialog::scroll_id(),
-                    dialog.selection,
-                    content.choices.len(),
-                )
-            }
-            _ => Task::none(),
-        }
+        let Some((dialog, content)) = self.dialog.as_ref().zip(self.dialog_content()) else {
+            return Task::none();
+        };
+        let id = match content.layout {
+            Layout::Buttons => views::dialog::scroll_id(),
+            Layout::List => views::dialog::list_scroll_id(),
+        };
+        scroll_in_proportion(id, dialog.selection, content.choices.len())
     }
 
     /// What the reset can do besides the settings in this build and this

@@ -21,7 +21,7 @@
 use super::{BUSY_PROGRAM_START, HEADER_START, ROM_SIZE, booted, header};
 use crate::address_bus::effects::empty_cartridge_effects;
 use crate::test_random::Random;
-use crate::{Emulator, Model};
+use crate::{Emulator, Model, SgbBorder, SgbBorderTime};
 use std::collections::HashMap;
 use std::ops::Range;
 
@@ -1202,6 +1202,96 @@ fn states_whose_copies_of_the_speed_or_system_counter_differ_are_refused() {
     emulator.load_state(&state.bytes).unwrap();
     let fast_serial_clock = with_value(&state, "serial.is_high_speed_clock", vec![1]);
     assert!(emulator.load_state(&fast_serial_clock).is_err());
+}
+
+/// A refused state that lacks the Super Game Boy leaves what save states don't keep as it was:
+/// the player's border, its look and palette, and the last frame with its border.
+#[test]
+fn a_refused_state_without_the_super_game_boy_keeps_the_players_choices() {
+    let (rom, state) = busy_state(Model::Sgb, 0x03);
+    let mut emulator = Tester::emulator(Model::Sgb, &rom);
+    emulator.load_state(&state.bytes).unwrap();
+    let (mut left, mut right) = (Vec::new(), Vec::new());
+    emulator.run_frame(&mut left, &mut right);
+    emulator.set_sgb_border(SgbBorder::Nubo);
+    emulator.set_sgb_border_time(SgbBorderTime::Day);
+    emulator.set_sgb_player_palette(Some([0x7FFF, 0x5294, 0x294A, 0x0000]));
+    let palette = emulator.sgb_player_palette();
+    let frame = emulator.frame_with_border().unwrap().to_vec();
+
+    let without_sgb = with_value(&state, "ppu.sgb (whether it is there)", vec![0]);
+    assert!(emulator.load_state(&without_sgb).is_err());
+
+    assert_eq!(emulator.sgb_border(), SgbBorder::Nubo);
+    assert_eq!(emulator.sgb_border_time(), SgbBorderTime::Day);
+    assert_eq!(emulator.sgb_player_palette(), palette);
+    assert_eq!(emulator.frame_with_border().unwrap(), frame);
+}
+
+/// A stored value a test damages: its path, the bytes written over it and the number it must hold
+/// once the state has loaded.
+type DamagedValue = (&'static str, &'static [u8], u64);
+
+/// The bank registers of MBC1, MBC2, MBC5 and HuC1 hold only the bits the hardware has, and
+/// MBC1's and MBC2's ROM bank isn't 0, also when a damaged state stores more, as when a game
+/// writes them.
+#[test]
+fn a_loaded_controller_keeps_only_the_bits_its_bank_registers_have() {
+    let cases: [(u8, &[DamagedValue]); 5] = [
+        (
+            0x03,
+            &[
+                ("cartridge.mapper.mbc1.bank1", &[0xE0], 1),
+                ("cartridge.mapper.mbc1.bank2", &[0xFF], 3),
+            ],
+        ),
+        (
+            0x06,
+            &[("cartridge.mapper.mbc2.rom_bank_number", &[0xF0], 1)],
+        ),
+        (
+            0x1B,
+            &[
+                (
+                    "cartridge.mapper.mbc5.rom_bank_number",
+                    &[0xFF, 0xFF],
+                    0x1FF,
+                ),
+                ("cartridge.mapper.mbc5.ram_bank_number", &[0xFF], 0x0F),
+            ],
+        ),
+        (
+            0x1E,
+            &[("cartridge.mapper.mbc5.ram_bank_number", &[0xFF], 0x07)],
+        ),
+        (
+            0xFF,
+            &[
+                ("cartridge.mapper.huc1.rom_bank_number", &[0xFF], 0x3F),
+                ("cartridge.mapper.huc1.ram_bank_number", &[0xFF], 0x03),
+            ],
+        ),
+    ];
+    for (cartridge_type, values) in cases {
+        let (rom, state) = busy_state(Model::Dmg, cartridge_type);
+        let mut emulator = Tester::emulator(Model::Dmg, &rom);
+        let mut damaged = state.bytes.clone();
+        for (path, bytes, _) in values {
+            let stored = StoredState::read(damaged, &Layout::of(&emulator));
+            damaged = with_value(&stored, path, bytes.to_vec());
+        }
+        emulator.load_state(&damaged).unwrap();
+
+        let layout = Layout::of(&emulator);
+        let saved = emulator.save_state();
+        let view = StateView {
+            bytes: &saved,
+            layout: &layout,
+        };
+        for (path, _, expected) in values {
+            assert_eq!(view.number(path), *expected, "{path}");
+        }
+    }
 }
 
 /// An MBC3's registers hold only the bits the hardware has, also when a damaged state stores

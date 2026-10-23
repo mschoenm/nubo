@@ -35,6 +35,14 @@ impl Mbc2CartridgeMapper {
         [0, u16::from(self.rom_bank_number)]
     }
 
+    /// Cuts the ROM bank of a loaded save state to its four bits, and from 0
+    /// to 1, as the game's writes do, so a damaged state can't map a bank
+    /// the hardware can't.
+    pub(super) fn within_register_widths(&mut self) {
+        let bank = self.rom_bank_number & 0xF;
+        self.rom_bank_number = if bank == 0 { 1 } else { bank };
+    }
+
     /// Sets a register by writing to the ROM area. MBC2 has one register
     /// area, 0x0000-0x3FFF. Bit 8 of the address picks the register: clear
     /// enables RAM, set selects the ROM bank.

@@ -63,12 +63,22 @@ impl Mbc5CartridgeMapper {
         self.ram_bank_number
     }
 
+    /// Cuts the bank registers of a loaded save state to the bits they have,
+    /// as the game's writes do, so a damaged state can't map a bank the
+    /// hardware can't.
+    pub(super) fn within_register_widths(&mut self) {
+        self.rom_bank_number &= 0x1FF;
+        self.ram_bank_number &= if self.has_rumble { 0x7 } else { 0xF };
+    }
+
     /// Sets a register by writing to the ROM area.
     pub(super) fn write_rom(&mut self, address: u16, value: u8) {
         match address {
             0x0000..=0x1FFF => {
                 if self.has_ram {
-                    self.ram_enabled = (value & 0xF) == 0x0A;
+                    // Unlike MBC1 and MBC3, MBC5 compares the whole byte, as
+                    // on SameBoy.
+                    self.ram_enabled = value == 0x0A;
                 }
             }
             0x2000..=0x2FFF => {
@@ -147,13 +157,17 @@ mod tests {
     }
 
     #[test]
-    fn enable_external_ram_if_lower_nibble_is_equal_to_a() {
+    fn only_0x0a_enables_external_ram() {
         let mut mapper =
             build_cartridge_mapper(CARTRIDGE_TYPE_MBC5_RAM, ROM_SIZE_64KB, RAM_SIZE_8KB);
+        mapper.write_rom(0x0000, 0xA);
+        mapper.write_ram(0x0000, 0xC2);
 
         mapper.write_rom(0x0000, 0x1A);
+        assert_eq!(mapper.read_ram(0x000), 0xFF);
+        mapper.write_ram(0x0000, 0x33);
 
-        mapper.write_ram(0x0000, 0xC2);
+        mapper.write_rom(0x0000, 0xA);
         assert_eq!(mapper.read_ram(0x000), 0xC2);
     }
 

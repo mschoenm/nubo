@@ -97,6 +97,15 @@ impl Mbc1CartridgeMapper {
         }
     }
 
+    /// Cuts the registers of a loaded save state to the bits they have, and
+    /// BANK1 from 0 to 1, as the game's writes do, so a damaged state can't
+    /// map a bank the hardware can't.
+    pub(super) fn within_register_widths(&mut self) {
+        let bank1 = self.bank1 & 0x1F;
+        self.bank1 = if bank1 == 0 { 1 } else { bank1 };
+        self.bank2 &= 0x3;
+    }
+
     /// Sets a register by writing to the ROM area.
     pub(super) fn write_rom(&mut self, address: u16, value: u8) {
         match address {

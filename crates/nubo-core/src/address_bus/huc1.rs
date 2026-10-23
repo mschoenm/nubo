@@ -48,6 +48,14 @@ impl Huc1CartridgeMapper {
         self.ram_bank_number
     }
 
+    /// Cuts the bank registers of a loaded save state to the bits they have,
+    /// as the game's writes do, so a damaged state can't map a bank the
+    /// hardware can't.
+    pub(super) fn within_register_widths(&mut self) {
+        self.rom_bank_number &= 0x3F;
+        self.ram_bank_number &= 0x03;
+    }
+
     /// Sets a register by writing to the ROM area.
     pub(super) fn write_rom(&mut self, address: u16, value: u8) {
         match address {
