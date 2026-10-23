@@ -621,7 +621,9 @@ pub(super) fn cartridge_type_name(cartridge_type: u8) -> &'static str {
 }
 
 /// Reads the cartridge header from a ROM and checks that Nubo supports
-/// its cartridge type and RAM size. Returns the header together with the
+/// its cartridge type and RAM size. A cartridge type without RAM accepts any
+/// RAM size byte, since its hardware never reads it, and an unknown one
+/// counts as no RAM. Returns the header together with the
 /// mapper kind and the RAM size in bytes. The header's RAM bank count comes
 /// from that size.
 fn parse_header(rom: &[u8]) -> Result<(CartridgeHeader, MapperKind, usize), LoadRomError> {
@@ -634,8 +636,11 @@ fn parse_header(rom: &[u8]) -> Result<(CartridgeHeader, MapperKind, usize), Load
         LoadRomError::UnsupportedCartridge(cartridge_type_name(cartridge_type)),
     )?;
     let ram_size_index = rom[RAM_SIZE_ADDRESS];
-    let ram_size =
-        ram_size(kind, ram_size_index).ok_or(LoadRomError::InvalidRamSize(ram_size_index))?;
+    let ram_size = match ram_size(kind, ram_size_index) {
+        Some(size) => size,
+        None if lacks_ram(cartridge_type) => 0,
+        None => return Err(LoadRomError::InvalidRamSize(ram_size_index)),
+    };
     let cgb_flag = rom[TITLE_START_ADDRESS + CGB_COMPATIBILITY_INDEX];
 
     let header = CartridgeHeader {
@@ -799,9 +804,23 @@ mod tests {
 
     #[test]
     fn rejects_an_invalid_ram_size() {
-        let rom = build_rom(CARTRIDGE_TYPE_MBC1, 0x01, 0x09);
+        let rom = build_rom(CARTRIDGE_TYPE_MBC1_RAM, 0x01, 0x09);
         let result = load_cartridge(rom, empty_cartridge_effects());
         assert_eq!(result.err(), Some(LoadRomError::InvalidRamSize(0x09)));
+    }
+
+    #[test]
+    fn a_cartridge_type_without_ram_ignores_an_invalid_ram_size() {
+        for cartridge_type in [
+            CARTRIDGE_TYPE_ROM_ONLY,
+            CARTRIDGE_TYPE_MBC1,
+            CARTRIDGE_TYPE_MBC5,
+        ] {
+            let rom = build_rom(cartridge_type, 0x01, 0x09);
+            let cartridge = load_cartridge(rom, empty_cartridge_effects()).unwrap();
+            assert!(cartridge.ram.is_empty());
+            assert_eq!(cartridge.header().ram_bank_count, 0);
+        }
     }
 
     const SUPPORTED_CARTRIDGE_TYPES: [u8; 20] = [
