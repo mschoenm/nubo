@@ -247,8 +247,9 @@ const NO_VALUES: [RetroCoreOptionValue; RETRO_NUM_CORE_OPTION_VALUES_MAX] = [Ret
 };
     RETRO_NUM_CORE_OPTION_VALUES_MAX];
 
-/// `struct retro_core_option_definition`, for `RETRO_ENVIRONMENT_SET_CORE_OPTIONS`: one option as
-/// the version 1 interface declares it, for frontends without version 2.
+/// `struct retro_core_option_definition`, for
+/// `RETRO_ENVIRONMENT_SET_CORE_OPTIONS`: one option as the version 1
+/// interface declares it, for frontends without version 2.
 #[repr(C)]
 struct RetroCoreOptionDefinition {
     key: *const c_char,
@@ -811,7 +812,8 @@ pub unsafe extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) 
     });
 }
 
-/// Keeps the environment callback, and tells RetroArch the core options.
+/// Keeps the environment callback, takes RetroArch's log interface, and
+/// declares the core options and the four controller ports.
 #[unsafe(no_mangle)]
 pub extern "C" fn retro_set_environment(callback: Option<RetroEnvironment>) {
     guard("retro_set_environment", (), || {

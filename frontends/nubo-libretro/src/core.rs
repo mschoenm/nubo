@@ -43,7 +43,8 @@ pub const SCREEN_HEIGHT: usize = 144;
 /// The widest picture the core hands over: a Super Game Boy's, with its
 /// border.
 pub const MAX_WIDTH: usize = SGB_FRAME_WIDTH as usize;
-/// The highest picture the core hands over.
+/// The tallest picture the core hands over: a Super Game Boy's, with its
+/// border.
 pub const MAX_HEIGHT: usize = SGB_FRAME_HEIGHT as usize;
 /// How many samples per second of each channel the core hands RetroArch.
 /// Nubo makes exactly this many per emulated second, and RetroArch
@@ -56,11 +57,11 @@ pub const FRAMES_PER_SECOND: f64 = DOTS_PER_SECOND / DOTS_PER_FRAME as f64;
 
 /// The bytes a save state may grow by after the first one of a game on its
 /// longest model (see [`largest_state`]), so [`Core::serialize_size`] never
-/// has to change. Only a few values change
-/// the length of a state, and by little: enum variants are stored by name
-/// (`Halted` is longer than `Running`), `Option`s with their value only when
-/// there is one, and the PPU's pixel queues with the pixels they hold, which
-/// together come to well under a kilobyte (the tests measure it).
+/// has to change. Only a few values change the length of a state, and by
+/// little: enum variants are stored by name (`Halted` is longer than
+/// `Running`), `Option`s with their value only when there is one, and the
+/// PPU's pixel queues with the pixels they hold, which together come to well
+/// under a kilobyte (the tests measure it).
 const STATE_SIZE_MARGIN: usize = 16 * 1024;
 /// The length of the number before each save state: its length in bytes.
 const STATE_LENGTH_BYTES: usize = 4;
