@@ -29,6 +29,7 @@ use crate::gpu::constants::{GB_SCREEN_HEIGHT, GB_SCREEN_WIDTH};
 use crate::gpu::lcdc::{lcd_enabled, objects_enabled, window_enabled};
 use crate::gpu::palettes::{Color, Palettes, WHITE};
 use crate::gpu::pipeline::Pipeline;
+use crate::gpu::save_state::ModelSgb;
 use crate::model::Model;
 use crate::serializable::{Serializable, read_name, unreadable_value, write_variant};
 use crate::sgb::Sgb;
@@ -342,7 +343,7 @@ pub struct Gpu {
 
     /// The Super Nintendo around a Super Game Boy, which colors each finished frame and draws
     /// its border (`sgb.rs`). Other models have none.
-    sgb: Option<Box<Sgb>>,
+    sgb: ModelSgb,
 }
 
 const HBLANK_MODE: u8 = 0;
@@ -507,14 +508,14 @@ impl Gpu {
             oam_scan_y_bus: 0,
             oam_scan_x_bus: 0,
             oam_scan_row: NO_OAM_SCAN_ROW,
-            sgb: None,
+            sgb: ModelSgb::default(),
         }
     }
 
     /// Selects the hardware model, which decides the PPU's timing along with the CPU's speed.
     pub(super) fn set_model(&mut self, model: Model) {
         self.model = model;
-        self.sgb = model.is_sgb().then(|| Box::new(Sgb::new()));
+        self.sgb = ModelSgb(model.is_sgb().then(|| Box::new(Sgb::new())));
         self.timing = if model.is_cgb() {
             TimingVariant::Cgb
         } else {
@@ -564,17 +565,17 @@ impl Gpu {
 
     /// The Super Game Boy's side of the console, on the Super Game Boy models.
     pub(crate) fn sgb(&self) -> Option<&Sgb> {
-        self.sgb.as_deref()
+        self.sgb.0.as_deref()
     }
 
     pub(crate) fn sgb_mut(&mut self) -> Option<&mut Sgb> {
-        self.sgb.as_deref_mut()
+        self.sgb.0.as_deref_mut()
     }
 
     /// On a Super Game Boy, draws the last picture again with the menu's
     /// settings as they are now (`Sgb::redraw`).
     pub(crate) fn redraw_sgb_picture(&mut self) {
-        if let Some(sgb) = &mut self.sgb {
+        if let Some(sgb) = &mut self.sgb.0 {
             sgb.redraw(&mut self.completed_frame);
         }
     }
@@ -703,7 +704,7 @@ impl Gpu {
     /// first frame after the LCD is switched on), and keeps showing the last one while none are
     /// drawn (SameBoy).
     fn publish_frame(&mut self, blank: bool, drawn: bool) {
-        if let Some(sgb) = &mut self.sgb {
+        if let Some(sgb) = &mut self.sgb.0 {
             let frame = drawn.then_some(self.frame_buffer.as_flattened());
             sgb.finish_frame(frame, &mut self.completed_frame);
         } else if blank {
