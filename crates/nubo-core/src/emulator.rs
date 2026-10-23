@@ -253,6 +253,7 @@ impl Emulator {
     /// wake it for a while, that whole stretch at once (up to about a thousand
     /// machine cycles), so the time one step covers varies.
     pub fn step(&mut self) {
+        self.start_running();
         self.cpu.step();
         self.finish_running();
     }
@@ -261,6 +262,7 @@ impl Emulator {
     /// left and right channel samples. Calling this in a loop and playing the
     /// audio keeps the emulator running at the right speed.
     pub fn step_until_next_audio_buffer(&mut self) -> (&[f32], &[f32]) {
+        self.start_running();
         self.address_bus_mut().clear_audio_buffers();
 
         while !self.address_bus().audio_buffers_full() {
@@ -293,6 +295,7 @@ impl Emulator {
     /// a call's overshoot past the boundary, that call finishes none and the
     /// next one two, of which [`Emulator::take_frame`] returns the latest.
     pub fn run_frame(&mut self, left: &mut Vec<f32>, right: &mut Vec<f32>) {
+        self.start_running();
         let frame_end = (self.address_bus().elapsed_dots() / DOTS_PER_FRAME + 1) * DOTS_PER_FRAME;
         let address_bus = self.address_bus_mut();
         address_bus.clear_audio_buffers();
@@ -317,6 +320,7 @@ impl Emulator {
     /// them), so it is for callers that don't play sound, such as test
     /// runners.
     pub fn step_toward_next_audio_buffer(&mut self, max_steps: usize) -> bool {
+        self.start_running();
         if self.address_bus().audio_buffers_full() {
             self.address_bus_mut().clear_audio_buffers();
         }
@@ -342,6 +346,13 @@ impl Emulator {
         self.address_bus()
             .audio_buffers_full()
             .then(|| self.address_bus().audio_samples())
+    }
+
+    /// Starts a call that runs the CPU: after a save state loaded, the keys
+    /// held now take over from its buttons, as the next button change would
+    /// make them (see [`Emulator::load_state`]).
+    fn start_running(&mut self) {
+        self.address_bus_mut().apply_held_keys_after_load();
     }
 
     /// Ends a call that ran the CPU: runs the M-cycles still waiting, so the
@@ -418,6 +429,19 @@ impl Emulator {
         self.address_bus_mut().set_player_keys(player, keys);
     }
 
+    /// Holds exactly `players`' keys, the first player's first, for a
+    /// frontend that reads every player's buttons each frame, such as
+    /// RetroArch: the first player's replace the keyboard keys
+    /// ([`Emulator::press_key`]), the others' the ones
+    /// [`Emulator::set_player_keys`] holds, and players left out hold
+    /// nothing. The buttons change in one go, so whether the change requests
+    /// the joypad interrupt doesn't depend on the order of the keys. Called
+    /// before every frame, it makes a loaded save state go on exactly like
+    /// the run it was saved from, given the same buttons.
+    pub fn set_held_keys(&mut self, players: &[&[Key]]) {
+        self.address_bus_mut().set_held_keys(players);
+    }
+
     /// On the Super Game Boy models, the palette the player picked from the
     /// Super Game Boy's menu ([`Emulator::set_sgb_player_palette`]), while it
     /// colors the screen: four RGB555 colors, from the lightest shade to the
@@ -436,7 +460,7 @@ impl Emulator {
     /// ([`Emulator::sgb_player_palette_allowed`]). The last frame shows it
     /// at once, so a paused game shows it too.
     ///
-    /// Save states don't keep it: it is the player's, like the buttons held,
+    /// Save states don't keep it: it is the player's, like the keys held,
     /// and stays as it is when a state loads. The loaded state shows it too,
     /// unless the game had taken its colors back by then, which states do
     /// keep. A new game, or this one started again, starts with the game's

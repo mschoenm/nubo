@@ -40,6 +40,21 @@ pub const JOYPAD: &[u8] = &[
     0x18, 0xE8,              // JR loop
 ];
 
+/// Selects the buttons, then counts the joypad interrupts requested at
+/// 0xC000, forever: one for each time a button's press pulls its line low.
+#[rustfmt::skip]
+pub const JOYPAD_INTERRUPTS: &[u8] = &[
+    0x3E, 0x10, 0xE0, 0x00,  // P1 = 0x10, the buttons
+    0xAF, 0xEA, 0x00, 0xC0,  // 0xC000 = 0
+    0xE0, 0x0F,              // IF = 0
+    0xF0, 0x0F,              // loop: A = IF
+    0xE6, 0x10,              // AND the joypad's bit
+    0x28, 0xFA,              // JR Z, loop
+    0x21, 0x00, 0xC0, 0x34,  // INC (0xC000)
+    0xAF, 0xE0, 0x0F,        // IF = 0
+    0x18, 0xF1,              // JR loop
+];
+
 /// Enables cartridge RAM, then copies 0xA000 to 0xC000 and counts 0xA001
 /// up, forever.
 #[rustfmt::skip]

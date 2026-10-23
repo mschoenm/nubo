@@ -21,8 +21,10 @@
 //! `GB_update_joyp`).
 
 use crate::controller::{ControllerMapping, ControllerState};
+use crate::serializable::Serializable;
 use getset::{CopyGetters, Setters};
 use nubo_serializable_derive::Serializable;
+use std::io::{self, Read, Write};
 
 /// A Game Boy button.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,10 +60,17 @@ pub(crate) const SGB_PLAYERS: usize = 4;
 /// on, up to four. Frontends without separate controllers for them, such as
 /// RetroArch's ports, set the other players' keys with `set_player_keys`.
 ///
-/// Save states keep what the game set (the group select bits) and the
-/// pending interrupt, but not which buttons are held: those belong to the
-/// player rather than the console, so loading a state keeps the buttons held
-/// now.
+/// Save states keep what the game set (the group select bits), the pending
+/// interrupt and the buttons each player held as the game saw them, so a
+/// loaded state goes on as the run it was saved from: the next button
+/// change starts from the saved buttons. They leave out which keys the
+/// keyboard, the controllers and the frontend hold, which belong to the
+/// player rather than the console: those take over from the saved buttons
+/// at the next button change, or when the emulator next runs
+/// (`apply_held_keys_after_load`), with the joypad interrupt if that pulls
+/// a line low, just as a change of buttons at that moment would. A state
+/// from before Nubo stored the buttons keeps the ones held now, without an
+/// interrupt.
 #[derive(Clone, Debug, CopyGetters, Setters, Serializable)]
 pub struct Joypad {
     /// Bits 4 and 5 of JOYP. Bit 4 low selects the directions, bit 5 low
@@ -69,13 +78,8 @@ pub struct Joypad {
     #[getset(get_copy = "pub(super)", set = "pub(super)")]
     group_select: u8,
 
-    /// Start, Select, B and A in bits 3 to 0, with 0 meaning pressed.
-    #[serializable(skip)]
-    action_buttons: u8,
-
-    /// Down, Up, Left and Right in bits 3 to 0, with 0 meaning pressed.
-    #[serializable(skip)]
-    directional_buttons: u8,
+    /// The buttons each player holds as the game reads them.
+    pressed_buttons: PressedButtons,
 
     /// Set when one of the four JOYP input lines goes from 1 to 0, to request
     /// the joypad interrupt.
@@ -105,16 +109,48 @@ pub struct Joypad {
     /// (`set_player_keys`).
     #[serializable(skip)]
     player_keys: [u8; SGB_PLAYERS - 1],
-    /// What the second to fourth players hold, worked out from the keys
-    /// above, one bit per key.
+    /// Set when a loaded save state's buttons differ from the ones the keys
+    /// above hold, until those take over (`apply_held_keys_after_load`).
     #[serializable(skip)]
-    other_players_pressed: [u8; SGB_PLAYERS - 1],
+    keys_pending: bool,
 
     /// Which controller buttons act as which Game Boy buttons, a setting of
     /// the player's.
     #[getset(set = "pub(super)")]
     #[serializable(skip)]
     controller_mapping: ControllerMapping,
+}
+
+/// The buttons each of the four players a Super Game Boy can read holds, as
+/// the game sees them: one byte per player, the first player's first, laid
+/// out by `key_mask` with 1 meaning held. Players other than the first only
+/// count once a Super Game Boy game asks for more players.
+///
+/// Stored as the four bytes. It notes when a save state's bytes were read,
+/// so the joypad can tell a state that stores them from one of a version of
+/// Nubo that didn't (`Joypad::finish_loading_save_state`).
+#[derive(Clone, Debug)]
+struct PressedButtons {
+    players: [u8; SGB_PLAYERS],
+    /// Set when a save state's buttons were just read, until the joypad
+    /// finishes loading it.
+    loaded: bool,
+}
+
+impl Serializable for PressedButtons {
+    fn serialize(&self, writer: &mut dyn Write) -> io::Result<()> {
+        self.players.serialize(writer)
+    }
+
+    fn deserialize(&mut self, reader: &mut dyn Read) -> io::Result<()> {
+        self.players.deserialize(reader)?;
+        self.loaded = true;
+        Ok(())
+    }
+
+    fn encoding() -> String {
+        <[u8; SGB_PLAYERS]>::encoding()
+    }
 }
 
 const DOWN_BIT: u8 = 3;
@@ -148,8 +184,10 @@ impl Joypad {
     pub(super) fn new() -> Self {
         Joypad {
             group_select: 0x0,
-            action_buttons: 0xF,
-            directional_buttons: 0xF,
+            pressed_buttons: PressedButtons {
+                players: [0; SGB_PLAYERS],
+                loaded: false,
+            },
             interrupt: false,
             sgb_player_count: 1,
             sgb_current_player: 0,
@@ -157,7 +195,7 @@ impl Joypad {
             controller_keys: [0; SGB_PLAYERS],
             other_controller_keys: 0,
             player_keys: [0; SGB_PLAYERS - 1],
-            other_players_pressed: [0; SGB_PLAYERS - 1],
+            keys_pending: false,
             controller_mapping: ControllerMapping::default(),
         }
     }
@@ -218,19 +256,13 @@ impl Joypad {
         if self.group_select == 0x30 && self.sgb_player_count > 1 {
             return 0x0F - player;
         }
-        let (directional_buttons, action_buttons) = match player {
-            0 => (self.directional_buttons, self.action_buttons),
-            _ => {
-                let pressed = self.other_players_pressed[usize::from(player - 1)];
-                (!(pressed >> DIRECTIONAL_KEYS_SHIFT) & 0x0F, !pressed & 0x0F)
-            }
-        };
+        let pressed = self.pressed_buttons.players[usize::from(player)];
         let mut lines = 0x0F;
         if self.group_select & 0x10 == 0 {
-            lines &= directional_buttons;
+            lines &= !(pressed >> DIRECTIONAL_KEYS_SHIFT);
         }
         if self.group_select & 0x20 == 0 {
-            lines &= action_buttons;
+            lines &= !pressed;
         }
         lines & 0x0F
     }
@@ -295,19 +327,52 @@ impl Joypad {
         self.update_buttons();
     }
 
-    /// Whether any player holds any button, on the keyboard or a controller.
-    pub(super) fn any_button_held(&self) -> bool {
-        self.keyboard_keys != 0
-            || self.other_controller_keys != 0
-            || self.controller_keys.iter().any(|&keys| keys != 0)
-            || self.player_keys.iter().any(|&keys| keys != 0)
+    /// Replaces the keys a frontend holds itself for every player at once,
+    /// the first player's first: the first player's are the keyboard keys
+    /// (`press_key`), the others' the ones `set_player_keys` holds. Players
+    /// left out hold nothing. The buttons change in one go, so the joypad
+    /// interrupt only depends on the buttons held before and after.
+    pub(super) fn set_held_keys(&mut self, players: &[&[Key]]) {
+        let held = |player: usize| {
+            players.get(player).map_or(0, |keys| {
+                keys.iter().fold(0, |held, &key| held | key_mask(key))
+            })
+        };
+        self.keyboard_keys = held(0);
+        for (index, keys) in self.player_keys.iter_mut().enumerate() {
+            *keys = held(index + 1);
+        }
+        self.update_buttons();
     }
 
-    /// Gives each player the buttons held now, after a loaded save state
-    /// changed how many players a Super Game Boy reads. The buttons held
-    /// aren't part of the state, so no interrupt follows.
+    /// Whether any player holds any button, as the game sees them.
+    pub(super) fn any_button_held(&self) -> bool {
+        self.pressed_buttons.players.iter().any(|&keys| keys != 0)
+    }
+
+    /// Finishes loading a save state. A state that stores the buttons keeps
+    /// them until the keys held now take over (see `Joypad`); one from a
+    /// version that didn't store them gives each player the keys held now
+    /// at once, with the players a Super Game Boy reads in the state, and
+    /// without an interrupt.
     pub(super) fn finish_loading_save_state(&mut self) {
-        self.combine_keys();
+        if std::mem::take(&mut self.pressed_buttons.loaded) {
+            self.keys_pending = self.combined_keys() != self.pressed_buttons.players;
+        } else {
+            self.combine_keys();
+        }
+    }
+
+    /// Lets the keys held now take over from the buttons of a save state
+    /// loaded since the last button change, requesting the joypad interrupt
+    /// when that pulls an input line low. Returns whether the buttons were
+    /// updated. The emulator calls it before it runs.
+    pub(super) fn apply_held_keys_after_load(&mut self) -> bool {
+        if !self.keys_pending {
+            return false;
+        }
+        self.update_buttons();
+        true
     }
 
     /// Recomputes the button bits from the keyboard and controller keys, and
@@ -318,11 +383,18 @@ impl Joypad {
         self.request_interrupt_on_falling_lines(previous_lines);
     }
 
-    /// Works out what each player holds: the first player the keyboard and
-    /// every controller, or with more than one player the first controller
-    /// and those after the fourth; each other player their own controller and
-    /// the keys the frontend holds for them.
+    /// Gives each player the buttons the keys held now press
+    /// (`combined_keys`).
     fn combine_keys(&mut self) {
+        self.pressed_buttons.players = self.combined_keys();
+        self.keys_pending = false;
+    }
+
+    /// What each player holds, worked out from the keys: the first player
+    /// the keyboard and every controller, or with more than one player the
+    /// first controller and those after the fourth; each other player their
+    /// own controller and the keys the frontend holds for them.
+    fn combined_keys(&self) -> [u8; SGB_PLAYERS] {
         let first_controller = if self.sgb_player_count > 1 {
             self.controller_keys[0] | self.other_controller_keys
         } else {
@@ -330,22 +402,41 @@ impl Joypad {
                 .iter()
                 .fold(self.other_controller_keys, |held, &keys| held | keys)
         };
-        let pressed = self.keyboard_keys | first_controller;
-        self.action_buttons = !pressed & 0x0F;
-        self.directional_buttons = !(pressed >> DIRECTIONAL_KEYS_SHIFT) & 0x0F;
-
-        for (index, pressed) in self.other_players_pressed.iter_mut().enumerate() {
-            *pressed = self.player_keys[index] | self.controller_keys[index + 1];
+        let mut players = [self.keyboard_keys | first_controller; SGB_PLAYERS];
+        for (index, pressed) in players.iter_mut().enumerate().skip(1) {
+            *pressed = self.player_keys[index - 1] | self.controller_keys[index];
         }
+        players
     }
 }
 
 #[cfg(test)]
 impl Joypad {
-    /// Sets the action button bits directly, for other modules' tests that
-    /// need held buttons without the joypad interrupt pressing them requests.
+    /// Sets the first player's action buttons directly (Start, Select, B
+    /// and A in bits 3 to 0, with 0 meaning pressed), for tests that need
+    /// held buttons without the joypad interrupt pressing them requests.
     pub(super) fn set_action_buttons(&mut self, buttons: u8) {
-        self.action_buttons = buttons;
+        let pressed = &mut self.pressed_buttons.players[0];
+        *pressed = (*pressed & 0xF0) | (!buttons & 0x0F);
+    }
+
+    /// Sets the first player's directions directly (Down, Up, Left and
+    /// Right in bits 3 to 0, with 0 meaning pressed).
+    fn set_directional_buttons(&mut self, buttons: u8) {
+        let pressed = &mut self.pressed_buttons.players[0];
+        *pressed = (*pressed & 0x0F) | (!buttons << DIRECTIONAL_KEYS_SHIFT);
+    }
+
+    /// The first player's action buttons, laid out as `set_action_buttons`
+    /// takes them.
+    fn action_buttons(&self) -> u8 {
+        !self.pressed_buttons.players[0] & 0x0F
+    }
+
+    /// The first player's directions, laid out as `set_directional_buttons`
+    /// takes them.
+    fn directional_buttons(&self) -> u8 {
+        !(self.pressed_buttons.players[0] >> DIRECTIONAL_KEYS_SHIFT) & 0x0F
     }
 }
 
@@ -358,8 +449,8 @@ mod tests {
     fn reads_from_directional_keys() {
         let mut joypad = Joypad::new();
         joypad.set_group_select(0x20);
-        joypad.directional_buttons = 0x4;
-        joypad.action_buttons = 0x2;
+        joypad.set_directional_buttons(0x4);
+        joypad.set_action_buttons(0x2);
         let result = joypad.read_byte();
         assert_eq!(result, 0xE4);
     }
@@ -368,8 +459,8 @@ mod tests {
     fn reads_from_select_keys() {
         let mut joypad = Joypad::new();
         joypad.set_group_select(0x10);
-        joypad.directional_buttons = 0x4;
-        joypad.action_buttons = 0x2;
+        joypad.set_directional_buttons(0x4);
+        joypad.set_action_buttons(0x2);
         let result = joypad.read_byte();
         assert_eq!(result, 0xD2);
     }
@@ -377,8 +468,8 @@ mod tests {
     #[test]
     fn writes_to_joyp() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0x4;
-        joypad.action_buttons = 0x2;
+        joypad.set_directional_buttons(0x4);
+        joypad.set_action_buttons(0x2);
         joypad.write_byte(0x20);
         assert_eq!(joypad.group_select(), 0x20);
     }
@@ -386,145 +477,145 @@ mod tests {
     #[test]
     fn stores_down_key_press() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0xF;
-        joypad.action_buttons = 0xF;
+        joypad.set_directional_buttons(0xF);
+        joypad.set_action_buttons(0xF);
         joypad.press_key(Key::Down);
-        assert_eq!(joypad.directional_buttons, 0x7);
+        assert_eq!(joypad.directional_buttons(), 0x7);
     }
 
     #[test]
     fn stores_down_key_release() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0x7;
-        joypad.action_buttons = 0xF;
+        joypad.set_directional_buttons(0x7);
+        joypad.set_action_buttons(0xF);
         joypad.release_key(Key::Down);
-        assert_eq!(joypad.directional_buttons, 0xF);
+        assert_eq!(joypad.directional_buttons(), 0xF);
     }
 
     #[test]
     fn stores_up_key_press() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0xF;
-        joypad.action_buttons = 0xF;
+        joypad.set_directional_buttons(0xF);
+        joypad.set_action_buttons(0xF);
         joypad.press_key(Key::Up);
-        assert_eq!(joypad.directional_buttons, 0xB);
+        assert_eq!(joypad.directional_buttons(), 0xB);
     }
 
     #[test]
     fn stores_up_key_release() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0xB;
-        joypad.action_buttons = 0xF;
+        joypad.set_directional_buttons(0xB);
+        joypad.set_action_buttons(0xF);
         joypad.release_key(Key::Up);
-        assert_eq!(joypad.directional_buttons, 0xF);
+        assert_eq!(joypad.directional_buttons(), 0xF);
     }
 
     #[test]
     fn stores_left_key_press() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0xF;
-        joypad.action_buttons = 0xF;
+        joypad.set_directional_buttons(0xF);
+        joypad.set_action_buttons(0xF);
         joypad.press_key(Key::Left);
-        assert_eq!(joypad.directional_buttons, 0xD);
+        assert_eq!(joypad.directional_buttons(), 0xD);
     }
 
     #[test]
     fn stores_left_key_release() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0xD;
-        joypad.action_buttons = 0xF;
+        joypad.set_directional_buttons(0xD);
+        joypad.set_action_buttons(0xF);
         joypad.release_key(Key::Left);
-        assert_eq!(joypad.directional_buttons, 0xF);
+        assert_eq!(joypad.directional_buttons(), 0xF);
     }
 
     #[test]
     fn stores_right_key_press() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0xF;
-        joypad.action_buttons = 0xF;
+        joypad.set_directional_buttons(0xF);
+        joypad.set_action_buttons(0xF);
         joypad.press_key(Key::Right);
-        assert_eq!(joypad.directional_buttons, 0xE);
+        assert_eq!(joypad.directional_buttons(), 0xE);
     }
 
     #[test]
     fn stores_right_key_release() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0xE;
-        joypad.action_buttons = 0xF;
+        joypad.set_directional_buttons(0xE);
+        joypad.set_action_buttons(0xF);
         joypad.release_key(Key::Right);
-        assert_eq!(joypad.directional_buttons, 0xF);
+        assert_eq!(joypad.directional_buttons(), 0xF);
     }
 
     #[test]
     fn stores_start_key_press() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0xF;
-        joypad.action_buttons = 0xF;
+        joypad.set_directional_buttons(0xF);
+        joypad.set_action_buttons(0xF);
         joypad.press_key(Key::Start);
-        assert_eq!(joypad.action_buttons, 0x7);
+        assert_eq!(joypad.action_buttons(), 0x7);
     }
 
     #[test]
     fn stores_start_key_release() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0xF;
-        joypad.action_buttons = 0x7;
+        joypad.set_directional_buttons(0xF);
+        joypad.set_action_buttons(0x7);
         joypad.release_key(Key::Start);
-        assert_eq!(joypad.action_buttons, 0xF);
+        assert_eq!(joypad.action_buttons(), 0xF);
     }
 
     #[test]
     fn stores_select_key_press() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0xF;
-        joypad.action_buttons = 0xF;
+        joypad.set_directional_buttons(0xF);
+        joypad.set_action_buttons(0xF);
         joypad.press_key(Key::Select);
-        assert_eq!(joypad.action_buttons, 0xB);
+        assert_eq!(joypad.action_buttons(), 0xB);
     }
 
     #[test]
     fn stores_select_key_release() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0xF;
-        joypad.action_buttons = 0xB;
+        joypad.set_directional_buttons(0xF);
+        joypad.set_action_buttons(0xB);
         joypad.release_key(Key::Select);
-        assert_eq!(joypad.action_buttons, 0xF);
+        assert_eq!(joypad.action_buttons(), 0xF);
     }
 
     #[test]
     fn stores_b_key_press() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0xF;
-        joypad.action_buttons = 0xF;
+        joypad.set_directional_buttons(0xF);
+        joypad.set_action_buttons(0xF);
         joypad.press_key(Key::B);
-        assert_eq!(joypad.action_buttons, 0xD);
+        assert_eq!(joypad.action_buttons(), 0xD);
     }
 
     #[test]
     fn stores_b_key_release() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0xF;
-        joypad.action_buttons = 0xD;
+        joypad.set_directional_buttons(0xF);
+        joypad.set_action_buttons(0xD);
         joypad.release_key(Key::B);
-        assert_eq!(joypad.action_buttons, 0xF);
+        assert_eq!(joypad.action_buttons(), 0xF);
     }
 
     #[test]
     fn stores_a_key_press() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0xF;
-        joypad.action_buttons = 0xF;
+        joypad.set_directional_buttons(0xF);
+        joypad.set_action_buttons(0xF);
         joypad.press_key(Key::A);
-        assert_eq!(joypad.action_buttons, 0xE);
+        assert_eq!(joypad.action_buttons(), 0xE);
     }
 
     #[test]
     fn stores_a_key_release() {
         let mut joypad = Joypad::new();
-        joypad.directional_buttons = 0xF;
-        joypad.action_buttons = 0xE;
+        joypad.set_directional_buttons(0xF);
+        joypad.set_action_buttons(0xE);
         joypad.release_key(Key::A);
-        assert_eq!(joypad.action_buttons, 0xF);
+        assert_eq!(joypad.action_buttons(), 0xF);
     }
 
     fn controller_pressing(button: ControllerButton) -> ControllerState {
@@ -537,8 +628,8 @@ mod tests {
     fn key_press_clears_matching_bit_and_raises_interrupt() {
         let mut joypad = Joypad::new();
         joypad.press_key(Key::Start);
-        assert_eq!(joypad.action_buttons, 0x7);
-        assert_eq!(joypad.directional_buttons, 0xF);
+        assert_eq!(joypad.action_buttons(), 0x7);
+        assert_eq!(joypad.directional_buttons(), 0xF);
         assert!(joypad.interrupt());
     }
 
@@ -546,7 +637,7 @@ mod tests {
     fn controller_press_clears_mapped_bit() {
         let mut joypad = Joypad::new();
         joypad.set_controller_states(&[controller_pressing(ControllerButton::DPadLeft)]);
-        assert_eq!(joypad.directional_buttons, 0xD);
+        assert_eq!(joypad.directional_buttons(), 0xD);
         assert!(joypad.interrupt());
     }
 
@@ -556,7 +647,7 @@ mod tests {
         joypad.set_controller_states(&[controller_pressing(ControllerButton::East)]);
         joypad.press_key(Key::A);
         joypad.release_key(Key::A);
-        assert_eq!(joypad.action_buttons, 0xE);
+        assert_eq!(joypad.action_buttons(), 0xE);
     }
 
     #[test]
@@ -565,7 +656,7 @@ mod tests {
         joypad.press_key(Key::Up);
         joypad.set_controller_states(&[controller_pressing(ControllerButton::DPadUp)]);
         joypad.set_controller_states(&[ControllerState::new()]);
-        assert_eq!(joypad.directional_buttons, 0xB);
+        assert_eq!(joypad.directional_buttons(), 0xB);
     }
 
     #[test]
@@ -584,7 +675,7 @@ mod tests {
         mapping.bind(ControllerButton::North, Key::Select);
         joypad.set_controller_mapping(mapping);
         joypad.set_controller_states(&[controller_pressing(ControllerButton::North)]);
-        assert_eq!(joypad.action_buttons, 0xB);
+        assert_eq!(joypad.action_buttons(), 0xB);
     }
 
     #[test]
@@ -744,12 +835,101 @@ mod tests {
         ]);
         joypad.deserialize(&mut bytes.as_slice()).unwrap();
         joypad.finish_loading_save_state();
+        assert!(joypad.apply_held_keys_after_load());
         joypad.write_byte(0x10);
         assert_eq!(
             joypad.read_byte() & 0x0F,
             0x0F,
             "the second controller isn't the first player's"
         );
+    }
+
+    /// Loads `state` the way `Emulator::load_state` does: over the state of
+    /// a joypad just after power-on.
+    fn load(joypad: &mut Joypad, state: &[u8]) {
+        use crate::serializable::Serializable;
+
+        let mut power_on = Vec::new();
+        Joypad::new().serialize(&mut power_on).unwrap();
+        for state in [power_on.as_slice(), state] {
+            joypad.deserialize(&mut &state[..]).unwrap();
+            joypad.finish_loading_save_state();
+        }
+    }
+
+    #[test]
+    fn a_loaded_state_keeps_every_players_buttons_until_the_keys_held_now_take_over() {
+        use crate::serializable::Serializable;
+
+        let mut saved = Joypad::new();
+        saved.write_byte_with_sgb_players(0x10, Some(2));
+        saved.press_key(Key::A);
+        saved.set_player_keys(2, &[Key::B]);
+        let mut bytes = Vec::new();
+        saved.serialize(&mut bytes).unwrap();
+
+        let mut joypad = Joypad::new();
+        joypad.set_player_keys(2, &[Key::Start]);
+        load(&mut joypad, &bytes);
+        assert_eq!(joypad.read_byte() & 0x0F, 0x0E, "the first player's A");
+        joypad.write_byte(0x30);
+        joypad.write_byte(0x10);
+        assert_eq!(joypad.read_byte() & 0x0F, 0x0D, "the second player's B");
+
+        joypad.set_interrupt(false);
+        assert!(joypad.apply_held_keys_after_load());
+        assert_eq!(joypad.read_byte() & 0x0F, 0x07, "Start, held now");
+        assert!(joypad.interrupt(), "Start's line went low");
+        assert!(!joypad.apply_held_keys_after_load(), "once");
+    }
+
+    #[test]
+    fn a_loaded_state_holding_the_keys_held_now_has_nothing_to_take_over() {
+        use crate::serializable::Serializable;
+
+        let mut saved = Joypad::new();
+        saved.press_key(Key::Up);
+        let mut bytes = Vec::new();
+        saved.serialize(&mut bytes).unwrap();
+
+        let mut joypad = Joypad::new();
+        joypad.press_key(Key::Up);
+        load(&mut joypad, &bytes);
+        assert!(!joypad.apply_held_keys_after_load());
+    }
+
+    /// A state from a version of Nubo that didn't store the buttons keeps
+    /// the keys held now, without an interrupt.
+    #[test]
+    fn a_state_without_the_buttons_keeps_the_keys_held_now() {
+        use crate::serializable::FieldWriter;
+
+        let mut old_state = Vec::new();
+        let mut fields = FieldWriter::new(&mut old_state);
+        fields.field("group_select", &0x10u8).unwrap();
+        fields.field("interrupt", &false).unwrap();
+        fields.finish().unwrap();
+
+        let mut joypad = Joypad::new();
+        joypad.press_key(Key::B);
+        joypad.set_interrupt(false);
+        load(&mut joypad, &old_state);
+        assert_eq!(joypad.read_byte() & 0x0F, 0x0D, "B, held now");
+        assert!(!joypad.interrupt());
+        assert!(!joypad.apply_held_keys_after_load());
+    }
+
+    #[test]
+    fn held_keys_replace_the_keyboard_and_other_players_keys() {
+        let mut joypad = Joypad::new();
+        joypad.write_byte_with_sgb_players(0x10, Some(2));
+        joypad.press_key(Key::B);
+        joypad.set_player_keys(2, &[Key::Start]);
+        joypad.set_held_keys(&[&[Key::A]]);
+        assert_eq!(joypad.read_byte() & 0x0F, 0x0E, "A, without B");
+        joypad.write_byte(0x30);
+        joypad.write_byte(0x10);
+        assert_eq!(joypad.read_byte() & 0x0F, 0x0F, "the second player: none");
     }
 
     #[test]

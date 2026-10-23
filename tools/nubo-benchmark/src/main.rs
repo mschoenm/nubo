@@ -291,8 +291,9 @@ struct LoadedCopy {
 
 impl LoadedCopy {
     /// Saves `original`'s state and loads it into a new emulator for `job`,
-    /// holding the same buttons, since the buttons held belong to the player
-    /// rather than the console and aren't part of save states.
+    /// holding the same keys: the state keeps the buttons the game saw, but
+    /// the keys held belong to the player rather than the console, and take
+    /// over from the state's buttons when the copy runs.
     fn load(job: &Run, rom: &[u8], original: &Emulator, held: &[Key]) -> Result<Self, String> {
         let mut emulator = start(job, rom)?;
         emulator

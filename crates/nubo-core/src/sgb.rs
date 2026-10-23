@@ -188,7 +188,8 @@ struct Transfer {
 ///
 /// Save states keep all of it but the finished pictures, which are the
 /// frontend's side of the hand-over like `Gpu::completed_frame`, the
-/// caches, and the player's choices from the menu and the buttons held.
+/// caches, the player's choices from the menu, and whether a button is held,
+/// which follows the joypad's buttons.
 #[derive(Clone, Debug, Serializable)]
 pub(crate) struct Sgb {
     /// The command arriving through JOYP.
@@ -250,7 +251,7 @@ pub(crate) struct Sgb {
     /// The palette the player picked from the menu, four RGB555 colors from
     /// the lightest shade to the darkest, or `None` for the game's colors.
     /// Save states leave it out, like `border_choice`: the player's choices
-    /// stay as they are when a state loads, as the buttons held do.
+    /// stay as they are when a state loads, as the keys held do.
     #[serializable(skip)]
     player_palette: Option<[u16; 4]>,
     /// The border the player picked from the menu.
@@ -264,8 +265,8 @@ pub(crate) struct Sgb {
     /// attraction mode starts at `attraction::IDLE_FRAMES`.
     idle_frames: u32,
     /// Whether the player holds a button now, which the address bus passes
-    /// on. Save states leave it out, as they leave out the buttons in the
-    /// joypad: they belong to the player rather than the console.
+    /// on. Save states leave it out: when one loads, the address bus sets it
+    /// again from the buttons the joypad stores.
     #[serializable(skip)]
     buttons_held: bool,
     /// Nubo's intro, drawn once.

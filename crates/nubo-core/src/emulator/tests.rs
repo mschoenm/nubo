@@ -325,9 +325,10 @@ fn cpu_and_bus_fields(emulator: &mut Emulator) -> Vec<(String, String)> {
 /// `Serializable` implementation), the PPU's hand-over of the finished frame
 /// to the frontend, the samples the APU already made for the frontend, and
 /// how long the rumble motor was on since the frontend last asked.
-/// The buttons the player holds and the sample rate are left out on purpose
-/// too (they belong to the player and the sound card, not the console), but
-/// both emulators here have the same ones, so they aren't listed.
+/// The keys the keyboard, the controllers and the frontend hold and the
+/// sample rate are left out on purpose too (they belong to the player and
+/// the sound card, not the console; the joypad stores the buttons the game
+/// sees), but both emulators here have the same ones, so they aren't listed.
 const FIELDS_NOT_IN_SAVE_STATES: [&str; 7] = [
     "address_bus.ppu_quiet_dots",
     "address_bus.ppu_quiet_dots_hold_no_interrupt",
@@ -1164,6 +1165,89 @@ fn the_super_game_boy_sees_the_buttons_the_player_holds() {
     loaded.set_player_keys(3, &[Key::Start]);
     loaded.load_state(&state).unwrap();
     assert!(held(&loaded));
+}
+
+/// Selects the action buttons, then counts the joypad interrupts requested
+/// at 0xC000, forever.
+#[rustfmt::skip]
+const JOYPAD_INTERRUPT_COUNTER: &[u8] = &[
+    0x3E, 0x10, 0xE0, 0x00, // JOYP = 0x10, the action buttons
+    0xAF, 0xEA, 0x00, 0xC0, // 0xC000 = 0
+    0xE0, 0x0F,             // IF = 0
+    0xF0, 0x0F,             // loop: A = IF
+    0xE6, 0x10,             // AND the joypad's bit
+    0x28, 0xFA,             // JR Z, loop
+    0x21, 0x00, 0xC0, 0x34, // INC (0xC000)
+    0xAF, 0xE0, 0x0F,       // IF = 0
+    0x18, 0xF1,             // JR loop
+];
+
+/// A state saved with A held and loaded while A is released goes on, once
+/// the frontend holds A again, exactly like the run it was saved from: the
+/// joypad starts from the buttons of the state, so A isn't pressed anew.
+#[test]
+fn a_loaded_state_starts_from_the_buttons_held_when_it_was_saved() {
+    let rom = program_rom(Model::Dmg, JOYPAD_INTERRUPT_COUNTER);
+    let mut original = booted(Model::Dmg, &rom);
+    run_frames(&mut original, 1);
+    original.press_key(Key::A);
+    run_frames(&mut original, 2);
+    assert_eq!(original.read_memory(0xC000), 1, "pressing A requests it");
+    let state = original.save_state();
+    run_frames(&mut original, 2);
+
+    let mut loaded = booted(Model::Dmg, &rom);
+    run_frames(&mut loaded, 3);
+    loaded.load_state(&state).unwrap();
+    loaded.press_key(Key::A);
+    run_frames(&mut loaded, 2);
+    assert_eq!(loaded.read_memory(0xC000), 1, "A was held already");
+    assert!(loaded.save_state() == original.save_state());
+}
+
+/// After a state loads, the keys held now take over from its buttons when
+/// the emulator runs, even without a button change from the frontend, as
+/// if they had been pressed then in the run the state was saved from.
+#[test]
+fn the_keys_held_now_take_over_from_a_loaded_state_when_the_emulator_runs() {
+    let rom = program_rom(Model::Dmg, JOYPAD_INTERRUPT_COUNTER);
+    let mut original = booted(Model::Dmg, &rom);
+    run_frames(&mut original, 1);
+    let state = original.save_state();
+    original.press_key(Key::A);
+    run_frames(&mut original, 2);
+    assert_eq!(original.read_memory(0xC000), 1);
+
+    let mut loaded = booted(Model::Dmg, &rom);
+    loaded.press_key(Key::A);
+    run_frames(&mut loaded, 3);
+    loaded.load_state(&state).unwrap();
+    assert!(
+        loaded.save_state() == state,
+        "the state's buttons last until it runs"
+    );
+    run_frames(&mut loaded, 2);
+    assert!(loaded.save_state() == original.save_state());
+}
+
+/// Frontends that read every player's buttons each frame hand them over in
+/// one go, so the joypad interrupt doesn't depend on the order of the keys:
+/// letting go of A while pressing Right, on the same input line, requests
+/// none.
+#[test]
+fn held_keys_change_in_one_go() {
+    let mut program = JOYPAD_INTERRUPT_COUNTER.to_vec();
+    program[1] = 0x00; // JOYP = 0, both groups
+    let rom = program_rom(Model::Dmg, &program);
+    let mut emulator = booted(Model::Dmg, &rom);
+    run_frames(&mut emulator, 1);
+    emulator.set_held_keys(&[&[Key::A]]);
+    run_frames(&mut emulator, 1);
+    assert_eq!(emulator.read_memory(0xC000), 1);
+    emulator.set_held_keys(&[&[Key::Right], &[Key::Start]]);
+    run_frames(&mut emulator, 1);
+    assert_eq!(emulator.read_memory(0xC000), 1, "line 0 stayed low");
+    assert_eq!(emulator.read_memory(0xFF00) & 0x0F, 0x0E, "Right");
 }
 
 #[test]
