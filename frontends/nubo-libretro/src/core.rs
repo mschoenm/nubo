@@ -844,7 +844,9 @@ pub enum MemoryKind {
 /// RetroAchievements reads and RetroArch's memory tools (its memory editor,
 /// the cheats its memory search makes, `WRITE_CORE_MEMORY`) read and write.
 /// Copies keep pointers into the emulator out of RetroArch's hands. Each
-/// buffer is boxed, so it stays at one address.
+/// buffer is boxed, so it stays at one address, and RetroArch touches it only
+/// between calls into the core, while no Rust reference to it is live (see
+/// `ffi`'s module docs).
 ///
 /// What RetroArch writes reaches the game through [`MemorySnapshot::apply`]
 /// before the next frame: `written` holds what the core last copied into
