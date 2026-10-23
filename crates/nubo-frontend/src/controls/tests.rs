@@ -221,3 +221,12 @@ fn rewind_gets_a_key_once_where_the_player_left_it_free() {
     assert_eq!(controls.controller.input(Action::Rewind), None);
     assert!(!add_new_actions(&mut controls));
 }
+
+#[test]
+fn a_key_bound_twice_in_the_file_keeps_only_its_first_action() {
+    let controls: Controls = toml::from_str("[keyboard]\na = \"KeyZ\"\nb = \"KeyZ\"").unwrap();
+
+    assert_eq!(controls.keyboard.action(KeyCode::KeyZ), Some(Action::A));
+    assert_eq!(controls.keyboard.input(Action::A), Some(KeyCode::KeyZ));
+    assert_eq!(controls.keyboard.input(Action::B), None);
+}
