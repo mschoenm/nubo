@@ -534,8 +534,8 @@ fn is_battery_backed(cartridge_type: u8) -> bool {
 /// Whether the header's cartridge type byte names a cartridge without RAM
 /// (ROM only, and MBC1, MBC3 and MBC5 without "+RAM"). Such a cartridge gets
 /// no RAM buffer, whatever RAM size its header claims, since its controller
-/// never reaches one.
-fn lacks_ram(cartridge_type: u8) -> bool {
+/// never reaches one, and its controller never enables RAM.
+pub(super) fn lacks_ram(cartridge_type: u8) -> bool {
     matches!(
         cartridge_type,
         CARTRIDGE_TYPE_ROM_ONLY
