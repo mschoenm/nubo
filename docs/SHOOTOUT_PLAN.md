@@ -157,11 +157,11 @@ must ignore or leave them out.
      `scale_factor`) or divide the size by it. The harness marks `nubo.exe` as high-DPI aware, so
      Windows itself won't stretch the window.
    - No top bar, padding, toasts, pause menu or fast forward badge, and nothing the mouse or keyboard
-     can bring up. The picture starts at the top-left corner, with nearest-neighbour scaling. There's
+     can bring up. The picture starts at the top-left corner, with nearest-neighbor scaling. There's
      no minimum window size.
    - Keys and controllers still play the game, and closing the window ends the program.
    - A ROM is required. Without one, print an error and exit with a non-zero code.
-   - Suggested shape: a screen-only flag on `App` from `parse_args`, honoured by the window settings in
+   - Suggested shape: a screen-only flag on `App` from `parse_args`, honored by the window settings in
      `main.rs` and by `views/game.rs`. Put the size calculation in a function with a unit test.
 2. **`--fresh`**: start like a new install and leave nothing behind.
    - Use default settings: don't read or write `settings.toml`.
@@ -197,7 +197,7 @@ the build differs from the steps above, and what was checked:
   be resized by hand, and keeps its title bar, since the harness finds it by its title.
 - **Checked on a virtual X display (Xvfb)** in a cloud session, with `WINIT_X11_SCALE_FACTOR` for
   the display's scaling: `--scale 2` gives an inside of exactly 320×288 pixels at 100%, 125%, 150%
-  and 200%, filled by the picture with nearest-neighbour scaling. With `--scale 1 --fresh --speed 4`,
+  and 200%, filled by the picture with nearest-neighbor scaling. With `--scale 1 --fresh --speed 4`,
   the window's pixels match the Shootout's `dmg-acid2` reference exactly, and `cgb-acid2`'s within 38
   of the 50 the harness allows. Nubo wrote no files.
 - **`--fresh` keeps more out than the plan listed.** Besides settings, battery saves, the resume slot,

@@ -179,7 +179,7 @@ impl Serializable for OamDmaAccess {
 /// a copy of the booted emulator matches a real boot, so a custom `Debug` that left out VRAM, OAM
 /// or the frame buffers would weaken that check.
 #[derive(Clone, Debug)]
-pub struct Gpu {
+pub(crate) struct Gpu {
     /// The line the PPU is on, 0 to 153. Unlike `ly`, it doesn't reset early on line 153.
     line: u8,
 
@@ -240,8 +240,8 @@ pub struct Gpu {
     /// Dots until HDMA (CGB's hblank-driven VRAM copy) learns that hblank started.
     hdma_start_delay: u8,
     /// The LCD was just switched off outside HBlank. STAT drops to mode 0, which HDMA takes as
-    /// the start of an HBlank once the PPU next runs (SameBoy; Gambatte's dma
-    /// hdma_disable_display tests).
+    /// the start of an HBlank once the PPU next runs (SameBoy; Gambatte's dma hdma_disable_display
+    /// tests).
     lcd_off_hblank_dma: bool,
 
     /// Dots between entering mode 3 and the renderer starting.

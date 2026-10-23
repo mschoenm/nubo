@@ -30,6 +30,8 @@ use std::process::ExitCode;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+/// The sample rate the emulator makes its sound at, which sets how much
+/// emulated time an audio buffer holds.
 const SAMPLE_RATE: u32 = 44100;
 /// The audio buffer the core fills on each `step_until_next_audio_buffer`.
 const SAMPLES_PER_BUFFER: u32 = 512;
@@ -138,8 +140,12 @@ struct Run {
 
 /// What a run measured and produced.
 struct Outcome {
+    /// How much emulated time the run covered.
     emulated: Duration,
+    /// Time spent inside the emulator's steps, which the speed is measured
+    /// against, not the run's whole wall time.
     spent: Duration,
+    /// How many frames the emulator handed over.
     frames: u64,
     fingerprints: Fingerprints,
     /// With `--check-save-states`: how a save state taken halfway went on,

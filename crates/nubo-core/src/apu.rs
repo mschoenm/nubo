@@ -909,6 +909,9 @@ impl Apu {
             self.pending_div_event.is_some() || self.state.pending_envelope_tick;
     }
 
+    /// Runs the envelope ticks a frame sequencer step held back to this
+    /// M-cycle (CGB-D and CGB-E in double speed), unless the APU was powered
+    /// off meanwhile.
     fn run_delayed_envelope_ticks(&mut self) {
         self.state.pending_envelope_tick = false;
         if !self.state.powered_on {
@@ -917,6 +920,8 @@ impl Apu {
         self.tick_pending_envelopes();
     }
 
+    /// Runs the tick of every envelope that has one scheduled (channels 1, 2
+    /// and 4).
     fn tick_pending_envelopes(&mut self) {
         for square in Square::BOTH {
             if self.state.square(square).envelope.tick_pending() {

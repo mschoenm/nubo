@@ -21,13 +21,6 @@ use crate::sgb::{BORDERED_HEIGHT, BORDERED_WIDTH, SCREEN_OFFSET, SgbBorderTime};
 use nubo_logo::{Part, SHAPES};
 use std::sync::OnceLock;
 
-/// The colors of Nubo's border that other parts of the Super Game Boy share,
-/// as RGB 8-bit channels.
-pub(super) mod nubo_colors {
-    /// The thin dark rim right around the screen at night.
-    pub(in crate::sgb) const RIM: [u8; 3] = [0x14, 0x0E, 0x38];
-}
-
 /// A color with 8-bit channels kept as floats, so blending doesn't round.
 type Color = [f32; 3];
 
@@ -770,4 +763,11 @@ fn hash(value: u32) -> u32 {
     mixed ^= mixed >> 12;
     mixed = mixed.wrapping_mul(0x297A_2D39);
     mixed ^ (mixed >> 15)
+}
+
+/// The colors of Nubo's border that other parts of the Super Game Boy share,
+/// as RGB 8-bit channels.
+pub(super) mod nubo_colors {
+    /// The thin dark rim right around the screen at night.
+    pub(in crate::sgb) const RIM: [u8; 3] = [0x14, 0x0E, 0x38];
 }

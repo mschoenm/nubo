@@ -75,9 +75,10 @@ pub fn library_changes(
 
 /// Produces an item when the system asks the app to stop with a Unix
 /// signal: SIGTERM (sent by `kill` and by logging out or shutting down),
-/// SIGINT (Ctrl+C in the terminal it was started from) or SIGQUIT. The app then closes as if its
-/// window were closed, which saves where the player left off. A second
-/// signal ends the process at once, in case closing gets stuck.
+/// SIGINT (Ctrl+C in the terminal it was started from) or SIGQUIT. The app
+/// then closes as if its window were closed, which saves where the player
+/// left off. A second signal ends the process at once, in case closing gets
+/// stuck.
 #[cfg(unix)]
 pub fn stop_requests() -> Subscription<()> {
     Subscription::run(|| {
