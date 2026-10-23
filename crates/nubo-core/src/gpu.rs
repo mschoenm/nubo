@@ -1015,13 +1015,21 @@ impl Gpu {
         self.pipeline.tall_objects_glitch = value;
     }
 
-    /// Resets the line timeline and blanks the screen when LCDC bit 7 is cleared.
+    /// Resets the line timeline and blanks the screen when LCDC bit 7 is cleared. An HBlank DMA
+    /// trigger or mode 0 interrupt source still on its way (`hdma_start_delay`,
+    /// `mode_0_interrupt_delay`) is dropped, so HDMA hears of no HBlank and sees a plain mode 0
+    /// while the LCD is off and on the first line after it is turned on again, where a CPU that
+    /// halts counts as halted inside HBlank (SameBoy: `GB_lcd_off` restarts `GB_display_run`'s
+    /// line, dropping its HDMA trigger, and `halt` lets HDMA start on wake only after halting
+    /// outside mode 0).
     fn turn_lcd_off(&mut self) {
         self.line = 0;
         self.ly = 0;
         self.line_dot = 0;
         self.line_state = LineState::HBlank;
         self.visible_mode = HBLANK_MODE;
+        self.hdma_start_delay = 0;
+        self.mode_0_interrupt_delay = 0;
         self.first_line_after_lcd_on = false;
         self.palette_ram_blocked = false;
         self.countdowns.palette_block = 0;

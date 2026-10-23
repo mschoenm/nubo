@@ -243,6 +243,8 @@ impl Apu {
             && self.state.square_sweep_calculate_countdown > 1
         {
             self.state.square_sweep_calculate_countdown -= 1;
+            // Unreachable, since the countdown was above 1, but kept line for
+            // line as in SameBoy's apu.c, where the same check is dead too.
             if self.state.square_sweep_calculate_countdown == 0 {
                 self.sweep_calculation_done();
             }

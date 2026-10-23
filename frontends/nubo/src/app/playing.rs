@@ -141,10 +141,12 @@ pub enum UndoPoint {
         picture: Option<Vec<u8>>,
     },
     /// The settings before a reset, with what the library knew then (on
-    /// builds that keep one).
+    /// builds that keep one) and the model `--model` picked for this run,
+    /// which resetting the settings forgets.
     Settings {
         settings: Box<Settings>,
         library: Option<LibrarySnapshot>,
+        model_override: Option<Model>,
     },
     /// What a library game's menu had picked for the game at `path` before
     /// the player picked another console (`None` to follow the settings).
@@ -769,8 +771,12 @@ impl App {
                 Ok(()) => self.toasts.info(format!("Put the earlier {slot} back")),
                 Err(error) => self.toasts.error(format!("Couldn't undo: {error}")),
             },
-            Some(UndoPoint::Settings { settings, library }) => {
-                return self.restore_settings(*settings, library);
+            Some(UndoPoint::Settings {
+                settings,
+                library,
+                model_override,
+            }) => {
+                return self.restore_settings(*settings, library, model_override);
             }
             Some(UndoPoint::GameModel { path, preference }) => {
                 match self.library.set_model(&path, preference) {
