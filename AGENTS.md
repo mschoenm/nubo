@@ -12,7 +12,7 @@ You need the newest stable Rust, as `rust-toolchain.toml` asks (`rustup update`)
 cargo build / cargo test           # The core crates only (the workspace's default members)
 cargo test --workspace             # Every crate, frontends and xtask included
 cargo test-roms [filter]           # The test ROM suites against tools/nubo-test-rom-runner/passing.txt (about 30 s)
-cargo cpu-tests                    # Every CPU opcode, checked cycle by cycle
+cargo cpu-tests                    # Every CPU opcode but STOP, HALT, DI and EI, checked cycle by cycle
 cargo save-states                  # The kept save states still load, and the stored layout is unchanged
 cargo play [rom] [--cgb | --model cgb-c]   # The desktop app; options in frontends/nubo/src/command_line.rs
 cargo screenshot rom.gb --seconds 10       # Headless, 5 emulated seconds by default; PNG in ./target/screenshots/

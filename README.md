@@ -179,7 +179,7 @@ Screenshots go to your Pictures folder, in `Pictures/Nubo`.
 Every change to Nubo is tested against thousands of test ROMs: small programs that each check one detail of the hardware against what real consoles do. Every pull request runs them all, and fails if a test that passed stops passing.
 
 - **The test ROM suites:** 6,793 of 6,824 test runs pass, each test on the models it was written for, across the 12 models Nubo emulates. The suites include Blargg's tests, Mooneye, the acid tests, SameSuite, Mealybug Tearoom and Gambatte's.
-- **The processor:** all [JSON CPU tests](https://github.com/adtennant/GameboyCPUTests) pass, which check every instruction cycle by cycle.
+- **The processor:** all [JSON CPU tests](https://github.com/adtennant/GameboyCPUTests) pass, which check every instruction cycle by cycle, except STOP, HALT, DI and EI, which the test ROMs check.
 - **Speed:** being exact costs speed, but on one core of a shared 2.1 GHz cloud server Nubo still runs games about 50 to 155 times as fast as a real Game Boy, so playing at normal speed takes only a small share of one processor core.
 
 [The results suite by suite](docs/ACCURACY.md) and [the tests that still fail, and why](tools/nubo-test-rom-runner/FAILING_TESTS.md).

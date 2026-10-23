@@ -66,7 +66,7 @@ Every package (the macOS app, the Windows installer and zip, the Flatpak, the we
 cargo test                          # The emulator's own tests
 cargo test --workspace              # Every crate, the apps and tools included
 cargo test-roms                     # Download and run the test ROM suites (about 30 s)
-cargo cpu-tests                     # Every CPU instruction, checked cycle by cycle
+cargo cpu-tests                     # Every CPU instruction but STOP, HALT, DI and EI, checked cycle by cycle
 ```
 
 [docs/ACCURACY.md](docs/ACCURACY.md) lists the test ROM suites, the results and the tests that aren't run.
