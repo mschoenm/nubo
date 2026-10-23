@@ -53,6 +53,25 @@ fn a_saved_state_loads_with_its_model_and_picture() {
 }
 
 #[test]
+fn a_picture_entry_is_read_and_written_back_as_it_is() {
+    let rom = Path::new("Picture.gb");
+    let png = b"any picture entry".to_vec();
+
+    save_png(rom, Slot::Numbered(1), &state(Model::Dmg, 3), Some(&png)).unwrap();
+
+    assert_eq!(
+        indexed_db::read("states/Picture.gb/slot-1.png")
+            .unwrap()
+            .bytes
+            .to_vec(),
+        png
+    );
+    assert_eq!(picture_png(rom, Slot::Numbered(1)), Some(png));
+    save_png(rom, Slot::Numbered(1), &state(Model::Dmg, 3), None).unwrap();
+    assert_eq!(picture_png(rom, Slot::Numbered(1)), None);
+}
+
+#[test]
 fn empty_slots_load_nothing() {
     let rom = Path::new("Example.gb");
 

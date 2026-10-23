@@ -19,13 +19,25 @@ pub fn save(
     state: &SaveState,
     pixels: Option<&[u8]>,
 ) -> Result<(), String> {
+    let png = pixels
+        .map(|pixels| encode_png(SCREEN_WIDTH, SCREEN_HEIGHT, pixels))
+        .transpose()?;
+    save_png(rom_path, slot, state, png.as_deref())
+}
+
+/// Saves a state in a slot with `png` written as its picture entry
+/// unchanged, or without a picture (removing an older one).
+pub fn save_png(
+    rom_path: &Path,
+    slot: Slot,
+    state: &SaveState,
+    png: Option<&[u8]>,
+) -> Result<(), String> {
     indexed_db::write(&slot_key(rom_path, slot, "state"), &state.data)?;
 
     let picture = slot_key(rom_path, slot, "png");
-    match pixels {
-        Some(pixels) => {
-            indexed_db::write(&picture, &encode_png(SCREEN_WIDTH, SCREEN_HEIGHT, pixels)?)
-        }
+    match png {
+        Some(png) => indexed_db::write(&picture, png),
         None => indexed_db::remove(&picture),
     }
 }
@@ -81,9 +93,15 @@ pub fn slot_info(rom_path: &Path, slot: Slot) -> SlotInfo {
 
 /// The picture saved with a slot's state, if it has one that decodes.
 pub fn thumbnail(rom_path: &Path, slot: Slot) -> Option<Picture> {
-    let png = indexed_db::read(&slot_key(rom_path, slot, "png"))?;
-    let (width, height, pixels) = decode_png(&png.bytes)?;
+    let png = picture_png(rom_path, slot)?;
+    let (width, height, pixels) = decode_png(&png)?;
     Some(Picture::new(width, height, pixels))
+}
+
+/// The picture entry saved with a slot's state as it is stored, without
+/// decoding it; `None` when the slot has none.
+pub fn picture_png(rom_path: &Path, slot: Slot) -> Option<Vec<u8>> {
+    indexed_db::read(&slot_key(rom_path, slot, "png")).map(|record| record.bytes.to_vec())
 }
 
 /// The start of the names of a game's entries, named after the ROM's file

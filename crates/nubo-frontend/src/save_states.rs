@@ -107,6 +107,20 @@ pub fn save(
         .map_err(|error| format!("Couldn't save the state: {error}"))
 }
 
+/// Saves `state` in `slot` of the game at `rom_path` with `png` as its
+/// picture, written as it is, such as the bytes [`picture_png`] read from
+/// the slot before, or without a picture. This puts back exactly what a slot
+/// held, for undoing a save over it.
+pub fn save_with_png(
+    rom_path: &Path,
+    slot: Slot,
+    state: &SaveState,
+    png: Option<&[u8]>,
+) -> Result<(), String> {
+    store::save_png(rom_path, slot, state, png)
+        .map_err(|error| format!("Couldn't save the state: {error}"))
+}
+
 /// Reads the state in `slot` of the game at `rom_path`, or `None` if the slot
 /// is empty.
 pub fn load(rom_path: &Path, slot: Slot) -> Result<Option<SaveState>, String> {
@@ -166,6 +180,13 @@ pub fn thumbnails(rom_path: &Path, slots: &[Slot]) -> Vec<(Slot, Option<Picture>
         .iter()
         .map(|&slot| (slot, store::thumbnail(rom_path, slot)))
         .collect()
+}
+
+/// Reads the picture of `slot` of the game at `rom_path` as it is stored, a
+/// PNG file, without decoding it, or `None` if it has none. Quick enough
+/// for the UI thread, unlike [`thumbnails`].
+pub fn picture_png(rom_path: &Path, slot: Slot) -> Option<Vec<u8>> {
+    store::picture_png(rom_path, slot)
 }
 
 /// How long ago `time` was, in words, such as "5 minutes ago".

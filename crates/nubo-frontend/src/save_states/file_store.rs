@@ -23,6 +23,17 @@ pub fn save(
     save_in(&states_directory()?, rom_path, slot, state, pixels)
 }
 
+/// Saves a state with a picture file as it is stored, like
+/// [`save_png_in`], in the player's `states/` folder.
+pub fn save_png(
+    rom_path: &Path,
+    slot: Slot,
+    state: &SaveState,
+    png: Option<&[u8]>,
+) -> Result<(), String> {
+    save_png_in(&states_directory()?, rom_path, slot, state, png)
+}
+
 /// Reads a state, like [`load_in`], from the player's `states/` folder.
 pub fn load(rom_path: &Path, slot: Slot) -> Result<Option<SaveState>, String> {
     load_in(&states_directory()?, rom_path, slot)
@@ -49,15 +60,28 @@ pub fn save_in(
     state: &SaveState,
     pixels: Option<&[u8]>,
 ) -> Result<(), String> {
+    let png = pixels
+        .map(|pixels| encode_png(SCREEN_WIDTH, SCREEN_HEIGHT, pixels))
+        .transpose()?;
+    save_png_in(directory, rom_path, slot, state, png.as_deref())
+}
+
+/// Saves a state in `directory` (the folder for every game's states) with
+/// `png` written as its picture file unchanged, or without a picture
+/// (removing an older one).
+pub fn save_png_in(
+    directory: &Path,
+    rom_path: &Path,
+    slot: Slot,
+    state: &SaveState,
+    png: Option<&[u8]>,
+) -> Result<(), String> {
     let path = slot_path(directory, rom_path, slot, "state");
     write_atomically(&path, &state.data).map_err(|error| error.to_string())?;
 
     let picture = slot_path(directory, rom_path, slot, "png");
-    match pixels {
-        Some(pixels) => {
-            write_atomically(&picture, &encode_png(SCREEN_WIDTH, SCREEN_HEIGHT, pixels)?)
-                .map_err(|error| error.to_string())
-        }
+    match png {
+        Some(png) => write_atomically(&picture, png).map_err(|error| error.to_string()),
         None => match fs::remove_file(picture) {
             Err(error) if error.kind() != ErrorKind::NotFound => Err(error.to_string()),
             _ => Ok(()),
@@ -161,9 +185,21 @@ pub fn thumbnail(rom_path: &Path, slot: Slot) -> Option<Picture> {
 /// Reads and decodes the picture of a slot in `directory`, anew each time,
 /// so a picture replaced by a new save shows up.
 pub fn thumbnail_in(directory: &Path, rom_path: &Path, slot: Slot) -> Option<Picture> {
-    let png = fs::read(slot_path(directory, rom_path, slot, "png")).ok()?;
+    let png = picture_png_in(directory, rom_path, slot)?;
     let (width, height, pixels) = decode_png(&png)?;
     Some(Picture::new(width, height, pixels))
+}
+
+/// Reads a slot's picture file, like [`picture_png_in`], from the player's
+/// `states/` folder.
+pub fn picture_png(rom_path: &Path, slot: Slot) -> Option<Vec<u8>> {
+    picture_png_in(&states_directory().ok()?, rom_path, slot)
+}
+
+/// Reads the picture file of a slot in `directory` as it is stored, without
+/// decoding it; `None` when the slot has none or it can't be read.
+pub fn picture_png_in(directory: &Path, rom_path: &Path, slot: Slot) -> Option<Vec<u8>> {
+    fs::read(slot_path(directory, rom_path, slot, "png")).ok()
 }
 
 /// The file of a slot, in a folder named after the ROM's file name.

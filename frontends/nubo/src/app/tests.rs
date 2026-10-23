@@ -727,6 +727,61 @@ fn waiting_over_box_art() -> App {
     app
 }
 
+/// Puts this test run's data, such as save states, in a folder of its own
+/// rather than the player's, and returns its data folder. The folder is the
+/// same for every test of the run, since only the first `use_folder` counts,
+/// so each test writes the states of games named after itself.
+fn test_data_folder() -> PathBuf {
+    use_folder(&std::env::temp_dir().join(format!("nubo-app-tests-{}", std::process::id())));
+    nubo_frontend::storage::files::data_folder().unwrap()
+}
+
+#[test]
+fn undoing_a_save_over_a_slot_puts_its_picture_file_back_unchanged() {
+    let data_folder = test_data_folder();
+    let rom_path = PathBuf::from("nubo-undo-save-test.gb");
+    let mut app = playing_app();
+    let _ = app.update(
+        GameMessage::RomPicked(Some(Rom {
+            path: rom_path.clone(),
+            bytes: Arc::from(vec![0; 0x8000]),
+        }))
+        .into(),
+    );
+    app.game.as_mut().unwrap().keeps_data = true;
+    let old_state = SaveState {
+        model: Model::Mgb,
+        data: Emulator::new(Model::Mgb).save_state(),
+    };
+    // A picture file that encoding its picture again wouldn't give byte for
+    // byte, as one an earlier version wrote may not.
+    let pixels = vec![90; 160 * 144 * 4];
+    let mut old_picture = nubo_frontend::storage::files::encode_png(160, 144, &pixels).unwrap();
+    old_picture.extend_from_slice(b"written by another encoder");
+    save_states::save_with_png(&rom_path, Slot::Quick, &old_state, Some(&old_picture)).unwrap();
+
+    let _ = app.update(GameMessage::SaveState(Slot::Quick).into());
+    assert_ne!(
+        save_states::load(&rom_path, Slot::Quick)
+            .unwrap()
+            .unwrap()
+            .data,
+        old_state.data
+    );
+    let _ = app.update(GameMessage::Undo.into());
+
+    let picture_file = data_folder.join("states").join(&rom_path).join("quick.png");
+    assert_eq!(std::fs::read(&picture_file).unwrap(), old_picture);
+    assert_eq!(
+        save_states::load(&rom_path, Slot::Quick)
+            .unwrap()
+            .unwrap()
+            .data,
+        old_state.data
+    );
+    let _ = std::fs::remove_dir_all(data_folder.join("states").join(&rom_path));
+}
+
 /// A `--fresh` app playing an empty game.
 fn playing_app() -> App {
     let (mut app, _) = App::new(
@@ -1057,8 +1112,7 @@ fn a_revision_other_than_the_most_common_shows_unfolded_and_b_goes_back() {
 #[test]
 fn a_games_menu_offers_to_delete_its_save_states_until_they_are_deleted() {
     let (mut app, path, folder) = app_with_color_game("save-states");
-    // The save states go to the test's folder rather than the player's.
-    use_folder(&folder);
+    test_data_folder();
     app.fresh = false;
     let offers_deleting = |app: &App| {
         app.dialog_content()
