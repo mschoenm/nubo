@@ -126,3 +126,19 @@ fn numbers_are_written_plainly() {
     assert_eq!(format_number(86.0), "86");
     assert_eq!(format_number(0.25), "0.25");
 }
+
+#[test]
+fn a_log_that_cannot_be_read_is_an_error_and_is_kept() {
+    let folder =
+        std::env::temp_dir().join(format!("nubo-metrics-unreadable-{}", std::process::id()));
+    fs::create_dir_all(&folder).unwrap();
+    let log = folder.join("metrics.jsonl");
+    let night_file = folder.join("night.json");
+    fs::write(&log, b"{\"date\": \"\xff\"}\n").unwrap();
+    fs::write(&night_file, r#"{"date": "2026-10-23"}"#).unwrap();
+    let result = append(&log, &night_file);
+    let kept = fs::read(&log);
+    fs::remove_dir_all(&folder).unwrap();
+    assert!(result.unwrap_err().contains("failed to read"));
+    assert_eq!(kept.unwrap(), b"{\"date\": \"\xff\"}\n");
+}

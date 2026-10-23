@@ -153,3 +153,21 @@ fn a_last_commit_git_does_not_know_starts_again_from_tonight() {
     let written: Value = serde_json::from_str(&written.unwrap()).unwrap();
     assert_eq!(written["last_commit"], Value::from(tonight_commit));
 }
+
+#[test]
+fn a_state_that_cannot_be_read_is_an_error_and_is_kept() {
+    let state = std::env::temp_dir().join(format!(
+        "nubo-review-units-unreadable-{}.json",
+        std::process::id()
+    ));
+    fs::write(&state, b"{\"files\": {\"\xff\": \"2026-10-16\"}}").unwrap();
+    let result = next_part(&NextOptions {
+        state: state.clone(),
+        date: String::from("2026-10-16"),
+        commit: String::from("0000000000000000000000000000000000000000"),
+    });
+    let kept = fs::read(&state);
+    fs::remove_file(&state).unwrap();
+    assert!(result.unwrap_err().contains("failed to read"));
+    assert_eq!(kept.unwrap(), b"{\"files\": {\"\xff\": \"2026-10-16\"}}");
+}
