@@ -1,10 +1,11 @@
 //! Starts each test where the boot ROM hands over to the cartridge.
 //!
 //! The boot ROM runs for 1.7 emulated seconds on the DMG, 3.1 on the CGB and
-//! 3.5 on the Super Game Boy, far longer than most tests. It only looks at a few header bytes of the ROM
-//! ([`Emulator::boot_rom_input`]), so each worker thread runs it once per
-//! model and set of those bytes and starts the other ROMs that share them
-//! from a copy ([`Emulator::clone_with_rom`]). With `--verify-boot` every
+//! 3.5 on the Super Game Boy, far longer than most tests. It only looks at
+//! a few header bytes of the ROM ([`Emulator::boot_rom_input`]), so each
+//! worker thread runs it once per model and set of those bytes and starts
+//! the other ROMs that share them from a copy
+//! ([`Emulator::clone_with_rom`]). With `--verify-boot` every
 //! test runs the real boot ROM instead and checks that the copy would have
 //! been identical, which makes the whole run take about two and a half
 //! minutes instead of about 30 seconds. The core test
