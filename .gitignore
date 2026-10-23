@@ -1,7 +1,4 @@
 /target
-gameboy_emulator/target
-bios.bin
-pkg
 .claude/*
 !.claude/skills/
 .DS_Store

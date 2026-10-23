@@ -20,6 +20,7 @@ use clap::Subcommand;
 use serde_json::Value;
 use std::fmt::Write;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
 /// How many nights before the latest one each median covers, shortest
@@ -106,7 +107,8 @@ pub fn run(command: Command) -> Result {
     }
 }
 
-/// Adds the night in `night` to the log at `log` as one line.
+/// Adds the night in `night` to the log at `log` as one line. A missing log
+/// is started; one that can't be read is an error, so it is never replaced.
 fn append(log: &Path, night: &Path) -> Result {
     let text = fs::read_to_string(night)
         .map_err(|error| format!("failed to read {}: {error}", night.display()))?;
@@ -116,7 +118,11 @@ fn append(log: &Path, night: &Path) -> Result {
         return Err(format!("{} has no date", night.display()));
     }
 
-    let mut lines = fs::read_to_string(log).unwrap_or_default();
+    let mut lines = match fs::read_to_string(log) {
+        Ok(text) => text,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => String::new(),
+        Err(error) => return Err(format!("failed to read {}: {error}", log.display())),
+    };
     if !lines.is_empty() && !lines.ends_with('\n') {
         lines.push('\n');
     }

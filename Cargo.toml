@@ -1,5 +1,7 @@
 [workspace]
-resolver = "2"
+# Resolver 3 makes `cargo update` prefer the newest crate versions that still
+# build with `rust-version`, so an update doesn't break the Flatpak's build.
+resolver = "3"
 members = [
     "crates/nubo-core",
     "crates/nubo-download",

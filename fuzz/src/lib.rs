@@ -6,14 +6,22 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-/// The hardware models the targets pick from, by a byte of the input.
-pub const MODELS: [Model; 6] = [
+/// The hardware models the targets pick from, by a byte of the input: every
+/// model. The six the targets started with stay first, so half the inputs of
+/// an older corpus still pick the model they picked then.
+pub const MODELS: [Model; 12] = [
     Model::Dmg,
     Model::Mgb,
     Model::Sgb,
     Model::CgbE,
     Model::Agb,
     Model::Cgb0,
+    Model::Dmg0,
+    Model::Sgb2,
+    Model::CgbA,
+    Model::CgbB,
+    Model::CgbC,
+    Model::CgbD,
 ];
 
 /// The Nintendo logo every cartridge header holds at 0x0104, which the boot

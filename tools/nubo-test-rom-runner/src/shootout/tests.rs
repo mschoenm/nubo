@@ -42,6 +42,22 @@ fn the_scoreboard_reads_the_published_table() {
 }
 
 #[test]
+fn nubo_is_not_ranked_against_its_own_published_row() {
+    let scoreboard = Scoreboard::parse(
+        "commit\t72fd7452fb4febd8832c0ca5b30fab431fde767e\n\
+published\t2026-06-04\n\
+a.gb\tDocBoy,Nubo\n\
+b.gb\tNubo\n",
+    )
+    .unwrap();
+    let standing = scoreboard.standing(&BTreeSet::from(["a.gb"]));
+    assert_eq!(
+        standing.to_string(),
+        "shootout  1/2  rank 1  leader DocBoy 1  published 2026-06-04 72fd745"
+    );
+}
+
+#[test]
 fn ties_share_a_rank() {
     let scoreboard = Scoreboard::parse(SMALL_SCOREBOARD).unwrap();
     let standing = |passing: &[&str]| scoreboard.standing(&passing.iter().copied().collect());

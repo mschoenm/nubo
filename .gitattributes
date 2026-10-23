@@ -1,5 +1,6 @@
-# Kept save states are binary: never change their line endings.
-save-states/**/*.state binary
+# Save states are binary: never change their line endings. This covers the
+# kept sets in save-states/ and the scenes' game.state in images/scenes/.
+*.state binary
 # The settings fixtures and the data folder of an earlier version are compared
 # byte for byte with what Nubo writes, which ends lines with LF on every system.
 frontends/nubo/src/settings/tests/*.toml -text

@@ -23,4 +23,8 @@ fuzz_target!(|data: &[u8]| {
     run_frames(&mut emulator, 1);
     emulator.unregister_cheat("0");
     run_frames(&mut emulator, 1);
+    let state = emulator.save_state();
+    emulator
+        .load_state(&state)
+        .expect("a state the emulator saved loads again");
 });
