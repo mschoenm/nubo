@@ -539,6 +539,30 @@ fn a_scan_reads_whether_an_unchanged_game_uses_the_super_game_boy_once() {
     assert_eq!(second[0].supports_sgb, Some(false));
 }
 
+#[cfg(all(unix, feature = "desktop"))]
+#[test]
+fn a_played_game_whose_path_isnt_utf8_stays_out_and_saving_still_works() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    let data_folder = temporary_folder("not-utf8");
+    let mut library = Library {
+        cache: Cache::in_folder(data_folder.clone()),
+        ..Library::default()
+    };
+    let latin1 = Path::new("/games").join(OsStr::from_bytes(b"Pok\xe9mon.gb"));
+    let header = CartridgeHeader::default();
+
+    library.record_played(&latin1, &header).unwrap();
+    library
+        .record_played(Path::new("/games/Tetris.gb"), &header)
+        .unwrap();
+
+    assert!(library.entry(&latin1).is_none());
+    assert!(library.entry(Path::new("/games/Tetris.gb")).is_some());
+    assert!(data_folder.join("library.toml").exists());
+}
+
 #[cfg(feature = "desktop")]
 #[test]
 fn an_unreadable_library_file_is_kept_aside_before_a_save_can_replace_it() {

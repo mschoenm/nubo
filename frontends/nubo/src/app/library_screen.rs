@@ -118,6 +118,13 @@ impl App {
                     LibraryMessage::FolderPicked(path).into()
                 });
             }
+            LibraryMessage::FolderPicked(Some(path)) if path.to_str().is_none() => {
+                // The settings file is TOML, whose text must be valid UTF-8.
+                self.toasts.error(format!(
+                    "Nubo can't keep {} as a game folder: its name has characters the settings can't store",
+                    path.display()
+                ));
+            }
             LibraryMessage::FolderPicked(Some(path)) => {
                 if !self
                     .settings

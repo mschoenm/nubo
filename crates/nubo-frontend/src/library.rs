@@ -757,13 +757,18 @@ impl Library {
 
     /// Notes that the game at `path` was played at `time`, adding it to the
     /// library if it wasn't known yet. Scenes of the library list their
-    /// played games this way, each as long ago as the scene says.
+    /// played games this way, each as long ago as the scene says. A game
+    /// whose path isn't valid UTF-8 stays out, as scans leave it out: the
+    /// library file couldn't store it, and no save of it would work again.
     pub fn record_played_at(
         &mut self,
         path: &Path,
         header: &CartridgeHeader,
         time: SystemTime,
     ) -> Result<(), String> {
+        if path.to_str().is_none() {
+            return Ok(());
+        }
         let now = seconds_since_epoch(time);
 
         if let Some(entry) = self.entries.iter_mut().find(|entry| entry.path == path) {
