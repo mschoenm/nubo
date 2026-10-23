@@ -2,9 +2,15 @@
 //! command line or a file dropped on the window. Picking a file is up to the
 //! app, which makes a [`Rom`] of what the player picked.
 
-use std::fs;
+use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
+/// The largest file read as a game. The largest Game Boy ROMs are 8 MiB;
+/// bigger files are something else, such as a disc image dropped on the
+/// window by mistake, and aren't read into memory.
+pub const MAX_FILE_SIZE: u64 = 16 * 1024 * 1024;
 
 /// The file extensions of ROMs and zipped ROMs: what the library scans its
 /// folders for, what its folder watcher reacts to and what an app's file
@@ -23,15 +29,25 @@ pub struct Rom {
 }
 
 impl Rom {
-    /// Reads the ROM at `path`, or says why it couldn't.
+    /// Reads the ROM at `path`, or says why it couldn't. A file bigger
+    /// than [`MAX_FILE_SIZE`] isn't read.
     pub fn read(path: &Path) -> Result<Rom, String> {
-        match fs::read(path) {
-            Ok(bytes) => Ok(Rom {
-                path: path.to_path_buf(),
-                bytes: Arc::from(bytes),
-            }),
-            Err(error) => Err(format!("Couldn't open {}: {error}", display_name(path))),
+        let couldnt_open =
+            |reason: String| format!("Couldn't open {}: {reason}", display_name(path));
+        let file = File::open(path).map_err(|error| couldnt_open(error.to_string()))?;
+        let mut bytes = Vec::new();
+        file.take(MAX_FILE_SIZE + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|error| couldnt_open(error.to_string()))?;
+        if bytes.len() as u64 > MAX_FILE_SIZE {
+            return Err(couldnt_open(String::from(
+                "it is too big to be a Game Boy game",
+            )));
         }
+        Ok(Rom {
+            path: path.to_path_buf(),
+            bytes: Arc::from(bytes),
+        })
     }
 
     /// The game's name, made from its file name (see [`game_name`]), such
