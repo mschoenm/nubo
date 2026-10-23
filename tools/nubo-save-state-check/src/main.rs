@@ -190,7 +190,6 @@ fn stored_layout(cartridges: &[Cartridge]) -> Result<BTreeSet<String>, String> {
 /// Keeps the states this version makes as a new set in `sets`, named after
 /// today's date, unless the newest set already has the same layout.
 fn record(sets: &Path, cartridges: &[Cartridge]) -> Result<(), String> {
-    let states = make_states(cartridges)?;
     let layout = stored_layout(cartridges)?;
     if let Some(newest) = kept_sets(sets)?.last()
         && read_layout(newest)? == layout
@@ -200,6 +199,7 @@ fn record(sets: &Path, cartridges: &[Cartridge]) -> Result<(), String> {
             newest.display()
         ));
     }
+    let states = make_states(cartridges)?;
 
     let today = today();
     let folder = (1..)
