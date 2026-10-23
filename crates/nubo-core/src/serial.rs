@@ -25,7 +25,6 @@ use nubo_serializable_derive::Serializable;
 #[derive(Debug, Clone, Default, Serializable, CopyGetters, Setters)]
 pub struct Serial {
     /// SB: the byte being sent, which is replaced bit by bit by the byte received.
-    #[getset(get_copy = "pub(super)", set = "pub(super)")]
     data: u8,
     /// SC bit 1: on the Game Boy Color, shift bits 32 times faster.
     is_high_speed_clock: bool,

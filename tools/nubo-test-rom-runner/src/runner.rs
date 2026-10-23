@@ -44,6 +44,8 @@ const KEY_RELEASE_AUDIO_BUFFERS: u32 = 16;
 /// Tests that keep running are only limited by their emulated timeout,
 /// however slow or busy the machine.
 pub(crate) const STALL_LIMIT: Duration = Duration::from_secs(60);
+/// Instructions to run between checks for a stalled test or boot.
+pub(crate) const STEPS_BETWEEN_STALL_CHECKS: usize = 10_000;
 /// How many tests may stall before the run stops. None should, so a few mean
 /// the emulator hangs, and running the rest would take hours.
 const MAX_HUNG_TESTS: usize = 3;
@@ -54,9 +56,6 @@ const MAX_HUNG_TESTS: usize = 3;
 const STUCK_LIMIT: Duration = Duration::from_secs(90);
 /// How often the watchdog looks at the running tests.
 const WATCHDOG_INTERVAL: Duration = Duration::from_millis(500);
-/// How many CPU steps run between two looks at `STALL_LIMIT` while an audio
-/// buffer is emulated.
-const STEPS_BETWEEN_STALL_CHECKS: usize = 10_000;
 
 /// The result of one test.
 pub(crate) enum Outcome {

@@ -12,7 +12,7 @@
 //! `clone_with_rom_matches_a_real_boot` checks the same for every model, with
 //! ROMs that differ everywhere outside the header bytes the boot ROM reads.
 
-use crate::runner::{Progress, STALL_LIMIT};
+use crate::runner::{Progress, STALL_LIMIT, STEPS_BETWEEN_STALL_CHECKS};
 use crate::suites::Model;
 use nubo_core::{Emulator, NoSaves, RtcClock};
 use std::collections::HashMap;
@@ -21,8 +21,6 @@ use std::time::Instant;
 /// The core's audio buffer holds 512 samples, so at this sample rate one
 /// buffer is exactly 1/128 of a second of emulated time.
 pub(crate) const SAMPLE_RATE: u32 = 65536;
-/// Instructions to run between checks for a stalled boot.
-const STEPS_BETWEEN_STALL_CHECKS: u32 = 10_000;
 
 /// Cartridge hooks with no saves and a real-time clock that counts emulated
 /// time, so every run is the same.

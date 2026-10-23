@@ -534,11 +534,7 @@ impl Serializable for String {
     fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
         let mut length = 0u32;
         length.deserialize(reader)?;
-        let mut bytes = Vec::new();
-        reader.take(u64::from(length)).read_to_end(&mut bytes)?;
-        if u32::try_from(bytes.len()) != Ok(length) {
-            return Err(Error::new(ErrorKind::UnexpectedEof, "a string ends early"));
-        }
+        let bytes = read_bytes(reader, u64::from(length))?;
         *self = String::from_utf8(bytes).map_err(|_| unreadable_value("a string isn't UTF-8"))?;
         Ok(())
     }

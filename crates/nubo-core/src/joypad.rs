@@ -70,12 +70,10 @@ pub struct Joypad {
     group_select: u8,
 
     /// Start, Select, B and A in bits 3 to 0, with 0 meaning pressed.
-    #[getset(get_copy = "pub(super)", set = "pub(super)")]
     #[serializable(skip)]
     action_buttons: u8,
 
     /// Down, Up, Left and Right in bits 3 to 0, with 0 meaning pressed.
-    #[getset(get_copy = "pub(super)", set = "pub(super)")]
     #[serializable(skip)]
     directional_buttons: u8,
 
@@ -343,6 +341,15 @@ impl Joypad {
 }
 
 #[cfg(test)]
+impl Joypad {
+    /// Sets the action button bits directly, for other modules' tests that
+    /// need held buttons without the joypad interrupt pressing them requests.
+    pub(super) fn set_action_buttons(&mut self, buttons: u8) {
+        self.action_buttons = buttons;
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::controller::ControllerButton;
@@ -351,8 +358,8 @@ mod tests {
     fn reads_from_directional_keys() {
         let mut joypad = Joypad::new();
         joypad.set_group_select(0x20);
-        joypad.set_directional_buttons(0x4);
-        joypad.set_action_buttons(0x2);
+        joypad.directional_buttons = 0x4;
+        joypad.action_buttons = 0x2;
         let result = joypad.read_byte();
         assert_eq!(result, 0xE4);
     }
@@ -361,8 +368,8 @@ mod tests {
     fn reads_from_select_keys() {
         let mut joypad = Joypad::new();
         joypad.set_group_select(0x10);
-        joypad.set_directional_buttons(0x4);
-        joypad.set_action_buttons(0x2);
+        joypad.directional_buttons = 0x4;
+        joypad.action_buttons = 0x2;
         let result = joypad.read_byte();
         assert_eq!(result, 0xD2);
     }
@@ -370,8 +377,8 @@ mod tests {
     #[test]
     fn writes_to_joyp() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0x4);
-        joypad.set_action_buttons(0x2);
+        joypad.directional_buttons = 0x4;
+        joypad.action_buttons = 0x2;
         joypad.write_byte(0x20);
         assert_eq!(joypad.group_select(), 0x20);
     }
@@ -379,145 +386,145 @@ mod tests {
     #[test]
     fn stores_down_key_press() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0xF);
-        joypad.set_action_buttons(0xF);
+        joypad.directional_buttons = 0xF;
+        joypad.action_buttons = 0xF;
         joypad.press_key(Key::Down);
-        assert_eq!(joypad.directional_buttons(), 0x7);
+        assert_eq!(joypad.directional_buttons, 0x7);
     }
 
     #[test]
     fn stores_down_key_release() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0x7);
-        joypad.set_action_buttons(0xF);
+        joypad.directional_buttons = 0x7;
+        joypad.action_buttons = 0xF;
         joypad.release_key(Key::Down);
-        assert_eq!(joypad.directional_buttons(), 0xF);
+        assert_eq!(joypad.directional_buttons, 0xF);
     }
 
     #[test]
     fn stores_up_key_press() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0xF);
-        joypad.set_action_buttons(0xF);
+        joypad.directional_buttons = 0xF;
+        joypad.action_buttons = 0xF;
         joypad.press_key(Key::Up);
-        assert_eq!(joypad.directional_buttons(), 0xB);
+        assert_eq!(joypad.directional_buttons, 0xB);
     }
 
     #[test]
     fn stores_up_key_release() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0xB);
-        joypad.set_action_buttons(0xF);
+        joypad.directional_buttons = 0xB;
+        joypad.action_buttons = 0xF;
         joypad.release_key(Key::Up);
-        assert_eq!(joypad.directional_buttons(), 0xF);
+        assert_eq!(joypad.directional_buttons, 0xF);
     }
 
     #[test]
     fn stores_left_key_press() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0xF);
-        joypad.set_action_buttons(0xF);
+        joypad.directional_buttons = 0xF;
+        joypad.action_buttons = 0xF;
         joypad.press_key(Key::Left);
-        assert_eq!(joypad.directional_buttons(), 0xD);
+        assert_eq!(joypad.directional_buttons, 0xD);
     }
 
     #[test]
     fn stores_left_key_release() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0xD);
-        joypad.set_action_buttons(0xF);
+        joypad.directional_buttons = 0xD;
+        joypad.action_buttons = 0xF;
         joypad.release_key(Key::Left);
-        assert_eq!(joypad.directional_buttons(), 0xF);
+        assert_eq!(joypad.directional_buttons, 0xF);
     }
 
     #[test]
     fn stores_right_key_press() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0xF);
-        joypad.set_action_buttons(0xF);
+        joypad.directional_buttons = 0xF;
+        joypad.action_buttons = 0xF;
         joypad.press_key(Key::Right);
-        assert_eq!(joypad.directional_buttons(), 0xE);
+        assert_eq!(joypad.directional_buttons, 0xE);
     }
 
     #[test]
     fn stores_right_key_release() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0xE);
-        joypad.set_action_buttons(0xF);
+        joypad.directional_buttons = 0xE;
+        joypad.action_buttons = 0xF;
         joypad.release_key(Key::Right);
-        assert_eq!(joypad.directional_buttons(), 0xF);
+        assert_eq!(joypad.directional_buttons, 0xF);
     }
 
     #[test]
     fn stores_start_key_press() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0xF);
-        joypad.set_action_buttons(0xF);
+        joypad.directional_buttons = 0xF;
+        joypad.action_buttons = 0xF;
         joypad.press_key(Key::Start);
-        assert_eq!(joypad.action_buttons(), 0x7);
+        assert_eq!(joypad.action_buttons, 0x7);
     }
 
     #[test]
     fn stores_start_key_release() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0xF);
-        joypad.set_action_buttons(0x7);
+        joypad.directional_buttons = 0xF;
+        joypad.action_buttons = 0x7;
         joypad.release_key(Key::Start);
-        assert_eq!(joypad.action_buttons(), 0xF);
+        assert_eq!(joypad.action_buttons, 0xF);
     }
 
     #[test]
     fn stores_select_key_press() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0xF);
-        joypad.set_action_buttons(0xF);
+        joypad.directional_buttons = 0xF;
+        joypad.action_buttons = 0xF;
         joypad.press_key(Key::Select);
-        assert_eq!(joypad.action_buttons(), 0xB);
+        assert_eq!(joypad.action_buttons, 0xB);
     }
 
     #[test]
     fn stores_select_key_release() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0xF);
-        joypad.set_action_buttons(0xB);
+        joypad.directional_buttons = 0xF;
+        joypad.action_buttons = 0xB;
         joypad.release_key(Key::Select);
-        assert_eq!(joypad.action_buttons(), 0xF);
+        assert_eq!(joypad.action_buttons, 0xF);
     }
 
     #[test]
     fn stores_b_key_press() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0xF);
-        joypad.set_action_buttons(0xF);
+        joypad.directional_buttons = 0xF;
+        joypad.action_buttons = 0xF;
         joypad.press_key(Key::B);
-        assert_eq!(joypad.action_buttons(), 0xD);
+        assert_eq!(joypad.action_buttons, 0xD);
     }
 
     #[test]
     fn stores_b_key_release() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0xF);
-        joypad.set_action_buttons(0xD);
+        joypad.directional_buttons = 0xF;
+        joypad.action_buttons = 0xD;
         joypad.release_key(Key::B);
-        assert_eq!(joypad.action_buttons(), 0xF);
+        assert_eq!(joypad.action_buttons, 0xF);
     }
 
     #[test]
     fn stores_a_key_press() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0xF);
-        joypad.set_action_buttons(0xF);
+        joypad.directional_buttons = 0xF;
+        joypad.action_buttons = 0xF;
         joypad.press_key(Key::A);
-        assert_eq!(joypad.action_buttons(), 0xE);
+        assert_eq!(joypad.action_buttons, 0xE);
     }
 
     #[test]
     fn stores_a_key_release() {
         let mut joypad = Joypad::new();
-        joypad.set_directional_buttons(0xF);
-        joypad.set_action_buttons(0xE);
+        joypad.directional_buttons = 0xF;
+        joypad.action_buttons = 0xE;
         joypad.release_key(Key::A);
-        assert_eq!(joypad.action_buttons(), 0xF);
+        assert_eq!(joypad.action_buttons, 0xF);
     }
 
     fn controller_pressing(button: ControllerButton) -> ControllerState {
@@ -530,8 +537,8 @@ mod tests {
     fn key_press_clears_matching_bit_and_raises_interrupt() {
         let mut joypad = Joypad::new();
         joypad.press_key(Key::Start);
-        assert_eq!(joypad.action_buttons(), 0x7);
-        assert_eq!(joypad.directional_buttons(), 0xF);
+        assert_eq!(joypad.action_buttons, 0x7);
+        assert_eq!(joypad.directional_buttons, 0xF);
         assert!(joypad.interrupt());
     }
 
@@ -539,7 +546,7 @@ mod tests {
     fn controller_press_clears_mapped_bit() {
         let mut joypad = Joypad::new();
         joypad.set_controller_states(&[controller_pressing(ControllerButton::DPadLeft)]);
-        assert_eq!(joypad.directional_buttons(), 0xD);
+        assert_eq!(joypad.directional_buttons, 0xD);
         assert!(joypad.interrupt());
     }
 
@@ -549,7 +556,7 @@ mod tests {
         joypad.set_controller_states(&[controller_pressing(ControllerButton::East)]);
         joypad.press_key(Key::A);
         joypad.release_key(Key::A);
-        assert_eq!(joypad.action_buttons(), 0xE);
+        assert_eq!(joypad.action_buttons, 0xE);
     }
 
     #[test]
@@ -558,7 +565,7 @@ mod tests {
         joypad.press_key(Key::Up);
         joypad.set_controller_states(&[controller_pressing(ControllerButton::DPadUp)]);
         joypad.set_controller_states(&[ControllerState::new()]);
-        assert_eq!(joypad.directional_buttons(), 0xB);
+        assert_eq!(joypad.directional_buttons, 0xB);
     }
 
     #[test]
@@ -577,7 +584,7 @@ mod tests {
         mapping.bind(ControllerButton::North, Key::Select);
         joypad.set_controller_mapping(mapping);
         joypad.set_controller_states(&[controller_pressing(ControllerButton::North)]);
-        assert_eq!(joypad.action_buttons(), 0xB);
+        assert_eq!(joypad.action_buttons, 0xB);
     }
 
     #[test]

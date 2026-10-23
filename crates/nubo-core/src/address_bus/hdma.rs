@@ -6,7 +6,6 @@
 
 use crate::address_bus::{AddressBus, MemoryMapped};
 use crate::utils::is_bit_set;
-use getset::{CopyGetters, Setters};
 use nubo_serializable_derive::Serializable;
 
 /// How a VRAM DMA transfer is paced.
@@ -19,7 +18,7 @@ pub(super) enum VramTransferMode {
 }
 
 /// The state of the VRAM DMA unit and its registers.
-#[derive(Clone, Debug, Serializable, CopyGetters, Setters)]
+#[derive(Clone, Debug, Serializable)]
 pub(crate) struct HdmaState {
     /// The address the next byte is read from (HDMA1/HDMA2).
     source: u16,
@@ -28,15 +27,11 @@ pub(crate) struct HdmaState {
     /// wraps around to 0 (SameBoy, Gambatte's dma_dst_wrap tests).
     destination: u16,
     /// HDMA5 bits 0-6: the number of 16-byte blocks left to copy, minus one.
-    #[getset(get_copy = "pub(super)", set = "pub(super)")]
     transfer_length: u8,
-    #[getset(get_copy = "pub(super)")]
     transfer_mode: VramTransferMode,
-    #[getset(get_copy = "pub(crate)", set = "pub(super)")]
     in_progress: bool,
     /// The last transfer copied all its blocks. False while a transfer runs
     /// and after one was cancelled part-way; HDMA5 reads differently then.
-    #[getset(get_copy = "pub(super)", set = "pub(super)")]
     completed: bool,
     /// An HBlank started, so an HBlank-mode transfer should copy its next
     /// block.
@@ -59,7 +54,6 @@ const HBLANK_MODE_BIT: u8 = 7;
 const BLOCK_SIZE: u8 = 16;
 /// Half an M-cycle at normal speed, in dots.
 const HALF_M_CYCLE_DOTS: u8 = 2;
-const VRAM_START: u16 = 0x8000;
 const VRAM_ADDRESS_MASK: u16 = 0x1FFF;
 
 impl HdmaState {
@@ -141,6 +135,11 @@ impl HdmaState {
         }
     }
 
+    /// Whether a transfer is running.
+    pub(crate) fn in_progress(&self) -> bool {
+        self.in_progress
+    }
+
     /// Records that an HBlank started. Ignored when no transfer runs.
     pub(crate) fn set_hblank_started(&mut self, value: bool) {
         if self.in_progress {
@@ -152,8 +151,9 @@ impl HdmaState {
         self.source
     }
 
-    pub(super) fn destination_address(&self) -> u16 {
-        VRAM_START + (self.destination & VRAM_ADDRESS_MASK)
+    /// Where in VRAM the next byte goes, as an offset from its start.
+    fn vram_offset(&self) -> u16 {
+        self.destination & VRAM_ADDRESS_MASK
     }
 
     fn advance_addresses(&mut self) {
@@ -197,7 +197,7 @@ impl AddressBus {
                     0x8000..=0x9FFF | 0xE000.. => 0xFF,
                     address => self.peek(address),
                 };
-                let destination = self.hdma.destination_address() & VRAM_ADDRESS_MASK;
+                let destination = self.hdma.vram_offset();
                 self.catch_up_ppu_before_change();
                 self.gpu.set_video_ram_byte(destination, source_byte);
                 self.hdma.advance_addresses();
@@ -236,14 +236,13 @@ impl AddressBus {
             self.hdma.hblank_started = false;
         }
 
-        if self.hdma.transfer_length() == 0 {
-            self.hdma.set_completed(true);
-            self.hdma.set_in_progress(false);
+        if self.hdma.transfer_length == 0 {
+            self.hdma.completed = true;
+            self.hdma.in_progress = false;
         } else {
-            let transfer_length = self.hdma.transfer_length();
-            self.hdma.set_transfer_length(transfer_length - 1);
+            self.hdma.transfer_length -= 1;
             if self.hdma.destination == 0 {
-                self.hdma.set_in_progress(false);
+                self.hdma.in_progress = false;
             }
         }
     }
@@ -252,8 +251,8 @@ impl AddressBus {
     /// general purpose mode, or one block in HBlank mode once an HBlank has
     /// started. The CPU waits meanwhile.
     pub(crate) fn hdma_step(&mut self) {
-        if self.cgb_mode && self.hdma.in_progress() {
-            let is_hblank_mode = self.hdma.transfer_mode() == VramTransferMode::HBlank;
+        if self.cgb_mode && self.hdma.in_progress {
+            let is_hblank_mode = self.hdma.transfer_mode == VramTransferMode::HBlank;
             if is_hblank_mode && self.hdma.hblank_started() {
                 let trailer = !std::mem::take(&mut self.hdma.copy_starts_on_wake);
                 self.hdma_transfer_block(trailer);
@@ -262,7 +261,7 @@ impl AddressBus {
                     self.hdma.completed = false;
                 }
             } else if !is_hblank_mode {
-                while self.hdma.in_progress() {
+                while self.hdma.in_progress {
                     self.hdma_transfer_block(false);
                 }
                 self.sync();
@@ -288,8 +287,8 @@ impl AddressBus {
     /// Whether an HBlank-mode transfer is waiting to copy its next block.
     pub(crate) fn hdma_block_pending(&self) -> bool {
         self.cgb_mode
-            && self.hdma.in_progress()
-            && self.hdma.transfer_mode() == VramTransferMode::HBlank
+            && self.hdma.in_progress
+            && self.hdma.transfer_mode == VramTransferMode::HBlank
             && self.hdma.hblank_started
     }
 
@@ -374,21 +373,21 @@ mod tests {
         let mut hdma = HdmaState::new();
         hdma.set_hdma3(0x71);
         hdma.set_hdma4(0xA2);
-        assert_eq!(hdma.destination_address(), 0x91A0);
+        assert_eq!(hdma.vram_offset(), 0x11A0);
     }
 
     #[test]
     fn should_get_general_purpose_for_vram_transfer_mode() {
         let mut hdma = HdmaState::new();
         hdma.set_hdma5(0x71);
-        assert_eq!(hdma.transfer_mode(), VramTransferMode::GeneralPurpose);
+        assert_eq!(hdma.transfer_mode, VramTransferMode::GeneralPurpose);
     }
 
     #[test]
     fn should_get_hblank_for_vram_transfer_mode() {
         let mut hdma = HdmaState::new();
         hdma.set_hdma5(0xF1);
-        assert_eq!(hdma.transfer_mode(), VramTransferMode::HBlank);
+        assert_eq!(hdma.transfer_mode, VramTransferMode::HBlank);
     }
 
     #[test]
@@ -400,19 +399,19 @@ mod tests {
     #[test]
     fn should_get_hdma5_when_transfer_is_active() {
         let mut hdma = HdmaState::new();
-        hdma.set_in_progress(true);
-        hdma.set_transfer_length(0b0101_0110);
+        hdma.in_progress = true;
+        hdma.transfer_length = 0b0101_0110;
         assert_eq!(hdma.hdma5(), 0b0101_0110);
     }
 
     #[test]
     fn should_terminate_active_vram_dma_transfer() {
         let mut hdma = HdmaState::new();
-        hdma.set_in_progress(true);
-        hdma.set_completed(false);
-        hdma.set_transfer_length(0b0101_0110);
+        hdma.in_progress = true;
+        hdma.completed = false;
+        hdma.transfer_length = 0b0101_0110;
         hdma.set_hdma5(0x0);
-        assert!(!hdma.in_progress());
+        assert!(!hdma.in_progress);
         assert_eq!(hdma.hdma5(), 0b1000_0000);
     }
 

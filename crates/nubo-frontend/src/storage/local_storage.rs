@@ -31,42 +31,34 @@ pub const KEY_PREFIX: &str = "nubo:";
 pub struct LocalStorage;
 
 impl LocalStorage {
-    /// The localStorage key of `entry`, or why the browser doesn't keep it.
-    pub fn key(entry: Entry<'_>) -> Result<String, String> {
+    /// The localStorage key of `entry`.
+    pub fn key(entry: Entry<'_>) -> String {
         match entry {
-            Entry::Settings => Ok(format!("{KEY_PREFIX}settings.toml")),
-            Entry::BatteryRam(rom_path) => Ok(format!(
-                "{KEY_PREFIX}{}",
-                rom_path.with_extension("sav").display()
-            )),
-            Entry::BatteryClock(rom_path) => Ok(format!(
-                "{KEY_PREFIX}{}",
-                rom_path.with_extension("rtc").display()
-            )),
-            Entry::Cheats(_) => Ok(format!(
-                "{KEY_PREFIX}cheats/{}",
-                entry.file_name().display()
-            )),
-            Entry::LastGame => Ok(format!("{KEY_PREFIX}last-game")),
+            Entry::Settings => format!("{KEY_PREFIX}settings.toml"),
+            Entry::BatteryRam(rom_path) => {
+                format!("{KEY_PREFIX}{}", rom_path.with_extension("sav").display())
+            }
+            Entry::BatteryClock(rom_path) => {
+                format!("{KEY_PREFIX}{}", rom_path.with_extension("rtc").display())
+            }
+            Entry::Cheats(_) => format!("{KEY_PREFIX}cheats/{}", entry.file_name().display()),
+            Entry::LastGame => format!("{KEY_PREFIX}last-game"),
         }
     }
 
     /// The key `entry` is kept aside under the `number`th time it couldn't
     /// be read (see [`super::kept_name`]), such as
     /// `nubo:settings.kept-1.toml`.
-    pub fn kept_key(entry: Entry<'_>, number: u32) -> Result<String, String> {
-        Ok(super::kept_name(&Self::key(entry)?, number))
+    pub fn kept_key(entry: Entry<'_>, number: u32) -> String {
+        super::kept_name(&Self::key(entry), number)
     }
 }
 
 #[cfg(feature = "web")]
 impl Storage for LocalStorage {
     fn read(&self, entry: Entry<'_>) -> Result<Option<Vec<u8>>, String> {
-        let Ok(key) = Self::key(entry) else {
-            return Ok(None);
-        };
         let Some(stored) = local_storage()?
-            .get_item(&key)
+            .get_item(&Self::key(entry))
             .map_err(|error| format!("{error:?}"))?
         else {
             return Ok(None);
@@ -83,7 +75,7 @@ impl Storage for LocalStorage {
     }
 
     fn write(&self, entry: Entry<'_>, contents: &[u8]) -> Result<(), String> {
-        let key = Self::key(entry)?;
+        let key = Self::key(entry);
         let stored = if is_text(entry) {
             String::from_utf8(contents.to_vec()).map_err(|error| error.to_string())?
         } else {
@@ -96,10 +88,7 @@ impl Storage for LocalStorage {
     }
 
     fn location(&self, entry: Entry<'_>) -> String {
-        match Self::key(entry) {
-            Ok(key) => format!("localStorage key {key}"),
-            Err(_) => String::from("localStorage"),
-        }
+        format!("localStorage key {}", Self::key(entry))
     }
 
     fn delete_battery_saves(&self) -> Result<(), String> {
@@ -122,10 +111,10 @@ impl Storage for LocalStorage {
     }
 
     fn keep_aside(&self, entry: Entry<'_>) -> Result<String, String> {
-        let key = Self::key(entry)?;
+        let key = Self::key(entry);
         let storage = local_storage()?;
         let kept = (1..)
-            .map(|number| super::kept_name(&key, number))
+            .map(|number| Self::kept_key(entry, number))
             .find(|kept| storage.get_item(kept).ok().flatten().is_none())
             .unwrap_or_default();
         let stored = storage

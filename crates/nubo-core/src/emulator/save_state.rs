@@ -207,7 +207,8 @@ impl Emulator {
         SaveStateHeader::of(self)
             .write(&mut data)
             .expect("writing to a Vec never fails");
-        data.extend_from_slice(&self.serialized_state());
+        self.serialize(&mut data)
+            .expect("writing to a Vec never fails");
         data
     }
 
