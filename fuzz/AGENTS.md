@@ -16,7 +16,7 @@ Each one runs what it loaded for a couple of frames, saves a state and loads it 
 
 ## Running them
 
-From the repository root, once: `cargo install cargo-fuzz --locked`, `rustup toolchain install nightly` and `cargo xtask benchmark-roms` (the `state` and `cheats` targets load the game from `target/benchmark-roms/`). Then from this folder:
+From the repository root, once: `cargo install cargo-fuzz --locked`, `rustup toolchain install nightly` and `cargo xtask benchmark-roms` (the `state`, `state_fields` and `cheats` targets load the game from the repository's `target/benchmark-roms/`, whatever `CARGO_TARGET_DIR` says: with it set, copy or link the games there). Then from this folder:
 
 ```bash
 mkdir -p corpus/state corpus/rom && cp ../save-states/<newest set>/tobudx.gb-*.state corpus/state/
