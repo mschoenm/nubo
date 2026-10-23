@@ -712,11 +712,12 @@ impl ResetChoices {
 
 /// The question what to start over with: a box for the settings, ticked at
 /// first, one for the controls, unticked at first, and one for each other
-/// thing `offers` lets it reset, ticked as in `choices`. A box ticks or unticks itself with
-/// `DialogMessage::ResetChoicesChanged`. While a game is open, the boxes
-/// that delete saves are greyed out and unticked, and say to close the game
-/// first, so nobody wonders whether the reset deletes them anyway. The
-/// button says what it does, and is greyed out while nothing is ticked.
+/// thing `offers` lets it reset, ticked as in `choices`. A box ticks or
+/// unticks itself with `DialogMessage::ResetChoicesChanged`. While a game is
+/// open, the boxes that delete saves are greyed out and unticked, and say to
+/// close the game first, so nobody wonders whether the reset deletes them
+/// anyway. The button says what it does, and is greyed out while nothing is
+/// ticked.
 fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
     let effective = choices.within(offers);
     let can_delete = offers.can_delete_saves();
