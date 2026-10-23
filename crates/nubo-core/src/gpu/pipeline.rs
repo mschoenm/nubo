@@ -21,6 +21,11 @@
 //!
 //! Registers such as SCX, LCDC and the palettes are read on the same dots as in SameBoy, so a
 //! write in the middle of mode 3 takes effect in the middle of the line, like on hardware.
+//!
+//! Runs of plain dots, whole background tiles and the line's start take shortcuts in
+//! `plain_pixels.rs` (Nubo's own, not part of the SameBoy port). They must give exactly what
+//! `Gpu::tick_drawing` gives, so a change to a phase or a fetcher step here needs the same change
+//! there, and `gpu/tests/random_scenes.rs` checks it.
 
 use crate::gpu::constants::{GB_SCREEN_HEIGHT, GB_SCREEN_WIDTH};
 use crate::gpu::lcdc::{
