@@ -48,6 +48,21 @@ fn models_are_saved_by_name() {
 }
 
 #[test]
+fn a_volume_outside_0_to_1_or_not_a_number_reads_within_range() {
+    for (written, read) in [
+        ("0.5", 0.5),
+        ("2.0", 1.0),
+        ("-1.0", 0.0),
+        ("nan", 1.0),
+        ("inf", 1.0),
+        ("-inf", 1.0),
+    ] {
+        let settings: Settings = toml::from_str(&format!("volume = {written}")).unwrap();
+        assert_eq!(settings.volume, read, "volume = {written}");
+    }
+}
+
+#[test]
 fn missing_fields_get_their_defaults() {
     let settings: Settings = toml::from_str("muted = true").unwrap();
 

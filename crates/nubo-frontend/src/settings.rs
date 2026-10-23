@@ -60,6 +60,7 @@ pub struct Settings {
     /// How fast fast forward runs.
     pub fast_forward_speed: FastForwardSpeed,
     /// How loud to play, from 0 (silent) to 1 (as loud as the game).
+    #[serde(deserialize_with = "volume_from_0_to_1")]
     pub volume: f32,
     /// Whether the sound is off, whatever the volume.
     pub muted: bool,
@@ -100,6 +101,18 @@ pub struct Settings {
     /// it is on.
     #[serde(skip_serializing_if = "is_false")]
     pub sgb_nubo_border: bool,
+}
+
+/// Reads the volume, kept from 0 to 1: a hand-edited file can hold any
+/// number, `nan` and `inf` included, and a volume that isn't a number would
+/// make every sample one too. One that isn't finite reads as full volume.
+fn volume_from_0_to_1<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<f32, D::Error> {
+    let volume = f32::deserialize(deserializer)?;
+    Ok(if volume.is_finite() {
+        volume.clamp(0.0, 1.0)
+    } else {
+        1.0
+    })
 }
 
 /// Whether `colors` are the game's own, which settings leave out.
