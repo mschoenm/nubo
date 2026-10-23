@@ -1,3 +1,5 @@
+//! Tests for handing new frames to the app and spreading fast forward's sound.
+
 use super::*;
 use std::hash::DefaultHasher;
 

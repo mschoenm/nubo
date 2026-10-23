@@ -7,8 +7,8 @@
 //! container, it does so in a mount namespace of its own (`unshare`), with
 //! a system bus of its own and empty `/run/systemd`, `/run/dbus` and
 //! `/tmp/.X11-unix` folders: GNOME Shell then runs without logind, which a
-//! container lacks, and nothing of the container's is changed. As another user, as on a
-//! Linux desktop, the system's own system bus is used.
+//! container lacks, and nothing of the container's is changed. As another
+//! user, as on a Linux desktop, the system's own system bus is used.
 //!
 //! [`run_session`] then starts GNOME Shell for each screen size and style
 //! the pictures need (`--headless --virtual-monitor`, with `--unsafe-mode`
@@ -582,7 +582,7 @@ fn title_bar_style(dark: bool) -> String {
 }
 
 /// Runs `script` in the GNOME Shell on the session bus and returns what it
-/// gave, as JSON.
+/// gave: its JSON, without a string's quotes.
 fn shell_eval(script: &str) -> Result<String> {
     let answer = gdbus(&[
         "--dest",
@@ -600,7 +600,8 @@ fn shell_eval(script: &str) -> Result<String> {
     Ok(value.trim_matches('"').to_owned())
 }
 
-/// Calls a method of GNOME Shell's on the session bus with `gdbus`.
+/// Calls a D-Bus method on the session bus with `gdbus call`, and returns
+/// what it printed.
 fn gdbus(arguments: &[&str]) -> Result<String> {
     let output = Command::new("gdbus")
         .args(["call", "--session"])

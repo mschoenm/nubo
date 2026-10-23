@@ -178,7 +178,7 @@ impl Serializable for OamDmaAccess {
 /// a copy of the booted emulator matches a real boot, so a custom `Debug` that left out VRAM, OAM
 /// or the frame buffers would weaken that check.
 #[derive(Clone, Debug)]
-pub struct Gpu {
+pub(crate) struct Gpu {
     /// The line the PPU is on, 0 to 153. Unlike `ly`, it doesn't reset early on line 153.
     line: u8,
 
@@ -239,8 +239,8 @@ pub struct Gpu {
     /// Dots until HDMA (CGB's hblank-driven VRAM copy) learns that hblank started.
     hdma_start_delay: u8,
     /// The LCD was just switched off outside HBlank. STAT drops to mode 0, which HDMA takes as
-    /// the start of an HBlank once the PPU next runs (SameBoy; Gambatte's dma
-    /// hdma_disable_display tests).
+    /// the start of an HBlank once the PPU next runs (SameBoy; Gambatte's dma hdma_disable_display
+    /// tests).
     lcd_off_hblank_dma: bool,
 
     /// Dots between entering mode 3 and the renderer starting.
@@ -1095,6 +1095,9 @@ impl Gpu {
     }
 
     /// Places the line timeline at `dot` of `line`, to match where the boot ROM leaves the PPU.
+    /// Only for positions where no line is being drawn: VBlank, OAM scan, or HBlank once mode 3
+    /// would be over (dot 252 or later). It doesn't set the renderer up for a line in progress,
+    /// so tests that place it elsewhere don't draw.
     pub(super) fn set_frame_position(&mut self, line: u8, dot: u16) {
         self.line = line;
         self.line_dot = dot;

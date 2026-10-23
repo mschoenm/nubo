@@ -1,3 +1,7 @@
+; From SameBoy's BootROMs/sameboot.inc at commit 6705401
+; (https://github.com/LIJI32/SameBoy), Expat License, Copyright (c) 2015-2026
+; Lior Halphon; see the notice in ../src/apu.rs.
+
 IF !DEF(SAMEBOY_INC)
 DEF SAMEBOY_INC EQU 1
 

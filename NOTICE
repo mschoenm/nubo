@@ -70,9 +70,18 @@ SOFTWARE.
 Bootix (https://github.com/Hacktix/Bootix)
 --------------------------------------------------------------------------------
 
-The boot ROM used for the DMG, MGB and SGB models is based on Bootix by
-Hacktix, modified to show the Nubo logo, released into the public domain under
-CC0-1.0 (https://creativecommons.org/publicdomain/zero/1.0/).
+The boot ROM used for the monochrome models (DMG-0, DMG, MGB, SGB and SGB2) is
+based on Bootix by Hacktix, modified to show the Nubo logo, released into the
+public domain under CC0-1.0
+(https://creativecommons.org/publicdomain/zero/1.0/).
+
+--------------------------------------------------------------------------------
+hardware.inc (https://github.com/gbdev/hardware.inc)
+--------------------------------------------------------------------------------
+
+The names of the hardware registers that the boot ROMs' sources use come from
+gbdev's hardware.inc, released into the public domain under CC0-1.0
+(https://creativecommons.org/publicdomain/zero/1.0/).
 
 --------------------------------------------------------------------------------
 Fira Sans (https://github.com/mozilla/Fira)
