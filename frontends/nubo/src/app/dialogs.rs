@@ -900,8 +900,9 @@ fn delete_question(path: &Path, entry: Option<&LibraryEntry>) -> DialogContent {
 /// The question whether to switch a game to `configured`, the model it is
 /// now set to start on, starting it from the title screen, or stay on
 /// `saved`, the model its automatic save was made on, continuing from that
-/// save. With `remembers`, it says that staying keeps the game on `saved`. The models are named by
-/// their console, or by their revision when both are the same console.
+/// save. With `remembers`, it says that staying keeps the game on `saved`.
+/// The models are named by their console, or by their revision when both
+/// are the same console.
 fn other_model_question(saved: Model, configured: Model, remembers: bool) -> DialogContent {
     let name = |model: Model| {
         if Console::of(saved) == Console::of(configured) {
