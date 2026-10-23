@@ -6,6 +6,7 @@ use crate::test_roms::{
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::palettes::DmgPalette;
 use nubo_frontend::sgb_menu::SgbColors;
+use std::time::Instant;
 
 /// Frames the boot ROM takes, with room to spare, before a test program
 /// runs.
@@ -369,6 +370,20 @@ fn game_time(core: &mut Core) -> (u8, u8, u8) {
     )
 }
 
+/// How many seconds the game's clock read past 10:20:30 (see [`ten_twenty_thirty`]).
+fn seconds_past_ten_twenty_thirty((hours, minutes, seconds): (u8, u8, u8)) -> i64 {
+    let total = |hours: u8, minutes: u8, seconds: u8| {
+        i64::from(hours) * 3600 + i64::from(minutes) * 60 + i64::from(seconds)
+    };
+    total(hours, minutes, seconds) - total(10, 20, 30)
+}
+
+/// The whole real seconds since `started`, plus one for the second under way: as far as a
+/// wall clock can have moved on.
+fn real_seconds_since(started: Instant) -> i64 {
+    i64::try_from(started.elapsed().as_secs()).unwrap() + 1
+}
+
 fn emulated_time() -> Options {
     Options {
         rtc_clock: RtcClock::EmulatedTime,
@@ -388,14 +403,18 @@ fn a_clock_filled_in_before_the_first_frame_is_what_the_game_reads() {
     for options in [Options::default(), emulated_time()] {
         let mut core = clock_game(options);
         assert_eq!(core.rtc_memory().len(), RtcState::BYTES);
+        let started = Instant::now();
         core.rtc_memory()
             .copy_from_slice(&ten_twenty_thirty().to_bytes());
         run(&mut core, BOOT_FRAMES);
-        let (hours, minutes, seconds) = game_time(&mut core);
-        assert_eq!((hours, minutes), (10, 20), "{options:?}");
+        let passed = seconds_past_ten_twenty_thirty(game_time(&mut core));
+        let most = match options.rtc_clock {
+            RtcClock::EmulatedTime => 4,
+            RtcClock::WallClock => real_seconds_since(started),
+        };
         assert!(
-            (30..=34).contains(&seconds),
-            "{options:?}: {seconds} seconds"
+            (0..=most).contains(&passed),
+            "{options:?}: {passed} seconds past 10:20:30"
         );
     }
 }
@@ -407,6 +426,7 @@ fn the_clock_the_game_keeps_reaches_the_buffer_in_the_wall_clock_layout() {
         .copy_from_slice(&ten_twenty_thirty().to_bytes());
     run(&mut core, BOOT_FRAMES);
     let before = RtcState::from_bytes(core.rtc_memory()).unwrap();
+    let started = Instant::now();
     run(&mut core, 120);
     let after = RtcState::from_bytes(core.rtc_memory()).unwrap();
     let seconds = |clock: &RtcState| u32::from(clock.minutes) * 60 + u32::from(clock.seconds);
@@ -416,8 +436,9 @@ fn the_clock_the_game_keeps_reaches_the_buffer_in_the_wall_clock_layout() {
         "two emulated seconds"
     );
     let behind = wall_clock_millis() - after.base_timestamp;
+    let most = started.elapsed().as_secs_f64() * 1000.0 + 1000.0;
     assert!(
-        (0.0..10_000.0).contains(&behind),
+        (0.0..most).contains(&behind),
         "on the wall clock: {behind} ms"
     );
 }
@@ -476,6 +497,7 @@ fn a_restart_keeps_the_save_and_the_clock() {
 #[test]
 fn a_restart_takes_on_the_model_and_the_clock_the_options_pick_now() {
     let mut core = clock_game(emulated_time());
+    let started = Instant::now();
     core.rtc_memory()
         .copy_from_slice(&ten_twenty_thirty().to_bytes());
     run(&mut core, BOOT_FRAMES);
@@ -489,11 +511,11 @@ fn a_restart_takes_on_the_model_and_the_clock_the_options_pick_now() {
     core.reset().unwrap();
     assert_eq!(core.model(), Model::CgbC);
     run(&mut core, BOOT_FRAMES);
-    let (hours, minutes, _) = game_time(&mut core);
-    assert_eq!(
-        (hours, minutes),
-        (10, 20),
-        "the clock neither stood still nor jumped"
+    // The emulated seconds of the first run, then the real ones since the restart.
+    let passed = seconds_past_ten_twenty_thirty(game_time(&mut core));
+    assert!(
+        (0..=4 + real_seconds_since(started)).contains(&passed),
+        "the clock jumped: {passed} seconds past 10:20:30"
     );
 
     core.set_options(emulated_time());
