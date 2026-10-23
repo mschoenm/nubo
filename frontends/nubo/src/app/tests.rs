@@ -68,7 +68,7 @@ fn a_reset_asks_first_puts_the_settings_back_and_can_be_undone() {
     assert_eq!(content.choices[dialog.selection].label, "Cancel");
 
     let _ = app.update(SettingsMessage::Reset(ResetChoices::default()).into());
-    assert_eq!(app.settings, changed.reset(false));
+    assert_eq!(app.settings, changed.reset());
     assert_eq!(app.settings.appearance, Appearance::System);
     assert!((app.settings.shared.volume - 1.0).abs() < f32::EPSILON);
 
