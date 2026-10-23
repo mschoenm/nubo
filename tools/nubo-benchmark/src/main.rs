@@ -72,7 +72,8 @@ struct Args {
     #[arg(short, long, value_name = "N", default_value_t = 1)]
     jobs: usize,
 
-    /// Save each game's last frame as a PNG in this folder
+    /// Save each game's last frame as a PNG in this folder, named after the
+    /// ROM's path and the model
     #[arg(long, value_name = "FOLDER")]
     screenshots: Option<PathBuf>,
 
@@ -430,25 +431,23 @@ fn run(
 }
 
 /// Saves `frame` (the Game Boy screen, in RGBA) as a PNG in `folder`, named
-/// after `name` with slashes and spaces turned into underscores.
+/// after `name` with slashes, backslashes, colons and spaces turned into
+/// underscores.
 fn save_screenshot(frame: &[u8], folder: &Path, name: &str) -> Result<(), String> {
     fs::create_dir_all(folder)
         .map_err(|error| format!("Failed to create {}: {error}", folder.display()))?;
     let image = RgbaImage::from_raw(SCREEN_WIDTH, SCREEN_HEIGHT, frame.to_vec())
         .ok_or("The frame has the wrong size")?;
-    let path = folder.join(format!("{}.png", name.replace(['/', ' '], "_")));
+    let path = folder.join(format!("{}.png", name.replace(['/', '\\', ':', ' '], "_")));
     image
         .save(&path)
         .map_err(|error| format!("Failed to save {}: {error}", path.display()))
 }
 
-/// The name a run is listed under: the ROM's file name and the model.
+/// The name a run's screenshot is saved under: the ROM's path and the model.
+/// The whole path, since ROMs in different folders can share a file name.
 fn run_name(job: &Run) -> String {
-    let file_name = job
-        .rom
-        .file_name()
-        .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
-    format!("{file_name} [{}]", job.model)
+    format!("{} [{}]", job.rom.display(), job.model)
 }
 
 /// The key a run's fingerprints are recorded under: the ROM's path, the model and the length of

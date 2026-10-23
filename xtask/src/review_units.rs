@@ -12,11 +12,13 @@
 //! moved without changes keeps its date under its new path, so moving
 //! folders doesn't send their files to the front or back of the rotation.
 
+use crate::release::parse_date;
 use crate::shootout_scoreboard::parse_commit;
 use crate::{Result, workspace_root};
 use clap::{Args, Subcommand};
 use serde_json::{Map, Value, json};
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process;
 
@@ -66,10 +68,10 @@ pub struct NextOptions {
     #[arg(long, value_name = "ROTATION.JSON")]
     state: PathBuf,
     /// Tonight's date, YYYY-MM-DD
-    #[arg(long)]
+    #[arg(long, value_parser = parse_date)]
     date: String,
-    /// The commit tonight's review reads, as a hash
-    #[arg(long, value_name = "SHA")]
+    /// The commit tonight's review reads, as a full hash
+    #[arg(long, value_name = "SHA", value_parser = parse_commit)]
     commit: String,
 }
 
@@ -98,7 +100,8 @@ pub fn run(command: Command) -> Result {
 /// the review should cover as JSON.
 ///
 /// The state is `{"last_commit": "<sha>", "files": {"<path>": "<date>"}}`.
-/// A missing state file starts the rotation from the beginning. When git
+/// A missing state file starts the rotation from the beginning; one that
+/// can't be read is an error, so it is never written over. When git
 /// can't compare `last_commit` with tonight's commit, such as after a
 /// force-push removed it from main's history, the night goes on with a
 /// warning as if there were no `last_commit`: no files count as changed,
@@ -108,7 +111,13 @@ fn next_part(options: &NextOptions) -> Result<String> {
     let state = match fs::read_to_string(&options.state) {
         Ok(text) => serde_json::from_str::<Value>(&text)
             .map_err(|error| format!("{} is not valid JSON: {error}", options.state.display()))?,
-        Err(_) => json!({}),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => json!({}),
+        Err(error) => {
+            return Err(format!(
+                "failed to read {}: {error}",
+                options.state.display()
+            ));
+        }
     };
     let Value::Object(mut state) = state else {
         return Err(format!("{} is not a JSON object", options.state.display()));

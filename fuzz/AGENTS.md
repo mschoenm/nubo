@@ -16,7 +16,7 @@ Each one runs what it loaded for a couple of frames, saves a state and loads it 
 
 ## Running them
 
-From the repository root, once: `cargo install cargo-fuzz --locked`, `rustup toolchain install nightly` and `cargo xtask benchmark-roms` (the `state` and `cheats` targets load the game from `target/benchmark-roms/`). Then from this folder:
+From the repository root, once: `cargo install cargo-fuzz --locked`, `rustup toolchain install nightly` and `cargo xtask benchmark-roms` (the `state`, `state_fields` and `cheats` targets load the game from the repository's `target/benchmark-roms/`, whatever `CARGO_TARGET_DIR` says: with it set, copy or link the games there). Then from this folder:
 
 ```bash
 mkdir -p corpus/state corpus/rom && cp ../save-states/<newest set>/tobudx.gb-*.state corpus/state/
@@ -35,4 +35,4 @@ Seed `state` with the game's kept states, or it starts from nothing and rarely g
 
 ## Upkeep
 
-The full review runs `cargo update` here at its start, so the targets follow their newest dependencies like the rest of Nubo. When `nubo-core`'s API changes, the review fixes the targets in the same pull request as its other changes.
+The full review runs `cargo update` here at its start, so the targets follow their newest dependencies like the rest of Nubo. It commits the updated `Cargo.lock` with its other changes, so the next fuzzing session starts from a clean tree. When `nubo-core`'s API changes, the review fixes the targets in the same pull request as its other changes.

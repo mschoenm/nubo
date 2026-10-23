@@ -153,3 +153,46 @@ fn a_last_commit_git_does_not_know_starts_again_from_tonight() {
     let written: Value = serde_json::from_str(&written.unwrap()).unwrap();
     assert_eq!(written["last_commit"], Value::from(tonight_commit));
 }
+
+#[test]
+fn a_state_that_cannot_be_read_is_an_error_and_is_kept() {
+    let state = std::env::temp_dir().join(format!(
+        "nubo-review-units-unreadable-{}.json",
+        std::process::id()
+    ));
+    fs::write(&state, b"{\"files\": {\"\xff\": \"2026-10-16\"}}").unwrap();
+    let result = next_part(&NextOptions {
+        state: state.clone(),
+        date: String::from("2026-10-16"),
+        commit: String::from("0000000000000000000000000000000000000000"),
+    });
+    let kept = fs::read(&state);
+    fs::remove_file(&state).unwrap();
+    assert!(result.unwrap_err().contains("failed to read"));
+    assert_eq!(kept.unwrap(), b"{\"files\": {\"\xff\": \"2026-10-16\"}}");
+}
+
+#[test]
+fn next_takes_only_a_full_date_and_commit_hash() {
+    /// A command line that is only the options of `review-units next`.
+    #[derive(clap::Parser)]
+    struct Command {
+        #[command(flatten)]
+        options: NextOptions,
+    }
+    let parse = |date: &str, commit: &str| {
+        <Command as clap::Parser>::try_parse_from([
+            "next",
+            "--state",
+            "rotation.json",
+            "--date",
+            date,
+            "--commit",
+            commit,
+        ])
+    };
+    let hash = "0123456789abcdef0123456789abcdef01234567";
+    assert!(parse("2026-10-23", hash).is_ok());
+    assert!(parse("2026-10-23", "0123456").is_err());
+    assert!(parse("23-10-2026", hash).is_err());
+}

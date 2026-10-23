@@ -30,6 +30,8 @@ jobs:
             runner: ubuntu-26.04-arm
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
+    env:
+      LINTER: ghcr.io/flathub/flatpak-builder-lint@sha256:16ed64e78b69eaf97275c2d2bdebd89982d2410ea6d99745f1e0bee795226ae4
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -57,29 +59,52 @@ jobs:
             measure-efficiency "$PWD/target/benchmark-roms/tobudx.gb" | tee "$RUNNER_TEMP/efficiency.json"
           jq -e '.playing.buffers_per_second > 0 and .playing.frames_per_second > 0' "$RUNNER_TEMP/efficiency.json"
 
-      # Flathub shows the AppStream file as it is in the repository, so it
-      # has to pass Flathub's checks as it is. The linter isn't pinned on
-      # purpose: when Flathub adds a check, the nightly run should fail
-      # until Nubo could be published on Flathub again.
-      - name: Check the AppStream file with Flathub's linter
-        if: matrix.arch == 'x86_64'
-        run: >-
-          docker run --rm -v "$PWD:/mnt" ghcr.io/flathub/flatpak-builder-lint:latest
-          appstream /mnt/frontends/nubo/linux/io.github.mschoenm.nubo.metainfo.xml
-
-      # Lists what Flathub's linter would still flag in the build, such as
-      # its permissions, without failing: the Flathub submission will have a
-      # manifest of its own.
-      - name: Report what Flathub's linter would flag in the build
-        if: matrix.arch == 'x86_64'
-        continue-on-error: true
-        run: >-
-          docker run --rm -v "$PWD:/mnt" ghcr.io/flathub/flatpak-builder-lint:latest
-          repo /mnt/target/flatpak/repo
-
+      # Uploaded before the linter runs, so nothing it does can change the
+      # file that releases and the nightly build publish.
       - name: Upload the Flatpak
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: flatpak-${{ matrix.arch }}
           path: target/bundle/*.flatpak
           if-no-files-found: error
+
+      # Flathub's linter is pinned by digest (LINTER), so an image someone
+      # pushes under its tag never runs here, and each run gets only what it
+      # reads. It should still be the newest, so that a check Flathub adds
+      # fails the nightly run until Nubo could be published on Flathub again:
+      # this warns when Flathub has published a newer image, and the digest
+      # is then raised by hand (docs/CI.md).
+      - name: Check that Flathub's linter is the newest
+        if: matrix.arch == 'x86_64'
+        continue-on-error: true
+        shell: bash
+        run: |
+          image=flathub/flatpak-builder-lint
+          token=$(curl -fsS "https://ghcr.io/token?scope=repository:$image:pull" | jq -r .token)
+          newest=$(curl -fsSI -H "Authorization: Bearer $token" \
+            -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json" \
+            -H "Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" \
+            "https://ghcr.io/v2/$image/manifests/latest" | tr -d '\r' | awk 'tolower($1) == "docker-content-digest:" { print $2 }')
+          if [ "ghcr.io/flathub/flatpak-builder-lint@$newest" != "$LINTER" ]; then
+            echo "::warning::Flathub's linter has a newer image ($newest): raise LINTER in flatpak.yml"
+          fi
+
+      # Flathub shows the AppStream file as it is in the repository, so it
+      # has to pass Flathub's checks as it is.
+      - name: Check the AppStream file with Flathub's linter
+        if: matrix.arch == 'x86_64'
+        run: >-
+          docker run --rm -v "$PWD/frontends/nubo/linux:/linux:ro" "$LINTER"
+          appstream /linux/io.github.mschoenm.nubo.metainfo.xml
+
+      # Lists what Flathub's linter would still flag in the build, such as
+      # its permissions, without failing: the Flathub submission will have a
+      # manifest of its own. It reads a copy of the repository, since ostree
+      # may want to write to it.
+      - name: Report what Flathub's linter would flag in the build
+        if: matrix.arch == 'x86_64'
+        continue-on-error: true
+        shell: bash
+        run: |
+          cp -a target/flatpak/repo "$RUNNER_TEMP/repo"
+          docker run --rm -v "$RUNNER_TEMP/repo:/repo" "$LINTER" repo /repo

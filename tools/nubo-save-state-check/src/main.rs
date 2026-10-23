@@ -19,7 +19,8 @@
 //! of an empty `Vec`'s items and of a `None`.
 //!
 //! The games aren't part of Nubo: `cargo xtask benchmark-roms` downloads them
-//! to `target/benchmark-roms`, where this looks for them. A game whose states
+//! to `target/benchmark-roms` (under `CARGO_TARGET_DIR` when that is set),
+//! where this looks for them. A game whose states
 //! are kept must stay in that list (`xtask/src/benchmark_roms.rs`) at the same
 //! version, since states of another version of a game don't load. Kept sets
 //! are never changed or removed.
@@ -27,6 +28,7 @@
 use clap::Parser;
 use nubo_core::{Emulator, Key, Model, NoSaves, RtcClock};
 use std::collections::BTreeSet;
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -75,7 +77,9 @@ fn main() -> ExitCode {
     let args = Args::parse();
     let root = workspace_root();
     let sets = root.join("save-states");
-    let roms = root.join("target").join("benchmark-roms");
+    let roms = env::var_os("CARGO_TARGET_DIR")
+        .map_or_else(|| root.join("target"), PathBuf::from)
+        .join("benchmark-roms");
     let result = with_games(&roms).and_then(|cartridges| {
         if args.record {
             record(&sets, &cartridges)
@@ -186,7 +190,6 @@ fn stored_layout(cartridges: &[Cartridge]) -> Result<BTreeSet<String>, String> {
 /// Keeps the states this version makes as a new set in `sets`, named after
 /// today's date, unless the newest set already has the same layout.
 fn record(sets: &Path, cartridges: &[Cartridge]) -> Result<(), String> {
-    let states = make_states(cartridges)?;
     let layout = stored_layout(cartridges)?;
     if let Some(newest) = kept_sets(sets)?.last()
         && read_layout(newest)? == layout
@@ -196,6 +199,7 @@ fn record(sets: &Path, cartridges: &[Cartridge]) -> Result<(), String> {
             newest.display()
         ));
     }
+    let states = make_states(cartridges)?;
 
     let today = today();
     let folder = (1..)

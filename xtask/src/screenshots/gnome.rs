@@ -415,7 +415,10 @@ impl Session {
             }
             thread::sleep(Duration::from_millis(250));
         }
-        session.share_with_portal()?;
+        if let Err(error) = session.share_with_portal() {
+            session.stop();
+            return Err(error);
+        }
         Ok(session)
     }
 

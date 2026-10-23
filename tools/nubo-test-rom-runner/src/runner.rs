@@ -454,13 +454,20 @@ fn run_every_frame_test(
     let TestRun { test, progress, .. } = *run;
     let timeout = run.audio_buffers;
     let mut audio_buffers = 0;
+    let mut steps = 0;
+    let mut buffer_started = Instant::now();
     while emulator.read_memory(LCDC_ADDRESS) & LCDC_SCREEN_ON != 0 {
         if audio_buffers >= timeout {
             return Err(Failure::new("the game never turned the screen off"));
         }
         if emulator.step_toward_next_audio_buffer(1) {
             audio_buffers += 1;
+            buffer_started = Instant::now();
             progress.tick();
+        }
+        steps += 1;
+        if steps % STEPS_BETWEEN_STALL_CHECKS == 0 && buffer_started.elapsed() > STALL_LIMIT {
+            return Err(stalled(emulator, test));
         }
     }
     emulator.take_frame();
@@ -635,7 +642,10 @@ fn run_gambatte_test(
     }
     let mut samples = Vec::new();
     for _ in 0..SOUND_CHECK_AUDIO_BUFFERS {
-        let (left, right) = emulator.step_until_next_audio_buffer();
+        step_audio_buffer(emulator, progress, test)?;
+        let (left, right) = emulator
+            .audio_samples()
+            .expect("step_audio_buffer returns once the buffer is full");
         samples.extend(left.iter().zip(right).map(|(left, right)| left + right));
     }
 
@@ -686,18 +696,24 @@ fn step_audio_buffer(
     while !emulator.step_toward_next_audio_buffer(STEPS_BETWEEN_STALL_CHECKS) {
         progress.tick();
         if started.elapsed() > STALL_LIMIT {
-            return Err(Failure {
-                reason: format!(
-                    "emulated time stopped advancing for {} seconds of wall-clock time",
-                    STALL_LIMIT.as_secs()
-                ),
-                screen: Some(screen::normalize(emulator.frame_buffer(), test.model)),
-                stalled: true,
-            });
+            return Err(stalled(emulator, test));
         }
     }
     progress.tick();
     Ok(())
+}
+
+/// The failure of a test whose emulated time stopped advancing for
+/// `STALL_LIMIT` of real time.
+fn stalled(emulator: &Emulator, test: &TestCase) -> Failure {
+    Failure {
+        reason: format!(
+            "emulated time stopped advancing for {} seconds of wall-clock time",
+            STALL_LIMIT.as_secs()
+        ),
+        screen: Some(screen::normalize(emulator.frame_buffer(), test.model)),
+        stalled: true,
+    }
 }
 
 /// Saves the failing screen as `<model>/<ROM's path>.png` under

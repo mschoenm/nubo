@@ -22,7 +22,7 @@ jobs:
   build:
     name: Core (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       # The Linux cores are built on Ubuntu 24.04 rather than the newest
@@ -46,12 +46,21 @@ jobs:
       - name: Install Rust
         run: rustup toolchain install
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Build the core's zip
         run: cargo xtask libretro
+
+      # Without the packages RetroArch's only recommend (video acceleration
+      # drivers, GameMode, Qt extras), which the test doesn't use. FFmpeg's
+      # codecs are hard dependencies and still come. A slow Ubuntu mirror
+      # once took 27 minutes here, so the step has a limit of its own.
+      - name: Install RetroArch
+        if: matrix.platform == 'linux-x86_64'
+        timeout-minutes: 15
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends retroarch dbus
 
       # The zip is what players install, so the core in it plays a game in
       # the RetroArch Ubuntu packages, headless: the null video and sound
@@ -64,7 +73,6 @@ jobs:
         if: matrix.platform == 'linux-x86_64'
         shell: bash
         run: |
-          sudo apt-get update && sudo apt-get install -y retroarch dbus
           cargo xtask benchmark-roms
           ra="$RUNNER_TEMP/retroarch"
           mkdir -p "$ra"/{cores,info,saves,states,shots,system}

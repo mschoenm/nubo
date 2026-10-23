@@ -54,6 +54,10 @@ use std::path::{Path, PathBuf};
 
 use list::TESTS;
 
+/// The name the harness class gives Nubo (`.github/shootout/nubo.py`), which
+/// the published table lists it under once the Shootout runs it. Its own row
+/// is left out of the rank, so Nubo is never ranked against itself.
+const HARNESS_NAME: &str = "Nubo";
 /// The speed the harness class runs Nubo at (`--speed 4` in
 /// `.github/shootout/nubo.py`, the draft of the Shootout's `emulators/nubo.py`).
 const HARNESS_SPEED: u32 = 4;
@@ -263,14 +267,15 @@ impl Scoreboard {
     }
 
     /// Where Nubo would stand in the table if it passed the tests named in
-    /// `passing`.
+    /// `passing`, among the other emulators in it.
     fn standing(&self, passing: &BTreeSet<&str>) -> Standing {
         let passed = self
             .tests
             .iter()
             .filter(|(name, _)| passing.contains(name.as_str()))
             .count();
-        let by_emulator = self.passed_by_emulator();
+        let mut by_emulator = self.passed_by_emulator();
+        by_emulator.remove(HARNESS_NAME);
         let (leader, leader_passed) = by_emulator
             .iter()
             .max_by(|a, b| a.1.cmp(b.1).then_with(|| b.0.cmp(a.0)))
