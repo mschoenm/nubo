@@ -2,14 +2,13 @@
 //! with its save states and cheats, and opening ROMs.
 
 use super::window_events::leave_fullscreen_for_game;
-use super::{App, Message};
+use super::{App, Message, scroll_in_proportion};
 use crate::dialog::{Dialog, DialogKind};
 use crate::game::{Game, PauseMenu, SgbBorderChoice};
 use crate::rom_picker;
 use crate::settings::Settings;
 use crate::views;
 use iced::Task;
-use iced::widget::{self, scrollable::RelativeOffset};
 use nubo_core::{CartridgeHeader, Emulator, Model, SgbBorder};
 use nubo_frontend::controls::Action;
 use nubo_frontend::library::LibrarySnapshot;
@@ -413,9 +412,30 @@ impl App {
             None
         };
 
+        self.start_or_ask(rom, header, resume_state);
+    }
+
+    /// Starts `rom` from `resume_state`, where the player left off, or asks
+    /// first when that was on another model than the one the game is set to
+    /// start on (see `App::ask_which_model`). A scene doesn't ask, and
+    /// continues on the save's model. A `--scale` window, which shows only
+    /// the game's picture and so can't show the question, doesn't ask
+    /// either: it continues on the save's model too, for this run only, so
+    /// where the player left off is never replaced without asking
+    /// (`--fresh` starts over on the model asked for).
+    pub(super) fn start_or_ask(
+        &mut self,
+        rom: Rom,
+        header: CartridgeHeader,
+        resume_state: Option<SaveState>,
+    ) {
         let model = self.model_for(&rom.path, &header);
         match resume_state {
-            Some(state) if state.model != model && !self.held_for_scene() => {
+            Some(state)
+                if state.model != model
+                    && self.screen_scale.is_none()
+                    && !self.held_for_scene() =>
+            {
                 self.ask_which_model(rom, header, state, model);
             }
             Some(state) => {
@@ -958,9 +978,11 @@ impl App {
             Action::Up | Action::Down => {
                 let step = if action == Action::Up { -1 } else { 1 };
                 game.move_menu_selection(step, rows, !held);
-                if page == PauseMenu::SuperGameBoy {
-                    return scroll_pause_menu(game.menu_selection(), rows);
-                }
+                return scroll_in_proportion(
+                    views::game::pause_scroll_id(),
+                    game.menu_selection(),
+                    rows,
+                );
             }
             Action::Left | Action::Right if page == PauseMenu::SuperGameBoy => {
                 let step = if action == Action::Left { -1 } else { 1 };
@@ -1003,23 +1025,6 @@ impl App {
 
         Task::none()
     }
-}
-
-/// Scrolls the pause menu so row `index` of `count` is roughly in view, as
-/// the settings window does (rows are spread fairly evenly over the page).
-fn scroll_pause_menu(index: usize, count: usize) -> Task<Message> {
-    let fraction = if count > 1 {
-        index as f32 / (count - 1) as f32
-    } else {
-        0.0
-    };
-    widget::operation::snap_to(
-        views::game::pause_scroll_id(),
-        RelativeOffset {
-            x: None,
-            y: Some(fraction),
-        },
-    )
 }
 
 /// Reads the ROM at `path` in the background: its file on the desktop, or

@@ -279,17 +279,24 @@ fn should_restore_the_frame_position_from_a_save_state() {
 
 #[test]
 fn should_reject_a_save_state_with_a_line_outside_the_frame() {
-    let mut bytes = serialize(&gpu_at(20, 100));
-    bytes[0] = 0xFF;
+    let mut gpu = gpu_at(153, 100);
+    let bytes = serialize(&gpu);
+    assert!(Gpu::new().deserialize(&mut bytes.as_slice()).is_ok());
 
+    gpu.line = 154;
+    gpu.ly = 154;
+    let bytes = serialize(&gpu);
     assert!(Gpu::new().deserialize(&mut bytes.as_slice()).is_err());
 }
 
 #[test]
 fn should_reject_a_save_state_with_a_dot_outside_the_line() {
-    let mut bytes = serialize(&gpu_at(20, 100));
-    bytes[1..3].copy_from_slice(&456u16.to_le_bytes());
+    let mut gpu = gpu_at(20, 455);
+    let bytes = serialize(&gpu);
+    assert!(Gpu::new().deserialize(&mut bytes.as_slice()).is_ok());
 
+    gpu.line_dot = 456;
+    let bytes = serialize(&gpu);
     assert!(Gpu::new().deserialize(&mut bytes.as_slice()).is_err());
 }
 

@@ -169,10 +169,35 @@ impl Action {
 }
 
 /// Which actions each input (a key or a controller button) does.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(transparent)]
 pub struct Bindings<Input> {
     inputs: BTreeMap<Action, Input>,
+}
+
+/// Reads the bindings as a map from action to input, as they are saved. An
+/// input bound to several actions in a hand-edited file keeps only one of
+/// them, so each input still does at most one thing: the pause menu, which
+/// must keep its button (see `Controls::can_clear`), or else the first in
+/// the order of [`Action`].
+impl<'de, Input: Copy + PartialEq + Deserialize<'de>> Deserialize<'de> for Bindings<Input> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let mut inputs = BTreeMap::<Action, Input>::deserialize(deserializer)?;
+        let mut bound: Vec<Input> = inputs
+            .get(&Action::PauseMenu)
+            .copied()
+            .into_iter()
+            .collect();
+        inputs.retain(|action, input| {
+            if *action == Action::PauseMenu {
+                return true;
+            }
+            let first = !bound.contains(input);
+            bound.push(*input);
+            first
+        });
+        Ok(Bindings { inputs })
+    }
 }
 
 impl<Input: Copy + PartialEq> Bindings<Input> {

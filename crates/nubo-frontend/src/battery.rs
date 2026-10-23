@@ -10,12 +10,17 @@
 //! stopped writing for a moment (see `SETTLE_TIME`), when it pauses and
 //! when it stops. That way the app ending without stopping the game most
 //! likely leaves a whole save behind, not half of one.
+//!
+//! A save that is there but can't be read (a file the player may not read,
+//! a broken localStorage entry) is never written over: the game starts
+//! without it, the player is told, and nothing is saved to it that run.
 
 use crate::notices::Notices;
 use crate::storage::{self, Entry, Storage};
 use crate::time::{Duration, Instant, SystemTime};
 use nubo_core::{CartridgeEffects, RtcState};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 /// How long the game has to stop writing before what it wrote is stored.
@@ -90,14 +95,20 @@ pub struct BatterySaves {
     /// The ROM the saves belong to, which names their entries.
     rom_path: PathBuf,
     pending: Mutex<PendingWrites>,
-    /// Where failed writes are reported.
+    /// Set when the RAM's save is there but couldn't be read: it stays as
+    /// it is, and nothing is written over it for as long as these saves
+    /// last.
+    ram_left_alone: AtomicBool,
+    /// The same for the clock's save.
+    rtc_left_alone: AtomicBool,
+    /// Where failed reads and writes are reported.
     notices: Notices,
 }
 
 impl BatterySaves {
     /// Creates the saves for the ROM at `rom_path` in this build's storage
-    /// (see [`storage::platform`]); they are named after the ROM. Writes that
-    /// fail are reported to `notices`.
+    /// (see [`storage::platform`]); they are named after the ROM. Reads and
+    /// writes that fail are reported to `notices`.
     pub fn for_rom(rom_path: &Path, notices: Notices) -> Arc<BatterySaves> {
         Self::in_storage(storage::platform(), rom_path, notices)
     }
@@ -111,8 +122,8 @@ impl BatterySaves {
         Self::in_storage(Arc::new(files), rom_path, Notices::default())
     }
 
-    /// The saves for the ROM at `rom_path`, kept in `storage`. Writes that
-    /// fail are reported to `notices`.
+    /// The saves for the ROM at `rom_path`, kept in `storage`. Reads and
+    /// writes that fail are reported to `notices`.
     pub fn in_storage(
         storage: Arc<dyn Storage>,
         rom_path: &Path,
@@ -123,6 +134,8 @@ impl BatterySaves {
             rom_path: rom_path.to_path_buf(),
             notices,
             pending: Mutex::new(PendingWrites::default()),
+            ram_left_alone: AtomicBool::new(false),
+            rtc_left_alone: AtomicBool::new(false),
         })
     }
 
@@ -164,15 +177,28 @@ impl BatterySaves {
         Entry::BatteryClock(&self.rom_path)
     }
 
+    /// Whether `entry` is a save that couldn't be read, and so is left as it
+    /// is: set by [`BatterySaves::read`].
+    fn left_alone(&self, entry: Entry<'_>) -> &AtomicBool {
+        match entry {
+            Entry::BatteryClock(_) => &self.rtc_left_alone,
+            _ => &self.ram_left_alone,
+        }
+    }
+
     /// Writes the data waiting in `pending` to `entry` if it is due at `now`,
     /// or right away without `now`. Data that fails to write is kept and
-    /// tried again later.
+    /// tried again later. Data for a save left alone is dropped.
     fn write<T: AsRef<[u8]>>(
         &self,
         entry: Entry<'_>,
         pending: &mut Option<Pending<T>>,
         now: Option<Instant>,
     ) {
+        if self.left_alone(entry).load(Ordering::Relaxed) {
+            *pending = None;
+            return;
+        }
         let Some(waiting) = pending else {
             return;
         };
@@ -202,9 +228,21 @@ impl BatterySaves {
     }
 
     /// Reads what is kept for `entry`, or `None` if nothing is or it can't
-    /// be read.
+    /// be read. One that is there but can't be read is reported and left
+    /// alone: nothing is written over it for as long as these saves last, so
+    /// the game playing on without it can't lose it.
     fn read(&self, entry: Entry<'_>) -> Option<Vec<u8>> {
-        self.storage.read(entry).ok().flatten()
+        match self.storage.read(entry) {
+            Ok(contents) => contents,
+            Err(error) => {
+                self.left_alone(entry).store(true, Ordering::Relaxed);
+                let location = self.storage.location(entry);
+                self.notices.report(format!(
+                    "The in-game save at {location} couldn't be read, so Nubo leaves it as it is and saves nothing to it this time: {error}"
+                ));
+                None
+            }
+        }
     }
 
     /// Reads the saved RAM, dropping any footer that isn't part of the RAM.

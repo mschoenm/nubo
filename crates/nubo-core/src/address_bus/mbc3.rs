@@ -295,16 +295,16 @@ pub(super) fn clock_time(
 impl Mbc3CartridgeMapper {
     /// The controller at power-on, for a cartridge with this type byte, ROM
     /// size and RAM size. The clock follows `rtc_clock` and goes on from
-    /// `saved_rtc`, the state the frontend saved, if any, which reads show
-    /// until the game latches it.
+    /// `rtc` (the state the frontend saved, or a new clock at 0), which reads
+    /// show until the game latches it.
     pub(super) fn new(
         cartridge_type: u8,
         rom_size: usize,
         ram_size: usize,
         rtc_clock: RtcClock,
-        saved_rtc: Option<RtcState>,
+        rtc: RtcState,
     ) -> Self {
-        let rtc = saved_rtc.map_or_else(RtcState::default, RtcState::within_register_widths);
+        let rtc = rtc.within_register_widths();
         Mbc3CartridgeMapper {
             rom_bank_number: 1,
             ram_rtc_enabled: false,
@@ -690,7 +690,7 @@ mod tests {
             0x1_0000,
             0,
             RtcClock::WallClock,
-            Some(damaged.clone()),
+            damaged.clone(),
         );
         assert_eq!(registers(&mapper), [63, 63, 31, 0xFF, 0x01]);
 
@@ -811,6 +811,38 @@ mod tests {
         assert_eq!(read_rtc_register(&mut mapper, RTC_SECONDS), 13);
         assert_eq!(read_rtc_register(&mut mapper, RTC_MINUTES), 12);
         assert_eq!(read_rtc_register(&mut mapper, RTC_HOURS), 11);
+    }
+
+    /// A wall clock at `now` with no saved clock state.
+    struct UnsavedClock {
+        now: Shared<f64>,
+    }
+
+    impl CartridgeEffects for UnsavedClock {
+        fn current_time_millis(&self) -> f64 {
+            self.now.get()
+        }
+    }
+
+    #[test]
+    fn a_new_clock_starts_at_0_and_counts_from_when_the_cartridge_is_inserted() {
+        let now = Shared::new(1_000_000_000_000.0);
+        let mut mapper = build_cartridge_mapper_with_effects(
+            CARTRIDGE_TYPE_MBC3_TIMER_BATTERY,
+            ROM_SIZE_64KB,
+            0,
+            Box::new(UnsavedClock { now: now.clone() }),
+        );
+        now.set(1_000_000_000_000.0 + 61_000.0);
+        mapper.write_rom(0x0000, 0xA);
+        mapper.write_rom(0x6000, 0x0);
+        mapper.write_rom(0x6000, 0x1);
+
+        assert_eq!(read_rtc_register(&mut mapper, RTC_SECONDS), 1);
+        assert_eq!(read_rtc_register(&mut mapper, RTC_MINUTES), 1);
+        assert_eq!(read_rtc_register(&mut mapper, RTC_HOURS), 0);
+        assert_eq!(read_rtc_register(&mut mapper, RTC_DAY_LOW), 0);
+        assert_eq!(read_rtc_register(&mut mapper, RTC_DAY_HIGH), 0);
     }
 
     /// A clock that starts at 10:10:10 at time 0, whose current time the

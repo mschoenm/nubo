@@ -21,6 +21,10 @@ const DEFAULT_SCALE_FACTOR: f32 = 4.0;
 const TOP_BAR_HEIGHT: f32 = 52.0;
 const SCREEN_PADDING: f32 = 24.0;
 const MINIMUM_SIZE: (f32, f32) = (480.0, 420.0);
+/// The longest side a window opens with, in logical pixels: a saved size
+/// from a damaged `settings.toml` is cut to it, and `capture --size` takes
+/// no more.
+const LARGEST_WINDOW_SIDE: u16 = 16_384;
 /// The size of the window icon, which taskbars scale down as they need.
 const WINDOW_ICON_SIZE: u32 = 256;
 /// The name Linux desktops match the window to the app's menu entry by. GNOME
@@ -143,15 +147,20 @@ fn launch(
 }
 
 /// The window the app usually opens: at `saved_size`, the size it had when
-/// it last closed (at least the smallest size the window allows; a size that
-/// isn't a finite number, from a damaged `settings.toml`, is ignored), or
+/// it last closed (at least the smallest size the window allows and at most
+/// [`LARGEST_WINDOW_SIDE`] a side; a size that isn't a finite number, from a
+/// damaged `settings.toml`, is ignored), or
 /// else wide enough for a whole row of library cards and high enough for the
 /// game screen at four times its size.
 fn default_window(saved_size: Option<(f32, f32)>) -> iced::window::Settings {
     let saved_size = saved_size.filter(|(width, height)| width.is_finite() && height.is_finite());
     let size = match saved_size {
         Some((width, height)) => {
-            iced::Size::new(width.max(MINIMUM_SIZE.0), height.max(MINIMUM_SIZE.1))
+            let largest = f32::from(LARGEST_WINDOW_SIDE);
+            iced::Size::new(
+                width.clamp(MINIMUM_SIZE.0, largest),
+                height.clamp(MINIMUM_SIZE.1, largest),
+            )
         }
         None => iced::Size::new(
             (app::SCREEN_WIDTH as f32 * DEFAULT_SCALE_FACTOR + SCREEN_PADDING)

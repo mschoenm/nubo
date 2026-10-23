@@ -301,7 +301,9 @@ fn parse_size(value: &str) -> Result<(f32, f32), String> {
     let (width, height) = value.split_once(['x', 'X']).ok_or_else(mistake)?;
     let length = |text: &str| -> Result<f32, String> {
         match text.trim().parse::<u32>() {
-            Ok(length) if (1..=16_384).contains(&length) => Ok(length as f32),
+            Ok(length) if (1..=u32::from(crate::LARGEST_WINDOW_SIDE)).contains(&length) => {
+                Ok(length as f32)
+            }
             _ => Err(mistake()),
         }
     };

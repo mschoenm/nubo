@@ -621,9 +621,9 @@ fn memory_descriptors(core: &mut Core) -> Vec<RetroMemoryDescriptor> {
         .collect()
 }
 
-/// Hands RetroArch the memory map `descriptors` describe. Called without the
-/// lock on `CORE` held, since RetroArch may ask for the core's memory
-/// (`retro_get_memory_data`) while it handles the map.
+/// Hands RetroArch the memory map `descriptors` describe. Called with the
+/// core already in `CORE` but without its lock held, since RetroArch may ask
+/// for the core's memory (`retro_get_memory_data`) while it handles the map.
 fn set_memory_maps(descriptors: &[RetroMemoryDescriptor]) {
     let mut map = RetroMemoryMap {
         descriptors: descriptors.as_ptr(),
@@ -669,16 +669,14 @@ fn geometry((width, height): (usize, usize)) -> RetroGameGeometry {
 fn present(core: &Core) {
     let frontend = frontend();
     let size = core.video_size();
-    let mut reported = lock(&GEOMETRY);
-    if *reported != size {
+    let resized = std::mem::replace(&mut *lock(&GEOMETRY), size) != size;
+    if resized {
         let mut new_geometry = geometry(size);
         environment(
             RETRO_ENVIRONMENT_SET_GEOMETRY,
             (&raw mut new_geometry).cast(),
         );
-        *reported = size;
     }
-    drop(reported);
     if let Some(video_refresh) = frontend.video_refresh {
         let data: *const c_void = match core.video() {
             Video::Xrgb8888(pixels) => pixels.as_ptr().cast(),
@@ -905,21 +903,17 @@ pub extern "C" fn retro_set_controller_port_device(_port: c_uint, _device: c_uin
 #[unsafe(no_mangle)]
 pub extern "C" fn retro_reset() {
     guard("retro_reset", (), || {
-        let descriptors = {
-            let mut core = lock(&CORE);
-            let Some(core) = core.as_mut() else {
-                return;
-            };
-            if let Err(error) = core.reset() {
-                log(
-                    RETRO_LOG_ERROR,
-                    &format!("the game didn't start again: {error}"),
-                );
-                return;
-            }
-            memory_descriptors(core)
-        };
-        set_memory_maps(&descriptors);
+        let restarted = lock(&CORE)
+            .as_mut()
+            .map(|core| core.reset().map(|()| memory_descriptors(core)));
+        match restarted {
+            Some(Ok(descriptors)) => set_memory_maps(&descriptors),
+            Some(Err(error)) => log(
+                RETRO_LOG_ERROR,
+                &format!("the game didn't start again: {error}"),
+            ),
+            None => {}
+        }
     });
 }
 
@@ -1010,13 +1004,24 @@ pub unsafe extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> 
         }
         // SAFETY: RetroArch passes a buffer of `size` bytes to read.
         let state = unsafe { std::slice::from_raw_parts(data.cast::<u8>(), size) };
-        let loaded = lock(&CORE)
-            .as_mut()
-            .is_some_and(|core| core.unserialize(state));
-        if !loaded {
-            log(RETRO_LOG_WARN, "the save state isn't one of this game's");
+        let loaded = lock(&CORE).as_mut().map(|core| core.unserialize(state));
+        match loaded {
+            Some(Ok(())) => true,
+            Some(Err(error)) => {
+                log(
+                    RETRO_LOG_WARN,
+                    &format!("the save state didn't load: {error}"),
+                );
+                false
+            }
+            None => {
+                log(
+                    RETRO_LOG_WARN,
+                    "no game is loaded to load the save state into",
+                );
+                false
+            }
         }
-        loaded
     })
 }
 
@@ -1046,13 +1051,15 @@ pub unsafe extern "C" fn retro_cheat_set(index: c_uint, enabled: bool, code: *co
                 .to_string_lossy()
                 .into_owned()
         };
-        if let Some(core) = lock(&CORE).as_mut() {
-            for invalid in core.cheat_set(index, enabled, &code) {
-                log(
-                    RETRO_LOG_WARN,
-                    &format!("The cheat code {} can't be used", invalid.0),
-                );
-            }
+        let invalid_codes = lock(&CORE)
+            .as_mut()
+            .map(|core| core.cheat_set(index, enabled, &code))
+            .unwrap_or_default();
+        for invalid in invalid_codes {
+            log(
+                RETRO_LOG_WARN,
+                &format!("the cheat code {} can't be used", invalid.0),
+            );
         }
     });
 }
@@ -1091,7 +1098,10 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
             RETRO_LOG_INFO,
             &format!("{} on {}", core.header().title, core.model().description()),
         );
-        set_memory_maps(&memory_descriptors(&mut core));
+        let descriptors = memory_descriptors(&mut core);
+        let has_rumble = core.has_rumble();
+        *lock(&CORE) = Some(core);
+        set_memory_maps(&descriptors);
         // Before the first `retro_run`, as libretro.h asks.
         let mut supported = true;
         environment(
@@ -1107,7 +1117,7 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
         if environment(RETRO_ENVIRONMENT_GET_INPUT_BITMASKS, ptr::null_mut()) {
             lock(&FRONTEND).input_bitmasks = true;
         }
-        if core.has_rumble() {
+        if has_rumble {
             let mut rumble = RetroRumbleInterface {
                 set_rumble_state: None,
             };
@@ -1118,7 +1128,6 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
                 lock(&FRONTEND).set_rumble_state = rumble.set_rumble_state;
             }
         }
-        *lock(&CORE) = Some(core);
         true
     })
 }

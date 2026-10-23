@@ -25,7 +25,7 @@
 use crate::options::Options;
 use nubo_core::{
     CartridgeEffects, CartridgeHeader, DOTS_PER_FRAME, Emulator, Key, LoadRomError, Model,
-    RtcClock, RtcState, SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH, SgbBorder, extract_rom,
+    RtcClock, RtcState, SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH, SaveStateError, SgbBorder, extract_rom,
     validate_gamegenie_code,
 };
 use nubo_frontend::picture::Frame;
@@ -609,26 +609,22 @@ impl Core {
         true
     }
 
-    /// Loads a save state written by [`Core::serialize`]. Returns false,
+    /// Loads a save state written by [`Core::serialize`]. Returns why not,
     /// leaving the game as it was, if it isn't one or is for another game or
     /// model.
-    pub fn unserialize(&mut self, data: &[u8]) -> bool {
-        let Some((length, rest)) = data.split_first_chunk::<STATE_LENGTH_BYTES>() else {
-            return false;
-        };
-        let Some(state) = usize::try_from(u32::from_le_bytes(*length))
+    pub fn unserialize(&mut self, data: &[u8]) -> Result<(), SaveStateError> {
+        let (length, rest) = data
+            .split_first_chunk::<STATE_LENGTH_BYTES>()
+            .ok_or(SaveStateError::InvalidFormat)?;
+        let state = usize::try_from(u32::from_le_bytes(*length))
             .ok()
             .and_then(|length| rest.get(..length))
-        else {
-            return false;
-        };
-        if self.emulator.load_state(state).is_err() {
-            return false;
-        }
+            .ok_or(SaveStateError::InvalidFormat)?;
+        self.emulator.load_state(state)?;
         self.sync_saves_from_emulator();
         self.draw_frame();
         self.memory.update(&mut self.emulator);
-        true
+        Ok(())
     }
 
     /// Turns every cheat off.

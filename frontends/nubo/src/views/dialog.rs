@@ -116,7 +116,7 @@ pub fn view<'a>(dialog: &Dialog, content: DialogContent) -> Element<'a, Message>
                 }
                 rows = rows.push(list_row(choice, index == selection, checks));
             }
-            panel = panel.push(scrollable(rows).spacing(8));
+            panel = panel.push(scrollable(rows).id(list_scroll_id()).spacing(8));
             MENU_WIDTH
         }
     };
@@ -224,6 +224,12 @@ fn list_row<'a>(choice: Choice, focused: bool, checks: bool) -> Element<'a, Mess
 /// D-pad is on in view.
 pub fn scroll_id() -> widget::Id {
     widget::Id::new("dialog-question")
+}
+
+/// The scrolling area of a menu's rows, so the app can keep the row the
+/// D-pad is on in view.
+pub fn list_scroll_id() -> widget::Id {
+    widget::Id::new("dialog-list")
 }
 
 /// A question's checkboxes, `(index, choice)` by their place among its

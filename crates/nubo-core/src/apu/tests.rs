@@ -412,9 +412,15 @@ fn rejects_a_save_state_with_an_out_of_range_duty_step() {
     );
 }
 
-/// Bytes of a serialized APU before its BLEP buffers, where most of what a
-/// corruption can break lies.
-const STATE_BYTES_BEFORE_BLEP: usize = 200;
+/// Where the BLEP buffers start in a serialized APU: every byte before them,
+/// the registers and every field of the channels and the sequencer, is where
+/// most of what a corruption can break lies.
+fn state_bytes_before_blep(state: &[u8]) -> usize {
+    state
+        .windows(b"blep_left".len())
+        .position(|window| window == b"blep_left")
+        .expect("a serialized APU stores blep_left")
+}
 /// Byte values at the edges of the ranges the APU's fields have.
 const EDGE_BYTES: [u8; 10] = [0x00, 0x01, 0x07, 0x08, 0x0F, 0x10, 0x7F, 0x80, 0xFE, 0xFF];
 
@@ -464,7 +470,7 @@ fn corrupted_save_states_never_make_the_apu_panic() {
                 Clock::new().run(&mut apu, 3001);
                 let state = serialized(&apu);
                 let mut loaded = 0;
-                for (position, value) in (0..STATE_BYTES_BEFORE_BLEP)
+                for (position, value) in (0..state_bytes_before_blep(&state))
                     .flat_map(|position| EDGE_BYTES.map(|value| (position, value)))
                 {
                     let mut corrupted = state.clone();
