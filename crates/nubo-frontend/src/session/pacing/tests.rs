@@ -1,3 +1,6 @@
+//! Tests for pacing frames by the screen's refreshes and keeping the sound
+//! queue filled.
+
 use super::*;
 
 /// The times between ticks that come `hz` times a second, each seen up to
