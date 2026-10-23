@@ -659,16 +659,14 @@ fn geometry((width, height): (usize, usize)) -> RetroGameGeometry {
 fn present(core: &Core) {
     let frontend = frontend();
     let size = core.video_size();
-    let mut reported = lock(&GEOMETRY);
-    if *reported != size {
+    let resized = std::mem::replace(&mut *lock(&GEOMETRY), size) != size;
+    if resized {
         let mut new_geometry = geometry(size);
         environment(
             RETRO_ENVIRONMENT_SET_GEOMETRY,
             (&raw mut new_geometry).cast(),
         );
-        *reported = size;
     }
-    drop(reported);
     if let Some(video_refresh) = frontend.video_refresh {
         let data: *const c_void = match core.video() {
             Video::Xrgb8888(pixels) => pixels.as_ptr().cast(),
@@ -894,21 +892,17 @@ pub extern "C" fn retro_set_controller_port_device(_port: c_uint, _device: c_uin
 #[unsafe(no_mangle)]
 pub extern "C" fn retro_reset() {
     guard("retro_reset", (), || {
-        let descriptors = {
-            let mut core = lock(&CORE);
-            let Some(core) = core.as_mut() else {
-                return;
-            };
-            if let Err(error) = core.reset() {
-                log(
-                    RETRO_LOG_ERROR,
-                    &format!("the game didn't start again: {error}"),
-                );
-                return;
-            }
-            memory_descriptors(core)
-        };
-        set_memory_maps(&descriptors);
+        let restarted = lock(&CORE)
+            .as_mut()
+            .map(|core| core.reset().map(|()| memory_descriptors(core)));
+        match restarted {
+            Some(Ok(descriptors)) => set_memory_maps(&descriptors),
+            Some(Err(error)) => log(
+                RETRO_LOG_ERROR,
+                &format!("the game didn't start again: {error}"),
+            ),
+            None => {}
+        }
     });
 }
 
@@ -1035,13 +1029,15 @@ pub unsafe extern "C" fn retro_cheat_set(index: c_uint, enabled: bool, code: *co
                 .to_string_lossy()
                 .into_owned()
         };
-        if let Some(core) = lock(&CORE).as_mut() {
-            for invalid in core.cheat_set(index, enabled, &code) {
-                log(
-                    RETRO_LOG_WARN,
-                    &format!("The cheat code {} can't be used", invalid.0),
-                );
-            }
+        let invalid_codes = lock(&CORE)
+            .as_mut()
+            .map(|core| core.cheat_set(index, enabled, &code))
+            .unwrap_or_default();
+        for invalid in invalid_codes {
+            log(
+                RETRO_LOG_WARN,
+                &format!("the cheat code {} can't be used", invalid.0),
+            );
         }
     });
 }
