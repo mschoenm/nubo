@@ -35,4 +35,4 @@ Seed `state` with the game's kept states, or it starts from nothing and rarely g
 
 ## Upkeep
 
-The full review runs `cargo update` here at its start, so the targets follow their newest dependencies like the rest of Nubo. When `nubo-core`'s API changes, the review fixes the targets in the same pull request as its other changes.
+The full review runs `cargo update` here at its start, so the targets follow their newest dependencies like the rest of Nubo. It commits the updated `Cargo.lock` with its other changes, so the next fuzzing session starts from a clean tree. When `nubo-core`'s API changes, the review fixes the targets in the same pull request as its other changes.
