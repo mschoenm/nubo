@@ -79,9 +79,12 @@ pub fn view<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Ele
         .into(),
     ];
 
+    // A paused game shows neither badge: it isn't going anywhere, and a
+    // scene recorded then must look as its capture, which starts at normal
+    // speed.
     if game.session.is_rewinding() && !game.is_paused() {
         layers.push(corner_badge(Icon::Rewind, String::from("Rewinding")));
-    } else if game.session.is_fast_forwarding() {
+    } else if game.session.is_fast_forwarding() && !game.is_paused() {
         layers.push(fast_forward_badge(game, settings));
     }
 
@@ -214,7 +217,7 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
     ])
 }
 
-/// The label in the top-right corner while fast forwarding.
+/// The label in the top-right corner while the game runs fast forward.
 fn fast_forward_badge<'a>(game: &Game, settings: &Settings) -> Element<'a, Message> {
     corner_badge(
         Icon::FastForward,
