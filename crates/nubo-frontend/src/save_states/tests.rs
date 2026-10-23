@@ -2,7 +2,8 @@
 //! directory, so they need the `desktop` feature.
 
 use super::store::{
-    delete_all_in, delete_in, keep_aside_in, load_in, save_in, slot_info_in, thumbnail_in,
+    delete_all_in, delete_in, keep_aside_in, load_in, picture_png_in, save_in, save_png_in,
+    slot_info_in, thumbnail_in,
 };
 use super::*;
 use crate::time::Duration;
@@ -41,6 +42,28 @@ fn a_saved_state_loads_with_its_model() {
 
     assert_eq!(loaded.model, Model::CgbE);
     assert_eq!(loaded.data, saved.data);
+}
+
+#[test]
+fn a_picture_file_is_read_and_written_back_as_it_is() {
+    let directory = temporary_folder("picture-file");
+    let rom = Path::new("roms/Other.gbc");
+    let saved = state(Model::Dmg, 3);
+    let png = b"any picture file".to_vec();
+
+    save_png_in(&directory, rom, Slot::Numbered(1), &saved, Some(&png)).unwrap();
+
+    assert_eq!(
+        fs::read(directory.join("Other.gbc/slot-1.png")).unwrap(),
+        png
+    );
+    assert_eq!(
+        picture_png_in(&directory, rom, Slot::Numbered(1)),
+        Some(png)
+    );
+    save_png_in(&directory, rom, Slot::Numbered(1), &saved, None).unwrap();
+    assert_eq!(picture_png_in(&directory, rom, Slot::Numbered(1)), None);
+    let _ = fs::remove_dir_all(&directory);
 }
 
 #[test]

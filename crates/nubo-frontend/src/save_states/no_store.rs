@@ -14,6 +14,15 @@ pub fn save(
     Err(String::from("this build keeps no save states"))
 }
 
+pub fn save_png(
+    _rom_path: &Path,
+    _slot: Slot,
+    _state: &SaveState,
+    _png: Option<&[u8]>,
+) -> Result<(), String> {
+    Err(String::from("this build keeps no save states"))
+}
+
 #[expect(clippy::unnecessary_wraps, reason = "matches the file store")]
 pub fn load(_rom_path: &Path, _slot: Slot) -> Result<Option<SaveState>, String> {
     Ok(None)
@@ -41,5 +50,9 @@ pub fn slot_info(_rom_path: &Path, slot: Slot) -> SlotInfo {
 }
 
 pub fn thumbnail(_rom_path: &Path, _slot: Slot) -> Option<Picture> {
+    None
+}
+
+pub fn picture_png(_rom_path: &Path, _slot: Slot) -> Option<Vec<u8>> {
     None
 }

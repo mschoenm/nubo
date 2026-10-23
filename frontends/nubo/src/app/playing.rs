@@ -133,7 +133,8 @@ enum RestoreError {
 pub enum UndoPoint {
     /// The game as it was before a state was loaded or it restarted.
     Game { rom_path: PathBuf, state: SaveState },
-    /// What a slot held before a save replaced it, with its picture.
+    /// What a slot held before a save replaced it, with its picture's PNG
+    /// file as it was stored, so Undo writes both back unchanged.
     Slot {
         rom_path: PathBuf,
         slot: Slot,
@@ -712,12 +713,9 @@ impl App {
         // What the slot held, so the save can be undone.
         let rom_path = game.session.rom().path.clone();
         let previous = save_states::load(&rom_path, slot).ok().flatten();
-        let picture = previous.as_ref().and_then(|_| {
-            save_states::thumbnails(&rom_path, &[slot])
-                .into_iter()
-                .find_map(|(_, picture)| picture)
-                .map(|picture| picture.pixels().to_vec())
-        });
+        let picture = previous
+            .as_ref()
+            .and_then(|_| save_states::picture_png(&rom_path, slot));
 
         match game.session.save(slot) {
             Ok(()) => {
@@ -765,7 +763,7 @@ impl App {
                 slot,
                 state,
                 picture,
-            }) => match save_states::save(&rom_path, slot, &state, picture.as_deref()) {
+            }) => match save_states::save_with_png(&rom_path, slot, &state, picture.as_deref()) {
                 Ok(()) => self.toasts.info(format!("Put the earlier {slot} back")),
                 Err(error) => self.toasts.error(format!("Couldn't undo: {error}")),
             },
