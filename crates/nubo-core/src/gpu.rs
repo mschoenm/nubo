@@ -239,8 +239,8 @@ pub struct Gpu {
     /// Dots until HDMA (CGB's hblank-driven VRAM copy) learns that hblank started.
     hdma_start_delay: u8,
     /// The LCD was just switched off outside HBlank. STAT drops to mode 0, which HDMA takes as
-    /// the start of an HBlank once the PPU next runs (SameBoy; Gambatte's dma
-    /// hdma_disable_display tests).
+    /// the start of an HBlank once the PPU next runs (SameBoy; Gambatte's dma hdma_disable_display
+    /// tests).
     lcd_off_hblank_dma: bool,
 
     /// Dots between entering mode 3 and the renderer starting.

@@ -66,10 +66,9 @@ impl Gpu {
     /// index out of bounds or overflow, or keep it from ever leaving them: a position outside the
     /// frame, a line state or LY that doesn't fit the line, a line outside the frame for LYC to be
     /// compared with, a mode STAT can't show, timing of another model (the address bus checks the
-    /// speed against its own once everything has loaded), a frame buffer of
-    /// the wrong size, an OAM DMA write outside OAM, a renderer state that doesn't fit
-    /// (`Pipeline::is_consistent`), or a Super Game Boy on a model without one, or none on a
-    /// model with one.
+    /// speed against its own once everything has loaded), a frame buffer of the wrong size, an OAM
+    /// DMA write outside OAM, a renderer state that doesn't fit (`Pipeline::is_consistent`), or a
+    /// Super Game Boy on a model without one, or none on a model with one.
     fn check_loaded_state(&self) -> std::io::Result<()> {
         let line_state_fits = match self.line_state {
             LineState::OamScan | LineState::Drawing | LineState::HBlank => {

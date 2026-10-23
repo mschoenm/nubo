@@ -51,12 +51,12 @@ impl Pipeline {
 }
 
 impl Gpu {
-    /// Whether the coming dot of mode 3 is a plain one that `draw_plain_pixels` can do, provided the
-    /// window can't start (`window_can_start`, which the caller checks): it starts with the window
-    /// check, no object starts at this position or was left behind, the background FIFO has a
-    /// pixel for it, it is past the fine scroll pixels and isn't one of the last pixels of the line
-    /// (which start the mode 0 interrupt countdown), and none of the glitches that the full dot
-    /// handles applies. Plain pixels don't change whether the window can start.
+    /// Whether the coming dot of mode 3 is a plain one that `draw_plain_pixels` can do, provided
+    /// the window can't start (`window_can_start`, which the caller checks): it starts with the
+    /// window check, no object starts at this position or was left behind, the background FIFO has
+    /// a pixel for it, it is past the fine scroll pixels and isn't one of the last pixels of the
+    /// line (which start the mode 0 interrupt countdown), and none of the glitches that the full
+    /// dot handles applies. Plain pixels don't change whether the window can start.
     fn can_draw_plain_pixel(&self) -> bool {
         let pipeline = &self.pipeline;
         let position = pipeline.position_in_line;
@@ -613,12 +613,11 @@ impl Gpu {
 
     /// Whether `draw_background_tiles` can take the fetcher's steps over a plain tile that starts
     /// at `start_position` in one go instead of one by one (`take_tile_steps`): none of the
-    /// glitches the steps handle can come up in them. Those are the LCDC tile data area write glitches
-    /// (`tile_sel_glitch`, and the CGB's read of the previous unsigned fetch right after a write
-    /// selects the $8000 method), STOP cutting the PPU off from VRAM, the CGB window starting
+    /// glitches the steps handle can come up in them. Those are the LCDC tile data area write
+    /// glitches (`tile_sel_glitch`, and the CGB's read of the previous unsigned fetch right after a
+    /// write selects the $8000 method), STOP cutting the PPU off from VRAM, the CGB window starting
     /// during the fetch (`update_wx_glitch`, on the dots of steps 1, 3 and 5), and the single blank
-    /// pixel the DMG pushes when the window was switched off where it would start
-    /// (`fetcher_push`).
+    /// pixel the DMG pushes when the window was switched off where it would start (`fetcher_push`).
     #[inline(always)]
     fn can_fetch_tile_row_at_once(&self, start_position: u8) -> bool {
         let lcdc = self.lcdc;
