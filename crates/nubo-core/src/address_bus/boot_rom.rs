@@ -66,8 +66,10 @@ impl AddressBus {
     }
 
     /// Unmaps the boot ROM and moves the timers and PPU to where they are on
-    /// real hardware when it exits. These values are calibrated per model
-    /// against Mooneye's boot tests.
+    /// real hardware when it exits. These values are fitted per model to test
+    /// ROMs (Mooneye's boot tests, GBMicrotest's poweron tests and Gambatte's
+    /// display_startstate, ch1_init_pos, ch2_init_env_counter_timing and div
+    /// start_inc tests; see each constant).
     pub(super) fn exit_boot_rom(&mut self) {
         self.catch_up_ppu_before_change();
         self.in_boot_rom = false;
