@@ -5,13 +5,13 @@
 
 #[cfg(not(target_arch = "wasm32"))]
 use super::FrameListener;
-use super::{Command, Playback, Saves, Session};
+use super::{Command, LatestFrames, Playback, Saves, Session};
 use crate::cheats::{self, Cheat};
 use crate::controls::Controls;
 use crate::lcd::ScreenEffects;
 use crate::notices::Notices;
 use crate::palettes::DmgPalette;
-use crate::picture::{Frame, Picture};
+use crate::picture::Picture;
 use crate::rom::Rom;
 use crate::save_states::{self, SaveState, Slot, SlotInfo};
 use crate::settings::{FastForwardSpeed, ScreenLook, Settings};
@@ -291,7 +291,7 @@ impl GameSession {
     /// On a Super Game Boy, what its menu's choices are, as the frame on
     /// screen was drawn with them; `None` on other models.
     pub fn sgb_menu(&self) -> Option<SgbMenu> {
-        self.screen.raw.as_ref()?.sgb_menu
+        self.screen.frames.newest()?.sgb_menu
     }
 
     /// On a Super Game Boy, colors the screen with `palette` (RGB555,
@@ -447,16 +447,14 @@ impl GameSession {
             |command| self.session.send(command),
             |reply| Command::RunFrames(count, reply),
         )?;
-        if let Some((sequence, _)) = self.session.frame_since(self.screen.sequence) {
+        let mut skipped = LatestFrames::default();
+        if let Some(sequence) = self.session.frame_since(self.screen.sequence, &mut skipped) {
             self.screen.sequence = sequence;
         }
         // Only the frames run here are blended, so the picture never
         // depends on what was on screen before.
-        if !frames.is_empty() {
-            self.screen.raw = None;
-        }
-        for frame in frames {
-            self.screen.show(frame);
+        if frames.newest().is_some() {
+            self.screen.show(frames);
         }
         Ok(())
     }
@@ -469,10 +467,15 @@ impl GameSession {
     }
 
     /// Replaces the picture on screen if the emulator finished a new frame.
+    /// It is blended with the frame the emulator finished before it, even
+    /// if the app never showed that one.
     pub fn refresh_screen(&mut self) {
-        if let Some((sequence, frame)) = self.session.frame_since(self.screen.sequence) {
+        if let Some(sequence) = self
+            .session
+            .frame_since(self.screen.sequence, &mut self.screen.frames)
+        {
             self.screen.sequence = sequence;
-            self.screen.show(frame);
+            self.screen.show_again();
         }
     }
 }
@@ -483,19 +486,17 @@ impl GameSession {
 struct Screen {
     /// The picture. Screenshots save it as it is.
     picture: Option<Picture>,
-    /// The newest frame as the emulator drew it, kept to show it again when
-    /// the palette or the border setting changes.
-    raw: Option<Frame>,
+    /// The newest frame and the one before it, as the emulator drew them,
+    /// to blend the newest with. They are kept to show them again when the
+    /// palette, the border setting or the effects change, in the emulator's
+    /// grays, so a new palette repaints both.
+    frames: LatestFrames,
     /// The colors original Game Boy games are shown in.
     palette: DmgPalette,
     /// Whether a Super Game Boy's border shows around the screen.
     border: bool,
     /// What the picture goes through to look like the model's own screen.
     effects: ScreenEffects,
-    /// The frame before the newest, as the emulator drew it, to blend the
-    /// newest with. It is kept in the emulator's grays, so a new palette
-    /// repaints it too.
-    previous: Option<Frame>,
     /// The sequence number of the frame shown, to skip unchanged frames.
     sequence: u64,
 }
@@ -504,11 +505,10 @@ impl Screen {
     fn new() -> Self {
         Screen {
             picture: None,
-            raw: None,
+            frames: LatestFrames::default(),
             palette: DmgPalette::default(),
             border: true,
             effects: ScreenEffects::default(),
-            previous: None,
             sequence: 0,
         }
     }
@@ -517,16 +517,16 @@ impl Screen {
     /// without any border. Save states and the library keep it as their
     /// picture.
     fn screen_pixels(&self) -> Option<Vec<u8>> {
-        let raw = self.raw.as_ref()?;
-        let picture = self.effects.show(raw, None, self.palette, false);
+        let newest = self.frames.newest()?;
+        let picture = self.effects.show(newest, None, self.palette, false);
         Some(picture.pixels().to_vec())
     }
 
-    /// Shows a frame as the emulator drew it, in the chosen palette, mixed
-    /// with the one before and with its colors corrected if the player wants.
-    fn show(&mut self, frame: Frame) {
-        self.previous = self.raw.take();
-        self.raw = Some(frame);
+    /// Shows the newest of `frames` as the emulator drew it, in the chosen
+    /// palette, mixed with the one before it and with its colors corrected
+    /// if the player wants.
+    fn show(&mut self, frames: LatestFrames) {
+        self.frames = frames;
         self.show_again();
     }
 
@@ -557,14 +557,14 @@ impl Screen {
         }
     }
 
-    /// Shows the newest frame again, mixed with the one before it as when
-    /// it came, after a setting changed.
+    /// Shows the newest frame again, mixed with the one before it, such as
+    /// after a setting changed or new frames came.
     fn show_again(&mut self) {
-        if let Some(raw) = &self.raw {
+        if let Some(newest) = self.frames.newest() {
             self.picture =
                 Some(
                     self.effects
-                        .show(raw, self.previous.as_ref(), self.palette, self.border),
+                        .show(newest, self.frames.before(), self.palette, self.border),
                 );
         }
     }

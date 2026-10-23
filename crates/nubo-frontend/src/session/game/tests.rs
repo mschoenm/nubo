@@ -2,7 +2,7 @@
 //! showing frames in the chosen palette, and for each model's screen effects.
 
 use super::*;
-use crate::picture::{SCREEN_HEIGHT, SCREEN_WIDTH};
+use crate::picture::{Frame, SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::settings::FastForwardSpeed;
 
 /// A whole Game Boy screen in the lightest of `palette`'s colors.
@@ -49,12 +49,22 @@ impl Screen {
     }
 }
 
+/// `frames` as the emulator finished them, the newest last, kept as a
+/// session keeps the last two.
+fn finished(frames: impl IntoIterator<Item = Frame>) -> LatestFrames {
+    let mut latest = LatestFrames::default();
+    for frame in frames {
+        latest.push(|newest| *newest = frame);
+    }
+    latest
+}
+
 #[test]
 fn an_original_game_boy_frame_is_shown_in_the_palette() {
     let mut screen = Screen::new();
     screen.set_palette(DmgPalette::Green);
 
-    screen.show(screen_frame(true));
+    screen.show(finished([screen_frame(true)]));
 
     assert_eq!(screen.pixels(), Some(&pixels_in(DmgPalette::Green)[..]));
 }
@@ -62,7 +72,7 @@ fn an_original_game_boy_frame_is_shown_in_the_palette() {
 #[test]
 fn changing_the_palette_repaints_the_frame_on_screen() {
     let mut screen = Screen::new();
-    screen.show(screen_frame(true));
+    screen.show(finished([screen_frame(true)]));
 
     screen.set_palette(DmgPalette::Green);
     assert_eq!(screen.pixels(), Some(&pixels_in(DmgPalette::Green)[..]));
@@ -77,7 +87,7 @@ fn a_color_game_keeps_its_colors() {
     let mut screen = Screen::new();
     screen.set_palette(DmgPalette::Green);
 
-    screen.show(screen_frame(false));
+    screen.show(finished([screen_frame(false)]));
 
     assert_eq!(screen.pixels(), Some(&pixels_in(DmgPalette::Gray)[..]));
 }
@@ -85,7 +95,7 @@ fn a_color_game_keeps_its_colors() {
 #[test]
 fn a_super_game_boy_border_shows_unless_it_is_switched_off() {
     let mut screen = Screen::new();
-    screen.show(bordered_frame());
+    screen.show(finished([bordered_frame()]));
     let picture = screen.picture.clone().unwrap();
     assert_eq!((picture.width(), picture.height()), (256, 224));
 
@@ -102,7 +112,7 @@ fn a_super_game_boy_border_shows_unless_it_is_switched_off() {
 fn the_palette_repaints_only_the_screen_inside_a_border() {
     let mut screen = Screen::new();
     screen.set_palette(DmgPalette::Green);
-    screen.show(bordered_frame());
+    screen.show(finished([bordered_frame()]));
 
     let pixels = screen.pixels().unwrap();
     assert_eq!(&pixels[..4], &[0, 0, 0, 0xFF]);
@@ -132,8 +142,7 @@ fn a_repainted_frame_stays_blended_with_the_one_before() {
         correct_colors: false,
         blend_frames: true,
     });
-    screen.show(color_frame(0xFF));
-    screen.show(color_frame(0x00));
+    screen.show(finished([color_frame(0xFF), color_frame(0x00)]));
     let blended = screen.pixels().unwrap().to_vec();
     assert_ne!(blended, color_frame(0x00).pixels);
 
@@ -179,8 +188,7 @@ fn blended_frames_leave_no_gray_in_a_palette() {
     for palette in [DmgPalette::Green, DmgPalette::Pocket] {
         for (first, second) in [(0, 3), (0, 2), (1, 3)] {
             let mut screen = blending_screen(palette);
-            screen.show(shade_frame(first));
-            screen.show(shade_frame(second));
+            screen.show(finished([shade_frame(first), shade_frame(second)]));
 
             let expected =
                 halfway(palette, first, second).repeat((SCREEN_WIDTH * SCREEN_HEIGHT) as usize);
@@ -196,8 +204,7 @@ fn blended_frames_leave_no_gray_in_a_palette() {
 #[test]
 fn a_new_palette_repaints_both_blended_frames() {
     let mut screen = blending_screen(DmgPalette::Green);
-    screen.show(shade_frame(0));
-    screen.show(shade_frame(3));
+    screen.show(finished([shade_frame(0), shade_frame(3)]));
 
     screen.set_palette(DmgPalette::Pocket);
 
