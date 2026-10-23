@@ -79,7 +79,8 @@ pub(crate) enum Check {
 /// starts counting.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Deadline {
-    /// Seconds from power-on, so the boot ROM's 2 to 3 seconds count too.
+    /// Seconds from power-on, so the boot ROM's time (1.7 seconds on DMG, 3.1
+    /// on CGB) counts too.
     FromPowerOn(u32),
     /// Seconds after the boot ROM hands over to the cartridge.
     AfterBoot(u32),

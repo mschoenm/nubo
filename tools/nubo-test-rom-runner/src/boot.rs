@@ -1,7 +1,7 @@
 //! Starts each test where the boot ROM hands over to the cartridge.
 //!
-//! The boot ROM runs for about 2.5 emulated seconds, far longer than most
-//! tests. It only looks at a few header bytes of the ROM
+//! The boot ROM runs for 1.7 emulated seconds on the DMG and 3.1 on the CGB,
+//! far longer than most tests. It only looks at a few header bytes of the ROM
 //! ([`Emulator::boot_rom_input`]), so each worker thread runs it once per
 //! model and set of those bytes and starts the other ROMs that share them
 //! from a copy ([`Emulator::clone_with_rom`]). With `--verify-boot` every
