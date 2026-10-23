@@ -5,5 +5,6 @@ Each full review of the repository (the `full-review` skill, `.claude/skills/ful
 | Report | `main` reviewed | Findings | Fixed | Pull requests | Issues filed | Still open |
 | --- | --- | --- | --- | --- | --- | --- |
 | [2026-10-16](2026-10-16.md) | 6db22a5 to bae9e11 | 163 | 132 | #163 to #167 | 19 (#144 to #162) | 0 on 2026-10-23 |
+| [2026-10-23](2026-10-23.md) | a3a10cc | 113 | 103 | #280 to #284 | 10 (#270 to #279), and the overviews #285 to #287 | 13 on 2026-10-23 |
 
 "Still open" counts the review's issues on the date given; the next review updates it, so the table shows how each review's findings were dealt with.
