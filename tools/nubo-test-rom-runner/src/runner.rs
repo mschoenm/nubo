@@ -643,7 +643,9 @@ fn run_gambatte_test(
     let mut samples = Vec::new();
     for _ in 0..SOUND_CHECK_AUDIO_BUFFERS {
         step_audio_buffer(emulator, progress, test)?;
-        let (left, right) = emulator.audio_samples();
+        let (left, right) = emulator
+            .audio_samples()
+            .expect("step_audio_buffer returns once the buffer is full");
         samples.extend(left.iter().zip(right).map(|(left, right)| left + right));
     }
 

@@ -332,12 +332,16 @@ impl Emulator {
         false
     }
 
-    /// The left and right samples made since the audio buffer was last
-    /// cleared: after [`Emulator::step_toward_next_audio_buffer`] returned
-    /// `true`, the whole buffer it filled. This lets a test runner that steps
-    /// in small chunks, to check a time limit, still read the sound.
-    pub fn audio_samples(&self) -> (&[f32], &[f32]) {
-        self.address_bus().audio_samples()
+    /// The left and right samples of the audio buffer, once it is full:
+    /// after [`Emulator::step_toward_next_audio_buffer`] returned `true`, the
+    /// whole buffer it filled. This lets a test runner that steps in small
+    /// chunks, to check a time limit, still read the sound. A buffer that
+    /// isn't full gives `None`, since the APU only adds the samples of the
+    /// M-cycles it hasn't run yet when it catches up.
+    pub fn audio_samples(&self) -> Option<(&[f32], &[f32])> {
+        self.address_bus()
+            .audio_buffers_full()
+            .then(|| self.address_bus().audio_samples())
     }
 
     /// Ends a call that ran the CPU: runs the M-cycles still waiting, so the
