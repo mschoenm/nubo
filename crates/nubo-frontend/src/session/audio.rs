@@ -103,6 +103,8 @@ impl AudioOutput {
         self.drop_queued_samples();
     }
 
+    /// Empties the queue, and starts counting what a missing sound device
+    /// plays from now.
     fn drop_queued_samples(&mut self) {
         if let Ok(mut samples) = self.queue.samples.lock() {
             samples.clear();
@@ -163,7 +165,7 @@ impl AudioOutput {
             let excess = self
                 .queued_samples()
                 .saturating_sub(QUEUE_LOW_THRESHOLD - 1);
-            Duration::from_secs_f64(excess as f64 / f64::from(self.sample_rate)).min(limit)
+            self.playing_time(excess).min(limit)
         };
         std::thread::park_timeout(wait);
     }
@@ -196,7 +198,12 @@ impl AudioOutput {
                     .map(|(left, right)| (left * volume, right * volume)),
             );
         }
-        Duration::from_secs_f64(left.len() as f64 / f64::from(self.sample_rate))
+        self.playing_time(left.len())
+    }
+
+    /// How long `samples` stereo samples take to play at the sample rate.
+    pub fn playing_time(&self, samples: usize) -> Duration {
+        Duration::from_secs_f64(samples as f64 / f64::from(self.sample_rate))
     }
 
     /// Without a sound device, discards as many samples as a sound card would
@@ -208,7 +215,7 @@ impl AudioOutput {
             return;
         }
 
-        self.last_drain += Duration::from_secs_f64(consumed as f64 / f64::from(self.sample_rate));
+        self.last_drain += self.playing_time(consumed);
 
         if let Ok(mut queue) = self.queue.samples.lock() {
             let drained = consumed.min(queue.len());
