@@ -2,9 +2,11 @@ name: Nightly build
 
 # Once a scheduled (or hand-started) nightly run has passed every check,
 # publishes its Flatpaks, Windows files and RetroArch cores as the "nightly"
-# pre-release, replacing the one before. Skipped when main hasn't changed
-# since the last nightly build. Pre-releases don't count as GitHub's latest
-# release, so the stable version stays the default download.
+# pre-release, replacing the one before. The Metrics job and the wiki push
+# measure and record rather than check, so a night where only they failed is
+# still published. Skipped when main hasn't changed since the last nightly
+# build. Pre-releases don't count as GitHub's latest release, so the stable
+# version stays the default download.
 on:
   workflow_run:
     workflows: [Nightly]
@@ -18,7 +20,7 @@ jobs:
   publish:
     name: Publish the nightly build
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
+      (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure') &&
       (github.event.workflow_run.event == 'schedule' || github.event.workflow_run.event == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -32,12 +34,28 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       COMMIT: ${{ github.event.workflow_run.head_sha }}
+      RUN: ${{ github.event.workflow_run.id }}
     steps:
+      - name: Check that every check of the nightly run passed
+        id: checks
+        run: |
+          failed=$(gh api --paginate "repos/$GH_REPO/actions/runs/$RUN/jobs?per_page=100" \
+            --jq '.jobs[] | select(.name != "Metrics" and .name != "Push the wiki")
+              | select(.conclusion != "success" and .conclusion != "skipped") | .name')
+          if [ -n "$failed" ]; then
+            echo "Not published, since these checks didn't pass:"
+            echo "$failed"
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "passed=true" >> "$GITHUB_OUTPUT"
+          fi
+
       # Publishing takes several API calls, so the tag alone doesn't prove the
       # last one finished: it must also be a published release with all eight
       # downloads, or this run publishes it again.
       - name: Check whether main changed since the last nightly build
         id: changed
+        if: steps.checks.outputs.passed == 'true'
         run: |
           published=$(gh api "repos/$GH_REPO/git/ref/tags/nightly" --jq .object.sha 2>/dev/null || true)
           release=$(gh release view nightly --json isDraft,assets \

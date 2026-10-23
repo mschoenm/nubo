@@ -5,9 +5,8 @@
 //! so it sees them) and picks up finished frames from a shared buffer,
 //! after the thread calls the app's callback to say a new one is there.
 
-use super::{Command, Machine, Playback, Saves, ask, stopped_error};
+use super::{Command, LatestFrames, Machine, Playback, Saves, ask, stopped_error};
 use crate::notices::Notices;
-use crate::picture::Frame;
 use crate::rom::Rom;
 use nubo_core::{Emulator, Model};
 use std::hash::{Hash, Hasher};
@@ -22,14 +21,16 @@ use std::time::{Duration, Instant};
 /// stops coming, such as when the sound device goes away.
 const LONGEST_SLEEP: Duration = Duration::from_secs(1);
 
-/// The latest finished frame, shared between the two threads.
+/// The two newest finished frames, shared between the two threads.
 #[derive(Default)]
 struct SharedFrame {
     /// Goes up by one for every new frame that differs from the one before
     /// (and for the first frame like it, see [`publish`]), so readers can
     /// tell whether there is a frame they haven't shown.
     sequence: u64,
-    frame: Frame,
+    /// The newest frame and the one the emulator finished before it, for
+    /// frame blending.
+    frames: LatestFrames,
     /// Whether the frame published last was the same as the one before it.
     repeated: bool,
     /// Called for every new frame while the app listens (see
@@ -62,10 +63,11 @@ impl FrameListener {
     /// Calls `on_frame` for every new frame from now on, replacing any
     /// earlier callback. It is called once straight away, since frames
     /// finished before the app listened were never announced. The app then
-    /// picks up the newest frame with [`Session::frame_since`]. A frame
-    /// still waiting when the next one comes is replaced by it, so the
-    /// callback can merge the calls the app hasn't handled yet into one,
-    /// such as by sending into a channel that holds one message.
+    /// picks up the newest frame, with the one before it, with
+    /// [`Session::frame_since`]. A frame still waiting when the next one
+    /// comes is replaced by it, so the callback can merge the calls the app
+    /// hasn't handled yet into one, such as by sending into a channel that
+    /// holds one message.
     ///
     /// The callback runs while the frame is locked, the first time on the
     /// thread that calls `listen` and after that on the emulator thread, so
@@ -220,11 +222,12 @@ impl Session {
         }
     }
 
-    /// Returns the newest frame and its sequence number, or `None` if it is
-    /// still the frame with the given sequence number.
-    pub fn frame_since(&self, sequence: u64) -> Option<(u64, Frame)> {
-        let frame = self.frame.lock().ok()?;
-        (frame.sequence != sequence).then(|| (frame.sequence, frame.frame.clone()))
+    /// Copies the newest frame and the one the emulator finished before it
+    /// into `frames`, reusing their memory, and returns the newest's
+    /// sequence number. Returns `None` and leaves `frames` alone if the
+    /// newest is still the frame with the given sequence number.
+    pub fn frame_since(&self, sequence: u64, frames: &mut LatestFrames) -> Option<u64> {
+        self.frame.lock().ok()?.copy_since(sequence, frames)
     }
 
     /// What the emulator thread has done since the session started.
@@ -244,6 +247,16 @@ impl Drop for Session {
             thread.thread().unpark();
             let _ = thread.join();
         }
+    }
+}
+
+impl SharedFrame {
+    /// See [`Session::frame_since`].
+    fn copy_since(&self, sequence: u64, frames: &mut LatestFrames) -> Option<u64> {
+        (self.sequence != sequence).then(|| {
+            frames.clone_from(&self.frames);
+            self.sequence
+        })
     }
 }
 
@@ -412,22 +425,24 @@ impl FastForward {
     }
 }
 
-/// Copies the emulator's finished frame into the shared buffer for the app, and calls
-/// the app's callback if it listens. A call the app hasn't handled yet
-/// already covers this frame, since the app always takes the newest one. Once
+/// Copies the emulator's finished frame into the shared buffer for the app,
+/// keeping the one before it, and calls the app's callback if it listens. A
+/// call the app hasn't handled yet already covers this frame, since the app
+/// always takes the newest one and the one before it. Once
 /// the picture stops changing, the first frame like the one before is still
 /// handed on, so a picture mixed with the frame before it (frame blending)
 /// settles; the ones after it are skipped, so still screens such as menus
 /// and text boxes don't redraw the window.
 fn publish_frame(frame: &Mutex<SharedFrame>, emulator: &Emulator) {
-    publish(frame, |latest| latest.update(emulator));
+    publish(frame, |frames| frames.update(emulator));
 }
 
-/// Lets `update` change the shared frame, and if it says it did, counts a new
-/// frame and calls the app's callback.
-fn publish(frame: &Mutex<SharedFrame>, update: impl FnOnce(&mut Frame) -> bool) {
+/// Lets `update` take in a new frame and say whether it differs from the one
+/// before. Unless an unchanged frame was already handed on, counts it and
+/// calls the app's callback.
+fn publish(frame: &Mutex<SharedFrame>, update: impl FnOnce(&mut LatestFrames) -> bool) {
     if let Ok(mut shared) = frame.lock() {
-        let changed = update(&mut shared.frame);
+        let changed = update(&mut shared.frames);
         if !changed && shared.repeated {
             return;
         }

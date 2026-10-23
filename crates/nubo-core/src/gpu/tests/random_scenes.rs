@@ -4,7 +4,9 @@
 //! They check that the bulk runs (`Gpu::run_dots` with its steady stretches and plain pixels) give
 //! exactly what running dot by dot does, down to every byte of a save state after each stretch,
 //! often ended near a line's timing events, and that a save state taken at any dot carries on
-//! exactly like the PPU it came from and can't make the PPU panic when corrupted.
+//! exactly like the PPU it came from and can't make the PPU panic when corrupted. Now and then the
+//! comparison also switches the LCD off for a while, enters STOP mode or runs an OAM DMA transfer
+//! (see `Event`), so that the bulk runs' paths for those are compared too.
 //!
 //! `NUBO_RANDOM_SCENES` sets how many scenes the comparison of bulk runs with running dot by dot
 //! tries (18 by default, a few seconds in a debug build), and `NUBO_RANDOM_SEED` the seed it starts
@@ -12,9 +14,11 @@
 
 use crate::address_bus::MemoryMapped;
 use crate::address_bus::hdma::HdmaState;
-use crate::gpu::{DOTS_PER_FRAME, DOTS_PER_LINE, Gpu};
+use crate::clock::dots_per_m_cycle;
+use crate::gpu::{DOTS_PER_FRAME, DOTS_PER_LINE, Gpu, OamDmaAccess};
 use crate::model::Model;
 use crate::serializable::Serializable;
+use std::collections::VecDeque;
 
 /// A small pseudo-random number generator (xorshift64), so that the tests are repeatable.
 struct TestRandom(u64);
@@ -110,12 +114,12 @@ fn random_scene(random: &mut TestRandom, model: Model, double_speed: bool) -> Gp
 }
 
 /// Writes a random value to a random register that changes what mode 3 draws or when the STAT
-/// interrupt is requested, keeping the LCD on. LYC and WY often get the current or the next line,
-/// where their late effects show.
+/// interrupt is requested, leaving the LCD on or off as it is. LYC and WY often get the current or
+/// the next line, where their late effects show.
 fn write_random_register(gpu: &mut Gpu, random: &mut TestRandom) {
     let near_line = gpu.ly.wrapping_add(random.byte_below(2));
     let (address, value) = match random.below(9) {
-        0 => (0xFF40, 0x80 | random.byte()),
+        0 => (0xFF40, (gpu.lcdc & 0x80) | (random.byte() & 0x7F)),
         1 => (0xFF41, random.byte()),
         2 => (0xFF42, random.byte()),
         3 => (0xFF43, random.byte()),
@@ -133,9 +137,163 @@ fn write_random_register(gpu: &mut Gpu, random: &mut TestRandom) {
     gpu.write_byte(address, value);
 }
 
+/// Writes the same random value to the same random register of both PPUs.
+fn write_random_register_to_both(by_dot: &mut Gpu, in_bulk: &mut Gpu, random: &mut TestRandom) {
+    let seed = random.next() | 1;
+    write_random_register(by_dot, &mut TestRandom(seed));
+    write_random_register(in_bulk, &mut TestRandom(seed));
+}
+
+/// Runs `dots` dots one at a time, as `Gpu::run_dots` does without its shortcuts: `Gpu::tick_dot`
+/// while the PPU draws, and one idle dot at a time while it doesn't (the LCD is off, or STOP mode
+/// stopped a monochrome model's PPU).
 fn tick_dots(gpu: &mut Gpu, hdma: &mut HdmaState, dots: u32) {
     for _ in 0..dots {
-        gpu.tick_dot(hdma);
+        if gpu.lcd_enabled() && !(gpu.stopped && !gpu.is_cgb()) {
+            if std::mem::take(&mut gpu.lcd_off_hblank_dma) {
+                hdma.set_hblank_started(true);
+            }
+            gpu.tick_dot(hdma);
+        } else {
+            gpu.run_dots(1, hdma, true);
+        }
+    }
+}
+
+/// Something the rest of the hardware does to the PPU over many dots, which both PPUs of
+/// `bulk_runs_match_running_dot_by_dot` go through alike.
+enum Event {
+    /// Nothing: the CPU only writes registers between stretches.
+    None,
+    /// The LCD is off, and an LCDC write switches it on again after `dots_left` dots.
+    LcdOff { dots_left: u32 },
+    /// The CPU is in STOP mode, which a button press ends after `dots_left` dots. A monochrome
+    /// model's PPU stands still meanwhile, and the CGB's is cut off from what the CPU could reach.
+    Stopped { dots_left: u32 },
+    /// An OAM DMA transfer, with the M-cycles it still has to run.
+    OamDma(VecDeque<OamDmaCycle>),
+}
+
+/// How many bytes an OAM DMA transfer copies: the whole of OAM.
+const OAM_DMA_BYTES: u8 = 160;
+
+/// One M-cycle of an OAM DMA transfer as the PPU sees it: how the transfer holds OAM from half an
+/// M-cycle in, and the byte it copies to OAM, if any.
+struct OamDmaCycle {
+    access: OamDmaAccess,
+    copied: Option<(u16, u8)>,
+}
+
+/// The M-cycles of an OAM DMA transfer, as the address bus runs them (`address_bus/dma.rs`): one
+/// for each byte it copies, then one that frees OAM. Sometimes HALT holds the transfer for up to a
+/// few lines. The bytes place objects where they can show, as `random_scene` does.
+fn random_oam_dma(random: &mut TestRandom) -> VecDeque<OamDmaCycle> {
+    let halt_at = random.chance(30).then(|| random.byte_below(OAM_DMA_BYTES));
+    let mut m_cycles = VecDeque::new();
+    for index in 0..OAM_DMA_BYTES {
+        if halt_at == Some(index) {
+            for _ in 0..1 + random.below(300) {
+                m_cycles.push_back(OamDmaCycle {
+                    access: OamDmaAccess::PausedByHalt,
+                    copied: None,
+                });
+            }
+        }
+        let value = match index % 4 {
+            0 => random.byte_below(170),
+            1 => random.byte_below(176),
+            _ => random.byte(),
+        };
+        m_cycles.push_back(OamDmaCycle {
+            access: OamDmaAccess::Running { destination: index },
+            copied: Some((u16::from(index), value)),
+        });
+    }
+    m_cycles.push_back(OamDmaCycle {
+        access: OamDmaAccess::Free,
+        copied: None,
+    });
+    m_cycles
+}
+
+/// How many dots the LCD stays off or STOP mode lasts: mostly a few hundred, sometimes long enough
+/// for the PPU to deliver the blank frame it owes then.
+fn event_dots(random: &mut TestRandom) -> u32 {
+    if random.chance(10) {
+        DOTS_PER_FRAME / 2 + random.below(DOTS_PER_FRAME)
+    } else {
+        100 + random.below(1500)
+    }
+}
+
+/// After a stretch without an event, starts one in both PPUs alike now and then (switching the LCD
+/// off, entering STOP mode or starting OAM DMA), or else often writes a random register.
+fn start_random_event(by_dot: &mut Gpu, in_bulk: &mut Gpu, random: &mut TestRandom) -> Event {
+    match random.below(100) {
+        0..2 => {
+            let lcdc = random.byte() & 0x7F;
+            by_dot.write_byte(0xFF40, lcdc);
+            in_bulk.write_byte(0xFF40, lcdc);
+            Event::LcdOff {
+                dots_left: event_dots(random),
+            }
+        }
+        2..4 => {
+            by_dot.enter_stop_mode();
+            in_bulk.enter_stop_mode();
+            Event::Stopped {
+                dots_left: event_dots(random),
+            }
+        }
+        4..7 => Event::OamDma(random_oam_dma(random)),
+        7..47 => {
+            write_random_register_to_both(by_dot, in_bulk, random);
+            Event::None
+        }
+        _ => Event::None,
+    }
+}
+
+/// Moves `event` on after a stretch of `dots` dots, in both PPUs alike, ending it when its time is
+/// up. The CPU writes registers now and then meanwhile, but not in STOP mode.
+fn continue_event(
+    event: Event,
+    dots: u32,
+    by_dot: &mut Gpu,
+    in_bulk: &mut Gpu,
+    random: &mut TestRandom,
+) -> Event {
+    match event {
+        Event::None => start_random_event(by_dot, in_bulk, random),
+        Event::LcdOff { dots_left } if dots_left == dots => {
+            let lcdc = 0x80 | random.byte();
+            by_dot.write_byte(0xFF40, lcdc);
+            in_bulk.write_byte(0xFF40, lcdc);
+            Event::None
+        }
+        Event::LcdOff { dots_left } => {
+            if random.chance(40) {
+                write_random_register_to_both(by_dot, in_bulk, random);
+            }
+            Event::LcdOff {
+                dots_left: dots_left - dots,
+            }
+        }
+        Event::Stopped { dots_left } if dots_left == dots => {
+            by_dot.leave_stop_mode();
+            in_bulk.leave_stop_mode();
+            Event::None
+        }
+        Event::Stopped { dots_left } => Event::Stopped {
+            dots_left: dots_left - dots,
+        },
+        Event::OamDma(m_cycles) if m_cycles.is_empty() => Event::None,
+        Event::OamDma(m_cycles) => {
+            if random.chance(3) {
+                write_random_register_to_both(by_dot, in_bulk, random);
+            }
+            Event::OamDma(m_cycles)
+        }
     }
 }
 
@@ -179,22 +337,43 @@ fn bulk_runs_match_running_dot_by_dot() {
             by_dot_hdma.write_byte(0xFF55, 0xFF);
             in_bulk_hdma.write_byte(0xFF55, 0xFF);
         }
+        let m_cycle_dots = dots_per_m_cycle(double_speed);
+        let mut event = Event::None;
         for frame in 0..2 {
             let mut left = DOTS_PER_FRAME;
             while left > 0 {
-                // Some stretches end where most timing events are: in the first dots of the next
-                // line, or about where its mode 3 ends.
-                let stretch = if random.chance(30) {
-                    let dot = if random.chance(50) {
-                        random.below(8)
-                    } else {
-                        240 + random.below(100)
-                    };
-                    u32::from(DOTS_PER_LINE - by_dot.line_dot) + dot
-                } else {
-                    1 + random.below(4000)
-                }
-                .min(left);
+                let stretch = match &mut event {
+                    // OAM DMA runs one M-cycle at a time, with the PPU seeing the M-cycle's DMA
+                    // state from half an M-cycle in, as in `AddressBus::sync_all_but_timers`.
+                    Event::OamDma(m_cycles) => {
+                        let m_cycle = m_cycles.pop_front().expect("an M-cycle left");
+                        for gpu in [&mut by_dot, &mut in_bulk] {
+                            if let Some((index, value)) = m_cycle.copied {
+                                gpu.write_oam_from_dma(index, value);
+                            }
+                            gpu.set_oam_dma_access(m_cycle.access, m_cycle_dots / 2);
+                        }
+                        u32::from(m_cycle_dots)
+                    }
+                    // Some stretches end where most timing events are: in the first dots of the
+                    // next line, or about where its mode 3 ends.
+                    _ if random.chance(30) => {
+                        let dot = if random.chance(50) {
+                            random.below(8)
+                        } else {
+                            240 + random.below(100)
+                        };
+                        u32::from(DOTS_PER_LINE - by_dot.line_dot) + dot
+                    }
+                    _ => 1 + random.below(4000),
+                };
+                let stretch = match event {
+                    Event::OamDma(_) => stretch,
+                    Event::LcdOff { dots_left } | Event::Stopped { dots_left } => {
+                        stretch.min(dots_left).min(left)
+                    }
+                    Event::None => stretch.min(left),
+                };
                 tick_dots(&mut by_dot, &mut by_dot_hdma, stretch);
                 let mut bulk_left = stretch;
                 while bulk_left > 0 {
@@ -202,14 +381,16 @@ fn bulk_runs_match_running_dot_by_dot() {
                     in_bulk.run_dots(chunk, &mut in_bulk_hdma, random.chance(50));
                     bulk_left -= chunk;
                 }
-                left -= stretch;
+                left = left.saturating_sub(stretch);
 
                 // What a save state holds is compared after every stretch, as a save state
                 // taken there would show what a shortcut left out even when a later dot puts it
-                // right. Interrupt requests are compared and cleared, so that one requested on one
-                // side only can't be hidden by a later one on both.
+                // right; in OAM DMA, whose M-cycles are short stretches, only now and then and
+                // once it is over. Interrupt requests and delivered frames are compared and
+                // cleared, so that one on one side only can't be hidden by a later one on both.
+                let in_oam_dma = matches!(&event, Event::OamDma(m_cycles) if !m_cycles.is_empty());
                 assert!(
-                    serialize(&by_dot) == serialize(&in_bulk),
+                    (in_oam_dma && !random.chance(5)) || serialize(&by_dot) == serialize(&in_bulk),
                     "seed {seed}, case {case}, frame {frame}, line {} dot {}: {:?}",
                     by_dot.line,
                     by_dot.line_dot,
@@ -221,6 +402,7 @@ fn bulk_runs_match_running_dot_by_dot() {
                         gpu.line_dot,
                         gpu.stat_interrupt,
                         gpu.vblank_interrupt,
+                        gpu.frame_ready,
                     )
                 };
                 assert_eq!(
@@ -231,6 +413,7 @@ fn bulk_runs_match_running_dot_by_dot() {
                 for gpu in [&mut by_dot, &mut in_bulk] {
                     gpu.stat_interrupt = false;
                     gpu.vblank_interrupt = false;
+                    gpu.frame_ready = false;
                 }
                 // Likewise HBlank's start for HBlank DMA, which the address bus would take.
                 assert_eq!(
@@ -242,11 +425,7 @@ fn bulk_runs_match_running_dot_by_dot() {
                     hdma.set_hblank_started(false);
                 }
 
-                if random.chance(40) {
-                    let seed = random.next() | 1;
-                    write_random_register(&mut by_dot, &mut TestRandom(seed));
-                    write_random_register(&mut in_bulk, &mut TestRandom(seed));
-                }
+                event = continue_event(event, stretch, &mut by_dot, &mut in_bulk, &mut random);
             }
             assert_eq!(
                 format!("{by_dot:?}"),

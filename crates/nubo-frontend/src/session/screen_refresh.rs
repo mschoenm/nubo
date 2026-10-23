@@ -13,9 +13,8 @@
 //! (see `session/pacing.rs`).
 
 use super::pacing::{FRAME_DURATION, Lock, RefreshRate, SampleRateControl};
-use super::{Command, Machine, Playback, Saves, ask};
+use super::{Command, LatestFrames, Machine, Playback, Saves, ask};
 use crate::notices::Notices;
-use crate::picture::Frame;
 use crate::rom::Rom;
 use nubo_core::Model;
 use refresh_clock::RefreshClock;
@@ -44,6 +43,10 @@ pub struct Session {
     machine: Machine,
     /// Counts finished frames, so the UI can tell when the screen changed.
     frame_sequence: u64,
+    /// The newest frame and the one the emulator finished before it, for
+    /// frame blending. Several frames can finish between two looks of the
+    /// app, such as while fast forwarding.
+    frames: LatestFrames,
     /// Frames the clock says are due but haven't been emulated yet.
     frames_due: f64,
     /// When the screen refreshed for the last frames made due, in seconds,
@@ -83,6 +86,7 @@ impl Session {
             emulator_sample_rate: machine.audio.sample_rate(),
             machine,
             frame_sequence: 0,
+            frames: LatestFrames::default(),
             frames_due: 0.0,
             last_tick: None,
             refresh_clock: RefreshClock::start(),
@@ -104,8 +108,14 @@ impl Session {
             self.last_tick = None;
         }
         if self.machine.handle(command) {
-            self.frame_sequence += 1;
+            self.take_frame();
         }
+    }
+
+    /// Takes in the frame the emulator just finished.
+    fn take_frame(&mut self) {
+        self.frames.update(&self.machine.emulator);
+        self.frame_sequence += 1;
     }
 
     /// Captures the game's complete state.
@@ -121,11 +131,15 @@ impl Session {
         )?
     }
 
-    /// Returns the newest frame and its sequence number, or `None` if it is
-    /// still the frame with the given sequence number.
-    pub fn frame_since(&mut self, sequence: u64) -> Option<(u64, Frame)> {
-        (self.frame_sequence != sequence)
-            .then(|| (self.frame_sequence, Frame::latest(&self.machine.emulator)))
+    /// Copies the newest frame and the one the emulator finished before it
+    /// into `frames`, reusing their memory, and returns the newest's
+    /// sequence number. Returns `None` and leaves `frames` alone if the
+    /// newest is still the frame with the given sequence number.
+    pub fn frame_since(&self, sequence: u64, frames: &mut LatestFrames) -> Option<u64> {
+        (self.frame_sequence != sequence).then(|| {
+            frames.clone_from(&self.frames);
+            self.frame_sequence
+        })
     }
 
     /// Emulates the frames that have come due by the screen's latest
@@ -232,7 +246,7 @@ impl Session {
                 self.machine.skip_buffer()
             };
             if new_frame {
-                self.frame_sequence += 1;
+                self.take_frame();
                 self.screen_off_credit = 0.0;
                 return;
             }
