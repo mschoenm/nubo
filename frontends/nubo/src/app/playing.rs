@@ -413,8 +413,27 @@ impl App {
             None
         };
 
+        self.start_or_ask(rom, header, resume_state);
+    }
+
+    /// Starts `rom` from `resume_state`, where the player left off, or asks
+    /// first when that was on another model than the one the game is set to
+    /// start on (see `App::ask_which_model`). A scene doesn't ask, and
+    /// continues on the save's model. A `--scale` window, which shows only
+    /// the game's picture and so can't show the question, doesn't ask
+    /// either: it starts over on the model set, as the answer Start over
+    /// does.
+    pub(super) fn start_or_ask(
+        &mut self,
+        rom: Rom,
+        header: CartridgeHeader,
+        resume_state: Option<SaveState>,
+    ) {
         let model = self.model_for(&rom.path, &header);
         match resume_state {
+            Some(state) if state.model != model && self.screen_scale.is_some() => {
+                self.launch(rom, header, model, None);
+            }
             Some(state) if state.model != model && !self.held_for_scene() => {
                 self.ask_which_model(rom, header, state, model);
             }

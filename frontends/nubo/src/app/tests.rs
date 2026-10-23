@@ -687,6 +687,20 @@ fn waiting_app() -> App {
     app
 }
 
+#[test]
+fn a_scale_window_which_cant_ask_starts_a_save_from_another_model_over() {
+    let mut app = waiting_app();
+    let pending = app.pending_start.take().unwrap();
+    app.dialog = None;
+    app.screen_scale = Some(1);
+
+    app.start_or_ask(pending.rom, pending.header, Some(pending.state));
+
+    assert!(app.dialog.is_none());
+    assert!(app.pending_start.is_none());
+    assert_eq!(app.game.as_ref().unwrap().session.model(), Model::Dmg);
+}
+
 /// `waiting_app`, its question having replaced the box art question.
 fn waiting_over_box_art() -> App {
     let mut app = waiting_app();
