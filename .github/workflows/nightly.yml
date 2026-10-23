@@ -34,6 +34,9 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  # No debug info, as in ci.yml (see there).
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_PROFILE_TEST_DEBUG: 0
 
 jobs:
   # CI too, so whatever a new stable Rust or another new release breaks

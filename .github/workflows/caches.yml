@@ -1,0 +1,53 @@
+name: Caches
+
+# Deletes the caches on main that newer ones replace, once a CI, Nightly or
+# Deploy run on main has finished and saved its own. A cache's key ends in
+# hashes (of Cargo.lock, Rust's version and the build settings for the Rust
+# caches, of the pins for the test data, of the version for RetroArch's
+# packages), so a change saves a new cache under a new key, and without this
+# the old one would stay for 7 days and push caches still in use out of the
+# repository's 10 GB. Caches whose keys are the same but for those hashes
+# make a group, and only the newest of each group stays. Pull requests'
+# caches are left alone: GitHub deletes them after 7 days. The step summary
+# lists the caches that stay, with their sizes. See docs/CI.md, "Caches".
+on:
+  workflow_run:
+    workflows: [CI, Nightly, Deploy]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: caches
+
+jobs:
+  clean:
+    name: Delete replaced caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Delete older caches of the same group
+        run: |
+          gh cache list --ref refs/heads/main --limit 1000 --json id,key,createdAt > "$RUNNER_TEMP/caches.json"
+          jq -r 'group_by(.key | sub("(-[0-9a-f]{8,})+$"; ""))
+            | map(sort_by(.createdAt) | reverse | .[1:][])
+            | .[] | "\(.id) \(.key)"' "$RUNNER_TEMP/caches.json" |
+          while read -r id key; do
+            echo "Deleting $key"
+            gh cache delete "$id"
+          done
+
+      - name: List the caches that stay
+        run: |
+          gh cache list --limit 1000 --sort size_in_bytes --json key,ref,sizeInBytes |
+            jq -r '"| Cache | Branch | Size |", "| --- | --- | --- |",
+              (.[] | "| `\(.key)` | \(.ref) | \(.sizeInBytes / 1048576 | round) MB |"),
+              "| Total | | \(map(.sizeInBytes) | add // 0 | . / 1048576 | round) MB |"' >> "$GITHUB_STEP_SUMMARY"
