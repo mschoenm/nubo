@@ -91,12 +91,12 @@ pub struct LibraryEntry {
     /// the cartridge even when the settings pick one model for every game;
     /// such a game keeps doing so until the player picks again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<ModelPreference>,
+    pub(crate) model: Option<ModelPreference>,
     /// When the library first found the game, in seconds since 1970, for
     /// listing the games added last first. `None` for a game found by a
     /// version that didn't keep it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub added: Option<u64>,
+    pub(crate) added: Option<u64>,
     /// The file's size in bytes when its header was read, so a scan can tell
     /// whether to read it again.
     size: u64,
@@ -120,9 +120,9 @@ impl LibraryEntry {
         self.size
     }
 
-    /// What the player picked for this game in its menu (see
-    /// [`LibraryEntry::model`](#structfield.model)), or `None` to follow the
-    /// settings.
+    /// What the player picked for this game in its menu, or `None` to follow
+    /// the settings. Earlier versions could also pick Automatic, which picks
+    /// by the cartridge even when the settings pick one model for every game.
     pub fn preference(&self) -> Option<ModelPreference> {
         self.model
     }
