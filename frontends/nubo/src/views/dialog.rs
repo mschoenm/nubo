@@ -30,10 +30,6 @@ fn buttons_fit<'a>(buttons: impl Iterator<Item = &'a Choice>) -> bool {
     // the space after it, and the space between buttons.
     const CHARACTER: f32 = 8.5;
     const AROUND_LABEL: f32 = 6.0 + 32.0 + 18.0 + 8.0 + 6.0;
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "labels are a few dozen characters long"
-    )]
     let width: f32 = buttons
         .map(|choice| choice.label.chars().count() as f32 * CHARACTER + AROUND_LABEL)
         .sum();
@@ -116,7 +112,7 @@ pub fn view<'a>(dialog: &Dialog, content: DialogContent) -> Element<'a, Message>
                 }
                 rows = rows.push(list_row(choice, index == selection, checks));
             }
-            panel = panel.push(scrollable(rows).spacing(8));
+            panel = panel.push(scrollable(rows).id(list_scroll_id()).spacing(8));
             MENU_WIDTH
         }
     };
@@ -226,11 +222,17 @@ pub fn scroll_id() -> widget::Id {
     widget::Id::new("dialog-question")
 }
 
+/// The scrolling area of a menu's rows, so the app can keep the row the
+/// D-pad is on in view.
+pub fn list_scroll_id() -> widget::Id {
+    widget::Id::new("dialog-list")
+}
+
 /// A question's checkboxes, `(index, choice)` by their place among its
 /// choices, in a card with thin lines between them. Each is a row that
 /// ticks or unticks it, highlighted while the D-pad is on it, and a ticked
 /// box that deletes something shows its label in red. A box that can't be
-/// ticked is greyed out, with its description, which says why, readable.
+/// ticked is grayed out, with its description, which says why, readable.
 fn checkboxes<'a>(boxes: Vec<(usize, Choice)>, selection: usize) -> Element<'a, Message> {
     let mut card = Column::new();
     for (place, (index, choice)) in boxes.into_iter().enumerate() {

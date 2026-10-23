@@ -3,10 +3,14 @@
 //! Every Game Boy ROM starts with a header at 0x0100-0x014F that describes the
 //! cartridge. The values here follow Pan Docs ("The Cartridge Header").
 
+/// Whether the game supports the Super Game Boy: 0x03 if it does.
 pub(crate) const SGB_SUPPORT_ADDRESS: usize = 0x146;
 pub(crate) const CARTRIDGE_TYPE_ADDRESS: usize = 0x147;
 pub(crate) const ROM_SIZE_ADDRESS: usize = 0x148;
 pub(crate) const RAM_SIZE_ADDRESS: usize = 0x149;
+/// The old licensee code, which must be 0x33 for the Super Game Boy's
+/// commands to work.
+pub(crate) const OLD_LICENSEE_CODE_ADDRESS: usize = 0x14B;
 pub(crate) const HEADER_END_ADDRESS: usize = 0x14F;
 
 /// The size of the two ROM banks the console can see at once (32 KiB).

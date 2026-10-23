@@ -54,12 +54,13 @@ pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub check_for_updates: Option<bool>,
     /// Whether a game's state is saved as the player plays and when they
-    /// leave it, so it continues there the next time it starts. On until the player turns it off, on the
-    /// settings' Playing tab.
+    /// leave it, so it continues there the next time it starts. On until the
+    /// player turns it off, on the settings' Playing tab.
     pub resume_games: bool,
     /// How fast fast forward runs.
     pub fast_forward_speed: FastForwardSpeed,
     /// How loud to play, from 0 (silent) to 1 (as loud as the game).
+    #[serde(deserialize_with = "volume_from_0_to_1")]
     pub volume: f32,
     /// Whether the sound is off, whatever the volume.
     pub muted: bool,
@@ -100,6 +101,18 @@ pub struct Settings {
     /// it is on.
     #[serde(skip_serializing_if = "is_false")]
     pub sgb_nubo_border: bool,
+}
+
+/// Reads the volume, kept from 0 to 1: a hand-edited file can hold any
+/// number, `nan` and `inf` included, and a volume that isn't a number would
+/// make every sample one too. One that isn't finite reads as full volume.
+fn volume_from_0_to_1<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<f32, D::Error> {
+    let volume = f32::deserialize(deserializer)?;
+    Ok(if volume.is_finite() {
+        volume.clamp(0.0, 1.0)
+    } else {
+        1.0
+    })
 }
 
 /// Whether `colors` are the game's own, which settings leave out.
@@ -334,7 +347,7 @@ pub fn load<T: Default>(
                     "Your settings couldn't be read, so Nubo starts with the defaults and kept them as {location}: {error}"
                 ),
                 Err(keep_error) => format!(
-                    "Your settings couldn't be read and were reset (keeping them aside failed too: {keep_error}): {error}"
+                    "Your settings couldn't be read, and keeping them aside failed too ({keep_error}), so Nubo starts with the defaults and saves only what you change: {error}"
                 ),
             };
             Loaded {

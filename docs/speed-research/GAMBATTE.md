@@ -28,7 +28,7 @@ What the profile shows:
   drawing. The plain-tile shortcut (`gpu/pipeline/plain_pixels.rs`, inclusive) alone is 23 to 34%
   of everything. That is about 35 instructions per pixel, or roughly 300 per tile, of which about
   80 go to stepping the fetcher (`find_tile_number`, `read_tile_data_*`, the FIFO bookkeeping) and
-  the rest to taking each pixel's colour index apart bit by bit. The per-dot path (`tick_dot`, its
+  the rest to taking each pixel's color index apart bit by bit. The per-dot path (`tick_dot`, its
   countdowns, `update_lyc_flag`, `update_stat_line`, `has_steady_shape`) and the per-line OAM scan
   (`tick_oam_scan`, `scan_oam_entries`) take the rest.
 - **The CPU and bus cost about as much as all of Gambatte on the busy games.** That is 55 to 85 M
@@ -54,7 +54,7 @@ access is a few instructions long.
 
 | Rank | Technique | Where Nubo pays for its absence | Estimated gain on the benchmark games |
 |---|---|---|---|
-| 1 | **Split the PPU into a timing model and a fast line/tile renderer.** Draw whole tiles, and whole lines where possible, straight to final colours. Do no per-dot fetcher or FIFO simulation while nothing can observe it. | 108 to 144 M instructions per second in the PPU | PPU about 4 to 6 times cheaper: **total instructions −40% to −60%**, about 1.6 to 2.3 times the speed on its own |
+| 1 | **Split the PPU into a timing model and a fast line/tile renderer.** Draw whole tiles, and whole lines where possible, straight to final colors. Do no per-dot fetcher or FIFO simulation while nothing can observe it. | 108 to 144 M instructions per second in the PPU | PPU about 4 to 6 times cheaper: **total instructions −40% to −60%**, about 1.6 to 2.3 times the speed on its own |
 | 2 | **Time-derived PPU status and predicted interrupt times** ("next event time" per source). LY, STAT, the LYC flag and VRAM/OAM accessibility are computed from the time without running the renderer. The next STAT, LYC, VBlank and HBlank-DMA moments are worked out in closed form, so the CPU runs until the earliest one. | 3 to 7 PPU catch-ups per line on games that poll or use STAT interrupts. Each one fragments the fast paths and stops the bulk M-cycles | 5 to 15% on top of #1, more on raster-effect games |
 | 3 | **A lean interpreter loop**: one deadline compare per instruction instead of per-access bookkeeping. A page table for plain memory. Rare conditions moved out of the hot loop into the deadline. CPU registers kept in locals. | About 40 instructions per plain read, and 55 to 85 M instructions per second on busy games | CPU and bus about 2 times cheaper: **total −10% to −25%** |
 | 4 | **Per-line object lists cached across frames**: rebuilt only when OAM (or the object size) changes, with exact handling of an OAM change in the middle of a scan. | Per-line OAM scan, about 3 to 5% | 3 to 5% |
@@ -90,11 +90,11 @@ machinery. Gambatte separates the two:
 - **A whole-tile fast path.** When the renderer is at a tile boundary and the next span holds no
   object and no window start, it draws whole tiles in a tight loop. For each tile it reads the tile
   index, then the two bitplane bytes (and the CGB attribute byte), and turns the two bytes into
-  eight 2-bit colour indices with a lookup table. The table maps a byte to a word with its bits
+  eight 2-bit color indices with a lookup table. The table maps a byte to a word with its bits
   spread out, one bit per 2-bit slot; a second variant has the bit order reversed, for horizontal
   flip. Combining the spread low byte with the spread high byte shifted by one gives all eight
-  indices at once. It then writes eight final colours straight into the frame buffer through a
-  palette that is already converted to output colours. That palette is updated when the game writes
+  indices at once. It then writes eight final colors straight into the frame buffer through a
+  palette that is already converted to output colors. That palette is updated when the game writes
   a palette register, after the renderer has caught up. There is no FIFO and no per-dot fetcher
   step.
 - **Objects are merged per tile, not per pixel.** The objects on the line come from a cached
@@ -127,7 +127,7 @@ tiles run whole (`draw_background_tile`). But even the plain-tile path still:
 - runs all eight fetcher steps per tile through the general step functions (`take_tile_steps`
   calling `find_tile_number`, `read_tile_number`, `read_tile_data_*`, `fetcher_push`), with their
   glitch checks (`tile_sel_glitch`, `stop_blocks`, `last_tileset`) and FIFO struct updates;
-- takes each pixel's colour index apart from the two FIFO bytes with shifts and masks (78 M
+- takes each pixel's color index apart from the two FIFO bytes with shifts and masks (78 M
   instructions in 10 s of Tobu Tobu Girl for that one line of code);
 - checks `can_draw_plain_tile` or `can_draw_plain_pixel` for every tile or pixel.
 
@@ -168,9 +168,9 @@ renderer is an accelerator that must reproduce it exactly, the way `plain_pixels
 4. **Objects without dropping to per-dot.** The pipeline's object fetch timing (the penalty each
    object adds) is what makes objects hard. With the model from step 2 giving the timing, the
    pixels can be produced by a classic object line buffer: per line, up to ten objects in drawing
-   priority order (DMG: by X, then OAM order; CGB: OAM order), each writing colour index, palette
+   priority order (DMG: by X, then OAM order; CGB: OAM order), each writing color index, palette
    and priority bits into a 160-entry buffer only where no higher-priority object already wrote,
-   then composited with the background colour index under the BG-priority rules.
+   then composited with the background color index under the BG-priority rules.
 
 **Estimated gain.** Drawing is 70 to 80% of Nubo's PPU cost. A tight tile loop costs roughly 30 to
 50 instructions per tile, against about 300 now, and the per-dot overhead around mode 3 mostly
@@ -212,7 +212,7 @@ For the PPU, Gambatte schedules only the moments the CPU could observe through a
 
 A small "STAT line" model decides, at each source's event, whether that source's rising edge
 actually raises the shared STAT interrupt line, given which other sources are high at that moment.
-That is the well-known STAT blocking behaviour. Register reads are answered from the time: LY from
+That is the well-known STAT blocking behavior. Register reads are answered from the time: LY from
 the line counter (with its known early-increment quirks), the STAT mode from the line position and
 the predicted mode 3 end, and the LYC flag from the comparison at that time. The renderer runs on a
 read only if an event is due before the read's time. VRAM and OAM accessibility for CPU accesses is
@@ -369,7 +369,7 @@ reads at mode 3 start), and mark it stale when OAM is written: by the CPU, by OA
 transfer), by the OAM corruption bug, or by an LCDC object-size change. A scan that runs while the
 cache is valid takes the cached result for its line. A scan that overlaps a change, or anything
 unusual (`tall_objects_glitch`, OAM DMA holding OAM, the first line after the LCD is switched on,
-STOP blocking OAM), runs the existing per-entry scan. This keeps the exact per-entry behaviour
+STOP blocking OAM), runs the existing per-entry scan. This keeps the exact per-entry behavior
 where it matters and skips it where nothing changed. Debug builds can compare the cached list
 against a fresh scan.
 
@@ -463,7 +463,7 @@ bulk DMA path should hand the PPU the same sequence. Low for serial.
 
 ### 2.7 Draw into the output buffer, or swap buffers, instead of copying (rank 7)
 
-**The concept.** Gambatte's renderer writes final colours straight into a buffer the frontend
+**The concept.** Gambatte's renderer writes final colors straight into a buffer the frontend
 provides. There is no per-frame copy.
 
 **Where Nubo differs.** `publish_frame` copies `frame_buffer` into `completed_frame` each frame. The
@@ -483,7 +483,7 @@ handled; check that the swap doesn't change which buffer a save state stores.
   effects with its own timing rules, and tests that depend on FIFO details (such as Mealybug
   Tearoom's mid-scanline register tests) are where FIFO emulators tend to be ahead. Check the GB
   Emulator Shootout's table before relying on any one test. No OAM corruption bug emulation turned
-  up in the files searched. Its speed comes partly from not modelling those details. Nubo must keep its SameBoy-port pipeline as the reference and
+  up in the files searched. Its speed comes partly from not modeling those details. Nubo must keep its SameBoy-port pipeline as the reference and
   take only the *structure* (timing model plus fast renderer plus fallback), with every timing
   derived from Nubo's own pipeline and calibration. Never copy its penalty rules or offsets; Nubo's
   are calibrated against Mooneye and SameBoy and may differ.

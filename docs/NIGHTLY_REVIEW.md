@@ -43,7 +43,7 @@ Leave alone: dependency versions (Dependabot updates them), the timing calibrati
 
 ## 4. Fix
 
-Fix whatever you are sure makes the code clearer, more idiomatic, better documented or correct, however many files that takes, as long as every change keeps what the program does. A change that would alter behaviour, a bug fix whose effect you can't verify, and anything debatable become suggestions in the report instead. Keep each change easy to review: one subject per commit, with a message in the style of `git log` (a short title in the imperative, a body saying why) ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+Fix whatever you are sure makes the code clearer, more idiomatic, better documented or correct, however many files that takes, as long as every change keeps what the program does. A change that would alter behavior, a bug fix whose effect you can't verify, and anything debatable become suggestions in the report instead. Keep each change easy to review: one subject per commit, with a message in the style of `git log` (a short title in the imperative, a body saying why) ending with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 
 ## 5. Verify
 
@@ -68,7 +68,7 @@ cargo cpu-tests
 cargo benchmark target/test-roms/v7.0 target/benchmark-roms --seconds 4 --jobs 4 --compare /tmp/before.txt
 ```
 
-The last one proves every frame, audio sample and end state is unchanged. A change that makes any check fail, or any fingerprint differ, is reverted and reported as a suggestion. When you changed `crates/nubo-core`, also run `cargo test-roms --verify-boot`. Changes to the Iced app can't be fingerprinted: there keep to changes that clearly keep behaviour, and rely on its tests.
+The last one proves every frame, audio sample and end state is unchanged. A change that makes any check fail, or any fingerprint differ, is reverted and reported as a suggestion. When you changed `crates/nubo-core`, also run `cargo test-roms --verify-boot`. Changes to the Iced app can't be fingerprinted: there keep to changes that clearly keep behavior, and rely on its tests.
 
 ## 6. Report
 
@@ -76,8 +76,8 @@ GitHub's GraphQL API is blocked in routines, so `gh pr create` and `gh issue` do
 
 What still needs someone to act goes into issues, which stay open until it's done; the rest goes into the night's pull request:
 
-- **Issues** (labelled `nightly`): every **problem** (a regressed metric, a failed or stuck nightly CI job, a nightly build that couldn't be published, a run of this review that couldn't finish), with its numbers, the CI run's link and the commits since the last good night; and every **bug** among the suggestions. A bug is anything the program does that it shouldn't, however small or rare: a crash or panic, memory safety, lost or damaged saves or save states, but also a question or dialog that disappears unanswered, a setting or choice that sticks after the action it belonged to failed, a command that refuses valid input or gives the wrong error, and anything that doesn't do what its docs or the UI say. When in doubt, it is a bug. Give each a short, fixed title that names it, such as `Nightly: the CI run is stuck` or `RetroArch core: save states stop working after a restart onto a Super Game Boy`, and say what you found, where (file and line) and the fix you'd propose.
-- **The pull request:** everything else you didn't change stays in its Suggestions: code that works as it should but could be clearer, tidying, duplicated code, docs and small improvements. A finding never goes only into the Suggestions because its fix is small, debatable or would change behaviour; if it is a bug, it gets an issue, and the Suggestions may point to it.
+- **Issues** (labeled `nightly`): every **problem** (a regressed metric, a failed or stuck nightly CI job, a nightly build that couldn't be published, a run of this review that couldn't finish), with its numbers, the CI run's link and the commits since the last good night; and every **bug** among the suggestions. A bug is anything the program does that it shouldn't, however small or rare: a crash or panic, memory safety, lost or damaged saves or save states, but also a question or dialog that disappears unanswered, a setting or choice that sticks after the action it belonged to failed, a command that refuses valid input or gives the wrong error, and anything that doesn't do what its docs or the UI say. When in doubt, it is a bug. Give each a short, fixed title that names it, such as `Nightly: the CI run is stuck` or `RetroArch core: save states stop working after a restart onto a Super Game Boy`, and say what you found, where (file and line) and the fix you'd propose.
+- **The pull request:** everything else you didn't change stays in its Suggestions: code that works as it should but could be clearer, tidying, duplicated code, docs and small improvements. A finding never goes only into the Suggestions because its fix is small, debatable or would change behavior; if it is a bug, it gets an issue, and the Suggestions may point to it.
 
 Before opening an issue, look at the open ones: `gh api 'repos/mschoenm/nubo/issues?state=open&labels=nightly&per_page=100'` (pull requests show up there too; skip those with a `pull_request` field). When one already covers the finding, add tonight's numbers or details as a comment instead of opening another. Open a new one with `gh api repos/mschoenm/nubo/issues -f title="<title>" -F body=@/tmp/issue.md -f 'labels[]=nightly'`.
 

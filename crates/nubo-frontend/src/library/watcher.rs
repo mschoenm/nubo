@@ -99,7 +99,10 @@ pub fn watch(
     };
     let mut failures = Vec::new();
 
-    for folder in folders.iter().filter(|folder| folder.path.is_dir()) {
+    for folder in library_folders_to_watch(folders)
+        .into_iter()
+        .filter(|folder| folder.path.is_dir())
+    {
         let mode = if folder.include_subfolders {
             RecursiveMode::Recursive
         } else {
@@ -123,6 +126,23 @@ pub fn watch(
         }),
         failures,
     }
+}
+
+/// The library folders to watch: those no other library folder that
+/// includes its subfolders contains, since that one's watch already sees
+/// them. Watching a folder again would replace that watch, and could stop
+/// it from seeing subfolders.
+fn library_folders_to_watch(folders: &[LibraryFolder]) -> Vec<&LibraryFolder> {
+    folders
+        .iter()
+        .filter(|folder| {
+            !folders.iter().any(|outer| {
+                outer.include_subfolders
+                    && outer.path != folder.path
+                    && folder.path.starts_with(&outer.path)
+            })
+        })
+        .collect()
 }
 
 /// The folders to watch for the files of `games`: each game's folder once,
@@ -198,7 +218,10 @@ fn matters(path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{QUIET_TIME, WatchEvent, affects, changes, game_folders, matters, watch};
+    use super::{
+        QUIET_TIME, WatchEvent, affects, changes, game_folders, library_folders_to_watch, matters,
+        watch,
+    };
     use crate::settings::LibraryFolder;
     use notify_debouncer_full::notify::EventKind;
     use notify_debouncer_full::notify::event::{
@@ -271,6 +294,30 @@ mod tests {
         let watched = game_folders(&folders, &games);
         std::fs::remove_dir_all(&root).unwrap();
         assert_eq!(watched, [elsewhere]);
+    }
+
+    #[test]
+    fn a_library_folder_inside_one_that_includes_subfolders_isnt_watched_again() {
+        let folders = [
+            folder("/games", true),
+            folder("/games/gb", false),
+            folder("/other", false),
+            folder("/other/gbc", true),
+        ];
+
+        let watched: Vec<&Path> = library_folders_to_watch(&folders)
+            .into_iter()
+            .map(|folder| folder.path.as_path())
+            .collect();
+
+        assert_eq!(
+            watched,
+            [
+                Path::new("/games"),
+                Path::new("/other"),
+                Path::new("/other/gbc")
+            ]
+        );
     }
 
     #[test]

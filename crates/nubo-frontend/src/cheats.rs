@@ -59,8 +59,15 @@ impl Cheat {
         })
     }
 
+    /// Checks the cheat's code (or codes) as [`Cheat::new`] does, or says
+    /// what is wrong with one. A cheat read from a cheats file the player
+    /// edited can hold any text; reading turns such a cheat off.
+    pub fn check(&self) -> Result<(), String> {
+        split_codes(&self.code).map(|_| ())
+    }
+
     /// The kind of the cheat's (first) code, which was checked when the
-    /// cheat was made.
+    /// cheat was made or read (see [`Cheat::check`]).
     pub fn kind(&self) -> CheatKind {
         self.codes()
             .next()
@@ -74,7 +81,9 @@ impl Cheat {
     }
 
     /// Turns the cheat on or off in `emulator`, as `enabled` says. The codes
-    /// were checked when the cheat was made, so turning it on doesn't fail.
+    /// were checked when the cheat was made or read, and a cheat whose code
+    /// failed the check is off (see [`Cheat::check`]), so turning it on
+    /// doesn't fail.
     /// Each code is known to the emulator by the whole cheat's code and its
     /// own, so two cheats that share a code don't turn each other off.
     pub fn apply_to(&self, emulator: &mut Emulator) {
@@ -230,14 +239,23 @@ pub fn save_to(storage: &dyn Storage, rom_path: &Path, cheats: &[Cheat]) -> Resu
         .map_err(|error| format!("The cheats couldn't be saved: {error}"))
 }
 
-/// Parses the contents of a game's cheats file.
+/// Parses the contents of a game's cheats file. Each code is put in the
+/// form [`Cheat::new`] gives it, and a cheat with a code that isn't one is
+/// kept as it is but turned off.
 fn parse_list(bytes: Vec<u8>) -> Result<Vec<Cheat>, String> {
     // The same words as reading a file that isn't text says.
     let contents =
         String::from_utf8(bytes).map_err(|_| String::from("stream did not contain valid UTF-8"))?;
-    toml::from_str::<CheatsFile>(&contents)
+    let mut cheats = toml::from_str::<CheatsFile>(&contents)
         .map(|file| file.cheats)
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    for cheat in &mut cheats {
+        match split_codes(&cheat.code) {
+            Ok(codes) => cheat.code = codes.join("+"),
+            Err(_) => cheat.enabled = false,
+        }
+    }
+    Ok(cheats)
 }
 
 #[cfg(test)]

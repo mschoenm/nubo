@@ -29,6 +29,7 @@ use crate::gpu::constants::{GB_SCREEN_HEIGHT, GB_SCREEN_WIDTH};
 use crate::gpu::lcdc::{lcd_enabled, objects_enabled, window_enabled};
 use crate::gpu::palettes::{Color, Palettes, WHITE};
 use crate::gpu::pipeline::Pipeline;
+use crate::gpu::save_state::ModelSgb;
 use crate::model::Model;
 use crate::serializable::{Serializable, read_name, unreadable_value, write_variant};
 use crate::sgb::Sgb;
@@ -178,7 +179,7 @@ impl Serializable for OamDmaAccess {
 /// a copy of the booted emulator matches a real boot, so a custom `Debug` that left out VRAM, OAM
 /// or the frame buffers would weaken that check.
 #[derive(Clone, Debug)]
-pub struct Gpu {
+pub(crate) struct Gpu {
     /// The line the PPU is on, 0 to 153. Unlike `ly`, it doesn't reset early on line 153.
     line: u8,
 
@@ -239,8 +240,8 @@ pub struct Gpu {
     /// Dots until HDMA (CGB's hblank-driven VRAM copy) learns that hblank started.
     hdma_start_delay: u8,
     /// The LCD was just switched off outside HBlank. STAT drops to mode 0, which HDMA takes as
-    /// the start of an HBlank once the PPU next runs (SameBoy; Gambatte's dma
-    /// hdma_disable_display tests).
+    /// the start of an HBlank once the PPU next runs (SameBoy; Gambatte's dma hdma_disable_display
+    /// tests).
     lcd_off_hblank_dma: bool,
 
     /// Dots between entering mode 3 and the renderer starting.
@@ -342,7 +343,7 @@ pub struct Gpu {
 
     /// The Super Nintendo around a Super Game Boy, which colors each finished frame and draws
     /// its border (`sgb.rs`). Other models have none.
-    sgb: Option<Box<Sgb>>,
+    sgb: ModelSgb,
 }
 
 const HBLANK_MODE: u8 = 0;
@@ -507,14 +508,14 @@ impl Gpu {
             oam_scan_y_bus: 0,
             oam_scan_x_bus: 0,
             oam_scan_row: NO_OAM_SCAN_ROW,
-            sgb: None,
+            sgb: ModelSgb::default(),
         }
     }
 
     /// Selects the hardware model, which decides the PPU's timing along with the CPU's speed.
     pub(super) fn set_model(&mut self, model: Model) {
         self.model = model;
-        self.sgb = model.is_sgb().then(|| Box::new(Sgb::new()));
+        self.sgb = ModelSgb(model.is_sgb().then(|| Box::new(Sgb::new())));
         self.timing = if model.is_cgb() {
             TimingVariant::Cgb
         } else {
@@ -564,17 +565,17 @@ impl Gpu {
 
     /// The Super Game Boy's side of the console, on the Super Game Boy models.
     pub(crate) fn sgb(&self) -> Option<&Sgb> {
-        self.sgb.as_deref()
+        self.sgb.0.as_deref()
     }
 
     pub(crate) fn sgb_mut(&mut self) -> Option<&mut Sgb> {
-        self.sgb.as_deref_mut()
+        self.sgb.0.as_deref_mut()
     }
 
     /// On a Super Game Boy, draws the last picture again with the menu's
     /// settings as they are now (`Sgb::redraw`).
     pub(crate) fn redraw_sgb_picture(&mut self) {
-        if let Some(sgb) = &mut self.sgb {
+        if let Some(sgb) = &mut self.sgb.0 {
             sgb.redraw(&mut self.completed_frame);
         }
     }
@@ -703,7 +704,7 @@ impl Gpu {
     /// first frame after the LCD is switched on), and keeps showing the last one while none are
     /// drawn (SameBoy).
     fn publish_frame(&mut self, blank: bool, drawn: bool) {
-        if let Some(sgb) = &mut self.sgb {
+        if let Some(sgb) = &mut self.sgb.0 {
             let frame = drawn.then_some(self.frame_buffer.as_flattened());
             sgb.finish_frame(frame, &mut self.completed_frame);
         } else if blank {
@@ -901,7 +902,7 @@ impl Gpu {
     /// holds.
     fn count_idle_dots(&mut self, dots: u32, blank: bool) -> u32 {
         let counted = dots.min(self.idle_dots_until_frame());
-        self.idle_dots = self.idle_dots.wrapping_add(counted);
+        self.idle_dots += counted;
         if self.idle_dots == DOTS_PER_FRAME {
             self.idle_dots = 0;
             self.publish_frame(blank, false);
@@ -1095,6 +1096,9 @@ impl Gpu {
     }
 
     /// Places the line timeline at `dot` of `line`, to match where the boot ROM leaves the PPU.
+    /// Only for positions where no line is being drawn: VBlank, OAM scan, or HBlank once mode 3
+    /// would be over (dot 252 or later). It doesn't set the renderer up for a line in progress,
+    /// so tests that place it elsewhere don't draw.
     pub(super) fn set_frame_position(&mut self, line: u8, dot: u16) {
         self.line = line;
         self.line_dot = dot;

@@ -6,6 +6,7 @@ use crate::test_roms::{
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::palettes::DmgPalette;
 use nubo_frontend::sgb_menu::SgbColors;
+use std::time::Instant;
 
 /// Frames the boot ROM takes, with room to spare, before a test program
 /// runs.
@@ -267,11 +268,11 @@ fn a_button_held_across_a_loaded_state_stays_pressed() {
     let mut state = vec![0; core.serialize_size()];
     assert!(core.serialize(&mut state), "saved with A released");
     run_holding(&mut core, 1, buttons(&[A]));
-    assert!(core.unserialize(&state));
+    assert!(core.unserialize(&state).is_ok());
     run_holding(&mut core, 2, buttons(&[A]));
     assert_eq!(work_ram(&mut core, 0xC001) & 0x0F, 0b1110, "A");
 
-    assert!(core.unserialize(&state));
+    assert!(core.unserialize(&state).is_ok());
     run(&mut core, 2);
     assert_eq!(work_ram(&mut core, 0xC001) & 0x0F, 0x0F, "released");
 }
@@ -338,7 +339,7 @@ fn loading_a_state_puts_its_ram_in_the_buffer_and_keeps_it_there() {
     run(&mut core, 2);
     assert_eq!(work_ram(&mut core, 0xC000), 0x33);
 
-    assert!(core.unserialize(&state));
+    assert!(core.unserialize(&state).is_ok());
     assert_eq!(core.save_ram()[0], 0x5A);
     let cartridge_ram = core.emulator().cartridge_ram().to_vec();
     assert_eq!(core.save_ram(), cartridge_ram);
@@ -369,6 +370,20 @@ fn game_time(core: &mut Core) -> (u8, u8, u8) {
     )
 }
 
+/// How many seconds the game's clock read past 10:20:30 (see [`ten_twenty_thirty`]).
+fn seconds_past_ten_twenty_thirty((hours, minutes, seconds): (u8, u8, u8)) -> i64 {
+    let total = |hours: u8, minutes: u8, seconds: u8| {
+        i64::from(hours) * 3600 + i64::from(minutes) * 60 + i64::from(seconds)
+    };
+    total(hours, minutes, seconds) - total(10, 20, 30)
+}
+
+/// The whole real seconds since `started`, plus one for the second under way: as far as a
+/// wall clock can have moved on.
+fn real_seconds_since(started: Instant) -> i64 {
+    i64::try_from(started.elapsed().as_secs()).unwrap() + 1
+}
+
 fn emulated_time() -> Options {
     Options {
         rtc_clock: RtcClock::EmulatedTime,
@@ -388,14 +403,18 @@ fn a_clock_filled_in_before_the_first_frame_is_what_the_game_reads() {
     for options in [Options::default(), emulated_time()] {
         let mut core = clock_game(options);
         assert_eq!(core.rtc_memory().len(), RtcState::BYTES);
+        let started = Instant::now();
         core.rtc_memory()
             .copy_from_slice(&ten_twenty_thirty().to_bytes());
         run(&mut core, BOOT_FRAMES);
-        let (hours, minutes, seconds) = game_time(&mut core);
-        assert_eq!((hours, minutes), (10, 20), "{options:?}");
+        let passed = seconds_past_ten_twenty_thirty(game_time(&mut core));
+        let most = match options.rtc_clock {
+            RtcClock::EmulatedTime => 4,
+            RtcClock::WallClock => real_seconds_since(started),
+        };
         assert!(
-            (30..=34).contains(&seconds),
-            "{options:?}: {seconds} seconds"
+            (0..=most).contains(&passed),
+            "{options:?}: {passed} seconds past 10:20:30"
         );
     }
 }
@@ -407,6 +426,7 @@ fn the_clock_the_game_keeps_reaches_the_buffer_in_the_wall_clock_layout() {
         .copy_from_slice(&ten_twenty_thirty().to_bytes());
     run(&mut core, BOOT_FRAMES);
     let before = RtcState::from_bytes(core.rtc_memory()).unwrap();
+    let started = Instant::now();
     run(&mut core, 120);
     let after = RtcState::from_bytes(core.rtc_memory()).unwrap();
     let seconds = |clock: &RtcState| u32::from(clock.minutes) * 60 + u32::from(clock.seconds);
@@ -416,8 +436,9 @@ fn the_clock_the_game_keeps_reaches_the_buffer_in_the_wall_clock_layout() {
         "two emulated seconds"
     );
     let behind = wall_clock_millis() - after.base_timestamp;
+    let most = started.elapsed().as_secs_f64() * 1000.0 + 1000.0;
     assert!(
-        (0.0..10_000.0).contains(&behind),
+        (0.0..most).contains(&behind),
         "on the wall clock: {behind} ms"
     );
 }
@@ -438,7 +459,7 @@ fn loading_a_state_puts_its_clock_in_the_buffer_and_keeps_it_there() {
     run(&mut core, 2);
     assert_eq!(game_time(&mut core).0, 20);
 
-    assert!(core.unserialize(&state));
+    assert!(core.unserialize(&state).is_ok());
     let loaded_clock = RtcState::from_bytes(core.rtc_memory()).unwrap();
     assert_eq!(
         (
@@ -476,6 +497,7 @@ fn a_restart_keeps_the_save_and_the_clock() {
 #[test]
 fn a_restart_takes_on_the_model_and_the_clock_the_options_pick_now() {
     let mut core = clock_game(emulated_time());
+    let started = Instant::now();
     core.rtc_memory()
         .copy_from_slice(&ten_twenty_thirty().to_bytes());
     run(&mut core, BOOT_FRAMES);
@@ -489,11 +511,11 @@ fn a_restart_takes_on_the_model_and_the_clock_the_options_pick_now() {
     core.reset().unwrap();
     assert_eq!(core.model(), Model::CgbC);
     run(&mut core, BOOT_FRAMES);
-    let (hours, minutes, _) = game_time(&mut core);
-    assert_eq!(
-        (hours, minutes),
-        (10, 20),
-        "the clock neither stood still nor jumped"
+    // The emulated seconds of the first run, then the real ones since the restart.
+    let passed = seconds_past_ten_twenty_thirty(game_time(&mut core));
+    assert!(
+        (0..=4 + real_seconds_since(started)).contains(&passed),
+        "the clock jumped: {passed} seconds past 10:20:30"
     );
 
     core.set_options(emulated_time());
@@ -532,7 +554,7 @@ fn a_loaded_state_goes_on_exactly_like_the_run_it_was_saved_from() {
         assert!(core.serialize(&mut state));
         let first = record(&mut core, 100);
 
-        assert!(core.unserialize(&state));
+        assert!(core.unserialize(&state).is_ok());
         let second = record(&mut core, 100);
         assert!(
             first == second,
@@ -568,7 +590,7 @@ fn a_restart_onto_a_super_game_boy_still_saves_states() {
         assert_eq!(core.serialize_size(), size, "RetroArch's size stays");
         let mut state = vec![0; size];
         assert!(core.serialize(&mut state), "a state on the {model:?} fits");
-        assert!(core.unserialize(&state));
+        assert!(core.unserialize(&state).is_ok());
     }
 }
 
@@ -624,11 +646,30 @@ fn damaged_or_foreign_states_do_not_load_and_change_nothing() {
         &other_state,
     ] {
         assert!(core.serialize(&mut before));
-        assert!(!core.unserialize(bad));
+        assert!(core.unserialize(bad).is_err());
         let mut after = vec![0; core.serialize_size()];
         assert!(core.serialize(&mut after));
         assert!(before == after, "a failed load changed the game");
     }
+}
+
+#[test]
+fn a_state_from_another_model_says_so() {
+    let mut core = booted(MBC1_RAM_BATTERY, RAM_8_KIB, RAM);
+    let mut state = vec![0; core.serialize_size()];
+    assert!(core.serialize(&mut state));
+    core.set_options(Options {
+        model: ModelPreference::Fixed(Model::CgbC),
+        ..Options::default()
+    });
+    core.reset().unwrap();
+    assert_eq!(
+        core.unserialize(&state),
+        Err(SaveStateError::DifferentModel {
+            found: Model::Dmg,
+            expected: Model::CgbC,
+        })
+    );
 }
 
 /// How much a state's length can change while a game runs: every program
@@ -887,7 +928,7 @@ fn a_state_saved_after_retroarch_wrote_memory_holds_the_write() {
     assert!(core.serialize(&mut state));
     core.system_ram()[0x100] = 0x00;
     run(&mut core, 2);
-    assert!(core.unserialize(&state));
+    assert!(core.unserialize(&state).is_ok());
     assert_eq!(core.system_ram()[0x100], 0x42);
     run(&mut core, 2);
     assert_eq!(cheated(&mut core).0, 0x42);

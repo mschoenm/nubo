@@ -1,5 +1,5 @@
 //! The game's recent past, for rewinding: a save state every few frames,
-//! going back up to [`MAX_STATES`] states or [`MAX_BYTES`] of memory.
+//! the newest and up to [`MAX_STATES`] older ones or [`MAX_BYTES`] of memory.
 //!
 //! States a few frames apart are mostly the same, so only the newest is
 //! kept whole. Each older one is kept as its difference from the next newer
@@ -10,7 +10,7 @@ use std::collections::VecDeque;
 
 /// Every how many frames a state is kept: 15 a second.
 pub const FRAMES_PER_STATE: u32 = 4;
-/// The most states kept: 30 seconds of play.
+/// The most older states kept besides the newest: 30 seconds of play.
 const MAX_STATES: usize = 30 * 60 / FRAMES_PER_STATE as usize;
 /// The most memory the history takes; the oldest states go first.
 const MAX_BYTES: usize = 64 * 1024 * 1024;

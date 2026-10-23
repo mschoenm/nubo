@@ -5,7 +5,7 @@ test checks, what Nubo does instead, and why it isn't fixed yet or can't be. `ca
 prints the same list with each test's symptom, and failing screenshot tests leave the emulator's
 screen and a diff in `target/test-roms/failures/<model>/`.
 
-Gambatte's tests and its behaviour are mentioned throughout. Gambatte is GPL-2.0-only, so Nubo uses
+Gambatte's tests and its behavior are mentioned throughout. Gambatte is GPL-2.0-only, so Nubo uses
 it only as a reference: its test ROMs, and what a local build of it does on them. None of its code is
 ported.
 
@@ -159,7 +159,7 @@ the difference can't be modelled as a hardware revision. Every variant tried bre
 | AND instead of OR | none | 9: 7 Gambatte tests (only the line ends broke), both Mealybug BGP tests |
 | The new value shows at once, no mixed dot | the 8 Gambatte tests | both Mealybug BGP tests; AGE's still fails |
 
-Mealybug's test changes BGP between neighbouring values, where OR and the new value differ in
+Mealybug's test changes BGP between neighboring values, where OR and the new value differ in
 subtle ways, while Gambatte's only switch between 00 and FF. **Next step:** tabulate every BGP write
 of the three suites (the dot it lands on, the pixel being output, the fetcher step, SCX & 7, the old
 and new values, what the hardware shows) and look for what separates the OR cases from the "new
@@ -204,13 +204,13 @@ cgb-c gambatte/scx_during_m3/scx_attrib_during_m3_spx2_ds.gbc
 **What they check.** SCX writes during mode 3 with an object on the left edge of the screen.
 
 **Why they can't pass.** Only pixel x = 0 of lines 0 to 7 differs: Nubo draws black, the reference
-shows the colour (33, 146, 108). That pixel is colour 2 of object palette 0, and these tests never
-write the object palettes, so the colour is whatever the CGB's object palette RAM held at power-on.
+shows the color (33, 146, 108). That pixel is color 2 of object palette 0, and these tests never
+write the object palettes, so the color is whatever the CGB's object palette RAM held at power-on.
 Patching all SCX writes out of the test leaves the pixel unchanged, so timing plays no part. The
 reference was made with Gambatte, which starts with object palette RAM holding values read from one
-real console; the colour matches its entry (0x4261) exactly. Real consoles power on with different
+real console; the color matches its entry (0x4261) exactly. Real consoles power on with different
 contents, so passing would mean copying that one console's dump into Nubo, which would be fitting the
-test rather than emulating the hardware (and Gambatte's licence doesn't allow copying it). The DMG
+test rather than emulating the hardware (and Gambatte's license doesn't allow copying it). The DMG
 version of the test passes.
 
 ## GBMicrotest
@@ -282,7 +282,7 @@ The test writes OAM at many points of a line and reads it back. 32 of its 40 row
 differ are the third row of each SCX block, which the source marks with (*): "DMG-C: This line seems
 to depend on when the LCD was last switched off. When the test is expanded to cover more than 2
 frames, the complete line looks different. [...] TODO: we should look into this." Until the hardware
-behaviour behind those rows is known, there is nothing to model.
+behavior behind those rows is known, there is nothing to model.
 
 ## The GB Emulator Shootout
 

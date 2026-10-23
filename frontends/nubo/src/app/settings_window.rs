@@ -187,6 +187,7 @@ impl App {
                 errors,
             } => {
                 self.deletions_running = self.deletions_running.saturating_sub(1);
+                self.refresh_game_menu_save_states();
                 for error in errors {
                     self.toasts.error(error);
                 }
@@ -253,7 +254,7 @@ impl App {
         if choices.reset_settings || choices.reset_controls || choices.remove_folders {
             let mut settings = if choices.reset_settings {
                 self.model_override = None;
-                self.settings.reset(false)
+                self.settings.reset()
             } else {
                 self.settings.clone()
             };

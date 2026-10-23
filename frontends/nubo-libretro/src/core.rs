@@ -25,7 +25,7 @@
 use crate::options::Options;
 use nubo_core::{
     CartridgeEffects, CartridgeHeader, DOTS_PER_FRAME, Emulator, Key, LoadRomError, Model,
-    RtcClock, RtcState, SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH, SgbBorder, extract_rom,
+    RtcClock, RtcState, SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH, SaveStateError, SgbBorder, extract_rom,
     validate_gamegenie_code,
 };
 use nubo_frontend::picture::Frame;
@@ -43,7 +43,8 @@ pub const SCREEN_HEIGHT: usize = 144;
 /// The widest picture the core hands over: a Super Game Boy's, with its
 /// border.
 pub const MAX_WIDTH: usize = SGB_FRAME_WIDTH as usize;
-/// The highest picture the core hands over.
+/// The tallest picture the core hands over: a Super Game Boy's, with its
+/// border.
 pub const MAX_HEIGHT: usize = SGB_FRAME_HEIGHT as usize;
 /// How many samples per second of each channel the core hands RetroArch.
 /// Nubo makes exactly this many per emulated second, and RetroArch
@@ -56,11 +57,11 @@ pub const FRAMES_PER_SECOND: f64 = DOTS_PER_SECOND / DOTS_PER_FRAME as f64;
 
 /// The bytes a save state may grow by after the first one of a game on its
 /// longest model (see [`largest_state`]), so [`Core::serialize_size`] never
-/// has to change. Only a few values change
-/// the length of a state, and by little: enum variants are stored by name
-/// (`Halted` is longer than `Running`), `Option`s with their value only when
-/// there is one, and the PPU's pixel queues with the pixels they hold, which
-/// together come to well under a kilobyte (the tests measure it).
+/// has to change. Only a few values change the length of a state, and by
+/// little: enum variants are stored by name (`Halted` is longer than
+/// `Running`), `Option`s with their value only when there is one, and the
+/// PPU's pixel queues with the pixels they hold, which together come to well
+/// under a kilobyte (the tests measure it).
 const STATE_SIZE_MARGIN: usize = 16 * 1024;
 /// The length of the number before each save state: its length in bytes.
 const STATE_LENGTH_BYTES: usize = 4;
@@ -608,26 +609,22 @@ impl Core {
         true
     }
 
-    /// Loads a save state written by [`Core::serialize`]. Returns false,
+    /// Loads a save state written by [`Core::serialize`]. Returns why not,
     /// leaving the game as it was, if it isn't one or is for another game or
     /// model.
-    pub fn unserialize(&mut self, data: &[u8]) -> bool {
-        let Some((length, rest)) = data.split_first_chunk::<STATE_LENGTH_BYTES>() else {
-            return false;
-        };
-        let Some(state) = usize::try_from(u32::from_le_bytes(*length))
+    pub fn unserialize(&mut self, data: &[u8]) -> Result<(), SaveStateError> {
+        let (length, rest) = data
+            .split_first_chunk::<STATE_LENGTH_BYTES>()
+            .ok_or(SaveStateError::InvalidFormat)?;
+        let state = usize::try_from(u32::from_le_bytes(*length))
             .ok()
             .and_then(|length| rest.get(..length))
-        else {
-            return false;
-        };
-        if self.emulator.load_state(state).is_err() {
-            return false;
-        }
+            .ok_or(SaveStateError::InvalidFormat)?;
+        self.emulator.load_state(state)?;
         self.sync_saves_from_emulator();
         self.draw_frame();
         self.memory.update(&mut self.emulator);
-        true
+        Ok(())
     }
 
     /// Turns every cheat off.
@@ -844,7 +841,9 @@ pub enum MemoryKind {
 /// RetroAchievements reads and RetroArch's memory tools (its memory editor,
 /// the cheats its memory search makes, `WRITE_CORE_MEMORY`) read and write.
 /// Copies keep pointers into the emulator out of RetroArch's hands. Each
-/// buffer is boxed, so it stays at one address.
+/// buffer is boxed, so it stays at one address, and RetroArch touches it only
+/// between calls into the core, while no Rust reference to it is live (see
+/// `ffi`'s module docs).
 ///
 /// What RetroArch writes reaches the game through [`MemorySnapshot::apply`]
 /// before the next frame: `written` holds what the core last copied into

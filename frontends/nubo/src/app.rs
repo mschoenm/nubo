@@ -155,6 +155,11 @@ pub struct App {
     box_art_problem: Option<String>,
     /// The dialog over the screen, if one is open.
     dialog: Option<Dialog>,
+    /// Whether the game whose menu is open has save states, so the menu
+    /// offers to delete them. Worked out when the menu opens and when save
+    /// states are deleted (`App::refresh_game_menu_save_states`) rather than
+    /// on every redraw, since it looks for each slot's file.
+    game_menu_save_states: bool,
     /// What the newest toast's Undo button puts back, if it has one.
     undo: Option<playing::UndoPoint>,
     /// How many resets are deleting saves in the background. No game starts
@@ -284,6 +289,7 @@ impl App {
             loading_game_list: false,
             box_art_problem: None,
             dialog: None,
+            game_menu_save_states: false,
             undo: None,
             deletions_running: 0,
             start_after_deleting: None,

@@ -1,17 +1,18 @@
 //! Starts each test where the boot ROM hands over to the cartridge.
 //!
-//! The boot ROM runs for about 2.5 emulated seconds, far longer than most
-//! tests. It only looks at a few header bytes of the ROM
-//! ([`Emulator::boot_rom_input`]), so each worker thread runs it once per
-//! model and set of those bytes and starts the other ROMs that share them
-//! from a copy ([`Emulator::clone_with_rom`]). With `--verify-boot` every
+//! The boot ROM runs for 1.7 emulated seconds on the DMG, 3.1 on the CGB and
+//! 3.5 on the Super Game Boy, far longer than most tests. It only looks at
+//! a few header bytes of the ROM ([`Emulator::boot_rom_input`]), so each
+//! worker thread runs it once per model and set of those bytes and starts
+//! the other ROMs that share them from a copy
+//! ([`Emulator::clone_with_rom`]). With `--verify-boot` every
 //! test runs the real boot ROM instead and checks that the copy would have
 //! been identical, which makes the whole run take about two and a half
 //! minutes instead of about 30 seconds. The core test
 //! `clone_with_rom_matches_a_real_boot` checks the same for every model, with
 //! ROMs that differ everywhere outside the header bytes the boot ROM reads.
 
-use crate::runner::{Progress, STALL_LIMIT};
+use crate::runner::{Progress, STALL_LIMIT, STEPS_BETWEEN_STALL_CHECKS};
 use crate::suites::Model;
 use nubo_core::{Emulator, NoSaves, RtcClock};
 use std::collections::HashMap;
@@ -20,8 +21,6 @@ use std::time::Instant;
 /// The core's audio buffer holds 512 samples, so at this sample rate one
 /// buffer is exactly 1/128 of a second of emulated time.
 pub(crate) const SAMPLE_RATE: u32 = 65536;
-/// Instructions to run between checks for a stalled boot.
-const STEPS_BETWEEN_STALL_CHECKS: u32 = 10_000;
 
 /// Cartridge hooks with no saves and a real-time clock that counts emulated
 /// time, so every run is the same.

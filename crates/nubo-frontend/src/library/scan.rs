@@ -2,7 +2,7 @@
 //! `Emulator::read_rom_header`.
 
 use super::{LibraryEntry, seconds_since_epoch};
-use crate::rom::EXTENSIONS;
+use crate::rom::{EXTENSIONS, MAX_FILE_SIZE};
 use crate::settings::LibraryFolder;
 use crate::time::SystemTime;
 use nubo_core::{CartridgeHeader, Emulator};
@@ -10,9 +10,6 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
-
-/// The largest Game Boy ROMs are 8 MiB; bigger files are something else.
-const MAX_FILE_SIZE: u64 = 16 * 1024 * 1024;
 
 /// What a scan found.
 #[derive(Debug, Clone, Default)]
@@ -62,9 +59,8 @@ pub struct FileCheck {
 /// Looks for ROMs in `folders` and returns an entry for each, reusing the
 /// `known` entry of files that didn't change (reading such a file only to
 /// learn whether it uses the Super Game Boy, when an earlier version didn't
-/// keep that). Recently played games outside
-/// the folders stay in the library as long as their file exists. Files that
-/// aren't valid ROMs are left out.
+/// keep that). Recently played games outside the folders stay in the library
+/// as long as their file exists. Files that aren't valid ROMs are left out.
 ///
 /// A known game whose file is gone is forgotten, unless the folder it is on
 /// is gone too: then it is most likely on a drive that is unplugged, and it

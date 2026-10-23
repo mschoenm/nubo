@@ -118,6 +118,13 @@ impl App {
                     LibraryMessage::FolderPicked(path).into()
                 });
             }
+            LibraryMessage::FolderPicked(Some(path)) if path.to_str().is_none() => {
+                // The settings file is TOML, whose text must be valid UTF-8.
+                self.toasts.error(format!(
+                    "Nubo can't keep {} as a game folder: its name has characters the settings can't store",
+                    path.display()
+                ));
+            }
             LibraryMessage::FolderPicked(Some(path)) => {
                 if !self
                     .settings
@@ -207,6 +214,7 @@ impl App {
                     Ok(()) => self.toasts.info("Save states deleted"),
                     Err(error) => self.toasts.error(error),
                 }
+                self.refresh_game_menu_save_states();
             }
             LibraryMessage::Watch(WatchEvent::Failed(error)) => self.toasts.error(format!(
                 "New games won't show up by themselves ({error}). Use \"Look for new games now\" in a folder's menu in Settings › Library instead."
@@ -598,9 +606,8 @@ impl App {
 
     /// Starts scanning the library folders in the background. A folder
     /// menu's "Look for new games now", the folder watcher and folder
-    /// changes all come here;
-    /// while a scan runs, they lead to one more scan after it instead of a
-    /// second scan at the same time.
+    /// changes all come here; while a scan runs, they lead to one more scan
+    /// after it instead of a second scan at the same time.
     pub(super) fn rescan(&mut self) -> Task<Message> {
         if !self.keeps_library() {
             return Task::none();

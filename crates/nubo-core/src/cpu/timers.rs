@@ -1,10 +1,11 @@
 //! The timer: DIV (0xFF04), TIMA (0xFF05), TMA (0xFF06) and TAC (0xFF07).
 //!
 //! A 16-bit system counter counts the ticks of the CPU's clock, four per
-//! M-cycle (see `clock.rs`); DIV shows its upper byte. TIMA counts up when the system counter bit selected by TAC falls from
-//! 1 to 0, and when it overflows it is reloaded from TMA and requests the timer
-//! interrupt. Because TIMA reacts to falling edges, writes to DIV or TAC that
-//! drop the selected bit also count it up, as on hardware.
+//! M-cycle (see `clock.rs`); DIV shows its upper byte. TIMA counts up when the
+//! system counter bit selected by TAC falls from 1 to 0, and when it overflows
+//! it is reloaded from TMA and requests the timer interrupt. Because TIMA
+//! reacts to falling edges, writes to DIV or TAC that drop the selected bit
+//! also count it up, as on hardware.
 
 use crate::address_bus::MemoryMapped;
 use crate::clock::SYSTEM_COUNTER_TICKS_PER_M_CYCLE;
@@ -22,9 +23,10 @@ const UNUSED_CONTROL_BITS: u8 = 0xF8;
 pub struct TimerRegisters {
     /// The internal counter that DIV is the upper byte of. The APU and the
     /// serial port keep copies to find the edges of its bits; the address bus
-    /// tells them about every change (`AddressBus::step_timers`,
-    /// `AddressBus::reset_divider`, `AddressBus::run_bulk_cycles`,
-    /// `AddressBus::set_post_boot_system_counter`).
+    /// passes them every change (`AddressBus::step_timers`,
+    /// `AddressBus::reset_divider`, `AddressBus::run_bulk_cycles`). After the
+    /// boot ROM's jump (`AddressBus::set_post_boot_system_counter`), the APU
+    /// learns the new value at once and the serial port at its next step.
     system_counter: u16,
     /// TIMA, the timer counter.
     counter: u8,

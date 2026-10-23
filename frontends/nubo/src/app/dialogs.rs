@@ -134,24 +134,23 @@ impl App {
         self.scroll_to_selection()
     }
 
-    /// Scrolls a question so the choice the D-pad is on is in view, in a
-    /// window too short for all of it. A menu scrolls its rows by itself.
+    /// Scrolls a question, or a menu's rows, so the choice the D-pad is on
+    /// is in view, in a window too short for all of it. Iced doesn't scroll
+    /// to the app's own highlight by itself.
     fn scroll_to_selection(&self) -> Task<Message> {
-        match (&self.dialog, self.dialog_content()) {
-            (Some(dialog), Some(content)) if content.layout == Layout::Buttons => {
-                scroll_in_proportion(
-                    views::dialog::scroll_id(),
-                    dialog.selection,
-                    content.choices.len(),
-                )
-            }
-            _ => Task::none(),
-        }
+        let Some((dialog, content)) = self.dialog.as_ref().zip(self.dialog_content()) else {
+            return Task::none();
+        };
+        let id = match content.layout {
+            Layout::Buttons => views::dialog::scroll_id(),
+            Layout::List => views::dialog::list_scroll_id(),
+        };
+        scroll_in_proportion(id, dialog.selection, content.choices.len())
     }
 
     /// What the reset can do besides the settings in this build and this
     /// run. Saves can't be deleted while a game is open, which would write
-    /// its own again, so their boxes are greyed out then, and nothing kept
+    /// its own again, so their boxes are grayed out then, and nothing kept
     /// between runs is touched with `--fresh`.
     pub(super) fn reset_offers(&self) -> ResetOffers {
         let keeps_data = !self.fresh;
@@ -182,6 +181,7 @@ impl App {
             })
         );
         self.dialog = Some(Dialog::new(DialogKind::GameMenu(path, page)));
+        self.refresh_game_menu_save_states();
         let selection = if page == GameMenuPage::Main && from_consoles {
             Some(CONSOLE_ROW)
         } else {
@@ -275,7 +275,7 @@ impl App {
                 DialogAction::CloseThen(LibraryMessage::RemoveRecent(path.clone()).into()),
             ));
         }
-        if save_states::AVAILABLE && !self.fresh && save_states::any_saved(path) {
+        if self.game_menu_save_states {
             choices.push(Choice::new(
                 Icon::Trash2,
                 "Delete save states…",
@@ -398,6 +398,21 @@ impl App {
     pub(super) fn open_dialog(&mut self, kind: DialogKind) {
         if self.dialog.is_none() {
             self.dialog = Some(Dialog::new(kind));
+        }
+    }
+
+    /// Works out whether the game whose menu is open has save states (see
+    /// `App::game_menu_save_states`). The menu only opens in the library,
+    /// where no game runs, so only deleting can change that while it is
+    /// open. With another dialog open nothing changes.
+    pub(super) fn refresh_game_menu_save_states(&mut self) {
+        if let Some(Dialog {
+            kind: DialogKind::GameMenu(path, _),
+            ..
+        }) = &self.dialog
+        {
+            self.game_menu_save_states =
+                save_states::AVAILABLE && !self.fresh && save_states::any_saved(path);
         }
     }
 
@@ -685,8 +700,8 @@ impl ResetOffers {
 
 impl ResetChoices {
     /// These choices as far as `offers` allows them: a box that isn't on
-    /// show or is greyed out resets nothing, such as a deleting one that a
-    /// game opened meanwhile greyed out.
+    /// show or is grayed out resets nothing, such as a deleting one that a
+    /// game opened meanwhile grayed out.
     pub fn within(self, offers: ResetOffers) -> ResetChoices {
         let can_delete = offers.can_delete_saves();
         ResetChoices {
@@ -714,9 +729,9 @@ impl ResetChoices {
 /// first, one for the controls, unticked at first, and one for each other
 /// thing `offers` lets it reset, ticked as in `choices`. A box ticks or
 /// unticks itself with `DialogMessage::ResetChoicesChanged`. While a game is
-/// open, the boxes that delete saves are greyed out and unticked, and say to
+/// open, the boxes that delete saves are grayed out and unticked, and say to
 /// close the game first, so nobody wonders whether the reset deletes them
-/// anyway. The button says what it does, and is greyed out while nothing is
+/// anyway. The button says what it does, and is grayed out while nothing is
 /// ticked.
 fn reset_question(choices: ResetChoices, offers: ResetOffers) -> DialogContent {
     let effective = choices.within(offers);
@@ -900,8 +915,9 @@ fn delete_question(path: &Path, entry: Option<&LibraryEntry>) -> DialogContent {
 /// The question whether to switch a game to `configured`, the model it is
 /// now set to start on, starting it from the title screen, or stay on
 /// `saved`, the model its automatic save was made on, continuing from that
-/// save. With `remembers`, it says that staying keeps the game on `saved`. The models are named by
-/// their console, or by their revision when both are the same console.
+/// save. With `remembers`, it says that staying keeps the game on `saved`.
+/// The models are named by their console, or by their revision when both
+/// are the same console.
 fn other_model_question(saved: Model, configured: Model, remembers: bool) -> DialogContent {
     let name = |model: Model| {
         if Console::of(saved) == Console::of(configured) {

@@ -5,9 +5,8 @@
 //! ROM bank or select the RAM bank, depending on the banking mode.
 
 use crate::address_bus::bank_utils::{banked_read, banked_write};
-use crate::address_bus::constants::{
-    CARTRIDGE_TYPE_MBC1_RAM, CARTRIDGE_TYPE_MBC1_RAM_BATTERY, RAM_BANK_SIZE,
-};
+use crate::address_bus::cartridge::lacks_ram;
+use crate::address_bus::constants::RAM_BANK_SIZE;
 use nubo_serializable_derive::Serializable;
 
 /// What BANK2 is used for, chosen by writing to 0x6000-0x7FFF.
@@ -61,10 +60,7 @@ impl Mbc1CartridgeMapper {
             bank2: 0,
             mode: Mbc1BankingMode::Rom,
             is_multicart: is_multicart(rom),
-            has_ram: matches!(
-                cartridge_type,
-                CARTRIDGE_TYPE_MBC1_RAM | CARTRIDGE_TYPE_MBC1_RAM_BATTERY
-            ),
+            has_ram: !lacks_ram(cartridge_type),
         }
     }
 
@@ -99,6 +95,15 @@ impl Mbc1CartridgeMapper {
             Mbc1BankingMode::Rom => 0,
             Mbc1BankingMode::Ram => self.bank2,
         }
+    }
+
+    /// Cuts the registers of a loaded save state to the bits they have, and
+    /// BANK1 from 0 to 1, as the game's writes do, so a damaged state can't
+    /// map a bank the hardware can't.
+    pub(super) fn within_register_widths(&mut self) {
+        let bank1 = self.bank1 & 0x1F;
+        self.bank1 = if bank1 == 0 { 1 } else { bank1 };
+        self.bank2 &= 0x3;
     }
 
     /// Sets a register by writing to the ROM area.

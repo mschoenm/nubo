@@ -7,8 +7,41 @@ use crate::gpu::{
     DOTS_PER_FRAME, DOTS_PER_LINE, FRAME_SCANLINE_COUNT, Gpu, LAST_LINE, LineState, TimingVariant,
     VBLANK_START_LINE, VRAM_MODE,
 };
-use crate::serializable::{FieldWriter, Serializable, read_fields};
+use crate::serializable::{FieldWriter, Serializable, read_fields, unreadable_value};
+use crate::sgb::Sgb;
 use std::io::{Read, Write};
+
+/// The PPU's Super Game Boy, which only the Super Game Boy models have. It is stored like an
+/// `Option`, but a load never adds or drops it: a state that has one where the model has none,
+/// or the other way round, is refused before anything changes. Dropping it would lose what it
+/// leaves out of save states (the player's border and palette, the last bordered frame), and
+/// undoing the refused load couldn't bring that back.
+#[derive(Clone, Debug, Default)]
+pub(super) struct ModelSgb(pub(super) Option<Box<Sgb>>);
+
+impl Serializable for ModelSgb {
+    fn serialize(&self, writer: &mut dyn Write) -> std::io::Result<()> {
+        self.0.serialize(writer)
+    }
+
+    fn deserialize(&mut self, reader: &mut dyn Read) -> std::io::Result<()> {
+        let mut tag = 0u8;
+        tag.deserialize(reader)?;
+        match (tag, &mut self.0) {
+            (0, None) => Ok(()),
+            (1, Some(sgb)) => sgb.deserialize(reader),
+            (2.., _) => Err(unreadable_value("an Option's tag isn't 0 or 1")),
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "a Super Game Boy on a model without one, or none on a model with one",
+            )),
+        }
+    }
+
+    fn encoding() -> String {
+        Option::<Box<Sgb>>::encoding()
+    }
+}
 
 /// Implements `Serializable` like `#[derive(Serializable)]` would, for a struct whose loaded values
 /// need checking, which the derive can't do: it stores the fields after `saved` with their names,
@@ -66,10 +99,9 @@ impl Gpu {
     /// index out of bounds or overflow, or keep it from ever leaving them: a position outside the
     /// frame, a line state or LY that doesn't fit the line, a line outside the frame for LYC to be
     /// compared with, a mode STAT can't show, timing of another model (the address bus checks the
-    /// speed against its own once everything has loaded), a frame buffer of
-    /// the wrong size, an OAM DMA write outside OAM, a renderer state that doesn't fit
-    /// (`Pipeline::is_consistent`), or a Super Game Boy on a model without one, or none on a
-    /// model with one.
+    /// speed against its own once everything has loaded), a frame buffer of the wrong size, an OAM
+    /// DMA write outside OAM, a renderer state that doesn't fit (`Pipeline::is_consistent`), or a
+    /// Super Game Boy on a model without one, or none on a model with one.
     fn check_loaded_state(&self) -> std::io::Result<()> {
         let line_state_fits = match self.line_state {
             LineState::OamScan | LineState::Drawing | LineState::HBlank => {
@@ -92,7 +124,7 @@ impl Gpu {
                 .pending_dma_oam_write
                 .is_none_or(|write| usize::from(write.index) < self.object_attribute_memory.len())
             && self.pipeline.is_consistent(drawing_line)
-            && self.sgb.is_some() == self.model.is_sgb();
+            && self.sgb.0.is_some() == self.model.is_sgb();
         if valid {
             Ok(())
         } else {

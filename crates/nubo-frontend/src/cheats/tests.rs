@@ -161,3 +161,33 @@ fn a_list_that_cant_be_read_is_not_safe_to_save_over() {
     assert!(!error.saving_is_safe);
     assert!(error.problem.contains("permission denied"), "{error}");
 }
+
+#[test]
+fn cheats_read_from_a_file_are_checked_and_put_in_form() {
+    let file = br#"
+[[cheats]]
+name = "Lowercase"
+code = "01ff56d0"
+enabled = true
+
+[[cheats]]
+name = "No dashes"
+code = "00a17bc49 cED56a"
+enabled = true
+
+[[cheats]]
+name = "Too short"
+code = "01FF56"
+enabled = true
+"#;
+
+    let cheats = parse_list(file.to_vec()).unwrap();
+
+    assert_eq!(cheats[0].code, "01FF56D0");
+    assert!(cheats[0].enabled);
+    assert_eq!(cheats[1].code, "00A-17B-C49+CED-56A");
+    assert!(cheats[1].enabled);
+    assert_eq!(cheats[2].code, "01FF56");
+    assert!(!cheats[2].enabled, "a code that isn't one stays off");
+    assert!(cheats[2].check().is_err());
+}

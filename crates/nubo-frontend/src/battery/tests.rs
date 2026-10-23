@@ -136,12 +136,70 @@ fn a_write_that_fails_is_reported_and_kept() {
     saves.queue_ram(&[1, 2, 3, 4], Instant::now());
     saves.flush();
 
-    assert!(saves.load_ram().is_none());
     assert_eq!(
         notices.take(),
         ["Could not save the game to game.sav: the system has no data folder to keep saves in"]
     );
     assert!(saves.pending().ram.is_some());
+}
+
+/// Storage whose battery saves are there but can't be read, and that
+/// counts the writes it is asked for.
+#[derive(Default)]
+struct UnreadableSaves {
+    writes: Mutex<usize>,
+}
+
+impl Storage for UnreadableSaves {
+    fn read(&self, _entry: Entry<'_>) -> Result<Option<Vec<u8>>, String> {
+        Err(String::from("permission denied"))
+    }
+
+    fn write(&self, _entry: Entry<'_>, _contents: &[u8]) -> Result<(), String> {
+        *self.writes.lock().unwrap() += 1;
+        Ok(())
+    }
+
+    fn location(&self, entry: Entry<'_>) -> String {
+        entry.file_name().display().to_string()
+    }
+
+    fn delete_battery_saves(&self) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn keep_aside(&self, _entry: Entry<'_>) -> Result<String, String> {
+        Ok(String::from("kept"))
+    }
+}
+
+#[test]
+fn a_save_that_cant_be_read_is_reported_and_never_written_over() {
+    let storage = Arc::new(UnreadableSaves::default());
+    let notices = Notices::default();
+    let saves = BatterySaves::in_storage(storage.clone(), Path::new("game.gb"), notices.clone());
+
+    assert!(saves.load_ram().is_none());
+    assert!(saves.load_rtc().is_none());
+    let problems = notices.take();
+    assert_eq!(problems.len(), 2);
+    assert!(
+        problems[0].contains("game.sav couldn't be read")
+            && problems[0].contains("permission denied"),
+        "{problems:?}"
+    );
+    assert!(
+        problems[1].contains("game.rtc couldn't be read"),
+        "{problems:?}"
+    );
+
+    saves.queue_ram(&[1, 2, 3, 4], Instant::now());
+    saves.queue_rtc(&sample_rtc(), Instant::now());
+    saves.flush();
+
+    assert_eq!(*storage.writes.lock().unwrap(), 0);
+    assert!(saves.pending().ram.is_none());
+    assert!(notices.take().is_empty());
 }
 
 #[test]

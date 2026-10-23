@@ -220,9 +220,9 @@ impl Gpu {
     /// (`EARLY_HBLANK_INTERRUPT_DOTS`), and then stays active through the end of mode 3 into
     /// HBlank instead of waiting for `mode_0_interrupt_delay` again, which would drop it for a
     /// dot and request a second interrupt. In the first dots of lines 1-143 the previous line's
-    /// source ends at a fixed dot, whatever STAT shows. The first line after
-    /// LCD on shows mode 0 during its would-be OAM scan, but that isn't an HBlank and doesn't
-    /// request mode 0 interrupts (SameBoy).
+    /// source ends at a fixed dot, whatever STAT shows. The first line after LCD on shows mode 0
+    /// during its would-be OAM scan, but that isn't an HBlank and doesn't request mode 0 interrupts
+    /// (SameBoy).
     pub(crate) fn hblank_source_active(&self) -> bool {
         if self.line_state == LineState::OamScan && (1..VBLANK_START_LINE).contains(&self.line) {
             return !self.is_cgb() && self.line_dot < DMG_HBLANK_SOURCE_END_DOT;

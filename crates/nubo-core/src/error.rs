@@ -16,8 +16,9 @@ pub enum LoadRomError {
     /// The cartridge uses hardware that Nubo does not emulate.
     /// Holds the cartridge type as written in Pan Docs, such as "MBC7".
     UnsupportedCartridge(&'static str),
-    /// The cartridge header announces a RAM size that doesn't exist. Holds the
-    /// RAM size byte from the header (at 0x0149).
+    /// The cartridge header of a cartridge type with RAM announces a RAM size
+    /// that doesn't exist. Holds the RAM size byte from the header (at
+    /// 0x0149).
     InvalidRamSize(u8),
     /// The file is a zip archive that could not be read.
     /// Holds a description of what went wrong.

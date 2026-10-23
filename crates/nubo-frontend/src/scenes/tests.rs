@@ -1,3 +1,5 @@
+//! Tests for reading, checking and writing scenes and their folders.
+
 use super::*;
 
 const GAME_SCENE: &str = r#"

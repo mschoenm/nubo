@@ -69,10 +69,12 @@ pub(crate) struct Cartridge {
     rom: Arc<[u8]>,
     #[serializable(skip)]
     header: CartridgeHeader,
-    /// The cartridge RAM. It is at least as large as the header says, but can
-    /// be larger, or any size at all once a save state or
-    /// `Cartridge::set_ram` replaced it; reads and writes wrap around its
-    /// length.
+    /// The cartridge RAM. It is at least as large as the header says (empty
+    /// for a cartridge type without RAM, see `lacks_ram`), but can be larger,
+    /// or any size at all once a save state or `Cartridge::set_ram` replaced
+    /// it; reads and writes wrap around its length (MBC2 uses the first 512
+    /// bytes; cells past the end of a shorter buffer read 0xFF and ignore
+    /// writes).
     ram: Vec<u8>,
     mapper: CartridgeMapper,
     /// Lets the cartridge save its RAM and clock through the frontend.
@@ -116,7 +118,9 @@ impl Cartridge {
     }
 
     /// Replaces the cartridge RAM, for example with a save file. A buffer of
-    /// the wrong size is accepted; reads and writes wrap around its length.
+    /// the wrong size is accepted; reads and writes wrap around its length
+    /// (MBC2 uses the first 512 bytes; cells past the end of a shorter buffer
+    /// read 0xFF and ignore writes).
     pub fn set_ram(&mut self, ram: Vec<u8>) {
         self.ram = ram;
     }
@@ -260,11 +264,15 @@ impl Cartridge {
         }
     }
 
-    /// Cuts a loaded MBC3's registers to the bits they have, and moves a
-    /// clock loaded from a save state made on the other [`RtcClock`] over to
-    /// the one this cartridge follows, keeping what it shows.
+    /// Cuts a loaded controller's registers to the bits they have, and moves
+    /// a clock loaded from a save state made on the other [`RtcClock`] over
+    /// to the one this cartridge follows, keeping what it shows.
     pub fn finish_loading_save_state(&mut self, elapsed_dots: u64) {
+        self.rumble = RumbleMeter::default();
         match &mut self.mapper {
+            CartridgeMapper::RomOnly | CartridgeMapper::RomRam => {}
+            CartridgeMapper::Mbc1(mbc1) => mbc1.within_register_widths(),
+            CartridgeMapper::Mbc2(mbc2) => mbc2.within_register_widths(),
             CartridgeMapper::Mbc3(mbc3) => {
                 let effects = self.effects.as_ref();
                 mbc3.finish_loading_save_state(effects.rtc_clock(), |clock| {
@@ -272,9 +280,10 @@ impl Cartridge {
                 });
             }
             CartridgeMapper::Mbc5(mbc5) => {
+                mbc5.within_register_widths();
                 self.rumble = RumbleMeter::starting(mbc5.is_rumbling(), elapsed_dots);
             }
-            _ => self.rumble = RumbleMeter::default(),
+            CartridgeMapper::Huc1(huc1) => huc1.within_register_widths(),
         }
     }
 
@@ -451,7 +460,8 @@ impl MapperKind {
     /// type byte and RAM size (from the header). Whether it has RAM comes
     /// from the type byte, never from the size of a save file. An MBC3 with
     /// more ROM or RAM than an MBC3 can address is an MBC30, and its clock
-    /// starts from the state the frontend saved, if any.
+    /// starts from the state the frontend saved. Without one, it is a new
+    /// clock at 0 that counts from now, on the clock it follows.
     fn create_mapper(
         self,
         rom: &[u8],
@@ -469,7 +479,10 @@ impl MapperKind {
                 rom.len(),
                 ram_size,
                 effects.rtc_clock(),
-                effects.load_rtc_state(),
+                effects.load_rtc_state().unwrap_or_else(|| RtcState {
+                    base_timestamp: rtc_time(effects, 0),
+                    ..RtcState::default()
+                }),
             )),
             Self::Mbc5 => CartridgeMapper::Mbc5(Mbc5CartridgeMapper::new(cartridge_type)),
             Self::Huc1 => CartridgeMapper::Huc1(Huc1CartridgeMapper::new()),
@@ -534,8 +547,8 @@ fn is_battery_backed(cartridge_type: u8) -> bool {
 /// Whether the header's cartridge type byte names a cartridge without RAM
 /// (ROM only, and MBC1, MBC3 and MBC5 without "+RAM"). Such a cartridge gets
 /// no RAM buffer, whatever RAM size its header claims, since its controller
-/// never reaches one.
-fn lacks_ram(cartridge_type: u8) -> bool {
+/// never reaches one, and its controller never enables RAM.
+pub(super) fn lacks_ram(cartridge_type: u8) -> bool {
     matches!(
         cartridge_type,
         CARTRIDGE_TYPE_ROM_ONLY
@@ -617,7 +630,9 @@ pub(super) fn cartridge_type_name(cartridge_type: u8) -> &'static str {
 }
 
 /// Reads the cartridge header from a ROM and checks that Nubo supports
-/// its cartridge type and RAM size. Returns the header together with the
+/// its cartridge type and RAM size. A cartridge type without RAM accepts any
+/// RAM size byte, since its hardware never reads it, and an unknown one
+/// counts as no RAM. Returns the header together with the
 /// mapper kind and the RAM size in bytes. The header's RAM bank count comes
 /// from that size.
 fn parse_header(rom: &[u8]) -> Result<(CartridgeHeader, MapperKind, usize), LoadRomError> {
@@ -630,8 +645,11 @@ fn parse_header(rom: &[u8]) -> Result<(CartridgeHeader, MapperKind, usize), Load
         LoadRomError::UnsupportedCartridge(cartridge_type_name(cartridge_type)),
     )?;
     let ram_size_index = rom[RAM_SIZE_ADDRESS];
-    let ram_size =
-        ram_size(kind, ram_size_index).ok_or(LoadRomError::InvalidRamSize(ram_size_index))?;
+    let ram_size = match ram_size(kind, ram_size_index) {
+        Some(size) => size,
+        None if lacks_ram(cartridge_type) => 0,
+        None => return Err(LoadRomError::InvalidRamSize(ram_size_index)),
+    };
     let cgb_flag = rom[TITLE_START_ADDRESS + CGB_COMPATIBILITY_INDEX];
 
     let header = CartridgeHeader {
@@ -659,22 +677,23 @@ pub(crate) fn read_header(rom: &[u8]) -> Result<CartridgeHeader, LoadRomError> {
 /// zeroed. A save shorter than the RAM the header announces fills its start
 /// and the rest starts zeroed, so even an empty save file leaves the game
 /// RAM to save to. A longer one is kept whole. A cartridge type without RAM
-/// gets none, even when its header announces some; the header's size still
-/// decides whether an MBC3 is an MBC30.
+/// gets none, even when its header announces some or the frontend has a save
+/// for it (which stays as it is, since nothing is written to it); the
+/// header's size still decides whether an MBC3 is an MBC30.
 pub(super) fn load_cartridge(
     mut rom: Vec<u8>,
     effects: Box<dyn CartridgeEffects>,
 ) -> Result<Cartridge, LoadRomError> {
     let (header, kind, ram_size) = parse_header(&rom)?;
-    let usable_ram_size = if lacks_ram(header.cartridge_type) {
-        0
+    let ram = if lacks_ram(header.cartridge_type) {
+        Vec::new()
     } else {
-        ram_size
+        let mut ram = effects.load_ram().unwrap_or_default();
+        if ram.len() < ram_size {
+            ram.resize(ram_size, 0);
+        }
+        ram
     };
-    let mut ram = effects.load_ram().unwrap_or_default();
-    if ram.len() < usable_ram_size {
-        ram.resize(usable_ram_size, 0);
-    }
 
     if rom.len() < MINIMUM_ROM_SIZE {
         rom.resize(MINIMUM_ROM_SIZE, 0xFF);
@@ -795,9 +814,23 @@ mod tests {
 
     #[test]
     fn rejects_an_invalid_ram_size() {
-        let rom = build_rom(CARTRIDGE_TYPE_MBC1, 0x01, 0x09);
+        let rom = build_rom(CARTRIDGE_TYPE_MBC1_RAM, 0x01, 0x09);
         let result = load_cartridge(rom, empty_cartridge_effects());
         assert_eq!(result.err(), Some(LoadRomError::InvalidRamSize(0x09)));
+    }
+
+    #[test]
+    fn a_cartridge_type_without_ram_ignores_an_invalid_ram_size() {
+        for cartridge_type in [
+            CARTRIDGE_TYPE_ROM_ONLY,
+            CARTRIDGE_TYPE_MBC1,
+            CARTRIDGE_TYPE_MBC5,
+        ] {
+            let rom = build_rom(cartridge_type, 0x01, 0x09);
+            let cartridge = load_cartridge(rom, empty_cartridge_effects()).unwrap();
+            assert!(cartridge.ram.is_empty());
+            assert_eq!(cartridge.header().ram_bank_count, 0);
+        }
     }
 
     const SUPPORTED_CARTRIDGE_TYPES: [u8; 20] = [
@@ -935,7 +968,10 @@ mod tests {
 
     #[test]
     fn a_short_save_file_fills_the_start_of_the_ram() {
-        for cartridge_type in SUPPORTED_CARTRIDGE_TYPES {
+        for cartridge_type in SUPPORTED_CARTRIDGE_TYPES
+            .into_iter()
+            .filter(|&cartridge_type| !lacks_ram(cartridge_type))
+        {
             let rom = build_rom(cartridge_type, 0x01, 0x03);
             let header_ram_size = load_cartridge(rom.clone(), empty_cartridge_effects())
                 .unwrap()
@@ -965,6 +1001,13 @@ mod tests {
         let rom = build_rom(CARTRIDGE_TYPE_MBC1_RAM, 0x01, 0x04);
         let cartridge = load_cartridge(rom, empty_cartridge_effects()).unwrap();
         assert_eq!(cartridge.ram().len(), 0x20000);
+    }
+
+    #[test]
+    fn a_cartridge_without_ram_leaves_a_save_file_out() {
+        let rom = build_rom(CARTRIDGE_TYPE_MBC3_TIMER_BATTERY, 0x01, 0x00);
+        let cartridge = load_cartridge(rom, Box::new(SavedRam(vec![0x5A; 48]))).unwrap();
+        assert!(cartridge.ram().is_empty());
     }
 
     #[test]

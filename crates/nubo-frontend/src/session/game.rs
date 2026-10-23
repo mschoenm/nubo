@@ -191,9 +191,10 @@ impl GameSession {
     }
 
     /// Reads the game's saved cheats and turns on the enabled ones, or says
-    /// why they couldn't be read. Saved cheats that couldn't be read and
-    /// couldn't be kept aside either are never written over: the cheats the
-    /// player adds then work, but saving them fails.
+    /// why they couldn't be read, or which have a code that can't be used
+    /// (those stay off). Saved cheats that couldn't be read and couldn't be
+    /// kept aside either are never written over: the cheats the player adds
+    /// then work, but saving them fails.
     pub fn load_cheats(&mut self) -> Result<(), String> {
         let cheats = cheats::load(&self.rom.path).map_err(|unreadable| {
             self.cheats_read_only = !unreadable.saving_is_safe;
@@ -202,8 +203,19 @@ impl GameSession {
         for cheat in &cheats {
             self.session.send(Command::SetCheat(cheat.clone()));
         }
+        let unusable: Vec<&str> = cheats
+            .iter()
+            .filter(|cheat| cheat.check().is_err())
+            .map(|cheat| cheat.name.as_str())
+            .collect();
+        let problem = (!unusable.is_empty()).then(|| {
+            format!(
+                "These saved cheats have a code that can't be used, so they stay off: {}",
+                unusable.join(", ")
+            )
+        });
         self.cheats = cheats;
-        Ok(())
+        problem.map_or(Ok(()), Err)
     }
 
     /// Turns on `cheat` and keeps it with the game's cheats. A cheat with
@@ -223,11 +235,17 @@ impl GameSession {
         self.save_cheats()
     }
 
-    /// Turns the cheat at `index` on or off.
+    /// Turns the cheat at `index` on or off. A cheat whose code can't be
+    /// used (see [`Cheat::check`]) stays off, and the error says why.
     pub fn set_cheat_enabled(&mut self, index: usize, enabled: bool) -> Result<(), String> {
         let Some(cheat) = self.cheats.get_mut(index) else {
             return Ok(());
         };
+        if enabled {
+            cheat
+                .check()
+                .map_err(|error| format!("{} can't be turned on: {error}", cheat.name))?;
+        }
         cheat.enabled = enabled;
         self.session.send(Command::SetCheat(cheat.clone()));
         self.save_cheats()

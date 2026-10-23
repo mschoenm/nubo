@@ -221,3 +221,27 @@ fn rewind_gets_a_key_once_where_the_player_left_it_free() {
     assert_eq!(controls.controller.input(Action::Rewind), None);
     assert!(!add_new_actions(&mut controls));
 }
+
+#[test]
+fn a_key_bound_twice_in_the_file_keeps_only_its_first_action() {
+    let controls: Controls = toml::from_str("[keyboard]\na = \"KeyZ\"\nb = \"KeyZ\"").unwrap();
+
+    assert_eq!(controls.keyboard.action(KeyCode::KeyZ), Some(Action::A));
+    assert_eq!(controls.keyboard.input(Action::A), Some(KeyCode::KeyZ));
+    assert_eq!(controls.keyboard.input(Action::B), None);
+}
+
+#[test]
+fn a_button_bound_twice_in_the_file_stays_on_the_pause_menu() {
+    let start = default_controller().input(Action::PauseMenu).unwrap();
+    let file = toml::to_string(&Bindings::from_pairs(&[
+        (Action::Up, start),
+        (Action::PauseMenu, start),
+    ]))
+    .unwrap();
+
+    let controller: Bindings<PadButton> = toml::from_str(&file).unwrap();
+
+    assert_eq!(controller.input(Action::PauseMenu), Some(start));
+    assert_eq!(controller.input(Action::Up), None);
+}
