@@ -451,7 +451,8 @@ impl MapperKind {
     /// type byte and RAM size (from the header). Whether it has RAM comes
     /// from the type byte, never from the size of a save file. An MBC3 with
     /// more ROM or RAM than an MBC3 can address is an MBC30, and its clock
-    /// starts from the state the frontend saved, if any.
+    /// starts from the state the frontend saved. Without one, it is a new
+    /// clock at 0 that counts from now, on the clock it follows.
     fn create_mapper(
         self,
         rom: &[u8],
@@ -469,7 +470,10 @@ impl MapperKind {
                 rom.len(),
                 ram_size,
                 effects.rtc_clock(),
-                effects.load_rtc_state(),
+                effects.load_rtc_state().unwrap_or_else(|| RtcState {
+                    base_timestamp: rtc_time(effects, 0),
+                    ..RtcState::default()
+                }),
             )),
             Self::Mbc5 => CartridgeMapper::Mbc5(Mbc5CartridgeMapper::new(cartridge_type)),
             Self::Huc1 => CartridgeMapper::Huc1(Huc1CartridgeMapper::new()),
