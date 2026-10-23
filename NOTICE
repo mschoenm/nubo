@@ -75,6 +75,14 @@ Hacktix, modified to show the Nubo logo, released into the public domain under
 CC0-1.0 (https://creativecommons.org/publicdomain/zero/1.0/).
 
 --------------------------------------------------------------------------------
+hardware.inc (https://github.com/gbdev/hardware.inc)
+--------------------------------------------------------------------------------
+
+The names of the hardware registers that the boot ROMs' sources use come from
+gbdev's hardware.inc, released into the public domain under CC0-1.0
+(https://creativecommons.org/publicdomain/zero/1.0/).
+
+--------------------------------------------------------------------------------
 Fira Sans (https://github.com/mozilla/Fira)
 --------------------------------------------------------------------------------
 
