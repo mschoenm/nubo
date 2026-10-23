@@ -3,9 +3,10 @@
 //! rumble motor.
 
 use crate::address_bus::bank_utils::{banked_read, banked_write};
+use crate::address_bus::cartridge::lacks_ram;
 use crate::address_bus::constants::{
-    CARTRIDGE_TYPE_MBC5_RAM, CARTRIDGE_TYPE_MBC5_RAM_BATTERY, CARTRIDGE_TYPE_MBC5_RUMBLE,
-    CARTRIDGE_TYPE_MBC5_RUMBLE_RAM, CARTRIDGE_TYPE_MBC5_RUMBLE_RAM_BATTERY, RAM_BANK_SIZE,
+    CARTRIDGE_TYPE_MBC5_RUMBLE, CARTRIDGE_TYPE_MBC5_RUMBLE_RAM,
+    CARTRIDGE_TYPE_MBC5_RUMBLE_RAM_BATTERY, RAM_BANK_SIZE,
 };
 use nubo_serializable_derive::Serializable;
 
@@ -36,13 +37,7 @@ impl Mbc5CartridgeMapper {
             is_rumbling: false,
             rom_bank_number: 1,
             ram_bank_number: 0,
-            has_ram: matches!(
-                cartridge_type,
-                CARTRIDGE_TYPE_MBC5_RAM
-                    | CARTRIDGE_TYPE_MBC5_RAM_BATTERY
-                    | CARTRIDGE_TYPE_MBC5_RUMBLE_RAM
-                    | CARTRIDGE_TYPE_MBC5_RUMBLE_RAM_BATTERY
-            ),
+            has_ram: !lacks_ram(cartridge_type),
             has_rumble: matches!(
                 cartridge_type,
                 CARTRIDGE_TYPE_MBC5_RUMBLE

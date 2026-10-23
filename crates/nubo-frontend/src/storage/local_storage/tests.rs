@@ -7,10 +7,7 @@ use std::path::Path;
 
 #[test]
 fn settings_keep_their_key() {
-    assert_eq!(
-        LocalStorage::key(Entry::Settings).unwrap(),
-        "nubo:settings.toml"
-    );
+    assert_eq!(LocalStorage::key(Entry::Settings), "nubo:settings.toml");
 }
 
 #[test]
@@ -18,11 +15,11 @@ fn battery_saves_are_keyed_by_the_rom_name() {
     let rom_path = Path::new("Pocket Game.gbc");
 
     assert_eq!(
-        LocalStorage::key(Entry::BatteryRam(rom_path)).unwrap(),
+        LocalStorage::key(Entry::BatteryRam(rom_path)),
         "nubo:Pocket Game.sav"
     );
     assert_eq!(
-        LocalStorage::key(Entry::BatteryClock(rom_path)).unwrap(),
+        LocalStorage::key(Entry::BatteryClock(rom_path)),
         "nubo:Pocket Game.rtc"
     );
 }
@@ -30,7 +27,7 @@ fn battery_saves_are_keyed_by_the_rom_name() {
 #[test]
 fn cheats_are_keyed_by_the_rom_file_name() {
     assert_eq!(
-        LocalStorage::key(Entry::Cheats(Path::new("Pocket Game.gbc"))).unwrap(),
+        LocalStorage::key(Entry::Cheats(Path::new("Pocket Game.gbc"))),
         "nubo:cheats/Pocket Game.gbc.toml"
     );
     assert!(!is_battery_save_key("nubo:cheats/Pocket Game.gbc.toml"));
@@ -39,11 +36,11 @@ fn cheats_are_keyed_by_the_rom_file_name() {
 #[test]
 fn unreadable_entries_are_kept_aside_next_to_their_key() {
     assert_eq!(
-        LocalStorage::kept_key(Entry::Settings, 1).unwrap(),
+        LocalStorage::kept_key(Entry::Settings, 1),
         "nubo:settings.kept-1.toml"
     );
     assert_eq!(
-        LocalStorage::kept_key(Entry::Cheats(Path::new("Pocket Game.gbc")), 2).unwrap(),
+        LocalStorage::kept_key(Entry::Cheats(Path::new("Pocket Game.gbc")), 2),
         "nubo:cheats/Pocket Game.gbc.kept-2.toml"
     );
     assert!(!is_battery_save_key("nubo:settings.kept-1.toml"));

@@ -91,12 +91,12 @@ pub struct LibraryEntry {
     /// the cartridge even when the settings pick one model for every game;
     /// such a game keeps doing so until the player picks again.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<ModelPreference>,
+    pub(crate) model: Option<ModelPreference>,
     /// When the library first found the game, in seconds since 1970, for
     /// listing the games added last first. `None` for a game found by a
     /// version that didn't keep it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub added: Option<u64>,
+    pub(crate) added: Option<u64>,
     /// The file's size in bytes when its header was read, so a scan can tell
     /// whether to read it again.
     size: u64,
@@ -120,9 +120,9 @@ impl LibraryEntry {
         self.size
     }
 
-    /// What the player picked for this game in its menu (see
-    /// [`LibraryEntry::model`](#structfield.model)), or `None` to follow the
-    /// settings.
+    /// What the player picked for this game in its menu, or `None` to follow
+    /// the settings. Earlier versions could also pick Automatic, which picks
+    /// by the cartridge even when the settings pick one model for every game.
     pub fn preference(&self) -> Option<ModelPreference> {
         self.model
     }
@@ -917,22 +917,12 @@ impl Library {
     /// again brings them back.
     #[cfg(all(feature = "web", not(feature = "desktop")))]
     pub fn remove_game(&mut self, path: &Path) -> Result<(), String> {
-        let removed = store::delete_rom(path).and_then(|()| store::delete_pictures(path));
-        self.entries.retain(|entry| entry.path != path);
-        for pictures in [
-            &mut self.box_art,
-            &mut self.title_screens,
-            &mut self.thumbnails,
-        ] {
-            pictures.remove(path);
-        }
-        removed
-            .map_err(|error| format!("The game couldn't be removed: {error}"))
-            .and(self.save())
+        self.forget_game(path).and(self.save())
     }
 
     /// Takes every game out of the library, as [`Library::remove_game`]
-    /// does, for a player starting over in the browser.
+    /// does, for a player starting over in the browser. The library is saved
+    /// once, at the end.
     #[cfg(all(feature = "web", not(feature = "desktop")))]
     pub fn remove_all_games(&mut self) -> Result<(), String> {
         let paths: Vec<PathBuf> = self
@@ -942,8 +932,25 @@ impl Library {
             .collect();
         paths
             .iter()
-            .map(|path| self.remove_game(path))
+            .map(|path| self.forget_game(path))
             .fold(Ok(()), Result::and)
+            .and(self.save())
+    }
+
+    /// Deletes the kept file and pictures of the game at `path` and drops it
+    /// from the library, without saving the library.
+    #[cfg(all(feature = "web", not(feature = "desktop")))]
+    fn forget_game(&mut self, path: &Path) -> Result<(), String> {
+        let removed = store::delete_rom(path).and_then(|()| store::delete_pictures(path));
+        self.entries.retain(|entry| entry.path != path);
+        for pictures in [
+            &mut self.box_art,
+            &mut self.title_screens,
+            &mut self.thumbnails,
+        ] {
+            pictures.remove(path);
+        }
+        removed.map_err(|error| format!("The game couldn't be removed: {error}"))
     }
 
     /// How many games the library keeps the files of, and about how many
