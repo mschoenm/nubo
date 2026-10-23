@@ -7,7 +7,9 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
-# RetroArch loads the `cdylib`; the `rlib` lets tests call the core.
+# RetroArch loads the `cdylib`. The `rlib` makes Cargo build the library before
+# the integration tests, and `tests/exports.rs` reads it: without the `rlib`,
+# Cargo doesn't build the `cdylib` for them.
 [lib]
 name = "nubo_libretro"
 crate-type = ["cdylib", "rlib"]

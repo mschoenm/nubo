@@ -182,6 +182,7 @@ impl App {
             })
         );
         self.dialog = Some(Dialog::new(DialogKind::GameMenu(path, page)));
+        self.refresh_game_menu_save_states();
         let selection = if page == GameMenuPage::Main && from_consoles {
             Some(CONSOLE_ROW)
         } else {
@@ -275,7 +276,7 @@ impl App {
                 DialogAction::CloseThen(LibraryMessage::RemoveRecent(path.clone()).into()),
             ));
         }
-        if save_states::AVAILABLE && !self.fresh && save_states::any_saved(path) {
+        if self.game_menu_save_states {
             choices.push(Choice::new(
                 Icon::Trash2,
                 "Delete save states…",
@@ -398,6 +399,21 @@ impl App {
     pub(super) fn open_dialog(&mut self, kind: DialogKind) {
         if self.dialog.is_none() {
             self.dialog = Some(Dialog::new(kind));
+        }
+    }
+
+    /// Works out whether the game whose menu is open has save states (see
+    /// `App::game_menu_save_states`). The menu only opens in the library,
+    /// where no game runs, so only deleting can change that while it is
+    /// open. With another dialog open nothing changes.
+    pub(super) fn refresh_game_menu_save_states(&mut self) {
+        if let Some(Dialog {
+            kind: DialogKind::GameMenu(path, _),
+            ..
+        }) = &self.dialog
+        {
+            self.game_menu_save_states =
+                save_states::AVAILABLE && !self.fresh && save_states::any_saved(path);
         }
     }
 

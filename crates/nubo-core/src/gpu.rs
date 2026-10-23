@@ -901,7 +901,7 @@ impl Gpu {
     /// holds.
     fn count_idle_dots(&mut self, dots: u32, blank: bool) -> u32 {
         let counted = dots.min(self.idle_dots_until_frame());
-        self.idle_dots = self.idle_dots.wrapping_add(counted);
+        self.idle_dots += counted;
         if self.idle_dots == DOTS_PER_FRAME {
             self.idle_dots = 0;
             self.publish_frame(blank, false);

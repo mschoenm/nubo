@@ -126,7 +126,7 @@ fn a_reset_keeps_the_window_size() {
     };
 
     assert_eq!(
-        settings.reset(false),
+        settings.reset(),
         Settings {
             window_size: Some((800.0, 600.0)),
             ..Settings::default()

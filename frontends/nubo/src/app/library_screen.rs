@@ -207,6 +207,7 @@ impl App {
                     Ok(()) => self.toasts.info("Save states deleted"),
                     Err(error) => self.toasts.error(error),
                 }
+                self.refresh_game_menu_save_states();
             }
             LibraryMessage::Watch(WatchEvent::Failed(error)) => self.toasts.error(format!(
                 "New games won't show up by themselves ({error}). Use \"Look for new games now\" in a folder's menu in Settings › Library instead."

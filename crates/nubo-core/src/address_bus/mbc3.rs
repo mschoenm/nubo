@@ -16,9 +16,9 @@
 //! CasualPokePlayer's latch-rtc-test and rtc-invalid-banks-test.
 
 use crate::address_bus::bank_utils::{banked_read, banked_write};
+use crate::address_bus::cartridge::lacks_ram;
 use crate::address_bus::constants::{
-    CARTRIDGE_TYPE_MBC3_RAM, CARTRIDGE_TYPE_MBC3_RAM_BATTERY, CARTRIDGE_TYPE_MBC3_TIMER_BATTERY,
-    CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY, RAM_BANK_SIZE,
+    CARTRIDGE_TYPE_MBC3_TIMER_BATTERY, CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY, RAM_BANK_SIZE,
 };
 use crate::address_bus::effects::{CartridgeEffects, RtcClock};
 use nubo_serializable_derive::Serializable;
@@ -313,12 +313,7 @@ impl Mbc3CartridgeMapper {
             rtc,
             rtc_clock,
             is_mbc30: rom_size > MBC3_MAX_ROM_SIZE || ram_size > MBC3_MAX_RAM_SIZE,
-            has_ram: matches!(
-                cartridge_type,
-                CARTRIDGE_TYPE_MBC3_RAM
-                    | CARTRIDGE_TYPE_MBC3_RAM_BATTERY
-                    | CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY
-            ),
+            has_ram: !lacks_ram(cartridge_type),
             has_timer: matches!(
                 cartridge_type,
                 CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY | CARTRIDGE_TYPE_MBC3_TIMER_BATTERY
@@ -590,8 +585,9 @@ mod tests {
     use crate::address_bus::cartridge::test_utils::*;
     use crate::address_bus::cartridge::*;
     use crate::address_bus::constants::{
-        CARTRIDGE_TYPE_MBC3, RAM_SIZE_2KB, RAM_SIZE_8KB, RAM_SIZE_32KB, RAM_SIZE_64KB,
-        ROM_SIZE_2MB, ROM_SIZE_4MB, ROM_SIZE_64KB,
+        CARTRIDGE_TYPE_MBC3, CARTRIDGE_TYPE_MBC3_RAM, CARTRIDGE_TYPE_MBC3_RAM_BATTERY,
+        RAM_SIZE_2KB, RAM_SIZE_8KB, RAM_SIZE_32KB, RAM_SIZE_64KB, ROM_SIZE_2MB, ROM_SIZE_4MB,
+        ROM_SIZE_64KB,
     };
     use crate::address_bus::effects::{CartridgeEffects, Shared, empty_cartridge_effects};
     use crate::address_bus::test_utils::*;

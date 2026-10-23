@@ -20,7 +20,8 @@ use nubo_frontend::gamepads::{ControllerEvent, Controllers};
 use nubo_frontend::library::{Cache, Library};
 use nubo_frontend::model::{Console, ModelPreference};
 use nubo_frontend::rom::Rom;
-use nubo_frontend::save_states::SaveState;
+use nubo_frontend::save_states::{self, SaveState, Slot};
+use nubo_frontend::storage::files::use_folder;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -68,7 +69,7 @@ fn a_reset_asks_first_puts_the_settings_back_and_can_be_undone() {
     assert_eq!(content.choices[dialog.selection].label, "Cancel");
 
     let _ = app.update(SettingsMessage::Reset(ResetChoices::default()).into());
-    assert_eq!(app.settings, changed.reset(false));
+    assert_eq!(app.settings, changed.reset());
     assert_eq!(app.settings.appearance, Appearance::System);
     assert!((app.settings.shared.volume - 1.0).abs() < f32::EPSILON);
 
@@ -986,5 +987,48 @@ fn a_revision_other_than_the_most_common_shows_unfolded_and_b_goes_back() {
         Some(&DialogKind::GameMenu(path.clone(), GameMenuPage::Main))
     );
     assert_eq!(selected_label(&app), "Console");
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
+fn a_games_menu_offers_to_delete_its_save_states_until_they_are_deleted() {
+    let (mut app, path, folder) = app_with_color_game("save-states");
+    // The save states go to the test's folder rather than the player's.
+    use_folder(&folder);
+    app.fresh = false;
+    let offers_deleting = |app: &App| {
+        app.dialog_content()
+            .unwrap()
+            .choices
+            .iter()
+            .any(|choice| choice.label == "Delete save states…")
+    };
+    let state = SaveState {
+        model: Model::CgbE,
+        data: vec![1, 2, 3],
+    };
+
+    app.show_game_menu(path.clone(), GameMenuPage::Main);
+    assert!(!offers_deleting(&app));
+
+    save_states::save(&path, Slot::Quick, &state, None).unwrap();
+    app.show_game_menu(path.clone(), GameMenuPage::Main);
+    assert!(offers_deleting(&app));
+    let _ = app.update(LibraryMessage::DeleteSaveStates(path.clone()).into());
+    assert!(!offers_deleting(&app));
+
+    save_states::save(&path, Slot::Quick, &state, None).unwrap();
+    app.show_game_menu(path.clone(), GameMenuPage::Main);
+    save_states::delete(&path, Slot::Quick).unwrap();
+    assert!(offers_deleting(&app), "worked out again on every redraw");
+    let _ = app.update(
+        SettingsMessage::SavesDeleted {
+            done: Vec::new(),
+            deleted: vec!["save states deleted"],
+            errors: Vec::new(),
+        }
+        .into(),
+    );
+    assert!(!offers_deleting(&app));
     let _ = std::fs::remove_dir_all(&folder);
 }
