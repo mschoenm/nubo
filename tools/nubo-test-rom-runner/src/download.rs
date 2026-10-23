@@ -10,9 +10,9 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// The pinned release of the test ROM collection, which names its download
+/// and the folder it is unpacked to.
 const VERSION: &str = "v7.0";
-const ARCHIVE_URL: &str =
-    "https://github.com/c-sp/game-boy-test-roms/releases/download/v7.0/game-boy-test-roms-v7.0.zip";
 const ARCHIVE_SHA256: &str = "b9a9d7a1075aa35a3d07c07c34974048672d8520dca9e07a50178f5860c3832c";
 const SHOOTOUT_COMMIT: &str = "38b926bdbc26993d1b4c43e97979ecc66287bf02";
 const SHOOTOUT_URL: &str = "https://raw.githubusercontent.com/gbdev/GBEmulatorShootout";
@@ -22,6 +22,13 @@ const SHOOTOUT_MANIFEST: &str = include_str!("../shootout.sha256");
 /// A file written after a download or extraction succeeds, so an interrupted
 /// one is redone on the next run.
 const COMPLETE_MARKER: &str = ".complete";
+
+/// Where the collection's release [`VERSION`] is downloaded from.
+fn archive_url() -> String {
+    format!(
+        "https://github.com/c-sp/game-boy-test-roms/releases/download/{VERSION}/game-boy-test-roms-{VERSION}.zip"
+    )
+}
 
 /// The folders the test ROMs are in.
 pub(crate) struct RomDirs {
@@ -70,13 +77,14 @@ fn ensure_collection() -> Result<PathBuf, String> {
         .map_err(|error| format!("failed to create {}: {error}", work_dir().display()))?;
 
     let archive = work_dir().join(format!("game-boy-test-roms-{VERSION}.zip"));
+    let url = archive_url();
     if !has_checksum(&archive, ARCHIVE_SHA256) {
-        println!("Downloading {ARCHIVE_URL}");
-        download(ARCHIVE_URL, &archive)?;
+        println!("Downloading {url}");
+        download(&url, &archive)?;
         if !has_checksum(&archive, ARCHIVE_SHA256) {
             let _ = fs::remove_file(&archive);
             return Err(format!(
-                "{ARCHIVE_URL} does not match the expected SHA-256 checksum"
+                "{url} does not match the expected SHA-256 checksum"
             ));
         }
     }
@@ -159,4 +167,17 @@ fn extract(archive: &Path, destination: &Path) -> Result<(), String> {
 
     fs::write(destination.join(COMPLETE_MARKER), VERSION)
         .map_err(|error| format!("failed to write to {}: {error}", destination.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_archive_is_downloaded_from_the_pinned_release() {
+        assert_eq!(
+            archive_url(),
+            "https://github.com/c-sp/game-boy-test-roms/releases/download/v7.0/game-boy-test-roms-v7.0.zip"
+        );
+    }
 }
