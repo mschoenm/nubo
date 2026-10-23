@@ -1095,6 +1095,8 @@ impl Gpu {
     }
 
     /// Places the line timeline at `dot` of `line`, to match where the boot ROM leaves the PPU.
+    /// Only for positions where no line is being drawn: VBlank, OAM scan, or HBlank once mode 3
+    /// would be over (dot 252 or later). It doesn't set the renderer up for a line in progress.
     pub(super) fn set_frame_position(&mut self, line: u8, dot: u16) {
         self.line = line;
         self.line_dot = dot;
