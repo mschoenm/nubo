@@ -3,8 +3,8 @@
 Nubo runs the benchmark games with 20 to 41% fewer instructions than at the start of this work, with
 results that are bit for bit the same. Gambatte, the fastest emulator in
 [the comparison](EMULATOR_COMPARISON.md), is still ahead: 54 to 92 M instructions per emulated second
-against Nubo's 72 to 185 M, and 2.2 to 3.9 times Nubo's speed (measured before the line renderer's
-first part), down from 3 to 4.3 times. The small, safe steps are used up; the line renderer's first
+against Nubo's 86 to 179 M in the same 10-second runs, and 2.2 to 3.9 times Nubo's speed, down from 3 to
+4.3 times (both measured before the line renderer's first part; see Results for what it saved). The small, safe steps are used up; the line renderer's first
 part is built, and what is left are its second part and predicted register reads. This file says what
 was done, what was learned from other emulators, what was tried without gain, and the work left.
 Update it as parts get done.
