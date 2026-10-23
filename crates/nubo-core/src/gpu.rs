@@ -178,7 +178,7 @@ impl Serializable for OamDmaAccess {
 /// a copy of the booted emulator matches a real boot, so a custom `Debug` that left out VRAM, OAM
 /// or the frame buffers would weaken that check.
 #[derive(Clone, Debug)]
-pub struct Gpu {
+pub(crate) struct Gpu {
     /// The line the PPU is on, 0 to 153. Unlike `ly`, it doesn't reset early on line 153.
     line: u8,
 
