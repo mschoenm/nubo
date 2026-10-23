@@ -12,7 +12,7 @@ You need the newest stable Rust, as `rust-toolchain.toml` asks (`rustup update`)
 cargo build / cargo test           # The core crates only (the workspace's default members)
 cargo test --workspace             # Every crate, frontends and xtask included
 cargo test-roms [filter]           # The test ROM suites against tools/nubo-test-rom-runner/passing.txt (about 30 s)
-cargo cpu-tests                    # Every CPU opcode, checked cycle by cycle
+cargo cpu-tests                    # Every CPU opcode but STOP, HALT, DI and EI, checked cycle by cycle
 cargo save-states                  # The kept save states still load, and the stored layout is unchanged
 cargo play [rom] [--cgb | --model cgb-c]   # The desktop app; options in frontends/nubo/src/command_line.rs
 cargo screenshot rom.gb --seconds 10       # Headless, 5 emulated seconds by default; PNG in ./target/screenshots/
@@ -108,7 +108,7 @@ Claude Code and Codex both read these `AGENTS.md` files; keep them the only inst
 
 ## Where Things Are
 
-The root `Cargo.toml` is a virtual workspace whose default members are `nubo-core` and `nubo-serializable-derive`, so `cargo build` and `cargo test` don't build the apps, the tools or xtask. Libraries are in `crates/`, apps players use in `frontends/`, developer programs in `tools/`. Every package's name starts with `nubo` (except `xtask`), and every crate's folder is named after its package.
+The root `Cargo.toml` is a virtual workspace whose default members are `nubo-core` and `nubo-serializable-derive`, so `cargo build` and `cargo test` don't build the apps, the tools or xtask. Libraries are in `crates/`, apps players use in `frontends/`, developer programs in `tools/`. Every package's name starts with `nubo` (except `xtask`), and every crate's folder is named after its package (except `fuzz/`, the name `cargo-fuzz` expects).
 
 - `crates/nubo-core/` (`AGENTS.md`): the emulator, a plain library with no platform dependencies. `Emulator` in `emulator.rs` is its API.
 - `crates/nubo-frontend/` (`AGENTS.md`): everything an app needs besides drawing, without a UI toolkit: settings, saves, the game library, running a game with its sound, game controllers, and what the RetroArch core shares with the app.
@@ -125,7 +125,7 @@ The root `Cargo.toml` is a virtual workspace whose default members are `nubo-cor
 - `xtask/` (`AGENTS.md`): the web build, packaging, licenses, the emulator comparison, the nightly review's tools and the screenshots.
 - `.github/shootout/` (`AGENTS.md`): Nubo's class in the GB Emulator Shootout's harness, kept the same as the Shootout's copy.
 - `fuzz/` (`AGENTS.md`): the fuzz targets of the full review, outside the Cargo workspace, on the nightly toolchain.
-- `images/`: the logo and the screenshots (listed in `images/screenshots.toml`), with the scenes they are made from in `images/scenes/`.
+- `images/`: the logo, the README's buttons (`images/buttons/`) and the screenshots (the Flathub one in `images/flatpak/`, all listed in `images/screenshots.toml`), with the scenes they are made from in `images/scenes/`.
 
 ## More Documentation
 

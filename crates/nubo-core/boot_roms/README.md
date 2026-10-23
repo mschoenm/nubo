@@ -25,8 +25,8 @@ the Super Nintendo as packets. A Nubo version of it, based on SameBoy's
 
 ## Building
 
-You need [RGBDS](https://rgbds.gbdev.io) 1.0 (`brew install rgbds` on macOS) and
-Python 3. Then run:
+You need [RGBDS](https://rgbds.gbdev.io) 1.0 (`brew install rgbds` on macOS),
+Python 3 and zsh (macOS has it; on Linux, install `zsh`). Then run:
 
 ```bash
 crates/nubo-core/boot_roms/build.sh
@@ -77,20 +77,18 @@ one by one.
 To measure them, add a temporary test like this one to
 `../src/emulator/tests.rs`. It counts clock ticks by adding up how far the
 system counter (the 16-bit counter whose upper byte is DIV) moves in every step,
-which needs a temporary `probe_system_counter` method on `AddressBus` returning
-`self.timers.system_counter()`:
+which `AddressBus::system_counter` gives in tests:
 
 ```rust
 #[test]
 fn probe_boot_timing() {
     let model = Model::CgbC;
     let rom = rom(model, &header(0x80, 0, 0, 0x01), |_| 0);
-    let mut emulator = Emulator::new();
-    emulator.set_model(model);
+    let mut emulator = Emulator::new(model);
     emulator.set_sample_rate(48_000);
     emulator.load_rom(&rom, empty_cartridge_effects()).unwrap();
     let mut ticks: u64 = 0;
-    let mut last = emulator.address_bus().probe_system_counter();
+    let mut last = emulator.address_bus().system_counter();
     let mut lcd_on = false;
     while emulator.is_running_boot_rom() {
         // The CPU has already fetched the next opcode, so the program counter
@@ -109,7 +107,7 @@ fn probe_boot_timing() {
             println!("hand-over at {before}");
             break;
         }
-        let now = emulator.address_bus().probe_system_counter();
+        let now = emulator.address_bus().system_counter();
         ticks += u64::from(now.wrapping_sub(last));
         last = now;
     }

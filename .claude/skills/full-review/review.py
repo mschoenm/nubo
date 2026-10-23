@@ -14,7 +14,7 @@ import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 OUTCOMES = ("FIX-docs", "FIX-style", "FIX-idioms", "FIX-bugs", "FIX-tooling", "ISSUE", "NOTE", "MOOT", "WRONG")
-BINARY = re.compile(r"\.(png|jpe?g|ico|icns|svg|state|gbc?|sav|rtc|zip|bin|ttf|otf|woff2?)$", re.IGNORECASE)
+BINARY = re.compile(r"\.(png|jpe?g|ico|icns|state|gbc?|sav|rtc|zip|bin|ttf|otf|woff2?)$", re.IGNORECASE)
 
 
 def areas() -> int:

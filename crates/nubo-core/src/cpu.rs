@@ -128,7 +128,7 @@ pub struct BusActivityEntry {
 /// `clone_with_rom_matches_a_real_boot`), so it must show every field and stay
 /// deterministic.
 #[derive(Debug, Getters, MutGetters, Serializable)]
-pub struct Cpu {
+pub(crate) struct Cpu {
     #[getset(get = "pub(crate)", get_mut = "pub(crate)")]
     registers: Registers,
     run_state: RunState,
@@ -156,7 +156,7 @@ pub struct Cpu {
 
 /// One of the CPU's 8-bit registers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Register {
+enum Register {
     A,
     B,
     C,
@@ -170,24 +170,28 @@ pub enum Register {
 /// Two 8-bit registers used together as one 16-bit value, `first` holding the
 /// high byte (for example BC, with B as the high byte).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RegisterPair {
-    pub first: Register,
-    pub second: Register,
+struct RegisterPair {
+    first: Register,
+    second: Register,
 }
 
-pub const REGISTER_AF: RegisterPair = RegisterPair {
+/// A and the flags in F, the pair PUSH AF and POP AF move.
+const REGISTER_AF: RegisterPair = RegisterPair {
     first: Register::A,
     second: Register::F,
 };
-pub const REGISTER_HL: RegisterPair = RegisterPair {
+/// H and L, the pair most instructions use as a memory address.
+const REGISTER_HL: RegisterPair = RegisterPair {
     first: Register::H,
     second: Register::L,
 };
-pub const REGISTER_BC: RegisterPair = RegisterPair {
+/// B and C.
+const REGISTER_BC: RegisterPair = RegisterPair {
     first: Register::B,
     second: Register::C,
 };
-pub const REGISTER_DE: RegisterPair = RegisterPair {
+/// D and E.
+const REGISTER_DE: RegisterPair = RegisterPair {
     first: Register::D,
     second: Register::E,
 };

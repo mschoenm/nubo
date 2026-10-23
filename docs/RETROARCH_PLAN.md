@@ -64,8 +64,8 @@ Where the code differs from the plan below:
   the emulator with `Emulator::memory_mut`, which catches the lazy components up first. Checked in RetroArch 1.18
   with a game-specific cheat file. The hardware registers stay read-only (`RETRO_MEMDESC_CONST`).
 
-Left: the maintainer's tests by hand (above), the AppStream release notes entry when the next version ships (the
-`release` skill writes it), and Phase 6 (on hold).
+Left: the maintainer's tests by hand (above) and Phase 6 (on hold). The AppStream release notes announced the core in
+0.6.0.
 
 ## Decisions for the maintainer before starting
 
@@ -233,7 +233,7 @@ before.
    comes along.
 5. **Read access to memory for achievements:** work RAM (all banks), HRAM and cartridge RAM as `&[u8]`.
    They are read-only, so no pointers into the emulator are needed (see Phase 4).
-6. **Optional: a rumble hook.** MBC5 rumble cartridges are recognised, but nothing reports the motor.
+6. **Optional: a rumble hook.** MBC5 rumble cartridges are recognized, but nothing reports the motor.
    A default no-op `CartridgeEffects::set_rumble(bool)` would let the core drive RetroArch's rumble
    interface.
 
@@ -388,7 +388,7 @@ RetroArch with a test account, and a rumble cartridge game (such as Pokémon Pin
    - **Names:** `display_name = "Nintendo - Game Boy / Color (Nubo)"`, `corename = "Nubo"`,
      `systemname`, `systemid = "game_boy"`, `database = "Nintendo - Game Boy|Nintendo - Game Boy Color"`,
      `supported_extensions = "gb|gbc"`.
-   - **Licence and firmware:** `license = "GPLv3"`, `firmware_count = 0` (the boot ROMs are built in).
+   - **License and firmware:** `license = "GPLv3"`, `firmware_count = 0` (the boot ROMs are built in).
    - **Features:** `savestate = "true"`, `savestate_features = "deterministic"` (see Status), `cheats = "true"`,
      `input_descriptors = "true"`, `libretro_saves = "true"`, `core_options = "true"`,
      `needs_fullpath = "false"`, `is_experimental = "true"` at first.
@@ -408,7 +408,7 @@ RetroArch with a test account, and a rumble cartridge game (such as Pokémon Pin
      the info file to its `info` folder), and what it does and doesn't support.
    - In AGENTS.md: the crate in Where Things Are, `cargo xtask libretro` in `xtask/AGENTS.md`, and the
      `unsafe` exception in Rules.
-   - Add the release notes entry when the next version ships.
+   - Add the release notes entry when the next version ships (announced in 0.6.0).
 
 **Done when:** a release has the core zips, and installing one by hand on Windows, Linux and macOS
 works.
@@ -423,7 +423,7 @@ This is outward-facing: only do it once the maintainer says to go ahead.
    with an RK3326 or A133 chip. Use `cargo benchmark` with the homebrew games from
    `cargo xtask benchmark-roms`, and note the result in the README.
 2. Contact the libretro team (their GitHub or Discord). Usually they mirror the core under the libretro
-   organisation and build it on their GitLab CI with a `.gitlab-ci.yml` in the core's repository that
+   organization and build it on their GitLab CI with a `.gitlab-ci.yml` in the core's repository that
    includes their `libretro-infrastructure/ci-templates`. Those templates are written for Makefiles, so
    a small Makefile that calls cargo for each platform may be needed. Rust cores are rare: find one that
    is already on the buildbot (Holani, an Atari Lynx core, is believed to be in Rust) and copy its

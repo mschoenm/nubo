@@ -121,30 +121,6 @@ const RESET_HOLD_FRAMES: u16 = 106;
 /// game sets it.
 const GRAY_PALETTE: [u16; 4] = [0x7FFF, 0x56B5, 0x294A, 0x0000];
 
-/// The Super Game Boy's commands Nubo carries out, by number (the top five
-/// bits of a command's first byte).
-mod command {
-    pub(super) const PAL01: u8 = 0x00;
-    pub(super) const PAL23: u8 = 0x01;
-    pub(super) const PAL03: u8 = 0x02;
-    pub(super) const PAL12: u8 = 0x03;
-    pub(super) const ATTR_BLK: u8 = 0x04;
-    pub(super) const ATTR_LIN: u8 = 0x05;
-    pub(super) const ATTR_DIV: u8 = 0x06;
-    pub(super) const ATTR_CHR: u8 = 0x07;
-    pub(super) const PAL_SET: u8 = 0x0A;
-    pub(super) const PAL_TRN: u8 = 0x0B;
-    pub(super) const ATRC_EN: u8 = 0x0C;
-    pub(super) const ICON_EN: u8 = 0x0E;
-    pub(super) const MLT_REQ: u8 = 0x11;
-    pub(super) const CHR_TRN: u8 = 0x13;
-    pub(super) const PCT_TRN: u8 = 0x14;
-    pub(super) const ATTR_TRN: u8 = 0x15;
-    pub(super) const ATTR_SET: u8 = 0x16;
-    pub(super) const MASK_EN: u8 = 0x17;
-    pub(super) const PAL_PRI: u8 = 0x19;
-}
-
 /// Which border a Super Game Boy shows, as the player picks it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum SgbBorder {
@@ -1006,6 +982,30 @@ fn faded(color: u16, fade: u8) -> u16 {
     }
     let channel = |shift: u16| ((color >> shift) & 0x1F).saturating_sub(u16::from(fade));
     channel(0) | channel(5) << 5 | channel(10) << 10
+}
+
+/// The Super Game Boy's commands Nubo carries out, by number (the top five
+/// bits of a command's first byte).
+mod command {
+    pub(super) const PAL01: u8 = 0x00;
+    pub(super) const PAL23: u8 = 0x01;
+    pub(super) const PAL03: u8 = 0x02;
+    pub(super) const PAL12: u8 = 0x03;
+    pub(super) const ATTR_BLK: u8 = 0x04;
+    pub(super) const ATTR_LIN: u8 = 0x05;
+    pub(super) const ATTR_DIV: u8 = 0x06;
+    pub(super) const ATTR_CHR: u8 = 0x07;
+    pub(super) const PAL_SET: u8 = 0x0A;
+    pub(super) const PAL_TRN: u8 = 0x0B;
+    pub(super) const ATRC_EN: u8 = 0x0C;
+    pub(super) const ICON_EN: u8 = 0x0E;
+    pub(super) const MLT_REQ: u8 = 0x11;
+    pub(super) const CHR_TRN: u8 = 0x13;
+    pub(super) const PCT_TRN: u8 = 0x14;
+    pub(super) const ATTR_TRN: u8 = 0x15;
+    pub(super) const ATTR_SET: u8 = 0x16;
+    pub(super) const MASK_EN: u8 = 0x17;
+    pub(super) const PAL_PRI: u8 = 0x19;
 }
 
 mod attraction;

@@ -1239,9 +1239,8 @@ fn palette_button<'a>(palette: DmgPalette, selected: bool) -> Element<'a, Messag
 
 /// The keyboard or controller switch with a Reset button as big as it
 /// beside it (under it in a narrow window) that resets that device's
-/// bindings, then on a
-/// controller which buttons pick and go back in the menus, and the bindings
-/// of the Game Boy's buttons and the shortcuts.
+/// bindings, then on a controller which buttons pick and go back in the
+/// menus, and the bindings of the Game Boy's buttons and the shortcuts.
 fn controls<'a>(
     settings: &'a Settings,
     page: &PageState<'a>,

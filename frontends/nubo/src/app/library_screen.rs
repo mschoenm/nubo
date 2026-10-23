@@ -605,9 +605,8 @@ impl App {
 
     /// Starts scanning the library folders in the background. A folder
     /// menu's "Look for new games now", the folder watcher and folder
-    /// changes all come here;
-    /// while a scan runs, they lead to one more scan after it instead of a
-    /// second scan at the same time.
+    /// changes all come here; while a scan runs, they lead to one more scan
+    /// after it instead of a second scan at the same time.
     pub(super) fn rescan(&mut self) -> Task<Message> {
         if !self.keeps_library() {
             return Task::none();

@@ -1,6 +1,7 @@
 //! Runs the GameboyCPUTests JSON suite: thousands of single-instruction tests
 //! that check the CPU registers, the memory and every memory access after
-//! each instruction.
+//! each instruction. The suite has no tests for STOP, HALT, DI and EI, which
+//! the test ROMs check instead.
 
 use clap::Parser;
 use nubo_core::{BusActivityEntry, BusActivityKind, Emulator, Registers};
@@ -265,7 +266,7 @@ fn run_test_files(files: &[PathBuf]) -> Vec<Result<usize, String>> {
     results
 }
 
-/// Run the GameboyCPUTests suite: every CPU opcode, checked cycle by cycle
+/// Run the GameboyCPUTests suite: every CPU opcode but STOP, HALT, DI and EI, checked cycle by cycle
 #[derive(Parser)]
 #[command(name = "nubo-json-test-runner")]
 struct Args {

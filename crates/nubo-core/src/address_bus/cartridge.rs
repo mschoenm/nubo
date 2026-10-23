@@ -72,7 +72,9 @@ pub(crate) struct Cartridge {
     /// The cartridge RAM. It is at least as large as the header says (empty
     /// for a cartridge type without RAM, see `lacks_ram`), but can be larger,
     /// or any size at all once a save state or `Cartridge::set_ram` replaced
-    /// it; reads and writes wrap around its length.
+    /// it; reads and writes wrap around its length (MBC2 uses the first 512
+    /// bytes; cells past the end of a shorter buffer read 0xFF and ignore
+    /// writes).
     ram: Vec<u8>,
     mapper: CartridgeMapper,
     /// Lets the cartridge save its RAM and clock through the frontend.
@@ -116,7 +118,9 @@ impl Cartridge {
     }
 
     /// Replaces the cartridge RAM, for example with a save file. A buffer of
-    /// the wrong size is accepted; reads and writes wrap around its length.
+    /// the wrong size is accepted; reads and writes wrap around its length
+    /// (MBC2 uses the first 512 bytes; cells past the end of a shorter buffer
+    /// read 0xFF and ignore writes).
     pub fn set_ram(&mut self, ram: Vec<u8>) {
         self.ram = ram;
     }

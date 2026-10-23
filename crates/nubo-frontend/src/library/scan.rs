@@ -59,9 +59,8 @@ pub struct FileCheck {
 /// Looks for ROMs in `folders` and returns an entry for each, reusing the
 /// `known` entry of files that didn't change (reading such a file only to
 /// learn whether it uses the Super Game Boy, when an earlier version didn't
-/// keep that). Recently played games outside
-/// the folders stay in the library as long as their file exists. Files that
-/// aren't valid ROMs are left out.
+/// keep that). Recently played games outside the folders stay in the library
+/// as long as their file exists. Files that aren't valid ROMs are left out.
 ///
 /// A known game whose file is gone is forgotten, unless the folder it is on
 /// is gone too: then it is most likely on a drive that is unplugged, and it

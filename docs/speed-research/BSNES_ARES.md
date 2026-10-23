@@ -33,10 +33,10 @@ The techniques, ranked by estimated impact for Nubo:
 |---|---|---|---|
 | 1 | Separate the PPU's timing from its pixels. Draw "clean" lines with an exact line renderer, and when a mid-line change comes, replay the reference FIFO from a checkpoint (bsnes's line cache with flush-on-change, made exact) | Yes, by construction plus differential tests | 1.3–1.6x on the benchmark games; more on games with busy screens |
 | 2 | Know mode 3's length at the start of mode 3, and answer reads of LY, STAT and IF from the predicted timeline without catching up (bsnes's CPU-side copy of the beam counters) | Yes | 5–15%; much more on games that poll in a loop |
-| 3 | In-PPU event horizon: work out the next dot at which anything can happen once, then run straight to it. Specialise the line schedule at compile time and keep rare work out of line (bsnes's accurate PPU) | Yes | 3–8% |
+| 3 | In-PPU event horizon: work out the next dot at which anything can happen once, then run straight to it. Specialize the line schedule at compile time and keep rare work out of line (bsnes's accurate PPU) | Yes | 3–8% |
 | 4 | A page table for the CPU's fast path, so ROM, work RAM and HRAM reads need no range matching (bsnes/ares bus lookup tables) | Yes | 2–4% |
 | 5 | Hand over finished frames by swapping buffers instead of copying them (bsnes hands the frontend its output buffer) | Yes | about 2% |
-| 6 | Monomorphise hot paths over settings fixed for a whole run: processor-test mode, model family, speed (bsnes's instruction tables per mode, templated step counts) | Yes | 1–3% |
+| 6 | Monomorphize hot paths over settings fixed for a whole run: processor-test mode, model family, speed (bsnes's instruction tables per mode, templated step counts) | Yes | 1–3% |
 | 7 | Skip pixel production when nobody can see it (run-ahead and frame-skip frames in bsnes). Needs #1, and never on the Super Game Boy | Yes for the emulation (frame contents need care) | Large, but only for run-ahead and fast-forward |
 | 8 | Batch rendering of the frame at VBlank, and multithreaded line rendering (bsnes fast PPU) | Batching yes; threads are a host detail | Small for Game Boy; not recommended now |
 
@@ -77,7 +77,7 @@ The pull-driven DSP is worth noting as a pattern. It is a resumable state machin
 1. **Split timing from pixels.** On the Game Boy, how long mode 3 lasts, and so the STAT mode changes, the mode 0 interrupt and the HBlank DMA start, depends only on non-data inputs: SCX's fine bits, whether and where the window starts (LCDC's window bit, WX, the WY trigger), the objects OAM scan found and their X positions, LCDC's object enable and size bits, the model and the speed. It never depends on tile data or palette contents. So timing can be worked out at the start of mode 3 without producing a single pixel.
 2. **Get the timing exactly.** There are two safe ways. Ideally use both, the second checking the first in debug builds and tests.
    - *Timing-only replay:* run the reference fetcher/FIFO state machine in a mode that skips VRAM data reads, palette lookups and frame buffer writes, and only counts dots until drawing ends. This is exact by construction and much cheaper per dot than the full pipeline.
-   - *Memoisation:* cache the mode-3 length under a key made of every timing input listed above: fine scroll, window parameters, the object X list with each object's place in the OAM-scan order, the LCDC bits, model and speed. Within a frame most lines share a key, so the replay runs once per distinct configuration. The key must cover every input, because a missing one silently changes the timing. Have debug builds and the random-scene tests compare the cached value with a fresh replay.
+   - *Memoization:* cache the mode-3 length under a key made of every timing input listed above: fine scroll, window parameters, the object X list with each object's place in the OAM-scan order, the LCDC bits, model and speed. Within a frame most lines share a key, so the replay runs once per distinct configuration. The key must cover every input, because a missing one silently changes the timing. Have debug builds and the random-scene tests compare the cached value with a fresh replay.
 3. **Define a "clean line".** From the start of mode 3 to its end:
    - no CPU write lands on anything the pipeline reads during mode 3: LCDC, SCX, SCY, WX, WY, the DMG palettes, the CGB palette data and index registers, OPRI, VRAM and OAM (Nubo already routes all of these through `reaches_ppu` and the dot-by-dot write path);
    - no OAM DMA or VRAM DMA activity touches OAM or VRAM;
@@ -87,7 +87,7 @@ The pull-driven DSP is worth noting as a pattern. It is a resumable state machin
    - no STOP-mode blocking applies.
 
    Most lines of most games are clean.
-4. **Draw clean lines with a line renderer.** It goes tile by tile (decode a tile row's two bitplanes into eight colour indices at once, then map them through a small palette table) and object by object (merge each object's eight pixels by the model's priority rules, the BG-to-OBJ priority bits, CGB master priority and OPRI). It has a separate inner loop for each colour mode, as `draw_plain_pixels_in` has now. It must reproduce what the reference FIFO gives on clean lines, including the quirks that come from clean inputs: fine-scroll discard, objects partly off the left edge, the window at the screen edges, the window line counter, the ten-object limit (already applied by OAM scan) and the DMG and CGB object ordering. For any configuration it does not cover yet (rare window positions, unusual object overlaps), it **declines**, and the line runs through the reference pipeline as today. This is the same "decline to the fast path" pattern as `can_draw_plain_pixel`, but at line granularity.
+4. **Draw clean lines with a line renderer.** It goes tile by tile (decode a tile row's two bitplanes into eight color indices at once, then map them through a small palette table) and object by object (merge each object's eight pixels by the model's priority rules, the BG-to-OBJ priority bits, CGB master priority and OPRI). It has a separate inner loop for each color mode, as `draw_plain_pixels_in` has now. It must reproduce what the reference FIFO gives on clean lines, including the quirks that come from clean inputs: fine-scroll discard, objects partly off the left edge, the window at the screen edges, the window line counter, the ten-object limit (already applied by OAM scan) and the DMG and CGB object ordering. For any configuration it does not cover yet (rare window positions, unusual object overlaps), it **declines**, and the line runs through the reference pipeline as today. This is the same "decline to the fast path" pattern as `can_draw_plain_pixel`, but at line granularity.
 5. **Checkpoint and replay on a mid-line change.** When a line starts as clean and a relevant write arrives in the middle of mode 3, the line is no longer clean. Nubo already catches the PPU up before such a write and runs that M-cycle dot by dot. At that moment, *before the write is applied*:
    - restore the pipeline state saved at the start of mode 3;
    - replay the reference pipeline dot by dot from mode 3's start to the current dot, writing the frame buffer row as usual;
@@ -98,7 +98,7 @@ The pull-driven DSP is worth noting as a pattern. It is a resumable state machin
 6. **When to draw.** The simplest exact choice: draw at the end of mode 3, or at the replay point if a write came first. Deferring further (whole-frame batches, 2.8) is possible but needs flushes before every VRAM and OAM write, which come often in VBlank, so it adds little on the Game Boy.
 
 **Fitting the bit-exact rule.** The frame buffer row, the mode-3 length, every STAT and interrupt event and every save-state field must equal the `eager` build. The line renderer and the timing cache sit behind the same kind of guard the steady stretches use. The replay uses the reference code itself. Verify it with:
-- the existing randomised `gpu/tests/random_scenes.rs`, extended to random clean lines with random objects, window and scroll, comparing the line renderer and timing cache against the FIFO;
+- the existing randomized `gpu/tests/random_scenes.rs`, extended to random clean lines with random objects, window and scroll, comparing the line renderer and timing cache against the FIFO;
 - random mid-line writes, to exercise replay;
 - `cargo benchmark --compare` between an eager build and a normal one, on the benchmark games and the test ROMs.
 
@@ -108,7 +108,7 @@ The pull-driven DSP is worth noting as a pattern. It is a resumable state machin
 
 The first way changes nothing in the stored layout. Store no new fields unless needed. If any are added, give them new stored names.
 
-**Estimated gain.** If clean lines move from about 60 to about 5–10 instructions per mode-3 dot (line rendering plus amortised timing), mode 3 falls from about 35–40% of instructions to about 5–10%: roughly **1.3–1.6x** overall on the benchmark games. Scenes with many objects and scrolling gain more, title screens less.
+**Estimated gain.** If clean lines move from about 60 to about 5–10 instructions per mode-3 dot (line rendering plus amortized timing), mode 3 falls from about 35–40% of instructions to about 5–10%: roughly **1.3–1.6x** overall on the benchmark games. Scenes with many objects and scrolling gain more, title screens less.
 
 **Risks.**
 - **Accuracy:** a missing timing-key input or quirk. Mitigate by declining anything unusual, and by differential tests against the FIFO.
@@ -135,7 +135,7 @@ The first way changes nothing in the stored layout. Store no new fields unless n
 
 **Risks.** Subtle STAT timing. The guard must be conservative. Save states are unaffected, since nothing is stored.
 
-### 2.3 Event horizon inside the PPU; compile-time specialised line schedule (from bsnes's accurate PPU)
+### 2.3 Event horizon inside the PPU; compile-time specialized line schedule (from bsnes's accurate PPU)
 
 **The problem.** `run_dots` re-checks `has_steady_shape`, `stat_settled` and the line state for each chunk, and the reference pipeline dispatches on fetcher and phase state every dot. Together about 5% of instructions are spent asking whether nothing changes.
 
@@ -143,7 +143,7 @@ The first way changes nothing in the stored layout. Store no new fields unless n
 
 **For Nubo (safe Rust).**
 - Keep one "next event dot" per line: the earliest of the next mode change, the WY check, a countdown expiring, mode 3's end (known from 2.1), the line end and the frame end. Update it only when a write or event changes the inputs. Then `run_dots` advances `line_dot` straight to it, with no per-chunk shape checks. `has_steady_shape` becomes a debug assertion instead of a hot check.
-- Make the timing variant (DMG, CGB, CGB double speed) and the colour mode generic parameters of the line-schedule and renderer functions, as `draw_plain_pixels_in` already does for colours, so the inner loops carry no model branches.
+- Make the timing variant (DMG, CGB, CGB double speed) and the color mode generic parameters of the line-schedule and renderer functions, as `draw_plain_pixels_in` already does for colors, so the inner loops carry no model branches.
 - Mark the rare paths (`tick_drawing`'s glitch branches, object fetch, window start) `#[cold]` or `#[inline(never)]` so the hot loop stays small for the instruction cache, as bsnes found out the hard way.
 
 **Exactness.** This is pure restructuring and must give the same results. Check with the random-scene tests and with fingerprint comparison against an eager build.
@@ -172,12 +172,12 @@ The fast path then becomes one table load plus a slice index, with no `match` on
 
 **Gain:** about 2%. Low risk.
 
-### 2.6 Specialise hot paths over settings fixed for a run (from bsnes's mode-specific instruction tables and step templates)
+### 2.6 Specialize hot paths over settings fixed for a run (from bsnes's mode-specific instruction tables and step templates)
 
 bsnes compiles four complete instruction tables, one per combination of its CPU's register-width flags, so no instruction re-checks a mode. It also makes the cycle count of each step a compile-time parameter, so the per-step loop unrolls. Nubo has no CPU modes, but every bus access checks `processor_test_mode()` at run time. `cgb_mode`, the model and the double-speed state are re-checked in many hot paths, and the deferral path re-asks the same questions on every `sync_now`.
 
 Options:
-- a const-generic "flavour" on the run loop (normal or processor-test; DMG family or CGB), chosen once per `step_until_next_audio_buffer` or `run_frame` call;
+- a const-generic "flavor" on the run loop (normal or processor-test; DMG family or CGB), chosen once per `step_until_next_audio_buffer` or `run_frame` call;
 - keeping derived flags (such as "may defer", "a slow page is mapped") so the fast path tests a single boolean.
 
 **Gain:** 1–3%. Pure restructuring.
@@ -222,8 +222,8 @@ It runs each component as a thread and syncs on every clock. It uses a fixed mod
 2. **2.3 (first half): event horizon in `run_dots`.** It removes the repeated shape checks and sets up the structure 2.1 needs (a known mode-3 end and a next-event dot).
 3. **2.1 Timing split.** First the timing-only replay plus the memo cache, with exhaustive differential tests against the FIFO. Use it at first only to set the next-event dot and to drop per-dot STAT checks during mode 3.
 4. **2.2 Predicted register reads**, which builds on the known timeline. Measure on the poll-heavy benchmark games.
-5. **2.1 Line renderer with checkpoint-and-replay**, starting with the most common case (no window, up to ten objects, DMG and CGB colour modes), and widening coverage as tests allow. Compare eager and normal builds on the benchmark games and the test ROMs (`cargo benchmark --compare`) at every step.
-6. **2.4 Page table** and **2.6 specialisation**, as cleanup once the PPU no longer dominates the profile.
+5. **2.1 Line renderer with checkpoint-and-replay**, starting with the most common case (no window, up to ten objects, DMG and CGB color modes), and widening coverage as tests allow. Compare eager and normal builds on the benchmark games and the test ROMs (`cargo benchmark --compare`) at every step.
+6. **2.4 Page table** and **2.6 specialization**, as cleanup once the PPU no longer dominates the profile.
 7. **2.7 Timing-only frames** for libretro run-ahead and fast-forward, if wanted.
 8. **2.8**: only if profiles show a need.
 

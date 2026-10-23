@@ -33,7 +33,7 @@ palettes and the model rule from there. A later app would only have to draw and 
      `ProjectDirs::from("", "", "Nubo")` picks.
    - **Identity:** the same app id (`io.github.mschoenm.nubo`), the same program name (`nubo`), the same
      installer `AppId`.
-   - **Behaviour:** the same.
+   - **Behavior:** the same.
 6. Every step is one pull request that leaves `main` working, with nothing half moved.
 
 Not goals: changing the emulator (beyond the one method step 2 adds), changing how the Iced app looks or
@@ -425,7 +425,9 @@ The order of all three plans, agreed with the maintainer on 2026-10-13:
    with Codex. The maintainer moved the core ahead of the Shootout's Parts 1 to 3 and asked for it
    straight away; Phases 1 to 5 are built (see that plan's Status).
 7. When their conditions are met and the maintainer says to go ahead:
-   - the pull request to the Shootout (its Part 4), once Nubo would rank first
+   - the pull request to the Shootout (its Part 4): open since 2026-10-15 as
+     [gbdev/GBEmulatorShootout#102](https://github.com/gbdev/GBEmulatorShootout/pull/102), done once Nubo
+     is in the published table
    - RetroArch's own core downloader (its Phase 6), once the core has been in a few releases
 
 Why this order:

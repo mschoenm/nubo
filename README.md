@@ -179,7 +179,7 @@ Screenshots go to your Pictures folder, in `Pictures/Nubo`.
 Every change to Nubo is tested against thousands of test ROMs: small programs that each check one detail of the hardware against what real consoles do. Every pull request runs them all, and fails if a test that passed stops passing.
 
 - **The test ROM suites:** 6,793 of 6,824 test runs pass, each test on the models it was written for, across the 12 models Nubo emulates. The suites include Blargg's tests, Mooneye, the acid tests, SameSuite, Mealybug Tearoom and Gambatte's.
-- **The processor:** all [JSON CPU tests](https://github.com/adtennant/GameboyCPUTests) pass, which check every instruction cycle by cycle.
+- **The processor:** all [JSON CPU tests](https://github.com/adtennant/GameboyCPUTests) pass, which check every instruction cycle by cycle, except STOP, HALT, DI and EI, which the test ROMs check.
 - **Speed:** being exact costs speed, but on one core of a shared 2.1 GHz cloud server Nubo still runs games about 50 to 155 times as fast as a real Game Boy, so playing at normal speed takes only a small share of one processor core.
 
 [The results suite by suite](docs/ACCURACY.md) and [the tests that still fail, and why](tools/nubo-test-rom-runner/FAILING_TESTS.md).
@@ -212,6 +212,7 @@ Much of its accuracy comes from other people's research and code:
 
 - [SameBoy](https://github.com/LIJI32/SameBoy) by Lior Halphon: the APU channel timing, the mode 3 pixel pipeline, the OAM corruption bug, the OAM DMA bus conflicts, the CGB speed switch timing, STOP mode, the PPU register write timing, the serial clock, the MBC3's banks and clock latch and the Super Game Boy's commands, colors, borders and multiplayer reads are ported from SameBoy, and the Game Boy Color boot ROM is a modified version of SameBoy's (Expat License, see [NOTICE](NOTICE)). SameBoy was also the reference for halt timing, the order of the hardware models, GameShark codes and many smaller hardware quirks.
 - [Bootix](https://github.com/Hacktix/Bootix) by Hacktix: the boot ROM of the monochrome models is a modified version of Bootix (CC0).
+- [hardware.inc](https://github.com/gbdev/hardware.inc) by the gbdev community: the names of the hardware registers in the boot ROMs' sources (CC0).
 - [Gambatte](https://github.com/pokemon-speedrunning/gambatte-core) by sinamas: the reference for much of Nubo's timing where test ROMs leave gaps: double speed, the window, the STAT and LY=LYC interrupts, the speed switch's pauses, TIMA's jump ahead, HDMA and the sound channels' sweep and envelope. It was worked out by running the same test ROMs in Gambatte and Nubo and studying where they differ, and Gambatte's own test ROMs make up more than three quarters of the test runs Nubo checks. Gambatte's GPL-2.0-only license can't be combined with Nubo's, so no code comes from it.
 - [Pan Docs](https://gbdev.io/pandocs/) and the [gbdev](https://gbdev.io) community: the reference for nearly every hardware register.
 - [SonoSooS's Game Boy CPU notes](https://gist.github.com/SonoSooS/c0055300670d678b5ae8433e20bea595): the fetch, decode and execute overlap of the CPU.

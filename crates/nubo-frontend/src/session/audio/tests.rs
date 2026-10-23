@@ -1,3 +1,5 @@
+//! Tests for waking the emulator thread when the sound queue runs low.
+
 use super::*;
 use std::thread;
 use std::time::Instant;

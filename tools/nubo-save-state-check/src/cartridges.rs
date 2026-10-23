@@ -19,6 +19,7 @@ pub(crate) struct TestCartridge {
     pub(crate) file: &'static str,
     /// The models its states are made on.
     pub(crate) models: &'static [Model],
+    /// The title written into the header (from 0x0134).
     title: &'static str,
     /// The cartridge type byte of the header (0x0147), which picks the
     /// controller.
