@@ -1,8 +1,8 @@
 # The ten areas of a full review, as path prefixes. A file belongs to the first
 # area whose prefix it starts with, so the order matters. `review.py areas`
 # lists every tracked file that no area takes and fails if there is one; add
-# new folders here when the repository grows. Binary files (pictures, save
-# states, ROMs) are skipped.
+# new folders here when the repository grows. Binary files (pictures other than
+# SVG, save states, ROMs) are skipped.
 CORE-BUS      crates/nubo-core/src/address_bus.rs
 CORE-BUS      crates/nubo-core/src/address_bus/
 CORE-GPU      crates/nubo-core/src/gpu.rs

@@ -26,7 +26,15 @@
 //!   interface, to standard error.
 //! - **Pointers RetroArch keeps** (the save buffers, the memory maps, the
 //!   frame during `retro_video_refresh`) point into buffers the `Core` owns
-//!   and never moves or resizes while the game is loaded.
+//!   and never moves or resizes while the game is loaded. RetroArch reads and
+//!   writes them only between calls into the core, on the core's thread, and
+//!   no function here holds a reference into them while it calls RetroArch
+//!   (`present` holds `&Core` for the frame, but borrows none of them), so
+//!   its accesses never overlap a Rust borrow. Keep it that way: never call
+//!   RetroArch while holding `&mut` to the save, clock or memory map buffers.
+//!   (Rust's aliasing rules formally end a pointer at the next mutable borrow
+//!   of its buffer; buffers of `Cell<u8>` would be the fully sound form, if
+//!   Miri ever runs these tests.)
 #![expect(
     unsafe_code,
     reason = "a libretro core exports C functions and reads the pointers RetroArch passes"
@@ -239,8 +247,9 @@ const NO_VALUES: [RetroCoreOptionValue; RETRO_NUM_CORE_OPTION_VALUES_MAX] = [Ret
 };
     RETRO_NUM_CORE_OPTION_VALUES_MAX];
 
-/// `struct retro_core_option_definition`, for `RETRO_ENVIRONMENT_SET_CORE_OPTIONS`: one option as
-/// the version 1 interface declares it, for frontends without version 2.
+/// `struct retro_core_option_definition`, for
+/// `RETRO_ENVIRONMENT_SET_CORE_OPTIONS`: one option as the version 1
+/// interface declares it, for frontends without version 2.
 #[repr(C)]
 struct RetroCoreOptionDefinition {
     key: *const c_char,
@@ -587,7 +596,8 @@ fn negotiate_pixel_format() -> PixelFormat {
 /// descriptor per region of `core`'s buffers. The map depends on the model (a
 /// Game Boy Color has more work RAM), so it is built again whenever a restart
 /// may have changed the model. The buffers never move, so the descriptors
-/// stay true after the lock on `core` is released.
+/// stay true after the lock on `core` is released, and RetroArch uses them
+/// only between calls into the core (see the module docs).
 fn memory_descriptors(core: &mut Core) -> Vec<RetroMemoryDescriptor> {
     core.memory_regions()
         .into_iter()
@@ -802,7 +812,8 @@ pub unsafe extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) 
     });
 }
 
-/// Keeps the environment callback, and tells RetroArch the core options.
+/// Keeps the environment callback, takes RetroArch's log interface, and
+/// declares the core options and the four controller ports.
 #[unsafe(no_mangle)]
 pub extern "C" fn retro_set_environment(callback: Option<RetroEnvironment>) {
     guard("retro_set_environment", (), || {
@@ -1159,7 +1170,8 @@ fn memory(core: &mut Core, id: c_uint) -> &mut [u8] {
     }
 }
 
-/// Where a kind of memory is, or null.
+/// Where a kind of memory is, or null. RetroArch keeps the pointer and uses
+/// it only between calls into the core (see the module docs).
 #[unsafe(no_mangle)]
 pub extern "C" fn retro_get_memory_data(id: c_uint) -> *mut c_void {
     guard("retro_get_memory_data", ptr::null_mut(), || {

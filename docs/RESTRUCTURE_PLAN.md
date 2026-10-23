@@ -425,7 +425,9 @@ The order of all three plans, agreed with the maintainer on 2026-10-13:
    with Codex. The maintainer moved the core ahead of the Shootout's Parts 1 to 3 and asked for it
    straight away; Phases 1 to 5 are built (see that plan's Status).
 7. When their conditions are met and the maintainer says to go ahead:
-   - the pull request to the Shootout (its Part 4), once Nubo would rank first
+   - the pull request to the Shootout (its Part 4): open since 2026-10-15 as
+     [gbdev/GBEmulatorShootout#102](https://github.com/gbdev/GBEmulatorShootout/pull/102), done once Nubo
+     is in the published table
    - RetroArch's own core downloader (its Phase 6), once the core has been in a few releases
 
 Why this order:

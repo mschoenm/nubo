@@ -64,8 +64,8 @@ Where the code differs from the plan below:
   the emulator with `Emulator::memory_mut`, which catches the lazy components up first. Checked in RetroArch 1.18
   with a game-specific cheat file. The hardware registers stay read-only (`RETRO_MEMDESC_CONST`).
 
-Left: the maintainer's tests by hand (above), the AppStream release notes entry when the next version ships (the
-`release` skill writes it), and Phase 6 (on hold).
+Left: the maintainer's tests by hand (above) and Phase 6 (on hold). The AppStream release notes announced the core in
+0.6.0.
 
 ## Decisions for the maintainer before starting
 
@@ -408,7 +408,7 @@ RetroArch with a test account, and a rumble cartridge game (such as Pokémon Pin
      the info file to its `info` folder), and what it does and doesn't support.
    - In AGENTS.md: the crate in Where Things Are, `cargo xtask libretro` in `xtask/AGENTS.md`, and the
      `unsafe` exception in Rules.
-   - Add the release notes entry when the next version ships.
+   - Add the release notes entry when the next version ships (announced in 0.6.0).
 
 **Done when:** a release has the core zips, and installing one by hand on Windows, Linux and macOS
 works.

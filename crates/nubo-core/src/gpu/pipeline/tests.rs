@@ -1,4 +1,5 @@
-//! Unit tests for the mode 3 renderer: each test draws one line and checks its pixels.
+//! Unit tests for the mode 3 renderer: lines drawn with `write_scanline` and their pixels, OAM
+//! scan's object list, and the renderer states a save state may hold.
 
 use super::*;
 use crate::address_bus::hdma::HdmaState;
