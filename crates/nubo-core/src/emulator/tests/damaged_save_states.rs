@@ -1204,6 +1204,72 @@ fn states_whose_copies_of_the_speed_or_system_counter_differ_are_refused() {
     assert!(emulator.load_state(&fast_serial_clock).is_err());
 }
 
+/// A stored value a test damages: its path, the bytes written over it and the number it must hold
+/// once the state has loaded.
+type DamagedValue = (&'static str, &'static [u8], u64);
+
+/// The bank registers of MBC1, MBC2, MBC5 and HuC1 hold only the bits the hardware has, and
+/// MBC1's and MBC2's ROM bank isn't 0, also when a damaged state stores more, as when a game
+/// writes them.
+#[test]
+fn a_loaded_controller_keeps_only_the_bits_its_bank_registers_have() {
+    let cases: [(u8, &[DamagedValue]); 5] = [
+        (
+            0x03,
+            &[
+                ("cartridge.mapper.mbc1.bank1", &[0xE0], 1),
+                ("cartridge.mapper.mbc1.bank2", &[0xFF], 3),
+            ],
+        ),
+        (
+            0x06,
+            &[("cartridge.mapper.mbc2.rom_bank_number", &[0xF0], 1)],
+        ),
+        (
+            0x1B,
+            &[
+                (
+                    "cartridge.mapper.mbc5.rom_bank_number",
+                    &[0xFF, 0xFF],
+                    0x1FF,
+                ),
+                ("cartridge.mapper.mbc5.ram_bank_number", &[0xFF], 0x0F),
+            ],
+        ),
+        (
+            0x1E,
+            &[("cartridge.mapper.mbc5.ram_bank_number", &[0xFF], 0x07)],
+        ),
+        (
+            0xFF,
+            &[
+                ("cartridge.mapper.huc1.rom_bank_number", &[0xFF], 0x3F),
+                ("cartridge.mapper.huc1.ram_bank_number", &[0xFF], 0x03),
+            ],
+        ),
+    ];
+    for (cartridge_type, values) in cases {
+        let (rom, state) = busy_state(Model::Dmg, cartridge_type);
+        let mut emulator = Tester::emulator(Model::Dmg, &rom);
+        let mut damaged = state.bytes.clone();
+        for (path, bytes, _) in values {
+            let stored = StoredState::read(damaged, &Layout::of(&emulator));
+            damaged = with_value(&stored, path, bytes.to_vec());
+        }
+        emulator.load_state(&damaged).unwrap();
+
+        let layout = Layout::of(&emulator);
+        let saved = emulator.save_state();
+        let view = StateView {
+            bytes: &saved,
+            layout: &layout,
+        };
+        for (path, _, expected) in values {
+            assert_eq!(view.number(path), *expected, "{path}");
+        }
+    }
+}
+
 /// An MBC3's registers hold only the bits the hardware has, also when a damaged state stores
 /// more, as they do when a game writes them or a `.rtc` file loads.
 #[test]

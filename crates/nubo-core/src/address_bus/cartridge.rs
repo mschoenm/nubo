@@ -260,11 +260,15 @@ impl Cartridge {
         }
     }
 
-    /// Cuts a loaded MBC3's registers to the bits they have, and moves a
-    /// clock loaded from a save state made on the other [`RtcClock`] over to
-    /// the one this cartridge follows, keeping what it shows.
+    /// Cuts a loaded controller's registers to the bits they have, and moves
+    /// a clock loaded from a save state made on the other [`RtcClock`] over
+    /// to the one this cartridge follows, keeping what it shows.
     pub fn finish_loading_save_state(&mut self, elapsed_dots: u64) {
+        self.rumble = RumbleMeter::default();
         match &mut self.mapper {
+            CartridgeMapper::RomOnly | CartridgeMapper::RomRam => {}
+            CartridgeMapper::Mbc1(mbc1) => mbc1.within_register_widths(),
+            CartridgeMapper::Mbc2(mbc2) => mbc2.within_register_widths(),
             CartridgeMapper::Mbc3(mbc3) => {
                 let effects = self.effects.as_ref();
                 mbc3.finish_loading_save_state(effects.rtc_clock(), |clock| {
@@ -272,9 +276,10 @@ impl Cartridge {
                 });
             }
             CartridgeMapper::Mbc5(mbc5) => {
+                mbc5.within_register_widths();
                 self.rumble = RumbleMeter::starting(mbc5.is_rumbling(), elapsed_dots);
             }
-            _ => self.rumble = RumbleMeter::default(),
+            CartridgeMapper::Huc1(huc1) => huc1.within_register_widths(),
         }
     }
 
