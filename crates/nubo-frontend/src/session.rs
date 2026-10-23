@@ -35,6 +35,7 @@ use nubo_core::{
     SgbBorder,
 };
 use pacing::FRAME_DURATION;
+use std::mem;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::mpsc::{self, Sender};
@@ -151,7 +152,65 @@ pub enum Command {
     /// Runs this many frames, whether the game is paused or not, and sends
     /// back the last two the emulator finished (see
     /// [`GameSession::run_frames`]).
-    RunFrames(u32, Sender<Vec<Frame>>),
+    RunFrames(u32, Sender<LatestFrames>),
+}
+
+/// The emulator's two newest frames, as it finished them. A session keeps
+/// them and hands both to the screen, so frame blending mixes the newest
+/// with the frame the emulator really drew before it, even when the app
+/// missed frames in between (while fast forwarding, or when it redraws
+/// late). A frame without pixels stands for none yet.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct LatestFrames {
+    newest: Frame,
+    before: Frame,
+}
+
+impl LatestFrames {
+    /// The newest frame, or `None` before the first.
+    pub fn newest(&self) -> Option<&Frame> {
+        (!self.newest.pixels.is_empty()).then_some(&self.newest)
+    }
+
+    /// The frame the emulator finished just before the newest, or `None`
+    /// before the second.
+    pub fn before(&self) -> Option<&Frame> {
+        (!self.before.pixels.is_empty()).then_some(&self.before)
+    }
+
+    /// Takes in the emulator's newest frame (see `Frame::update`), keeping
+    /// the one that was newest as the one before it. Returns whether the new
+    /// frame differs from the one before.
+    fn update(&mut self, emulator: &Emulator) -> bool {
+        self.push(|newest| {
+            newest.update(emulator);
+        })
+    }
+
+    /// Makes the frame `fill` writes the newest, keeping the one that was
+    /// newest as the one before it. `fill` writes into the oldest frame's
+    /// memory, so nothing is allocated once both frames have pixels.
+    /// Returns whether the new frame differs from the one before.
+    fn push(&mut self, fill: impl FnOnce(&mut Frame)) -> bool {
+        mem::swap(&mut self.newest, &mut self.before);
+        fill(&mut self.newest);
+        self.newest != self.before
+    }
+}
+
+impl Clone for LatestFrames {
+    fn clone(&self) -> Self {
+        LatestFrames {
+            newest: self.newest.clone(),
+            before: self.before.clone(),
+        }
+    }
+
+    /// Copies both of `source`'s frames into these, reusing their memory.
+    fn clone_from(&mut self, source: &Self) {
+        self.newest.clone_from(&source.newest);
+        self.before.clone_from(&source.before);
+    }
 }
 
 /// The emulated Game Boy with its sound output and battery saves, playing
@@ -263,20 +322,17 @@ impl Machine {
 
     /// Runs `count` frames of emulated time with `Emulator::run_frame`,
     /// without playing their sound, and returns the last two frames that
-    /// finished, the newest last. Runs the same from the same state, so a
-    /// save state and a count make a picture that can always be made again.
-    fn run_frames(&mut self, count: u32) -> Vec<Frame> {
+    /// finished. Runs the same from the same state, so a save state and a
+    /// count make a picture that can always be made again.
+    fn run_frames(&mut self, count: u32) -> LatestFrames {
         let (mut left, mut right) = (Vec::new(), Vec::new());
-        let mut frames = Vec::new();
+        let mut frames = LatestFrames::default();
         for _ in 0..count {
             self.emulator.run_frame(&mut left, &mut right);
             left.clear();
             right.clear();
             if self.emulator.take_frame().is_some() {
-                if frames.len() == 2 {
-                    frames.remove(0);
-                }
-                frames.push(Frame::latest(&self.emulator));
+                frames.update(&self.emulator);
             }
         }
         frames

@@ -284,7 +284,8 @@ fn frames_run_from_a_state_come_out_the_same_every_time() {
     };
 
     let frames = run_frames(&mut machine);
-    assert_eq!(frames.len(), 2, "the last two frames come back");
+    assert!(frames.newest().is_some(), "the newest frame comes back");
+    assert!(frames.before().is_some(), "and the one before it");
     let after = save_state(&mut machine);
 
     ask(
@@ -296,9 +297,6 @@ fn frames_run_from_a_state_come_out_the_same_every_time() {
     .unwrap()
     .unwrap();
     let again = run_frames(&mut machine);
-    assert_eq!(
-        again.iter().map(|frame| &frame.pixels).collect::<Vec<_>>(),
-        frames.iter().map(|frame| &frame.pixels).collect::<Vec<_>>()
-    );
+    assert!(again == frames, "the same frames come back");
     assert_eq!(save_state(&mut machine), after);
 }

@@ -1,6 +1,9 @@
 //! Tests for handing new frames to the app and spreading fast forward's sound.
 
 use super::*;
+use crate::lcd::ScreenEffects;
+use crate::palettes::DmgPalette;
+use crate::picture::{Frame, SCREEN_HEIGHT, SCREEN_WIDTH};
 use std::hash::DefaultHasher;
 
 fn shared_frame() -> Arc<Mutex<SharedFrame>> {
@@ -10,10 +13,23 @@ fn shared_frame() -> Arc<Mutex<SharedFrame>> {
 /// Publishes a frame of `pixels`, as `Frame::update` would: only if they
 /// differ from the frame before.
 fn publish_pixels(frame: &Mutex<SharedFrame>, pixels: &[u8]) {
-    publish(frame, |latest| {
-        let changed = latest.pixels != pixels;
-        latest.pixels = pixels.to_vec();
-        changed
+    publish(frame, |frames| {
+        frames.push(|newest| newest.pixels = pixels.to_vec())
+    });
+}
+
+/// Publishes a whole Game Boy Color screen with every channel of every pixel
+/// at `level`.
+fn publish_level(frame: &Mutex<SharedFrame>, level: u8) {
+    publish(frame, |frames| {
+        frames.push(|newest| {
+            *newest = Frame {
+                pixels: vec![level; (SCREEN_WIDTH * SCREEN_HEIGHT * 4) as usize],
+                width: SCREEN_WIDTH,
+                height: SCREEN_HEIGHT,
+                ..Frame::default()
+            };
+        })
     });
 }
 
@@ -75,6 +91,52 @@ fn only_the_first_frame_like_the_one_before_is_published() {
 
     publish_pixels(&frame, &[1, 2, 4]);
     assert_eq!(frame.lock().unwrap().sequence, 3);
+}
+
+#[test]
+fn a_frame_the_app_missed_is_still_the_one_the_newest_blends_with() {
+    let shared = shared_frame();
+    let mut shown = LatestFrames::default();
+    publish_level(&shared, 0x00);
+    let sequence = shared.lock().unwrap().copy_since(0, &mut shown).unwrap();
+
+    // Two frames come before the app looks again.
+    publish_level(&shared, 0x40);
+    publish_level(&shared, 0xC0);
+    shared
+        .lock()
+        .unwrap()
+        .copy_since(sequence, &mut shown)
+        .unwrap();
+
+    let blending = ScreenEffects {
+        correct_colors: false,
+        blend_frames: true,
+    };
+    let picture = blending.show(
+        shown.newest().unwrap(),
+        shown.before(),
+        DmgPalette::Gray,
+        true,
+    );
+    assert!(picture.pixels().iter().all(|&channel| channel == 0x80));
+}
+
+#[test]
+fn nothing_is_copied_while_the_frame_is_still_the_one_shown() {
+    let shared = shared_frame();
+    let mut shown = LatestFrames::default();
+    publish_level(&shared, 0x40);
+    let sequence = shared.lock().unwrap().copy_since(0, &mut shown).unwrap();
+
+    assert_eq!(
+        shared.lock().unwrap().copy_since(sequence, &mut shown),
+        None
+    );
+    assert!(
+        shown.before().is_none(),
+        "the first frame has none before it"
+    );
 }
 
 #[test]

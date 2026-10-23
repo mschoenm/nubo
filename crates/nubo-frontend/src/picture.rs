@@ -21,7 +21,7 @@ pub const SCREEN_HEIGHT: u32 = 144;
 /// A frame as the emulator finished it, before the player's palette or
 /// choices change it: the Game Boy screen, or on a Super Game Boy the TV
 /// picture with the border around the screen.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct Frame {
     /// RGBA pixels, row by row from the top left.
     pub pixels: Vec<u8>,
@@ -37,6 +37,25 @@ pub struct Frame {
     /// On a Super Game Boy, what its menu's choices were as the frame was
     /// drawn.
     pub sgb_menu: Option<SgbMenu>,
+}
+
+impl Clone for Frame {
+    fn clone(&self) -> Self {
+        Frame {
+            pixels: self.pixels.clone(),
+            ..*self
+        }
+    }
+
+    /// Copies `source` into this frame, reusing its pixels' memory.
+    fn clone_from(&mut self, source: &Self) {
+        self.pixels.clone_from(&source.pixels);
+        self.width = source.width;
+        self.height = source.height;
+        self.screen_position = source.screen_position;
+        self.in_dmg_shades = source.in_dmg_shades;
+        self.sgb_menu = source.sgb_menu;
+    }
 }
 
 impl Frame {
