@@ -400,6 +400,9 @@ enum Phase {
 }
 
 impl Phase {
+    /// Whether this is one of the object fetch's phases that a DMG LCDC write disabling objects
+    /// still aborts (`object_fetch_aborted`): up to the read of the tile row's low byte. From
+    /// `ReadObjectHigh` on, the fetch finishes, so those phases aren't included.
     fn is_object_fetch(self) -> bool {
         matches!(
             self,

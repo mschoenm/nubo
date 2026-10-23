@@ -19,7 +19,7 @@ the README or a release says "most accurate".
    Nubo passes more tests than every other emulator measured, on both monochrome and color models.
    Every test it still fails is explained.
 2. **Hardware.** Where test suites disagree with each other, and where Nubo's timing was fitted to
-   another emulator instead of to tests verified on hardware, the behaviour has been checked on real
+   another emulator instead of to tests verified on hardware, the behavior has been checked on real
    consoles and Nubo matches them.
 3. **Coverage.** Nubo emulates the hardware licensed games use: the Super Game Boy's functions, the
    link cable, infrared, and the cartridge types and accessories of the commercial library. An emulator
@@ -48,7 +48,7 @@ What is missing or unproven:
 - **Timing fitted to Gambatte.** The double speed line start, the window's WY checks, STAT and LYC
   changes in double speed, the speed switch's freeze lengths and TIMA's jump ahead were worked out by
   comparing Nubo with Gambatte where Gambatte's tests left gaps. Gambatte's tests were verified on
-  hardware, but its behaviour between the tested points may not be.
+  hardware, but its behavior between the tested points may not be.
 - **Super Game Boy.** Command packets, palettes, attribute maps, transfers, borders, masking and
   multiplayer requests are emulated (`crates/nubo-core/src/sgb.rs`, ported from SameBoy), and pass
   SameSuite's `sgb` tests and CasualPokePlayer's `sgb-ext-test`, with controllers for up to four
@@ -105,7 +105,7 @@ without hardware:
 | Tests | Group | Next step |
 |---|---|---|
 | 2 | Mealybug's tile data switch glitch on CGB-C | Find where CGB-C's glitched fetch takes its data from, using SameBoy traces |
-| 9 | Channel 1 duty timing across CGB speed switches | Realigning the tick parity at STOP and DIV resets was tried and can't fix them. 7 need the sound clock's position within a 2 MHz tick modelled across switches without breaking SameSuite's PCM12 tests; 2 conflict with SameSuite on CGB-C and need a CGB-C (Phase 3) |
+| 9 | Channel 1 duty timing across CGB speed switches | Realigning the tick parity at STOP and DIV resets was tried and can't fix them. 7 need the sound clock's position within a 2 MHz tick modeled across switches without breaking SameSuite's PCM12 tests; 2 conflict with SameSuite on CGB-C and need a CGB-C (Phase 3) |
 | 3 | AGE spsw-interrupts | No reference emulator passes it; needs a CGB (Phase 3) |
 | 2 | Mooneye's MGB madness | MGB only and unexplained by its author; needs an MGB (Phase 3) |
 | 9 | DMG palette writes during mode 3 | Mealybug's DMG-blob references and AGE disagree; settle on hardware (Phase 3) |
@@ -141,7 +141,7 @@ Work:
    each result.
 2. Run the report-only ROMs (`which.gb`, `rom_and_ram.gb`, [AntonioND's GBC hardware tests](https://github.com/AntonioND/gbc-hw-tests),
    the 144p Test Suite) and record what each console shows, so they can become automatic checks in Phase 5.
-3. Re-check the behaviours fitted to Gambatte (listed under "Where Nubo stands"). Write small test ROMs
+3. Re-check the behaviors fitted to Gambatte (listed under "Where Nubo stands"). Write small test ROMs
    that sweep each one cycle by cycle, like Gambatte's `_1`/`_2` pairs, record the hardware results and
    add the ROMs to the test runner as Nubo's own suite.
 4. Dump work RAM, VRAM, OAM, HRAM and palette RAM at power-on on each console, to decide how much of
@@ -249,7 +249,7 @@ qualifier ("for games that need no Super Game Boy, link cable or special cartrid
 was measured and link the table, for example:
 
 > Nubo passes N of M tests from K public Game Boy test suites, more than any other emulator we measured
-> (versions, date). Every test it fails is explained, and the behaviours tests don't pin down were
+> (versions, date). Every test it fails is explained, and the behaviors tests don't pin down were
 > checked on a DMG-01 and a Game Boy Color (CPU CGB C).
 
 GateBoy deserves a note: it simulates the DMG's gates, so on monochrome timing it is a reference in its

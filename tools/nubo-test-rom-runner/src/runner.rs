@@ -54,6 +54,8 @@ const MAX_HUNG_TESTS: usize = 3;
 const STUCK_LIMIT: Duration = Duration::from_secs(90);
 /// How often the watchdog looks at the running tests.
 const WATCHDOG_INTERVAL: Duration = Duration::from_millis(500);
+/// How many CPU steps run between two looks at `STALL_LIMIT` while an audio
+/// buffer is emulated.
 const STEPS_BETWEEN_STALL_CHECKS: usize = 10_000;
 
 /// The result of one test.

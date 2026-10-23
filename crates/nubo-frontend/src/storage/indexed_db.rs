@@ -19,8 +19,8 @@
 //! the background, in the order they were made. A write the database
 //! refuses (it is full, say) is collected for the app to show ([`take_errors`]),
 //! and [`settled`] waits until every write so far has committed, before
-//! anything kept elsewhere is let go. ROMs are too big to hold them all, so they are read when a game starts
-//! ([`read_rom`]).
+//! anything kept elsewhere is let go. ROMs are too big to hold them all, so
+//! they are read when a game starts ([`read_rom`]).
 //!
 //! Without a browser (the tests, and builds with the `web` feature for
 //! another target) the entries live in memory only, for the current thread,

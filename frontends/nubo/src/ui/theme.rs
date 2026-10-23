@@ -301,7 +301,7 @@ pub fn secondary_button(theme: &Theme, status: button::Status) -> button::Style 
 
 /// One option of a segmented control: the selected option is tinted with
 /// the accent color, the others look like icon buttons, and a disabled one
-/// has greyed-out text either way.
+/// has grayed-out text either way.
 pub fn segment(selected: bool) -> impl Fn(&Theme, button::Status) -> button::Style {
     move |theme, status| {
         if !selected {

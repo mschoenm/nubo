@@ -23,8 +23,8 @@ const CGB_OAM_WRITE_BLOCK_DOT: u16 = 0;
 /// ignored two dots before mode 3 (SameBoy; AGE's oam-write test).
 const FIRST_LINE_OAM_WRITE_BLOCK_DOT: u16 = DRAWING_START_DOT - 2;
 /// On CGB at normal speed the CPU can't reach VRAM from this dot of OAM scan, just before mode 3
-/// (fitted to Gambatte's `vram_m3` and `late_gdma` tests); the DMG's reads are blocked from the end of
-/// OAM scan.
+/// (fitted to Gambatte's `vram_m3` and `late_gdma` tests); the DMG's reads are blocked from the end
+/// of OAM scan.
 const CGB_VRAM_BLOCK_DOT: u16 = 83;
 
 impl Gpu {

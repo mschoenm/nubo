@@ -205,8 +205,13 @@ impl TestCase {
     }
 }
 
+/// The models a test runs on when its file name names none.
 const DEFAULT_MODELS: [Model; 2] = [Model::Dmg, Model::CgbE];
+/// Seconds from power-on a test that reports through the CPU registers may
+/// run before it fails.
 const REGISTER_TIMEOUT_SECONDS: u32 = 30;
+/// Seconds from power-on a screenshot test may take to draw its reference
+/// screen before it fails.
 const SCREEN_TIMEOUT_SECONDS: u32 = 10;
 /// AGE's register tests have no failure signal, so a failing test runs until
 /// it times out. They all finish within a few seconds.
@@ -480,7 +485,10 @@ const RTC3TEST_SUBTESTS: [(&str, &[Key], u32); 3] = [
 /// seconds it needs.
 struct BlarggTest {
     rom: &'static str,
+    /// The reference screenshot on the DMG and the seconds it needs on top
+    /// of `BOOT_ROM_SECONDS`, or `None` when it doesn't run there.
     dmg: Option<(&'static str, u32)>,
+    /// The same on the CGB.
     cgb: Option<(&'static str, u32)>,
 }
 
