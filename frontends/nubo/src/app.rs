@@ -67,8 +67,10 @@ pub struct App {
     /// The operating system's light or dark mode, used by the "System"
     /// appearance.
     system_mode: Mode,
-    /// A model picked on the command line, used instead of the settings
-    /// until the user picks one in the settings.
+    /// A model picked on the command line (`--model`), which every game of
+    /// this run starts on, before the game's own pick and the settings'
+    /// (see `App::model_for`), until the player picks one in the settings or
+    /// resets them.
     model_override: Option<Model>,
     /// With `--scale`: the window shows only the game screen, this many
     /// times its size, and nothing else can be brought up (see
@@ -148,6 +150,7 @@ pub struct App {
     settings_focus: Option<SettingsFocus>,
     /// The No-Intro game lists that box art is looked up with, once read.
     game_list: Option<Arc<GameList>>,
+    /// Whether the game lists are being read, so they are read only once.
     loading_game_list: bool,
     /// Why box art couldn't be downloaded this run, shown in the settings'
     /// Library tab. Nubo stops trying until the player asks it to or the
@@ -210,6 +213,7 @@ pub enum Message {
     /// about to draw (browser, which also emulates the frames due by then,
     /// see `nubo_frontend::session`).
     Tick,
+    /// Takes down the toast at this place in the list.
     DismissToast(usize),
     /// Opens this web page in the player's browser.
     OpenLink(&'static str),
@@ -427,6 +431,8 @@ impl App {
         }
     }
 
+    /// The colors for the appearance the settings pick, following the
+    /// system's light or dark mode for "System".
     pub fn theme(&self) -> Theme {
         theme::for_appearance(self.settings.appearance, self.system_mode)
     }
@@ -590,9 +596,9 @@ impl App {
 
     /// Listens for keys, the mouse, dropped files, theme changes, close
     /// requests and, on macOS and Linux, signals asking the app to stop, and
-    /// for frame ticks while a game is running or toasts need
-    /// to expire. On the desktop the window only redraws for new frames, not
-    /// on every refresh of the screen.
+    /// for frame ticks while a game is running or toasts need to expire. On
+    /// the desktop the window only redraws for new frames, not on every
+    /// refresh of the screen.
     ///
     /// New frames aren't shown while the window is minimized on Windows,
     /// which reports that as a window without a size. Iced 0.14 passes on no
