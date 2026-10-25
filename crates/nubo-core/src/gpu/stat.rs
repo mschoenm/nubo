@@ -243,7 +243,7 @@ impl Gpu {
 
     /// Called when the second to last pixel of a line is drawn; see
     /// `EARLY_HBLANK_INTERRUPT_DOTS`.
-    pub(crate) fn start_hblank_interrupt_countdown(&mut self) {
+    pub(super) fn start_hblank_interrupt_countdown(&mut self) {
         self.countdowns.early_hblank = EARLY_HBLANK_INTERRUPT_DOTS;
     }
 
