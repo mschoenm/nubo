@@ -626,6 +626,13 @@ fn a_save_state_with_an_impossible_ppu_dot_debt_does_not_load() {
 }
 
 #[test]
+fn a_save_state_with_memory_cut_off_outside_stop_mode_does_not_load() {
+    for name in [b"\x03oam".as_slice(), b"\x04vram", b"\x08palettes"] {
+        assert_state_with_field_does_not_load(&[b"\x03ppu", b"\x0bstop_blocks", name], &[1]);
+    }
+}
+
+#[test]
 fn a_save_state_with_an_impossible_oam_dma_does_not_load() {
     for offset in [161, u8::MAX] {
         assert_state_with_field_does_not_load(&[b"\x07oam_dma", b"\x06offset"], &[offset]);
