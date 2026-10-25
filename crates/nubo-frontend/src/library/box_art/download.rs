@@ -4,6 +4,7 @@
 use super::names::{
     GAME_BOY, GAME_BOY_COLOR, GameList, MAX_DOWNLOAD_SIZE, box_art_url, list_url, shrink, systems,
 };
+use crate::rom::Rom;
 use crate::storage::files::{data_folder, write_atomically};
 use nubo_core::extract_rom;
 use std::fs;
@@ -69,8 +70,8 @@ pub fn find(
         .into_owned();
 
     let names = games.names_for(&file_stem, || {
-        let data = fs::read(rom_path).ok()?;
-        Some(crc32fast::hash(&extract_rom(&data).ok()?))
+        let rom = Rom::read(rom_path).ok()?;
+        Some(crc32fast::hash(&extract_rom(&rom.bytes).ok()?))
     });
 
     for name in &names {
