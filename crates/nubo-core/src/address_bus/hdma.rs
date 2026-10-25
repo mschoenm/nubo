@@ -171,6 +171,7 @@ impl HdmaState {
     }
 
     /// Whether an HBlank started that the transfer hasn't copied a block for yet.
+    #[cfg(test)]
     pub(crate) fn hblank_started(&self) -> bool {
         self.hblank_started
     }
