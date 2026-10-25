@@ -37,9 +37,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// The width of the Game Boy's screen in pixels.
-pub const SCREEN_WIDTH: usize = 160;
+pub const SCREEN_WIDTH: usize = nubo_core::SCREEN_WIDTH as usize;
 /// The height of the Game Boy's screen in pixels.
-pub const SCREEN_HEIGHT: usize = 144;
+pub const SCREEN_HEIGHT: usize = nubo_core::SCREEN_HEIGHT as usize;
 /// The widest picture the core hands over: a Super Game Boy's, with its
 /// border.
 pub const MAX_WIDTH: usize = SGB_FRAME_WIDTH as usize;

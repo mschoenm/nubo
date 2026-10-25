@@ -29,6 +29,10 @@ const SGB_HEADER_END: usize = 0x0150;
 /// multiple of it since power-on.
 pub const DOTS_PER_FRAME: u64 = crate::gpu::DOTS_PER_FRAME as u64;
 
+/// The width of the Game Boy screen ([`Emulator::frame_buffer`]), in pixels.
+pub const SCREEN_WIDTH: u32 = crate::gpu::GB_SCREEN_WIDTH;
+/// The height of the Game Boy screen, in pixels.
+pub const SCREEN_HEIGHT: u32 = crate::gpu::GB_SCREEN_HEIGHT;
 /// The width of a Super Game Boy's picture with its border
 /// ([`Emulator::frame_with_border`]), in pixels.
 pub const SGB_FRAME_WIDTH: u32 = crate::sgb::BORDERED_WIDTH as u32;

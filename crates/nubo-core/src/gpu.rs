@@ -25,7 +25,7 @@ pub(crate) use crate::gpu::palettes::rgb555_to_rgba;
 
 use crate::address_bus::MemoryMapped;
 use crate::address_bus::hdma::HdmaState;
-use crate::gpu::constants::{GB_SCREEN_HEIGHT, GB_SCREEN_WIDTH};
+pub(crate) use crate::gpu::constants::{GB_SCREEN_HEIGHT, GB_SCREEN_WIDTH};
 use crate::gpu::lcdc::{lcd_enabled, objects_enabled, window_enabled};
 use crate::gpu::palettes::{Color, Palettes, WHITE};
 use crate::gpu::pipeline::Pipeline;

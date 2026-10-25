@@ -8,15 +8,14 @@ use chrono::Local;
 use clap::Parser;
 use image::RgbaImage;
 use nubo_core::{
-    Emulator, Model, NoSaves, RtcClock, SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH, SgbBorderTime,
+    Emulator, Model, NoSaves, RtcClock, SCREEN_HEIGHT, SCREEN_WIDTH, SGB_FRAME_HEIGHT,
+    SGB_FRAME_WIDTH, SgbBorderTime,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::Instant;
 
-const SCREEN_WIDTH: u32 = 160;
-const SCREEN_HEIGHT: u32 = 144;
 /// Nothing is played, so any sample rate works. At this one, the core's
 /// audio buffers of 512 samples are exactly 1/128 of a second.
 const SAMPLE_RATE: u32 = 65536;

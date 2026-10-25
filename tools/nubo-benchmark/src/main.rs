@@ -21,7 +21,7 @@
 
 use clap::Parser;
 use image::RgbaImage;
-use nubo_core::{Emulator, Key, Model, NoSaves, RtcClock};
+use nubo_core::{Emulator, Key, Model, NoSaves, RtcClock, SCREEN_HEIGHT, SCREEN_WIDTH};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::fs;
@@ -37,8 +37,6 @@ const SAMPLE_RATE: u32 = 44100;
 const SAMPLES_PER_BUFFER: u32 = 512;
 /// The Game Boy's frame rate.
 const FRAMES_PER_SECOND: f64 = 4_194_304.0 / 70224.0;
-const SCREEN_WIDTH: u32 = 160;
-const SCREEN_HEIGHT: u32 = 144;
 
 /// Benchmark the emulator core on a set of games
 #[derive(Parser)]
