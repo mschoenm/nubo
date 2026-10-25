@@ -215,6 +215,35 @@ pub fn host_target() -> Result<String> {
 /// Build scripts' and tests' dependencies aren't part of the app and are left
 /// out.
 fn dependencies(package: &str, target: &str) -> Result<Vec<Crate>> {
+    let metadata = metadata(target)?;
+    let mut crates: Vec<Crate> = built_from(&metadata, package, false)?
+        .into_iter()
+        .filter(|package| !package["source"].is_null())
+        .map(|package| Crate {
+            name: string(&package["name"]).to_owned(),
+            version: string(&package["version"]).to_owned(),
+            license: package["license"]
+                .as_str()
+                .unwrap_or("not stated")
+                .to_owned(),
+            authors: list(&package["authors"])
+                .iter()
+                .map(|author| string(author).to_owned())
+                .collect(),
+            directory: Path::new(string(&package["manifest_path"]))
+                .parent()
+                .map(Path::to_path_buf)
+                .unwrap_or_default(),
+            license_file: package["license_file"].as_str().map(str::to_owned),
+        })
+        .collect();
+    crates.sort_by(|a, b| (&a.name, &a.version).cmp(&(&b.name, &b.version)));
+    Ok(crates)
+}
+
+/// What `cargo metadata` says about the workspace's packages and their
+/// dependencies when they are built for `target`.
+pub fn metadata(target: &str) -> Result<Value> {
     let output = cargo()
         .args([
             "metadata",
@@ -232,9 +261,19 @@ fn dependencies(package: &str, target: &str) -> Result<Vec<Crate>> {
             String::from_utf8_lossy(&output.stderr)
         ));
     }
-    let metadata: Value = serde_json::from_slice(&output.stdout)
-        .map_err(|error| format!("failed to read cargo metadata's output: {error}"))?;
+    serde_json::from_slice(&output.stdout)
+        .map_err(|error| format!("failed to read cargo metadata's output: {error}"))
+}
 
+/// The packages in `metadata` that the workspace's `package` is built from,
+/// itself included, as `cargo metadata` describes them: what its normal
+/// dependencies reach, and with `build_scripts` also the build dependencies
+/// that build scripts use on the way. Tests' dependencies are left out.
+pub fn built_from<'a>(
+    metadata: &'a Value,
+    package: &str,
+    build_scripts: bool,
+) -> Result<Vec<&'a Value>> {
     let packages: HashMap<&str, &Value> = list(&metadata["packages"])
         .iter()
         .map(|package| (string(&package["id"]), package))
@@ -259,46 +298,27 @@ fn dependencies(package: &str, target: &str) -> Result<Vec<Crate>> {
             continue;
         };
         for dependency in list(&node["deps"]) {
-            let normal = list(&dependency["dep_kinds"])
+            let followed = list(&dependency["dep_kinds"])
                 .iter()
-                .any(|kind| kind["kind"].is_null());
-            if normal {
+                .any(|kind| kind["kind"].is_null() || (build_scripts && kind["kind"] == "build"));
+            if followed {
                 pending.push(string(&dependency["pkg"]));
             }
         }
     }
-
-    let mut crates: Vec<Crate> = seen
+    Ok(seen
         .into_iter()
-        .filter_map(|id| packages.get(id))
-        .filter(|package| !package["source"].is_null())
-        .map(|package| Crate {
-            name: string(&package["name"]).to_owned(),
-            version: string(&package["version"]).to_owned(),
-            license: package["license"]
-                .as_str()
-                .unwrap_or("not stated")
-                .to_owned(),
-            authors: list(&package["authors"])
-                .iter()
-                .map(|author| string(author).to_owned())
-                .collect(),
-            directory: Path::new(string(&package["manifest_path"]))
-                .parent()
-                .map(Path::to_path_buf)
-                .unwrap_or_default(),
-            license_file: package["license_file"].as_str().map(str::to_owned),
-        })
-        .collect();
-    crates.sort_by(|a, b| (&a.name, &a.version).cmp(&(&b.name, &b.version)));
-    Ok(crates)
+        .filter_map(|id| packages.get(id).copied())
+        .collect())
 }
 
-fn list(value: &Value) -> &[Value] {
+/// The array `value` holds, or an empty one.
+pub fn list(value: &Value) -> &[Value] {
     value.as_array().map_or(&[], Vec::as_slice)
 }
 
-fn string(value: &Value) -> &str {
+/// The string `value` holds, or an empty one.
+pub fn string(value: &Value) -> &str {
     value.as_str().unwrap_or_default()
 }
 

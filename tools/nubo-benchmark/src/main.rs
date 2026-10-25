@@ -26,9 +26,11 @@ use nubo_core::{Emulator, Key, Model, NoSaves, RtcClock, SCREEN_HEIGHT, SCREEN_W
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::fs;
+use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::sync::Mutex;
+use std::sync::OnceLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 /// The sample rate the emulator makes its sound at, which sets how much
@@ -350,6 +352,15 @@ fn bit_identical(first: &[f32], second: &[f32]) -> bool {
             .all(|(first, second)| first.to_bits() == second.to_bits())
 }
 
+/// The message of a caught panic, if it has one.
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    payload
+        .downcast_ref::<String>()
+        .cloned()
+        .or_else(|| payload.downcast_ref::<&str>().map(ToString::to_string))
+        .unwrap_or_else(|| "unknown panic".to_owned())
+}
+
 /// Runs one game on one model for `seconds` of emulated time.
 fn run(
     job: &Run,
@@ -543,27 +554,27 @@ fn benchmark(args: &Args) -> Result<bool, String> {
         })
         .collect();
 
-    let next_job = Mutex::new(0);
-    let outcomes: Mutex<Vec<Option<Result<Outcome, String>>>> =
-        Mutex::new(jobs.iter().map(|_| None).collect());
+    let next_job = AtomicUsize::new(0);
+    let outcomes: Vec<OnceLock<Result<Outcome, String>>> =
+        jobs.iter().map(|_| OnceLock::new()).collect();
     std::thread::scope(|scope| {
         for _ in 0..args.jobs.max(1) {
             scope.spawn(|| {
                 loop {
-                    let index = {
-                        let mut next = next_job.lock().expect("no worker panics");
-                        let index = *next;
-                        *next += 1;
-                        index
-                    };
+                    let index = next_job.fetch_add(1, Ordering::Relaxed);
                     let Some(job) = jobs.get(index) else { break };
-                    let outcome = run(
-                        job,
-                        args.seconds,
-                        args.screenshots.as_deref(),
-                        args.check_save_states,
-                    );
-                    outcomes.lock().expect("no worker panics")[index] = Some(outcome);
+                    let outcome = panic::catch_unwind(AssertUnwindSafe(|| {
+                        run(
+                            job,
+                            args.seconds,
+                            args.screenshots.as_deref(),
+                            args.check_save_states,
+                        )
+                    }))
+                    .unwrap_or_else(|payload| {
+                        Err(format!("panicked: {}", panic_message(payload.as_ref())))
+                    });
+                    let _ = outcomes[index].set(outcome);
                 }
             });
         }
@@ -577,17 +588,14 @@ fn benchmark(args: &Args) -> Result<bool, String> {
         "{:<60} {:>8} {:>8}  fingerprints (frames, audio, state)",
         "game", "speed", "fps"
     );
-    for (job, outcome) in jobs
-        .iter()
-        .zip(outcomes.into_inner().expect("no worker panics"))
-    {
+    for (job, outcome) in jobs.iter().zip(outcomes) {
         let name = fingerprint_key(job, args.seconds);
         let short_name: String = job.rom.file_stem().map_or_else(String::new, |stem| {
             stem.to_string_lossy().chars().take(45).collect()
         });
         let label = format!("{short_name} [{}]", job.model);
         seen.insert(name.clone());
-        let outcome = match outcome.expect("every job ran") {
+        let outcome = match outcome.into_inner().expect("every job ran") {
             Ok(outcome) => outcome,
             Err(error) => {
                 all_good = false;

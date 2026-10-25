@@ -30,8 +30,9 @@ const NO_SAVES: NoSaves = NoSaves {
 
 /// Why a test couldn't be started where the boot ROM hands over.
 pub(crate) enum BootError {
-    /// The boot ROM's emulated time stopped advancing.
-    TimedOut,
+    /// The boot ROM's emulated time stopped advancing for `STALL_LIMIT` of
+    /// wall-clock time.
+    Stalled,
     /// The ROM couldn't be loaded, or a copied boot differs from a real one.
     Failed(String),
 }
@@ -132,7 +133,7 @@ fn run_boot_rom(rom: &[u8], model: Model, progress: &Progress<'_>) -> Result<Boo
         }
         steps += 1;
         if steps % STEPS_BETWEEN_STALL_CHECKS == 0 && buffer_started.elapsed() > STALL_LIMIT {
-            return Err(BootError::TimedOut);
+            return Err(BootError::Stalled);
         }
     }
     Ok(Booted {

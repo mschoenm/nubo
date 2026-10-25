@@ -12,6 +12,7 @@
 //! more than Rust.
 
 use clap::{Parser, Subcommand};
+use nubo_download::target_dir;
 use std::env;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
@@ -106,6 +107,9 @@ enum Task {
         /// The release's tag, such as v1.2.3, which must name that version too
         tag: Option<String>,
     },
+    /// Check that no crate the app or the RetroArch core is built from needs a newer Rust than
+    /// the workspace's rust-version, which builds the Flatpak
+    RustVersion,
     /// Download the free homebrew games the nightly CI benchmarks into target/benchmark-roms
     /// and check their checksums
     BenchmarkRoms,
@@ -152,12 +156,6 @@ fn workspace_root() -> PathBuf {
         .parent()
         .expect("xtask lives inside the workspace")
         .to_path_buf()
-}
-
-/// Cargo's target folder: `CARGO_TARGET_DIR` when set, otherwise `target/`
-/// in the workspace root.
-fn target_dir() -> PathBuf {
-    env::var_os("CARGO_TARGET_DIR").map_or_else(|| workspace_root().join("target"), PathBuf::from)
 }
 
 /// The cargo that runs xtask, so the same toolchain builds everything, with
@@ -274,6 +272,7 @@ fn build_wasm_package(package: &str, artifact: &str, profile: &str) -> Result<Pa
     run(cargo()
         .args([
             "build",
+            "--locked",
             "--profile",
             profile,
             "--package",
@@ -494,6 +493,7 @@ fn main() -> ExitCode {
         Task::ReleaseNotes { tag } => {
             release::release_notes(tag.as_deref()).map(|notes| print!("{notes}"))
         }
+        Task::RustVersion => rust_version::check(),
         Task::BenchmarkRoms => benchmark_roms::ensure_benchmark_roms().map(|folder| {
             println!("The benchmark games are in {}", folder.display());
         }),
@@ -601,6 +601,7 @@ mod macos;
 mod metrics;
 mod release;
 mod review_units;
+mod rust_version;
 mod scene;
 mod screenshots;
 mod shootout_scoreboard;

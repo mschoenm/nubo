@@ -13,7 +13,8 @@ permissions:
   contents: read
 
 # A new push to a pull request cancels the checks still running for the old
-# one; runs on main always finish, so every commit there gets deployed.
+# one. A run on main is never cancelled once it has started, but one still
+# waiting gives way to a newer push, whose deploy then includes its commit.
 #
 # Every job here should finish in about a minute, so pull requests get their
 # answer fast. Slower checks belong in nightly.yml, which every release runs
@@ -190,6 +191,11 @@ jobs:
       # Reuses the xtask build above.
       - name: Check the newest release in the AppStream file is this version
         run: cargo xtask release-notes > /dev/null
+
+      # Here rather than in the dependencies job, which has no xtask build to
+      # reuse. The Flatpak builds with an older Rust than CI (docs/CI.md).
+      - name: Check no crate needs a newer Rust than rust-version
+        run: cargo xtask rust-version
 
   # The one check branch protection requires, so the list of required checks
   # doesn't have to change when the jobs above do.

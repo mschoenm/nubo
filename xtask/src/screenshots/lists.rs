@@ -10,6 +10,7 @@
 use crate::Result;
 use nubo_frontend::scenes::Scene;
 use serde::Deserialize;
+use std::io;
 use std::path::Path;
 
 /// What `images/screenshots.toml` holds.
@@ -156,8 +157,12 @@ pub struct Tile {
 impl ScreenshotList {
     /// Reads `images/screenshots.toml`, or an empty list if there is none.
     pub fn read(path: &Path) -> Result<ScreenshotList> {
-        let Ok(text) = std::fs::read_to_string(path) else {
-            return Ok(ScreenshotList::default());
+        let text = match std::fs::read_to_string(path) {
+            Ok(text) => text,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                return Ok(ScreenshotList::default());
+            }
+            Err(error) => return Err(format!("failed to read {}: {error}", path.display())),
         };
         let list: ScreenshotList =
             toml::from_str(&text).map_err(|error| format!("{}: {error}", path.display()))?;
@@ -345,8 +350,12 @@ pub struct Game {
 impl GameList {
     /// Reads `images/scenes/games.toml`, or an empty list if there is none.
     pub fn read(path: &Path) -> Result<GameList> {
-        let Ok(text) = std::fs::read_to_string(path) else {
-            return Ok(GameList::default());
+        let text = match std::fs::read_to_string(path) {
+            Ok(text) => text,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                return Ok(GameList::default());
+            }
+            Err(error) => return Err(format!("failed to read {}: {error}", path.display())),
         };
         toml::from_str(&text).map_err(|error| format!("{}: {error}", path.display()))
     }

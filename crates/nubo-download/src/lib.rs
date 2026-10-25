@@ -3,9 +3,10 @@
 //! uses it. The HTTP client finds a proxy and trusted certificates the way
 //! the system's own tools do, from the `HTTPS_PROXY` variable and the
 //! system's certificate store, so it works behind the proxies of CI and
-//! cloud machines.
+//! cloud machines. [`target_dir`] says where they keep what they download.
 
 use sha2::{Digest, Sha256};
+use std::env;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -21,6 +22,22 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 /// How long a whole download may take before it fails, so a connection that
 /// stalls doesn't hang the tools (and CI) for good.
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(600);
+
+/// Cargo's target folder: `CARGO_TARGET_DIR` when set, otherwise `target/`
+/// in the workspace root. The tools keep their downloads and builds there.
+#[must_use]
+pub fn target_dir() -> PathBuf {
+    env::var_os("CARGO_TARGET_DIR").map_or_else(
+        || {
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .ancestors()
+                .nth(2)
+                .expect("nubo-download lives in crates/nubo-download")
+                .join("target")
+        },
+        PathBuf::from,
+    )
+}
 
 /// An HTTP client that finds a proxy and trusted certificates the way the
 /// system's own tools do, and gives up on a download that takes too long.

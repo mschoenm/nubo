@@ -27,7 +27,7 @@ cargo fuzz build
 cargo fuzz run state_fields -- -max_total_time=900    # 15 minutes; the same for state, rom, cheats and battery
 ```
 
-Seed `state` with the game's kept states, or it starts from nothing and rarely gets past the header; `state_fields` reads them itself. Seed `rom` with real games too, plain and zipped (stored and compressed), each after one byte that picks the model: a header the boot ROM rejects is skipped, and every new header costs a boot (`start` in `src/lib.rs`), so changes inside a game are what run fast. `corpus/`, `artifacts/` and `target/` are not committed.
+Seed `state` with the game's kept states, or it starts from nothing and rarely gets past the header; `state_fields` reads them itself. Seed `rom` with real games too, plain and zipped (stored and compressed), each after one byte that picks the model: every new header costs a boot (`start` in `src/lib.rs`), so changes inside a game are what run fast. `corpus/`, `artifacts/` and `target/` are not committed.
 
 ## When one crashes
 

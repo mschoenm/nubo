@@ -18,6 +18,7 @@ cargo xtask libretro          # The RetroArch core's zip into target/bundle/ (Li
 cargo xtask icon <path.png|path.svg|path.ico>   # Write the logo (images/icon.png and images/icon.svg in the README)
 cargo xtask licenses <folder> # LICENSE, NOTICE and every crate's license for the desktop app
 cargo xtask release-notes [v<version>]   # Check Cargo.toml, the newest AppStream release and the tag (if given) agree, and print the notes
+cargo xtask rust-version      # Check no crate the app or the RetroArch core is built from needs a newer Rust than rust-version (the Flatpak's)
 
 # Speed next to other emulators (docs/EMULATOR_COMPARISON.md)
 cargo xtask compare-emulators [roms]          # Nubo, SameBoy, Gambatte, mGBA, binjgb and Gearboy, best of 3 rounds of 30 s

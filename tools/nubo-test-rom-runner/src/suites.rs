@@ -915,11 +915,6 @@ fn screenshot_tests() -> Vec<TestCase> {
         .flat_map(|test| {
             test.screens.iter().map(|(model, screen)| {
                 let screen = PathBuf::from(screen);
-                assert!(
-                    test.input.is_empty() || !(test.grayscale || test.every_frame),
-                    "{} has buttons to press, but only screen tests press them",
-                    test.rom
-                );
                 let check = if test.grayscale {
                     Check::GrayscaleScreen(vec![screen])
                 } else if test.every_frame {
