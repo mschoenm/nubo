@@ -171,7 +171,11 @@ fn report(nights: &[Value]) -> String {
     let regressions = regressions(latest, earlier);
     page.push_str("## Regressions\n\n");
     if regressions.is_empty() {
-        page.push_str("None against the 14-night medians.\n\n");
+        let _ = writeln!(
+            page,
+            "None against the {}-night medians.\n",
+            MEDIAN_NIGHTS[0]
+        );
     } else {
         for regression in &regressions {
             let _ = writeln!(page, "- {regression}");
@@ -196,11 +200,15 @@ fn report(nights: &[Value]) -> String {
         }
         page.push('\n');
     }
+    let no_medians = " |".repeat(MEDIAN_NIGHTS.len());
     for (key, result) in test_results(latest) {
-        let _ = writeln!(page, "| {key} | {result} | | | |");
+        let _ = writeln!(page, "| {key} | {result} |{no_medians}");
     }
 
-    page.push_str("\n## Last 30 nights\n\n| Date | Commit | Tests |");
+    let _ = write!(
+        page,
+        "\n## Last {HISTORY_NIGHTS} nights\n\n| Date | Commit | Tests |"
+    );
     for (_, title) in HISTORY_COLUMNS {
         let _ = write!(page, " {title} |");
     }
@@ -295,8 +303,9 @@ fn regressions(latest: &Value, earlier: &[Value]) -> Vec<String> {
         };
         if worse {
             found.push(format!(
-                "`{key}`: {} against a 14-night median of {}",
+                "`{key}`: {} against a {}-night median of {}",
                 format_number(value),
+                MEDIAN_NIGHTS[0],
                 format_number(median)
             ));
         }
