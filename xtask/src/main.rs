@@ -288,8 +288,7 @@ fn build_wasm_package(package: &str, artifact: &str, profile: &str) -> Result<Pa
 
 /// Builds the Iced frontend for WebAssembly next to its `index.html`, the
 /// license files and the download page (`download_page`), and returns the
-/// directory to serve. `quick` (`--quick`)
-/// builds with `QUICK_WASM_PROFILE`.
+/// directory to serve. `quick` (`--quick`) builds with `QUICK_WASM_PROFILE`.
 ///
 /// The JavaScript glue is generated with the `wasm-bindgen-cli-support`
 /// library, so neither wasm-pack nor Node.js is needed. It only works with
