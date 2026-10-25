@@ -15,7 +15,7 @@
 //! a channel, which band visibly in the sky's gradients, so the colors are
 //! rounded with an ordered dither (`dithered_rgb555`).
 
-use crate::sgb::attraction::{self, Cloud};
+use crate::sgb::attraction::{self, CLOUD_AREA, Cloud};
 use crate::sgb::border::{BorderPicture, TRANSPARENT};
 use crate::sgb::{
     BORDERED_HEIGHT, BORDERED_WIDTH, SCREEN_HEIGHT, SCREEN_OFFSET, SCREEN_WIDTH, SgbBorderTime,
@@ -298,15 +298,14 @@ fn cloud_puffs(seed: u32, base: f32, extra: f32) -> Vec<Shape> {
 /// a glint in each eye, behind where the panel goes.
 fn draw_buddy(canvas: &mut Canvas, look: &Look) {
     let (left, top, width) = BUDDY;
-    let scale = width / 40.0;
-    // The logo's cloud spans 12 to 52 across and starts 15 down its
-    // 64-unit design square.
+    let (area_left, area_top, area_width, area_height) = CLOUD_AREA;
+    let scale = width / area_width;
     let to_pixels = |(x, y, width, height, radius): (f32, f32, f32, f32, f32)| {
         Shape::rounded(
-            left + (x - 12.0) * scale,
-            top + (y - 15.0) * scale,
-            left + (x + width - 12.0) * scale,
-            top + (y + height - 15.0) * scale,
+            left + (x - area_left) * scale,
+            top + (y - area_top) * scale,
+            left + (x + width - area_left) * scale,
+            top + (y + height - area_top) * scale,
             radius * scale,
         )
     };
@@ -320,10 +319,10 @@ fn draw_buddy(canvas: &mut Canvas, look: &Look) {
         let grown: Vec<Shape> = body.iter().map(|shape| shape.grown(1.0)).collect();
         canvas.paint(&grown, |_, _| outline, 0.55, Layer::Front);
     }
-    let height = 33.0 * scale;
+    let height = area_height * scale;
     canvas.paint(&body, |_, y| buddy_color(y, top, height), 1.0, Layer::Front);
 
-    let to_point = |x: f32, y: f32| (left + (x - 12.0) * scale, top + (y - 15.0) * scale);
+    let to_point = |x: f32, y: f32| (left + (x - area_left) * scale, top + (y - area_top) * scale);
     let cheeks = [19.0, 45.0].map(|x| {
         let (x, y) = to_point(x, 40.0);
         Shape::ellipse(x, y, 3.4 * scale, 2.2 * scale)

@@ -24,7 +24,7 @@ pub(super) const IDLE_FRAMES: u32 = 25_086;
 const FADE_IN_FRAMES: u32 = 64;
 /// The part of the logo's design square the cloud fills, eyes included: its
 /// left and top edges, width and height, in design units.
-const CLOUD_AREA: (f32, f32, f32, f32) = (12.0, 15.0, 40.0, 33.0);
+pub(super) const CLOUD_AREA: (f32, f32, f32, f32) = (12.0, 15.0, 40.0, 33.0);
 /// How many samples per pixel edge a cloud is drawn with, to smooth its
 /// edges.
 const SAMPLES: usize = 4;
