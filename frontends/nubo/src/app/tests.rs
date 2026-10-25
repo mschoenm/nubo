@@ -173,10 +173,10 @@ fn a_game_waits_for_every_reset_deleting_saves() {
     );
     app.deletions_running = 2;
     let _ = app.update(
-        GameMessage::RomPicked(Some(Rom {
+        GameMessage::RomPicked(Some(Ok(Rom {
             path: PathBuf::from("game.gb"),
             bytes: Arc::from(vec![0; 0x8000]),
-        }))
+        })))
         .into(),
     );
     let _ = app.update(
@@ -205,10 +205,10 @@ fn starting_a_game_takes_away_a_resets_undo() {
     app.settings.appearance = Appearance::Dark;
     let _ = app.update(SettingsMessage::Reset(ResetChoices::default()).into());
     let _ = app.update(
-        GameMessage::RomPicked(Some(Rom {
+        GameMessage::RomPicked(Some(Ok(Rom {
             path: PathBuf::from("game.gb"),
             bytes: Arc::from(vec![0; 3]),
-        }))
+        })))
         .into(),
     );
     let _ = app.update(GameMessage::Undo.into());
@@ -285,10 +285,10 @@ fn controller_shortcuts_wait_while_the_settings_are_open() {
         },
     );
     let _ = app.update(
-        GameMessage::RomPicked(Some(Rom {
+        GameMessage::RomPicked(Some(Ok(Rom {
             path: PathBuf::from("game.gb"),
             bytes: Arc::from(vec![0; 0x8000]),
-        }))
+        })))
         .into(),
     );
     let rewinding = |app: &App| app.game.as_ref().unwrap().session.is_rewinding();
@@ -318,10 +318,10 @@ fn pausing_with_the_command_key_waits_while_the_settings_are_open() {
         },
     );
     let _ = app.update(
-        GameMessage::RomPicked(Some(Rom {
+        GameMessage::RomPicked(Some(Ok(Rom {
             path: PathBuf::from("game.gb"),
             bytes: Arc::from(vec![0; 0x8000]),
-        }))
+        })))
         .into(),
     );
     let command_p = Message::Key(KeyInput {
@@ -434,10 +434,10 @@ fn a_game_saved_on_another_model_starts_as_the_player_answers() {
 fn another_game_starting_replaces_the_one_waiting() {
     let mut app = waiting_app();
     let _ = app.update(
-        GameMessage::RomPicked(Some(Rom {
+        GameMessage::RomPicked(Some(Ok(Rom {
             path: PathBuf::from("other.gb"),
             bytes: Arc::from(vec![0; 0x8000]),
-        }))
+        })))
         .into(),
     );
 
@@ -521,10 +521,10 @@ fn the_model_question_keeps_the_open_question_through_another_waiting_game() {
 /// Starts `other.gb`, an empty game, as a dropped file or Ctrl+O would.
 fn start_other_game(app: &mut App) {
     let _ = app.update(
-        GameMessage::RomPicked(Some(Rom {
+        GameMessage::RomPicked(Some(Ok(Rom {
             path: PathBuf::from("other.gb"),
             bytes: Arc::from(vec![0; 0x8000]),
-        }))
+        })))
         .into(),
     );
 }
@@ -742,10 +742,10 @@ fn undoing_a_save_over_a_slot_puts_its_picture_file_back_unchanged() {
     let rom_path = PathBuf::from("nubo-undo-save-test.gb");
     let mut app = playing_app();
     let _ = app.update(
-        GameMessage::RomPicked(Some(Rom {
+        GameMessage::RomPicked(Some(Ok(Rom {
             path: rom_path.clone(),
             bytes: Arc::from(vec![0; 0x8000]),
-        }))
+        })))
         .into(),
     );
     app.game.as_mut().unwrap().keeps_data = true;
@@ -792,10 +792,10 @@ fn playing_app() -> App {
         },
     );
     let _ = app.update(
-        GameMessage::RomPicked(Some(Rom {
+        GameMessage::RomPicked(Some(Ok(Rom {
             path: PathBuf::from("game.gb"),
             bytes: Arc::from(vec![0; 0x8000]),
-        }))
+        })))
         .into(),
     );
     app
@@ -1018,10 +1018,10 @@ fn starting_a_game_takes_away_a_console_picks_undo() {
     assert!(matches!(app.undo, Some(UndoPoint::GameModel { .. })));
 
     let _ = app.update(
-        GameMessage::RomPicked(Some(Rom {
+        GameMessage::RomPicked(Some(Ok(Rom {
             path: PathBuf::from("game.gb"),
             bytes: Arc::from(vec![0; 3]),
-        }))
+        })))
         .into(),
     );
 

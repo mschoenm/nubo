@@ -45,7 +45,7 @@ pub enum LibraryMessage {
     /// folders (see `nubo_frontend::library::KEEPS_GAMES`).
     AddGames,
     /// The player picked these games to keep.
-    GamesPicked(Vec<Rom>),
+    GamesPicked(Vec<Result<Rom, String>>),
     /// Asks whether to take this game out of the browser's library.
     AskRemoveGame(PathBuf),
     /// Takes this game out of the browser's library, as the player
@@ -416,13 +416,13 @@ impl App {
     /// Keeps `roms` in the browser's library (see
     /// `nubo_frontend::library::KEEPS_GAMES`), says which couldn't be kept,
     /// and starts on their pictures.
-    fn add_games(&mut self, roms: &[Rom]) -> Task<Message> {
+    fn add_games(&mut self, roms: &[Result<Rom, String>]) -> Task<Message> {
         if roms.is_empty() {
             return Task::none();
         }
         let mut added = 0;
         for rom in roms {
-            match self.add_game(rom) {
+            match rom.clone().and_then(|rom| self.add_game(&rom)) {
                 Ok(()) => added += 1,
                 Err(error) => self.toasts.error(error),
             }

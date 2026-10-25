@@ -26,7 +26,9 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 pub enum GameMessage {
     OpenRom,
-    RomPicked(Option<Rom>),
+    /// The file picker closed: with the game read, why it couldn't be, or
+    /// nothing when the player canceled.
+    RomPicked(Option<Result<Rom, String>>),
     /// A ROM from the library, the command line or a dropped file was read.
     RomRead(Result<Rom, String>),
     /// Starts the library game at this path.
@@ -171,13 +173,14 @@ impl App {
             GameMessage::OpenRom => {
                 return Task::perform(rom_picker::pick(), |rom| GameMessage::RomPicked(rom).into());
             }
-            GameMessage::RomPicked(Some(rom)) => {
+            GameMessage::RomPicked(Some(Ok(rom))) => {
                 #[cfg(target_arch = "wasm32")]
                 if !self.fresh {
                     self.keep_game(&rom);
                 }
                 self.start_game(rom, true);
             }
+            GameMessage::RomPicked(Some(Err(error))) => self.toasts.error(error),
             GameMessage::RomPicked(None) => {}
             GameMessage::RomRead(rom) => self.open(rom),
             GameMessage::PlayGame(path) => return read_rom(path),
