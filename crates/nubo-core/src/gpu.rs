@@ -432,8 +432,8 @@ const HDMA_START_DELAY_DOTS: u8 = 2;
 const HBLANK_DMA_START_END_DOT: u16 = 453;
 const DOUBLE_SPEED_HBLANK_DMA_START_END_DOT: u16 = 455;
 
-/// How many more dots the LY=LYC and mode 0 STAT interrupt sources stay active after a CGB STAT
-/// write at normal speed disables them.
+/// How many more dots the STAT interrupt sources a CGB STAT write at normal speed disables stay
+/// active (see `Gpu::cgb_late_cleared_stat_sources`).
 pub(super) const CGB_STAT_CLEAR_DELAY_DOTS: u8 = 2;
 
 const LYC_STAT_SOURCE_BIT: u8 = 6;
