@@ -87,20 +87,25 @@ pub fn find(
 /// Downloads `url`, returning `None` if the server doesn't have it.
 fn download(url: &str) -> Result<Option<Vec<u8>>, String> {
     match AGENT.get(url).call() {
-        Ok(response) => {
-            let mut bytes = Vec::new();
-            response
-                .into_body()
-                .into_reader()
-                .take(MAX_DOWNLOAD_SIZE)
-                .read_to_end(&mut bytes)
-                .map_err(|error| error.to_string())?;
-            Ok(Some(bytes))
-        }
+        Ok(response) => read_answer(response.into_body().into_reader()).map(Some),
         Err(ureq::Error::StatusCode(404)) => Ok(None),
         Err(ureq::Error::StatusCode(code)) => Err(format!("the server answered {code}")),
         Err(error) => Err(error.to_string()),
     }
+}
+
+/// Reads a server's answer from `reader`, refusing one bigger than
+/// `MAX_DOWNLOAD_SIZE` rather than keeping a part of it as if it were whole.
+fn read_answer(reader: impl Read) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    reader
+        .take(MAX_DOWNLOAD_SIZE + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| error.to_string())?;
+    if bytes.len() as u64 > MAX_DOWNLOAD_SIZE {
+        return Err(String::from("the answer was too big"));
+    }
+    Ok(bytes)
 }
 
 /// The folder the downloaded game lists are kept in: `box_art/lists` in the
@@ -109,4 +114,19 @@ fn lists_folder() -> Result<PathBuf, String> {
     data_folder()
         .map(|folder| folder.join("box_art").join("lists"))
         .ok_or_else(|| String::from("the system has no data folder for us"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_answer_bigger_than_the_limit_is_refused_rather_than_cut() {
+        let size = usize::try_from(MAX_DOWNLOAD_SIZE).unwrap();
+        assert_eq!(read_answer(&vec![1; size][..]).unwrap().len(), size);
+        assert_eq!(
+            read_answer(&vec![1; size + 1][..]),
+            Err(String::from("the answer was too big"))
+        );
+    }
 }
