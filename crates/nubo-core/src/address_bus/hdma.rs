@@ -32,7 +32,7 @@ pub(crate) struct HdmaState {
     transfer_mode: VramTransferMode,
     in_progress: bool,
     /// The last transfer copied all its blocks. False while a transfer runs
-    /// and after one was cancelled part-way; HDMA5 reads differently then.
+    /// and after one was canceled part-way; HDMA5 reads differently then.
     completed: bool,
     /// An HBlank started, so an HBlank-mode transfer should copy its next
     /// block.
@@ -46,7 +46,7 @@ pub(crate) struct HdmaState {
     /// The block kept through a speed switch halt starts copying in the
     /// M-cycle the CPU wakes up in, which already ran.
     copy_starts_on_wake: bool,
-    /// The transfer was cancelled while a block was already due, so it stops
+    /// The transfer was canceled while a block was already due, so it stops
     /// once that block is copied.
     cancelled_after_block: bool,
 }

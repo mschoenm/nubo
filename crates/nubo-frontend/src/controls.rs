@@ -608,7 +608,7 @@ macro_rules! key_codes {
         #[serde(try_from = "String", into = "String")]
         pub enum KeyCode {
             $(
-                #[doc = concat!("The key labelled `", $label, "` in the settings.")]
+                #[doc = concat!("The key labeled `", $label, "` in the settings.")]
                 $code
             ),*
         }
