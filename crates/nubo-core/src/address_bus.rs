@@ -94,14 +94,15 @@ const STAT_INTERRUPT_BIT: u8 = 0x02;
 /// for checking that those shortcuts change nothing; see the module docs.
 const EAGER: bool = cfg!(feature = "eager");
 
-/// Whether a CPU access to `address` reads or changes the PPU's state: VRAM, OAM
-/// and the area after it, IF (where the PPU requests interrupts), the LCD and
-/// VRAM DMA registers from LCDC (0xFF40) to HDMA5 (0xFF55), the CGB palette
+/// Whether a CPU access to `address` reads or changes the PPU's state: VRAM,
+/// OAM and the area after it, IF (where the PPU requests interrupts), the LCD
+/// and VRAM DMA registers from LCDC (0xFF40) to HDMA5 (0xFF55), the CGB palette
 /// registers and OPRI, and IE, which decides whether the PPU's STAT requests
 /// matter before anyone reads IF (see `Gpu::run_dots`). The PPU catches up
 /// before such an access, except for reads that see the same without it
-/// (`AddressBus::ppu_read_can_wait`). Every register whose writes `write_timing.rs` times
-/// to the dot must be one of these (its tests check that).
+/// (`AddressBus::ppu_read_can_wait`). Every register whose writes
+/// `write_timing.rs` times to the dot must be one of these (its tests check
+/// that).
 pub(crate) fn reaches_ppu(address: u16) -> bool {
     matches!(
         address,
@@ -251,14 +252,14 @@ pub struct AddressBus {
     undocumented_registers: [u8; 4],
 
     /// Dots the PPU still has to run (or, when negative, ran ahead) because a
-    /// register write was timed off the M-cycle boundary. Paid back on the
-    /// next M-cycle, or rarely the one after (`take_cycle_dots`); see
-    /// `write_timing.rs`. Dot counts are
-    /// unsigned everywhere else. Usually 0 between calls into the emulator,
-    /// but not always: the byte after a HALT that an HBlank DMA block
-    /// interrupted is fetched again without an M-cycle, so a write it makes
-    /// in its last M-cycle can end a step. Save states keep it, and a loaded
-    /// value outside `PPU_DOT_DEBT_RANGE` fails the load.
+    /// register write was timed off the M-cycle boundary. Paid back on the next
+    /// M-cycle, or rarely the one after (`take_cycle_dots`); see
+    /// `write_timing.rs`. Dot counts are unsigned everywhere else. Usually 0
+    /// between calls into the emulator, but not always: the byte after a HALT
+    /// that an HBlank DMA block interrupted is fetched again without an
+    /// M-cycle, so a write it makes in its last M-cycle can end a step. Save
+    /// states keep it, and a loaded value outside `PPU_DOT_DEBT_RANGE` fails
+    /// the load.
     ppu_dot_debt: i16,
 
     /// The source address and byte of the VRAM DMA (HDMA) copy in progress,
@@ -857,10 +858,11 @@ impl AddressBus {
     }
 
     /// Runs an M-cycle up to its middle, where the CPU can sample state (a
-    /// halted DMG samples interrupts there). Finish it with [`AddressBus::finish_mid_cycle_sync`].
-    /// The timer raises its interrupt late in the M-cycle, so it only runs in
-    /// the second half: a halted DMG sees a timer interrupt one M-cycle later
-    /// than a PPU interrupt raised at the same time (Gambatte's tima tests).
+    /// halted DMG samples interrupts there). Finish it with
+    /// [`AddressBus::finish_mid_cycle_sync`]. The timer raises its interrupt
+    /// late in the M-cycle, so it only runs in the second half: a halted DMG
+    /// sees a timer interrupt one M-cycle later than a PPU interrupt raised at
+    /// the same time (Gambatte's tima tests).
     pub(crate) fn sync_until_mid_cycle(&mut self) {
         self.run_deferred_cycles_before_change();
         self.apu.begin_machine_cycle();
@@ -1412,9 +1414,9 @@ impl AddressBus {
     /// Sets up what a loaded save state doesn't hold: the views of the
     /// cartridge's ROM, the buttons of a state from before they were stored,
     /// whether a Super Game Boy sees a button held, and the PPU and M-cycles
-    /// caught up (see above). First rejects a state
-    /// whose components disagree on the copies they keep of the address
-    /// bus's state (see `check_loaded_copies`).
+    /// caught up (see above). First rejects a state whose components disagree
+    /// on the copies they keep of the address bus's state (see
+    /// `check_loaded_copies`).
     pub(crate) fn finish_loading_save_state(&mut self) -> std::io::Result<()> {
         self.check_loaded_copies()?;
         self.cartridge.finish_loading_save_state(self.elapsed_dots);
