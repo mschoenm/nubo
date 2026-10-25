@@ -47,3 +47,17 @@ fn a_piece_of_a_capture_stays_short_without_frames_that_count() {
     assert!(capture.steps <= MAX_STEPS_AT_ONCE);
     assert!(capture.steps > 0);
 }
+
+#[test]
+fn a_long_capture_keeps_no_more_than_a_buffer_of_sound() {
+    let rom = vec![0; 0x8000];
+    let mut capture = Capture::start(&rom).unwrap();
+
+    for _ in 0..3 {
+        assert!(capture.run(10).is_none());
+    }
+    // About a second of sound at the capture's rate, of which only the last
+    // buffer (512 samples) may be left.
+    let (left, right) = capture.emulator.audio_samples().unwrap_or_default();
+    assert!(left.len() < 1024 && right.len() < 1024);
+}

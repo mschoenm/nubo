@@ -630,6 +630,13 @@ fn a_save_state_with_an_impossible_ppu_dot_debt_does_not_load() {
 }
 
 #[test]
+fn a_save_state_with_memory_cut_off_outside_stop_mode_does_not_load() {
+    for name in [b"\x03oam".as_slice(), b"\x04vram", b"\x08palettes"] {
+        assert_state_with_field_does_not_load(&[b"\x03ppu", b"\x0bstop_blocks", name], &[1]);
+    }
+}
+
+#[test]
 fn a_save_state_with_an_impossible_oam_dma_does_not_load() {
     for offset in [161, u8::MAX] {
         assert_state_with_field_does_not_load(&[b"\x07oam_dma", b"\x06offset"], &[offset]);
@@ -659,22 +666,28 @@ fn a_save_state_with_an_impossible_speed_switch_does_not_load() {
     );
 }
 
-/// Checks that a save state whose field at `path` (the names of the
-/// components it lies in and then its own, each with its length byte in
-/// front) holds `value` fails to load, leaves the emulator as it was, and
-/// that the emulator then runs on.
-fn assert_state_with_field_does_not_load(path: &[&[u8]], value: &[u8]) {
-    let rom = busy_rom();
-    let mut emulator = booted(Model::CgbE, &rom);
-    let mut state = emulator.save_state();
-    let start = path.iter().fold(0, |start, name| {
+/// Where the value of the field at `path` (the names of the components it
+/// lies in and then its own, each with its length byte in front) starts in
+/// `state`.
+fn field_start(state: &[u8], path: &[&[u8]]) -> usize {
+    path.iter().fold(0, |start, name| {
         start
             + state[start..]
                 .windows(name.len())
                 .position(|window| window == *name)
                 .expect("the state holds the field")
             + name.len()
-    }) + size_of::<u32>();
+    }) + size_of::<u32>()
+}
+
+/// Checks that a save state whose field at `path` (see `field_start`) holds
+/// `value` fails to load, leaves the emulator as it was, and that the
+/// emulator then runs on.
+fn assert_state_with_field_does_not_load(path: &[&[u8]], value: &[u8]) {
+    let rom = busy_rom();
+    let mut emulator = booted(Model::CgbE, &rom);
+    let mut state = emulator.save_state();
+    let start = field_start(&state, path);
     state[start..start + value.len()].copy_from_slice(value);
     let before = emulator.save_state();
 
@@ -684,6 +697,47 @@ fn assert_state_with_field_does_not_load(path: &[&[u8]], value: &[u8]) {
         "the failed load changed the emulator"
     );
     emulator.run_frame(&mut Vec::new(), &mut Vec::new());
+}
+
+/// Loads `emulator`'s own state with the field at `path` (see `field_start`)
+/// set to `value`, and returns what the field holds once loaded, as the next
+/// state saved stores it.
+fn field_once_loaded(emulator: &mut Emulator, path: &[&[u8]], value: &[u8]) -> Vec<u8> {
+    let mut state = emulator.save_state();
+    let start = field_start(&state, path);
+    state[start..start + value.len()].copy_from_slice(value);
+    emulator.load_state(&state).unwrap();
+    let loaded = emulator.save_state();
+    let start = field_start(&loaded, path);
+    loaded[start..start + value.len()].to_vec()
+}
+
+#[test]
+fn a_save_state_with_a_vram_dma_length_past_seven_bits_loads_it_cut() {
+    let mut emulator = booted(Model::CgbE, &busy_rom());
+    let path: &[&[u8]] = &[b"\x08vram_dma", b"\x0ftransfer_length"];
+    assert_eq!(field_once_loaded(&mut emulator, path, &[0xFF]), [0x7F]);
+}
+
+#[test]
+fn a_state_at_the_most_time_since_power_on_saves_states_that_load_again() {
+    let mut emulator = booted(Model::CgbE, &busy_rom());
+    let mut state = emulator.save_state();
+    let start = field_start(&state, &[b"\x03bus", b"\x0celapsed_dots"]);
+    state[start..start + 8].copy_from_slice(&(1u64 << 62).to_le_bytes());
+    emulator.load_state(&state).unwrap();
+    emulator.run_frame(&mut Vec::new(), &mut Vec::new());
+
+    let again = emulator.save_state();
+    emulator.load_state(&again).unwrap();
+    assert!(emulator.load_state(&state[..state.len() - 1]).is_err());
+}
+
+#[test]
+fn a_save_state_with_low_flag_bits_set_loads_them_cleared() {
+    let mut emulator = booted(Model::CgbE, &busy_rom());
+    let path: &[&[u8]] = &[b"\x03cpu", b"\x09registers", b"\x01f"];
+    assert_eq!(field_once_loaded(&mut emulator, path, &[0xFF]), [0xF0]);
 }
 
 const CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY: u8 = 0x10;

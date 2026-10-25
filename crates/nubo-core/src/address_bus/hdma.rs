@@ -74,6 +74,13 @@ impl HdmaState {
         }
     }
 
+    /// Cuts the block count of a loaded save state to HDMA5's seven bits, as
+    /// the game's writes do, so a damaged state can't copy more blocks than
+    /// the hardware can.
+    pub(super) fn within_register_widths(&mut self) {
+        self.transfer_length &= 0x7F;
+    }
+
     /// Sets the high byte of the source address.
     fn set_hdma1(&mut self, value: u8) {
         self.source = (u16::from(value) << 8) | (self.source & 0x00F0);
@@ -161,6 +168,12 @@ impl HdmaState {
     /// An HBlank-mode transfer is running and waits for the next HBlank.
     pub(super) fn hblank_transfer_waiting(&self) -> bool {
         self.in_progress && self.transfer_mode == VramTransferMode::HBlank
+    }
+
+    /// Whether an HBlank started that the transfer hasn't copied a block for yet.
+    #[cfg(test)]
+    pub(crate) fn hblank_started(&self) -> bool {
+        self.hblank_started
     }
 }
 

@@ -130,6 +130,18 @@ fn reads_from_bios() {
 }
 
 #[test]
+fn game_genie_codes_change_the_cartridge_but_not_the_boot_rom() {
+    let mut address_bus = setup_test_address_bus();
+    address_bus
+        .cheats_mut()
+        .register_gamegenie_cheat("boot", "420-02F")
+        .unwrap();
+    assert_eq!(address_bus.peek(0x02), 0x42);
+    address_bus.in_boot_rom = true;
+    assert_eq!(address_bus.peek(0x02), 0x03);
+}
+
+#[test]
 fn reads_from_rom_in_bank_zero() {
     let address_bus = setup_test_address_bus();
     assert_eq!(address_bus.peek(0x02), 0x01);
@@ -498,6 +510,18 @@ fn ignores_vbk_and_opri_on_dmg() {
 
     assert_eq!(address_bus.peek(0xFF4F), 0xFF);
     assert_eq!(address_bus.peek(0xFF6C), 0xFF);
+}
+
+#[test]
+fn only_cgb_mode_picks_the_fast_serial_clock() {
+    for (key0, high_speed_bit) in [(0x00, 0x02), (0x04, 0x00)] {
+        let mut address_bus = address_bus_with_model(Model::CgbE);
+        address_bus.in_boot_rom = true;
+        address_bus.poke(0xFF4C, key0);
+        address_bus.in_boot_rom = false;
+        address_bus.poke(0xFF02, 0x83);
+        assert_eq!(address_bus.serial.read_byte(0xFF02) & 0x02, high_speed_bit);
+    }
 }
 
 #[test]

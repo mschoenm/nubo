@@ -3,7 +3,9 @@
 //!
 //! They check that the bulk runs (`Gpu::run_dots` with its steady stretches and plain pixels) give
 //! exactly what running dot by dot does, down to every byte of a save state after each stretch,
-//! often ended near a line's timing events, and that a save state taken at any dot carries on
+//! often ended near a line's timing events, that the quiet dots a bulk run promises (the ones the
+//! address bus may leave the PPU behind for) hold no interrupt, frame or HBlank signal the CPU
+//! could see, and that a save state taken at any dot carries on
 //! exactly like the PPU it came from and can't make the PPU panic when corrupted. Now and then the
 //! comparison also switches the LCD off for a while, enters STOP mode or runs an OAM DMA transfer
 //! (see `Event`), so that the bulk runs' paths for those are compared too.
@@ -297,6 +299,15 @@ fn continue_event(
     }
 }
 
+/// The dots after a bulk run that `Gpu::run_dots` promised the rest of the hardware can't see
+/// (`quiet_dots`), and whether they hold no STAT interrupt request either, as the address bus
+/// works it out for a read of IF (`AddressBus::ppu_read_can_wait`).
+#[derive(Clone, Copy)]
+struct QuietDots {
+    dots: u32,
+    hold_no_stat_interrupt: bool,
+}
+
 /// The first line of the two PPUs' debug output that differs, to show what a failed comparison
 /// found.
 fn first_difference(expected: &Gpu, actual: &Gpu) -> Option<(String, String)> {
@@ -339,9 +350,17 @@ fn bulk_runs_match_running_dot_by_dot() {
         }
         let m_cycle_dots = dots_per_m_cycle(double_speed);
         let mut event = Event::None;
+        let mut quiet: Option<QuietDots> = None;
         for frame in 0..2 {
             let mut left = DOTS_PER_FRAME;
             while left > 0 {
+                // OAM DMA changes what the PPU sees before its M-cycle's dots, and the address bus
+                // runs the PPU as it goes then.
+                let promised = if matches!(event, Event::OamDma(_)) {
+                    None
+                } else {
+                    quiet.take()
+                };
                 let stretch = match &mut event {
                     // OAM DMA runs one M-cycle at a time, with the PPU seeing the M-cycle's DMA
                     // state from half an M-cycle in, as in `AddressBus::sync_all_but_timers`.
@@ -374,11 +393,34 @@ fn bulk_runs_match_running_dot_by_dot() {
                     }
                     Event::None => stretch.min(left),
                 };
-                tick_dots(&mut by_dot, &mut by_dot_hdma, stretch);
+                // The quiet dots the last bulk run promised, while nothing touched the PPU since,
+                // must hold nothing the CPU could see without the PPU catching up.
+                let checked = promised.map_or(0, |promised| promised.dots.min(stretch));
+                tick_dots(&mut by_dot, &mut by_dot_hdma, checked);
+                if let Some(promised) = promised {
+                    assert!(
+                        !by_dot.vblank_interrupt
+                            && !by_dot.frame_ready
+                            && !by_dot_hdma.hblank_started()
+                            && !(promised.hold_no_stat_interrupt && by_dot.stat_interrupt),
+                        "seed {seed}, case {case}, frame {frame}, line {} dot {}: something \
+                         happened in the {} quiet dots",
+                        by_dot.line,
+                        by_dot.line_dot,
+                        promised.dots
+                    );
+                }
+                tick_dots(&mut by_dot, &mut by_dot_hdma, stretch - checked);
                 let mut bulk_left = stretch;
                 while bulk_left > 0 {
                     let chunk = (1 + random.below(700)).min(bulk_left);
-                    in_bulk.run_dots(chunk, &mut in_bulk_hdma, random.chance(50));
+                    let stat_interrupt_enabled = random.chance(50);
+                    let dots = in_bulk.run_dots(chunk, &mut in_bulk_hdma, stat_interrupt_enabled);
+                    quiet = Some(QuietDots {
+                        dots,
+                        hold_no_stat_interrupt: stat_interrupt_enabled
+                            || in_bulk.stat_line_stays_low(),
+                    });
                     bulk_left -= chunk;
                 }
                 left = left.saturating_sub(stretch);
@@ -425,7 +467,11 @@ fn bulk_runs_match_running_dot_by_dot() {
                     hdma.set_hblank_started(false);
                 }
 
+                let after_stretch = serialize(&by_dot);
                 event = continue_event(event, stretch, &mut by_dot, &mut in_bulk, &mut random);
+                if serialize(&by_dot) != after_stretch {
+                    quiet = None;
+                }
             }
             assert_eq!(
                 format!("{by_dot:?}"),

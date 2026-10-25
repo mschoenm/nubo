@@ -104,6 +104,24 @@ fn a_game_that_keeps_writing_is_saved_after_the_longest_delay() {
 }
 
 #[test]
+fn a_clock_that_keeps_changing_is_saved_after_its_own_longest_delay() {
+    let directory = temporary_saves_directory("busy-clock");
+    let saves = saves_in(&directory);
+    let start = Instant::now();
+    let mut now = start;
+
+    while now < start + LONGEST_CLOCK_DELAY {
+        saves.queue_rtc(&sample_rtc(), now);
+        saves.flush_due(now);
+        assert!(!directory.join("game.rtc").exists());
+        now += SETTLE_TIME / 2;
+    }
+
+    saves.flush_due(start + LONGEST_CLOCK_DELAY);
+    assert!(directory.join("game.rtc").exists());
+}
+
+#[test]
 fn a_clock_that_keeps_changing_doesnt_hold_up_the_ram() {
     let directory = temporary_saves_directory("clock");
     let saves = saves_in(&directory);
@@ -200,6 +218,55 @@ fn a_save_that_cant_be_read_is_reported_and_never_written_over() {
     assert_eq!(*storage.writes.lock().unwrap(), 0);
     assert!(saves.pending().ram.is_none());
     assert!(notices.take().is_empty());
+}
+
+#[test]
+fn a_save_too_short_to_use_is_reported_and_never_written_over() {
+    let directory = temporary_saves_directory("short");
+    fs::create_dir_all(&directory).unwrap();
+    fs::write(directory.join("game.sav"), [0x42; 0x100]).unwrap();
+    fs::write(directory.join("game.rtc"), [0x42; 5]).unwrap();
+    let notices = Notices::default();
+    let files = Files::in_folders(None, Some(directory.parent().unwrap().to_path_buf()));
+    let saves = BatterySaves::in_storage(
+        Arc::new(files),
+        &Path::new("roms").join("game.gb"),
+        notices.clone(),
+    );
+
+    assert!(saves.load_ram().is_none());
+    assert!(saves.load_rtc().is_none());
+    let problems = notices.take();
+    assert_eq!(problems.len(), 2, "{problems:?}");
+    assert!(
+        problems[0].contains("game.sav isn't one Nubo can read"),
+        "{problems:?}"
+    );
+    assert!(
+        problems[1].contains("game.rtc isn't one Nubo can read"),
+        "{problems:?}"
+    );
+
+    saves.queue_ram(&[1; 0x200], Instant::now());
+    saves.queue_rtc(&sample_rtc(), Instant::now());
+    saves.flush();
+    assert_eq!(fs::read(directory.join("game.sav")).unwrap(), [0x42; 0x100]);
+    assert_eq!(fs::read(directory.join("game.rtc")).unwrap(), [0x42; 5]);
+}
+
+#[test]
+fn an_empty_save_counts_as_none() {
+    let directory = temporary_saves_directory("empty");
+    fs::create_dir_all(&directory).unwrap();
+    fs::write(directory.join("game.sav"), []).unwrap();
+    fs::write(directory.join("game.rtc"), []).unwrap();
+    let saves = saves_in(&directory);
+
+    assert!(saves.load_ram().is_none());
+    assert!(saves.load_rtc().is_none());
+    saves.queue_ram(&[1; 0x200], Instant::now());
+    saves.flush();
+    assert_eq!(fs::read(directory.join("game.sav")).unwrap(), [1; 0x200]);
 }
 
 #[test]

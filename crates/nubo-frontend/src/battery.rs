@@ -12,8 +12,9 @@
 //! likely leaves a whole save behind, not half of one.
 //!
 //! A save that is there but can't be read (a file the player may not read,
-//! a broken localStorage entry) is never written over: the game starts
-//! without it, the player is told, and nothing is saved to it that run.
+//! a broken localStorage entry, a file too short to hold any RAM or a clock
+//! of the wrong size) is never written over: the game starts without it, the
+//! player is told, and nothing is saved to it that run.
 
 use crate::notices::Notices;
 use crate::storage::{self, Entry, Storage};
@@ -25,9 +26,18 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 /// How long the game has to stop writing before what it wrote is stored.
 const SETTLE_TIME: Duration = Duration::from_millis(250);
-/// A game that keeps writing is still saved this often: some games use the
-/// battery-backed RAM as scratch space, and some read the clock every frame.
+/// A game that keeps writing its RAM is still saved this often: some games
+/// use the battery-backed RAM as scratch space.
 const LONGEST_DELAY: Duration = Duration::from_secs(1);
+/// A clock that keeps changing is still saved this often. Games such as the
+/// Pokémon ones with a clock read it every frame, which changes it each time,
+/// so a shorter delay would write the file every second for as long as they
+/// run, on the thread that keeps the sound going. Most of those writes only
+/// move the stored time on by the time that passed, which loading the older
+/// file works out again from the wall clock, and the clock is still written
+/// when the game pauses and stops, so a crash can lose at most the last
+/// minute of a change to the clock, such as setting its time.
+const LONGEST_CLOCK_DELAY: Duration = Duration::from_secs(60);
 /// Cartridge RAM sizes are multiples of 512 bytes (MBC2's built-in RAM, the
 /// smallest). Other emulators append an RTC footer of 44 or 48 bytes to
 /// `.sav` files, and rounding down to this size drops it.
@@ -51,12 +61,12 @@ struct Pending<T> {
 }
 
 impl<T> Pending<T> {
-    /// Data the game wrote at `now`.
-    fn new(data: T, now: Instant) -> Self {
+    /// Data the game wrote at `now`, to be written within `longest_delay`.
+    fn new(data: T, now: Instant, longest_delay: Duration) -> Self {
         Pending {
             data,
             settles_at: now + SETTLE_TIME,
-            deadline: now + LONGEST_DELAY,
+            deadline: now + longest_delay,
         }
     }
 
@@ -140,7 +150,8 @@ impl BatterySaves {
     }
 
     /// Writes the saves the game has stopped writing to for `SETTLE_TIME`,
-    /// or has kept writing to for `LONGEST_DELAY`.
+    /// or has kept writing to for `LONGEST_DELAY` (`LONGEST_CLOCK_DELAY` for
+    /// the clock).
     pub fn flush_when_settled(&self) {
         self.flush_due(Instant::now());
     }
@@ -246,11 +257,31 @@ impl BatterySaves {
         }
     }
 
+    /// Reports that what is kept for `entry` was read but isn't a save
+    /// Nubo can use, and leaves it alone as [`BatterySaves::read`] does one
+    /// it can't read.
+    fn leave_unusable_alone(&self, entry: Entry<'_>) {
+        self.left_alone(entry).store(true, Ordering::Relaxed);
+        let location = self.storage.location(entry);
+        self.notices.report(format!(
+            "The in-game save at {location} isn't one Nubo can read, so Nubo leaves it as it is and saves nothing to it this time"
+        ));
+    }
+
     /// Reads the saved RAM, dropping any footer that isn't part of the RAM.
+    /// An empty save counts as none; one too short to hold any RAM is left
+    /// alone ([`BatterySaves::leave_unusable_alone`]).
     fn load_ram(&self) -> Option<Vec<u8>> {
         let mut ram = self.read(self.ram_entry())?;
+        if ram.is_empty() {
+            return None;
+        }
         ram.truncate(ram.len() / RAM_SIZE_GRANULARITY * RAM_SIZE_GRANULARITY);
-        (!ram.is_empty()).then_some(ram)
+        if ram.is_empty() {
+            self.leave_unusable_alone(self.ram_entry());
+            return None;
+        }
+        Some(ram)
     }
 
     /// Queues RAM the game wrote at `now`, reusing the queued buffer if
@@ -266,12 +297,22 @@ impl BatterySaves {
                 }
                 waiting.written_again(now);
             }
-            None => pending.ram = Some(Pending::new(ram.to_vec(), now)),
+            None => pending.ram = Some(Pending::new(ram.to_vec(), now, LONGEST_DELAY)),
         }
     }
 
+    /// Reads the saved clock. An empty save counts as none; one of another
+    /// size is left alone ([`BatterySaves::leave_unusable_alone`]).
     fn load_rtc(&self) -> Option<RtcState> {
-        RtcState::from_bytes(&self.read(self.clock_entry())?)
+        let bytes = self.read(self.clock_entry())?;
+        if bytes.is_empty() {
+            return None;
+        }
+        let state = RtcState::from_bytes(&bytes);
+        if state.is_none() {
+            self.leave_unusable_alone(self.clock_entry());
+        }
+        state
     }
 
     /// Queues the clock state the game left at `now`.
@@ -282,7 +323,9 @@ impl BatterySaves {
                 waiting.data = state.to_bytes();
                 waiting.written_again(now);
             }
-            None => pending.rtc = Some(Pending::new(state.to_bytes(), now)),
+            None => {
+                pending.rtc = Some(Pending::new(state.to_bytes(), now, LONGEST_CLOCK_DELAY));
+            }
         }
     }
 }

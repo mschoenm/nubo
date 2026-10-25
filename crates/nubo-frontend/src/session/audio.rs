@@ -4,13 +4,16 @@
 //! callback drains; the emulator watches the queue's length to know when to
 //! produce more, which keeps emulation running at real-time speed. On the
 //! desktop the callback also wakes the emulator thread when the queue runs
-//! low, so the thread can sleep until then.
+//! low, so the thread can sleep until then. Without a sound device, or once
+//! it goes away while a game runs, the queue drains at the speed a sound card
+//! would play it instead, so the game keeps its speed without sound.
 
 use crate::notices::Notices;
 use crate::time::{Duration, Instant};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, FromSample, SampleFormat, SizedSample, Stream, StreamConfig};
+use cpal::{Device, ErrorKind, FromSample, SampleFormat, SizedSample, Stream, StreamConfig};
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread::Thread;
 
@@ -30,6 +33,21 @@ struct SampleQueue {
     /// as the queue drops below that, since the thread only waits while the
     /// queue has more.
     low_waker: OnceLock<Thread>,
+    /// Set when the sound device stopped for good while it played (it went
+    /// away, or its stream couldn't start again), so that the queue is
+    /// drained by the clock from then on (see `AudioOutput::device_drains`).
+    device_lost: AtomicBool,
+}
+
+impl SampleQueue {
+    /// Notes that the sound device stopped for good, and wakes the thread
+    /// waiting for it to drain the queue, which it never will.
+    fn lose_device(&self) {
+        self.device_lost.store(true, Ordering::Relaxed);
+        if let Some(thread) = self.low_waker.get() {
+            thread.unpark();
+        }
+    }
 }
 
 /// The sound output and its sample queue. Without a sound device it still
@@ -37,10 +55,14 @@ struct SampleQueue {
 pub struct AudioOutput {
     queue: Arc<SampleQueue>,
     sample_rate: u32,
-    /// `None` when no sound device could be opened.
+    /// `None` when no sound device could be opened, or once it stopped for
+    /// good.
     stream: Option<Stream>,
-    /// When `drain_elapsed` last discarded samples (only used without a
-    /// sound device).
+    /// Whether the sound card drains the queue: false without a sound device,
+    /// and once it stopped for good (see `device_drains`).
+    paced_by_device: bool,
+    /// When `drain_elapsed` last discarded samples (only used while no sound
+    /// device drains the queue).
     last_drain: Instant,
     /// How loud to play, from 0 (silent) to 1 (as loud as the game).
     volume: f32,
@@ -69,6 +91,7 @@ impl AudioOutput {
         AudioOutput {
             queue,
             sample_rate,
+            paced_by_device: stream.is_some(),
             stream,
             last_drain: Instant::now(),
             volume: 1.0,
@@ -80,7 +103,8 @@ impl AudioOutput {
     /// waking up to play silence, and starts it again when the game goes on.
     /// Samples still queued are dropped, so the game doesn't go on with the
     /// sound from before the pause. A sound card that can't pause keeps
-    /// playing silence instead.
+    /// playing silence instead, and one that can't start again leaves the
+    /// game to go on without sound.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn set_paused(&mut self, paused: bool) {
         self.drop_queued_samples();
@@ -89,7 +113,10 @@ impl AudioOutput {
             if paused {
                 let _ = stream.pause();
             } else if let Err(error) = stream.play() {
-                self.notices.report(format!("Sound error: {error}"));
+                self.notices.report(format!(
+                    "Sound error, the game goes on without sound: {error}"
+                ));
+                self.queue.lose_device();
             }
         }
     }
@@ -120,10 +147,35 @@ impl AudioOutput {
             queue: Arc::new(SampleQueue::default()),
             sample_rate: FALLBACK_SAMPLE_RATE,
             stream: None,
+            paced_by_device: false,
             last_drain: Instant::now(),
             volume: 1.0,
             notices: Notices::default(),
         }
+    }
+
+    /// An output whose sound device drains the queue, as far as pacing goes,
+    /// but has no stream that plays, for tests of losing the device.
+    #[cfg(test)]
+    fn with_silent_device() -> Self {
+        AudioOutput {
+            paced_by_device: true,
+            ..Self::without_device()
+        }
+    }
+
+    /// Whether the sound card drains the queue. Once the device has stopped
+    /// for good (`SampleQueue::lose_device`), it drops the stream and drains
+    /// the queue by the clock from now on, as without a sound device, so the
+    /// game doesn't stand still waiting for a sound card that never asks for
+    /// more.
+    fn device_drains(&mut self) -> bool {
+        if self.paced_by_device && self.queue.device_lost.load(Ordering::Relaxed) {
+            self.paced_by_device = false;
+            self.stream = None;
+            self.last_drain = Instant::now();
+        }
+        self.paced_by_device
     }
 
     pub fn sample_rate(&self) -> u32 {
@@ -139,7 +191,7 @@ impl AudioOutput {
 
     /// How many stereo samples are waiting to be played.
     pub fn queued_samples(&mut self) -> usize {
-        if self.stream.is_none() {
+        if !self.device_drains() {
             self.drain_elapsed();
         }
 
@@ -159,7 +211,7 @@ impl AudioOutput {
     /// without one it works out when the queue will have drained that far.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn wait_until_samples_needed(&mut self, limit: Duration) {
-        let wait = if self.stream.is_some() {
+        let wait = if self.device_drains() {
             limit
         } else {
             let excess = self
@@ -206,8 +258,8 @@ impl AudioOutput {
         Duration::from_secs_f64(samples as f64 / f64::from(self.sample_rate))
     }
 
-    /// Without a sound device, discards as many samples as a sound card would
-    /// have played since the last call.
+    /// While no sound device drains the queue, discards as many samples as a
+    /// sound card would have played since the last call.
     fn drain_elapsed(&mut self) {
         let consumed =
             (self.last_drain.elapsed().as_secs_f64() * f64::from(self.sample_rate)) as usize;
@@ -238,9 +290,9 @@ fn open_stream(queue: Arc<SampleQueue>, notices: &Notices) -> Result<(Stream, u3
     let sample_rate = config.sample_rate;
 
     let stream = match supported.sample_format() {
-        SampleFormat::F32 => build_stream::<f32>(&device, config, queue, notices.clone()),
-        SampleFormat::I16 => build_stream::<i16>(&device, config, queue, notices.clone()),
-        SampleFormat::U16 => build_stream::<u16>(&device, config, queue, notices.clone()),
+        SampleFormat::F32 => build_stream::<f32>(&device, config, queue, notices),
+        SampleFormat::I16 => build_stream::<i16>(&device, config, queue, notices),
+        SampleFormat::U16 => build_stream::<u16>(&device, config, queue, notices),
         format => Err(format!("unsupported sample format {format:?}")),
     }?;
 
@@ -254,21 +306,42 @@ fn build_stream<T>(
     device: &Device,
     config: StreamConfig,
     queue: Arc<SampleQueue>,
-    notices: Notices,
+    notices: &Notices,
 ) -> Result<Stream, String>
 where
     T: SizedSample + FromSample<f32>,
 {
     let channels = usize::from(config.channels).max(1);
+    let errors_queue = queue.clone();
+    let notices = notices.clone();
 
     device
         .build_output_stream(
             config,
             move |data: &mut [T], _| fill_output_buffer(data, channels, &queue),
-            move |error| notices.report(format!("Sound error: {error}")),
+            move |error| report_stream_error(&error, &errors_queue, &notices),
             None,
         )
         .map_err(|error| error.to_string())
+}
+
+/// Reports an error the sound card's stream has while it plays. When the
+/// stream stopped for good (its device went away, as when headphones are
+/// unplugged, or it has to be built again), the game goes on without sound,
+/// paced by the clock (`SampleQueue::lose_device`).
+fn report_stream_error(error: &cpal::Error, queue: &SampleQueue, notices: &Notices) {
+    let stopped = matches!(
+        error.kind(),
+        ErrorKind::DeviceNotAvailable | ErrorKind::HostUnavailable | ErrorKind::StreamInvalidated
+    );
+    if stopped {
+        notices.report(format!(
+            "Sound error, the game goes on without sound: {error}"
+        ));
+        queue.lose_device();
+    } else {
+        notices.report(format!("Sound error: {error}"));
+    }
 }
 
 /// Fills the sound card's buffer from the queue, and wakes the thread that

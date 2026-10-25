@@ -202,6 +202,7 @@ impl Gpu {
     pub(crate) fn set_oam_dma_access(&mut self, access: OamDmaAccess, delay: u8) {
         if delay == 0 || !self.lcd_enabled() {
             self.oam_dma_access = access;
+            self.next_oam_dma_access = access;
             self.countdowns.oam_dma_access = 0;
             self.apply_dma_oam_write();
         } else if access == self.oam_dma_access

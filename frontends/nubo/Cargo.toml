@@ -16,7 +16,9 @@ iced = { version = "0.14", features = ["advanced", "image-without-codecs"] }
 # Iced's image handles hold their pixels as `Bytes`; ui/pictures.rs shares a
 # picture's pixels with its handle without copying them.
 bytes = "1.12"
-rfd = "0.17"
+# "file-handle-inner" lets the browser's picker check a file's size before
+# reading it into the page's memory (rom_picker.rs).
+rfd = { version = "0.17", features = ["file-handle-inner"] }
 lucide-icons = "1.55"
 serde = { version = "1", features = ["derive"] }
 toml = "1"
