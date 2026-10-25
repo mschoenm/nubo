@@ -71,6 +71,7 @@ static RECORD: Mutex<Option<Record>> = Mutex::new(None);
 /// The buttons the pretend player holds, one bit per libretro button.
 static HELD: Mutex<[u16; 4]> = Mutex::new([0; 4]);
 
+/// Changes this test's record, making it first if there is none.
 fn record<T>(change: impl FnOnce(&mut Record) -> T) -> T {
     change(lock(&RECORD).get_or_insert_with(Record::default))
 }
@@ -95,6 +96,8 @@ fn values(values: &[RetroCoreOptionValue]) -> Vec<String> {
         .collect()
 }
 
+/// RetroArch's environment callback: answers each command as `SETTINGS` say
+/// and records what the core hands over.
 unsafe extern "C" fn test_environment(cmd: c_uint, data: *mut c_void) -> bool {
     let settings = lock(&SETTINGS);
     // SAFETY: each command's data is what libretro.h says it is.
@@ -241,6 +244,8 @@ unsafe extern "C" fn test_environment(cmd: c_uint, data: *mut c_void) -> bool {
     }
 }
 
+/// RetroArch's video callback: records each frame's size, pitch and first
+/// pixel.
 unsafe extern "C" fn test_video_refresh(
     data: *const c_void,
     width: c_uint,
@@ -254,6 +259,8 @@ unsafe extern "C" fn test_video_refresh(
     record(|record| record.frames.push((width, height, pitch, first)));
 }
 
+/// RetroArch's callback for one sound frame at a time, which the core must
+/// never use.
 unsafe extern "C" fn test_audio_sample(_left: i16, _right: i16) {
     panic!("the core should use the batch callback");
 }
@@ -269,10 +276,13 @@ unsafe extern "C" fn test_audio_sample_batch(data: *const i16, frames: usize) ->
     taken
 }
 
+/// RetroArch's input poll callback: counts the polls.
 unsafe extern "C" fn test_input_poll() {
     record(|record| record.polls += 1);
 }
 
+/// Which buttons the pretend player on `port` holds (see `HELD`): all at
+/// once as a bitmask, or whether button `id` is held.
 unsafe extern "C" fn test_input_state(
     port: c_uint,
     device: c_uint,
@@ -290,6 +300,8 @@ unsafe extern "C" fn test_input_state(
     }
 }
 
+/// RetroArch's rumble callback: records the strength of each change to the
+/// first player's strong motor.
 unsafe extern "C" fn test_rumble(port: c_uint, effect: c_int, strength: u16) -> bool {
     assert_eq!((port, effect), (0, RETRO_RUMBLE_STRONG));
     record(|record| record.rumble.push(strength));
@@ -313,6 +325,8 @@ fn start(settings: Settings) -> MutexGuard<'static, ()> {
     turn
 }
 
+/// The settings RetroArch has by default: XRGB8888, version 2 core options
+/// and input bitmasks.
 fn default_settings() -> Settings {
     Settings {
         accepts_xrgb8888: true,
@@ -323,6 +337,8 @@ fn default_settings() -> Settings {
     }
 }
 
+/// Loads `rom` as RetroArch does, with its bytes in memory, and returns
+/// whether the core took it.
 fn load_game(rom: &[u8]) -> bool {
     let game = RetroGameInfo {
         path: c"/games/test.gb".as_ptr(),
@@ -334,10 +350,13 @@ fn load_game(rom: &[u8]) -> bool {
     unsafe { retro_load_game(&raw const game) }
 }
 
+/// What the core has handed the pretend RetroArch so far, starting a new
+/// record.
 fn take_record() -> Record {
     lock(&RECORD).take().unwrap_or_default()
 }
 
+/// Runs `frames` frames, as RetroArch does once per frame.
 fn run_frames(frames: usize) {
     for _ in 0..frames {
         retro_run();
@@ -367,6 +386,8 @@ fn fill_memory(id: c_uint, bytes: &[u8]) {
         .copy_from_slice(bytes);
 }
 
+/// Ends a test as RetroArch closes a game: unloads it and shuts the core
+/// down.
 fn finish() {
     retro_unload_game();
     retro_deinit();
