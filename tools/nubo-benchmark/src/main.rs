@@ -25,6 +25,7 @@ use nubo_core::{Emulator, Key, Model, NoSaves, RtcClock};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::fs;
+use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::OnceLock;
@@ -352,6 +353,15 @@ fn bit_identical(first: &[f32], second: &[f32]) -> bool {
             .all(|(first, second)| first.to_bits() == second.to_bits())
 }
 
+/// The message of a caught panic, if it has one.
+fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
+    payload
+        .downcast_ref::<String>()
+        .cloned()
+        .or_else(|| payload.downcast_ref::<&str>().map(ToString::to_string))
+        .unwrap_or_else(|| "unknown panic".to_owned())
+}
+
 /// Runs one game on one model for `seconds` of emulated time.
 fn run(
     job: &Run,
@@ -554,12 +564,17 @@ fn benchmark(args: &Args) -> Result<bool, String> {
                 loop {
                     let index = next_job.fetch_add(1, Ordering::Relaxed);
                     let Some(job) = jobs.get(index) else { break };
-                    let outcome = run(
-                        job,
-                        args.seconds,
-                        args.screenshots.as_deref(),
-                        args.check_save_states,
-                    );
+                    let outcome = panic::catch_unwind(AssertUnwindSafe(|| {
+                        run(
+                            job,
+                            args.seconds,
+                            args.screenshots.as_deref(),
+                            args.check_save_states,
+                        )
+                    }))
+                    .unwrap_or_else(|payload| {
+                        Err(format!("panicked: {}", panic_message(payload.as_ref())))
+                    });
                     let _ = outcomes[index].set(outcome);
                 }
             });
