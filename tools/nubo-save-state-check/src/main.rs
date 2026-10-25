@@ -1,14 +1,14 @@
 //! Checks that save states made by earlier versions of Nubo still load, so
 //! an update never costs a player their save states.
 //!
-//! `save-states/` in the repository keeps sets of states, each made by Nubo
-//! on the day its folder is named after, of the test cartridges in
-//! `cartridges.rs` and three free homebrew games. A new set is only needed
-//! when what save states store changes (their layout: every field with how
-//! its value is stored, and every variant of every enum value): the check fails when this version's layout
-//! isn't the one the newest set lists, and `cargo save-states --record` then
-//! adds a set. Every state of every set must load into this version without a
-//! value it can't read, and play on.
+//! `save-states/` in the repository keeps sets of states, each made by Nubo on
+//! the day its folder is named after, of the test cartridges in `cartridges.rs`
+//! and three free homebrew games. A new set is only needed when what save
+//! states store changes (their layout: every field with how its value is
+//! stored, and every variant of every enum value): the check fails when this
+//! version's layout isn't the one the newest set lists, and
+//! `cargo save-states --record` then adds a set. Every state of every set must
+//! load into this version without a value it can't read, and play on.
 //!
 //! `cargo test --workspace` checks the test cartridges' states on every
 //! platform CI runs it on, so states made on one platform are shown to load on
@@ -20,10 +20,10 @@
 //!
 //! The games aren't part of Nubo: `cargo xtask benchmark-roms` downloads them
 //! to `target/benchmark-roms` (under `CARGO_TARGET_DIR` when that is set),
-//! where this looks for them. A game whose states
-//! are kept must stay in that list (`xtask/src/benchmark_roms.rs`) at the same
-//! version, since states of another version of a game don't load. Kept sets
-//! are never changed or removed.
+//! where this looks for them. A game whose states are kept must stay in that
+//! list (`xtask/src/benchmark_roms.rs`) at the same version, since states of
+//! another version of a game don't load. Kept sets are never changed or
+//! removed.
 
 use clap::Parser;
 use nubo_core::{Emulator, Key, Model, NoSaves, RtcClock};

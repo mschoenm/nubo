@@ -541,8 +541,9 @@ const BLARGG_TESTS: [BlarggTest; 9] = [
     },
 ];
 
-/// Lists every test case, sorted by ID. Fails if two cases share an ID, since the run's results
-/// and `passing.txt` are kept by ID: a passing case would hide a failing one with its ID.
+/// Lists every test case, sorted by ID. Fails if two cases share an ID, since
+/// the run's results and `passing.txt` are kept by ID: a passing case would
+/// hide a failing one with its ID.
 pub(crate) fn discover(dirs: &RomDirs) -> Result<Vec<TestCase>, String> {
     let root = dirs.root(Source::Collection);
     let mut tests = blargg();
@@ -1083,7 +1084,8 @@ fn super_game_boy(root: &Path) -> Vec<TestCase> {
     same_suite.chain(packet_protocol).collect()
 }
 
-/// The path of a Mealybug reference screenshot, such as `m3_scx_low_3_bits_cgb_d.png`.
+/// The path of a Mealybug reference screenshot, such as
+/// `m3_scx_low_3_bits_cgb_d.png`.
 fn reference_screen(rom: &Path, revision: &str) -> PathBuf {
     let stem = rom.file_stem().unwrap_or_default().to_string_lossy();
     rom.with_file_name(format!("{stem}_{revision}.png"))
