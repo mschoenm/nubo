@@ -207,8 +207,15 @@ fn every_game_in_the_published_screenshots_is_credited() {
 #[test]
 fn a_list_that_cant_be_read_is_an_error_but_a_missing_one_is_empty() {
     let folder = std::env::temp_dir();
-    assert!(ScreenshotList::read(&folder).is_err());
-    assert!(GameList::read(&folder).is_err());
+    // Bytes that aren't UTF-8 fail the read the same way on every system,
+    // where reading a folder doesn't.
+    let unreadable = folder.join(format!("nubo-unreadable-list-{}.toml", std::process::id()));
+    std::fs::write(&unreadable, [0xFF, 0xFE, 0xFD]).unwrap();
+    let screenshots = ScreenshotList::read(&unreadable);
+    let games = GameList::read(&unreadable);
+    std::fs::remove_file(&unreadable).unwrap();
+    assert!(screenshots.is_err());
+    assert!(games.is_err());
     let missing = folder.join("nubo-no-such-list.toml");
     assert!(
         ScreenshotList::read(&missing)
