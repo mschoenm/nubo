@@ -145,7 +145,8 @@ impl BatterySaves {
         self.flush_due(Instant::now());
     }
 
-    /// Writes the saves due at `now` (see [`BatterySaves::flush_when_settled`]).
+    /// Writes the saves due at `now` (see
+    /// [`BatterySaves::flush_when_settled`]).
     fn flush_due(&self, now: Instant) {
         let mut pending = self.pending();
         self.write(self.ram_entry(), &mut pending.ram, Some(now));

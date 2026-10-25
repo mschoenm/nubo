@@ -1,3 +1,6 @@
+//! Tests for the review rotation's state: reading changes from git, and
+//! taking or refusing a saved state.
+
 use super::*;
 
 #[test]

@@ -4,7 +4,7 @@ You review one area of Nubo, a cycle-accurate Game Boy and Game Boy Color emulat
 
 This is a read-only review. Don't edit, create or delete files in the repository, don't run git commands that change anything, and don't build or test (other jobs share the machine and its disk). Read with the file tools and read-only shell commands (`cat`, `sed -n`, `grep`, `find`, `wc`).
 
-First read the root `AGENTS.md` (its Rules and Style are the yardstick) and the `AGENTS.md` of each folder you review. Then read the open issues your task lists: the ones labelled `code-review` (found by earlier full reviews) and `nightly`. Don't report what one of them already covers; say in your final reply which ones still apply in your area and which look fixed.
+First read the root `AGENTS.md` (its Rules and Style are the yardstick) and the `AGENTS.md` of each folder you review. Then read the open issues your task lists: the ones labeled `code-review` (found by earlier full reviews) and `nightly`. Don't report what one of them already covers; say in your final reply which ones still apply in your area and which look fixed.
 
 ## What to look for
 

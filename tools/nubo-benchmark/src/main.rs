@@ -458,8 +458,8 @@ fn run_name(job: &Run) -> String {
     format!("{} [{}]", job.rom.display(), job.model)
 }
 
-/// The key a run's fingerprints are recorded under: the ROM's path, the model and the length of
-/// the run.
+/// The key a run's fingerprints are recorded under: the ROM's path, the model
+/// and the length of the run.
 fn fingerprint_key(job: &Run, seconds: f64) -> String {
     format!("{} [{}] {seconds}s", job.rom.display(), job.model)
 }

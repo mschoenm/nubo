@@ -36,6 +36,7 @@ const EARLY_STATE_PREFIX: &[u8] = b"Nubo state ";
 pub enum Slot {
     /// Written as the player plays a game and when they leave it, and read
     /// when it starts again.
+    ///
     /// Only used while "Continue games where you left off" is on (see
     /// `Settings::resume_games`).
     Resume,

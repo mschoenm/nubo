@@ -8,7 +8,7 @@
 //! OAM (object attribute memory, 0xFE00-0xFE9F) holds 40 four-byte object entries. On DMG-family
 //! hardware, when the CPU accesses OAM, or increments or decrements a 16-bit register that points
 //! into it, while the PPU is reading OAM during mode 2 (OAM scan), the PPU's row gets mixed with
-//! neighbouring rows. The corruption formulas, including the differences between DMG, MGB and
+//! neighboring rows. The corruption formulas, including the differences between DMG, MGB and
 //! SGB2, follow SameBoy's OAM bug code. CGB hardware doesn't have the bug.
 
 use crate::gpu::{Gpu, NO_OAM_SCAN_ROW};

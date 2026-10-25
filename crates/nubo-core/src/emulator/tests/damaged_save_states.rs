@@ -9,9 +9,9 @@
 //! real state, and writes edge values over one value at a time and over random pairs of them.
 //!
 //! The states come from a game made here that keeps the hardware busy (`busy_game`): sound on all
-//! four channels, the timer, a serial transfer, objects and the window on screen, OAM DMA, a
-//! Super Game Boy packet half sent, and on the Game Boy Color palettes, an HBlank VRAM DMA and a
-//! speed switch every fourth frame. Each model saves at a few moments picked by what the state holds
+//! four channels, the timer, a serial transfer, objects and the window on screen, OAM DMA, a Super
+//! Game Boy packet half sent, and on the Game Boy Color palettes, an HBlank VRAM DMA and a speed
+//! switch every fourth frame. Each model saves at a few moments picked by what the state holds
 //! (`MOMENTS`), such as the PPU in the middle of fetching an object.
 //!
 //! The number of cases is fixed, with fixed seeds, so the test takes a few seconds on every run.

@@ -85,8 +85,8 @@ h1 { font-size: 26px; line-height: 1.2; margin: 0; text-wrap: balance; }
 .badge.no { background: var(--no-bg); color: var(--no); }
 .badge.plain { background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 400; }
 .badge.done { background: var(--done-bg); color: var(--done); }
-.verdict { margin: 8px 14px 0 56px; font-size: 15px; }
-details { margin: 4px 14px 12px 56px; }
+.verdict { margin: 8px 14px 0; font-size: 15px; }
+details { margin: 4px 14px 12px; }
 summary { cursor: pointer; color: var(--accent); font-weight: 700; font-size: 14.5px; padding-block: 8px; list-style: none; }
 summary::-webkit-details-marker { display: none; }
 summary::after { content: " ▾"; }
@@ -95,7 +95,7 @@ dl { margin: 4px 0 0; display: flex; flex-direction: column; gap: 10px; }
 dt { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
 dd { margin: 2px 0 0; overflow-wrap: anywhere; }
 code { font-family: var(--font-mono); font-size: 0.86em; background: var(--bg); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
-.status { margin: 0 14px 12px 56px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
+.status { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
 .status a { color: var(--done); font-weight: 700; }
 
 .btn { font: inherit; font-weight: 700; font-size: 15px; border-radius: 10px; padding: 10px 14px; cursor: pointer; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
@@ -105,16 +105,13 @@ code { font-family: var(--font-mono); font-size: 0.86em; background: var(--bg); 
 .msg.ok { color: var(--yes); }
 .msg.err { color: var(--accent); }
 .foot { color: var(--muted); font-size: 13px; margin-top: 12px; }
-.verdict, details, .status, .cardfoot { margin-left: 14px; margin-right: 14px; }
-.cardfoot { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-.cardfoot .status { margin: 0; }
+.cardfoot { margin: 0 14px 12px; display: flex; flex-direction: column; gap: 8px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .actions .btn { flex: 1 1 140px; }
 details.notebox { margin: 0; }
 details.notebox summary { font-size: 14px; color: var(--muted); font-weight: 400; padding-block: 4px; }
 details.notebox textarea { font: inherit; font-size: 15px; width: 100%; min-height: 64px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--bg); color: var(--fg); margin-top: 4px; }
 .card.compact { padding: 12px 14px; gap: 6px; }
-.card.compact .status { margin: 0; }
 a.badge { text-decoration: none; }
 .badge.pr-open { background: var(--maybe-bg); color: var(--maybe); }
 .badge.pr-merged { background: var(--yes-bg); color: var(--yes); }
@@ -231,9 +228,9 @@ function busy(n) {
 function workingHtml() {
   const rows = Object.values(statuses).filter((s) => s.state !== "Klaar").sort((a, b) => a.n - b.n);
   if (!rows.length) return "";
-  return `<h3 class="group-title">Bezig</h3><div class="list">${rows.map((s) => `<article class="card compact">
+  return `<h2 class="group-title">Bezig</h2><div class="list">${rows.map((s) => `<article class="card compact">
     <span class="num"><a href="${REPO}${s.n}" target="_blank" rel="noopener">#${s.n}</a></span>
-    <h2 class="title">${esc(issueTitle(s.n) || "Issue #" + s.n)}</h2>
+    <h3 class="title">${esc(issueTitle(s.n) || "Issue #" + s.n)}</h3>
     <div class="status">${statusParts(s)}</div></article>`).join("")}</div>`;
 }
 
@@ -263,7 +260,7 @@ function card(i) {
   return `<article class="card${i.status === "opgelost" ? " closed-on-main" : ""}" data-n="${i.n}">
     <div class="head">
       <span class="num"><a href="${REPO}${i.n}" target="_blank" rel="noopener">#${i.n}</a> · ${esc(areaOf(i))}</span>
-      <h2 class="title">${esc(i.title)}</h2>
+      <h3 class="title">${esc(i.title)}</h3>
       <div class="badges"><span class="badge ${vk}">${vl}</span><span class="badge plain">${esc(i.size)}</span>${statusBadge}</div>
     </div>
     <p class="verdict">${rich(i.opinion)}</p>
@@ -285,7 +282,7 @@ function closedCard(i) {
   const s = statuses[i.n];
   return `<article class="card compact closed-on-main">
     <span class="num"><a href="${REPO}${i.n}" target="_blank" rel="noopener">#${i.n}</a> · ${esc(areaOf(i))}</span>
-    <h2 class="title">${esc(i.title)}</h2>
+    <h3 class="title">${esc(i.title)}</h3>
     <div class="status"><span class="badge done">Gesloten${i.closed_by ? " · " + esc(i.closed_by) : ""}</span>${s ? prBadge(s) : ""}</div>
   </article>`;
 }
@@ -300,12 +297,12 @@ function renderList() {
   for (const area of AREAS) {
     const group = items.filter((i) => areaOf(i) === area);
     if (!group.length) continue;
-    html += `<h3 class="group-title">${esc(area)}</h3><div class="list">${group.map(card).join("")}</div>`;
+    html += `<h2 class="group-title">${esc(area)}</h2><div class="list">${group.map(card).join("")}</div>`;
   }
   if (!listed().length) html += `<p class="msg">Er staan geen open issues. Dien er een in op GitHub; binnen een uur staat hij hier.</p>`;
   else if (!items.length) html += `<p class="msg">Niets in dit filter.</p>`;
   const closed = ISSUES.filter((i) => i.closed).sort((a, b) => b.n - a.n);
-  if (closed.length && filter === "alles") html += `<h3 class="group-title">Onlangs gesloten</h3><div class="list">${closed.map(closedCard).join("")}</div>`;
+  if (closed.length && filter === "alles") html += `<h2 class="group-title">Onlangs gesloten</h2><div class="list">${closed.map(closedCard).join("")}</div>`;
   $("main").innerHTML = html;
   open.forEach((id) => { const d = document.getElementById(id); if (d) d.open = true; });
   if (focus && document.getElementById(focus)) document.getElementById(focus).focus();

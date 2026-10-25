@@ -146,10 +146,7 @@ fn scoreboard(commit: &str, tests: &Value, results: &[Value]) -> Result<String> 
          # Read from the results the Shootout publishes (the project is MIT-licensed, Copyright (c) 2026 daid); see NOTICE.\n",
     );
     let _ = writeln!(text, "commit\t{commit}");
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "a date in seconds since 1970 fits an i64"
-    )]
+    // A date in seconds since 1970 fits an i64.
     let day = (newest as i64).div_euclid(SECONDS_PER_DAY);
     let _ = writeln!(text, "published\t{}", civil_date(day));
     for name in names {

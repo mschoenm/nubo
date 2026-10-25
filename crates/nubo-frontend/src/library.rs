@@ -975,6 +975,8 @@ impl Library {
         saved
     }
 
+    /// Makes `entries` the library's games, sorted by name as the library
+    /// lists them.
     fn replace_entries(&mut self, mut entries: Vec<LibraryEntry>) {
         entries.sort_by_cached_key(|entry| entry.name().to_lowercase());
 
