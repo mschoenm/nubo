@@ -344,6 +344,7 @@ impl App {
                         fail(&error);
                     }
                 }
+                self.watch_recent_games();
                 return check_after(NEXT_CHECK);
             }
         }

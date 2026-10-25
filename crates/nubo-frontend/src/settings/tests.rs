@@ -352,7 +352,7 @@ fn a_reset_keeps_only_the_folders_unless_asked_and_the_controls_and_asks_the_que
         ..Settings::default()
     };
 
-    let reset = settings.reset(false);
+    let reset = settings.reset();
 
     assert_eq!(
         reset,
@@ -365,5 +365,4 @@ fn a_reset_keeps_only_the_folders_unless_asked_and_the_controls_and_asks_the_que
     );
     assert!(!reset.box_art_asked);
     assert_eq!(reset.check_for_updates, None);
-    assert!(settings.reset(true).library_folders.is_empty());
 }

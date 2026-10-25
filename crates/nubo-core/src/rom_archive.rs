@@ -42,12 +42,18 @@ fn is_rom_name(name: &str) -> bool {
 /// the `__MACOSX/` and `._` metadata files macOS adds. Frontends use it to
 /// look at the ROM itself, for example to take its checksum.
 pub fn extract_rom(data: &[u8]) -> Result<Vec<u8>, LoadRomError> {
-    extract_rom_borrowed(data).map(Cow::into_owned)
+    extract_rom_borrowed(data, None).map(Cow::into_owned)
 }
 
 /// Like [`extract_rom`], but a plain ROM is borrowed from `data` instead of
 /// copied, for callers that only look at it (such as reading the header).
-pub(crate) fn extract_rom_borrowed(data: &[u8]) -> Result<Cow<'_, [u8]>, LoadRomError> {
+/// With `prefix`, at most that many bytes of a zipped ROM are unpacked, for
+/// callers that only look at its start; a ROM the archive says is larger
+/// than 8 MiB fails all the same.
+pub(crate) fn extract_rom_borrowed(
+    data: &[u8],
+    prefix: Option<u64>,
+) -> Result<Cow<'_, [u8]>, LoadRomError> {
     if !data.starts_with(ZIP_SIGNATURE) {
         return Ok(Cow::Borrowed(data));
     }
@@ -61,13 +67,17 @@ pub(crate) fn extract_rom_borrowed(data: &[u8]) -> Result<Cow<'_, [u8]>, LoadRom
         .ok_or_else(|| invalid_archive("it does not contain a .gb or .gbc ROM"))?;
 
     let rom_file = archive.by_index(rom_index).map_err(invalid_archive)?;
+    let too_large = || invalid_archive("the ROM in it is larger than 8 MiB");
+    if rom_file.size() > LARGEST_ROM_SIZE {
+        return Err(too_large());
+    }
     let mut rom = Vec::new();
     rom_file
-        .take(LARGEST_ROM_SIZE + 1)
+        .take(prefix.unwrap_or(LARGEST_ROM_SIZE + 1))
         .read_to_end(&mut rom)
         .map_err(invalid_archive)?;
     if rom.len() as u64 > LARGEST_ROM_SIZE {
-        return Err(invalid_archive("the ROM in it is larger than 8 MiB"));
+        return Err(too_large());
     }
 
     Ok(Cow::Owned(rom))
@@ -99,7 +109,7 @@ mod tests {
         let rom = vec![0x00, 0xC3, 0x50, 0x01];
         assert_eq!(extract_rom(&rom).unwrap(), rom);
         assert!(
-            matches!(extract_rom_borrowed(&rom), Ok(Cow::Borrowed(borrowed)) if borrowed == rom)
+            matches!(extract_rom_borrowed(&rom, None), Ok(Cow::Borrowed(borrowed)) if borrowed == rom)
         );
     }
 
@@ -108,6 +118,26 @@ mod tests {
         let rom = vec![0x42; 0x8000];
         let zip = build_zip(&[("game.gb", &rom, CompressionMethod::Deflated)]);
         assert_eq!(extract_rom(&zip).unwrap(), rom);
+    }
+
+    #[test]
+    fn unpacks_only_the_start_of_a_zipped_rom_when_asked() {
+        let rom: Vec<u8> = (0..0x8000).map(|index| index as u8).collect();
+        let zip = build_zip(&[("game.gb", &rom, CompressionMethod::Deflated)]);
+        assert_eq!(
+            extract_rom_borrowed(&zip, Some(0x150)).unwrap(),
+            &rom[..0x150]
+        );
+    }
+
+    #[test]
+    fn fails_on_a_zipped_rom_over_8_mib_even_when_unpacking_its_start() {
+        let rom = vec![0x00; LARGEST_ROM_SIZE as usize + 1];
+        let zip = build_zip(&[("game.gb", &rom, CompressionMethod::Deflated)]);
+        for prefix in [None, Some(0x150)] {
+            let error = extract_rom_borrowed(&zip, prefix).unwrap_err();
+            assert!(error.to_string().contains("larger than 8 MiB"));
+        }
     }
 
     #[test]

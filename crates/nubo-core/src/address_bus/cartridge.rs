@@ -595,7 +595,7 @@ fn read_title(rom: &[u8]) -> String {
 }
 
 /// Returns the name Pan Docs uses for a cartridge type byte.
-pub(super) fn cartridge_type_name(cartridge_type: u8) -> &'static str {
+fn cartridge_type_name(cartridge_type: u8) -> &'static str {
     match cartridge_type {
         0x00 => "ROM ONLY",
         0x01 => "MBC1",

@@ -124,7 +124,7 @@ pub fn top_bar(theme: &Theme) -> container::Style {
     }
 }
 
-/// The one-pixel line under the top bar.
+/// The color of the thin lines between parts of the window.
 pub fn divider(theme: &Theme) -> container::Style {
     container::Style {
         background: Some(theme.extended_palette().background.strong.color.into()),

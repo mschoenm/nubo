@@ -175,6 +175,7 @@ impl App {
                 if let Err(error) = self.library.forget_played(&path) {
                     self.toasts.error(error);
                 }
+                self.watch_recent_games();
                 self.library_selection = None;
                 // A game moving up into "Continue playing" wasn't watched
                 // before, so its file may be gone already.
@@ -221,6 +222,7 @@ impl App {
                 if let Err(error) = self.library.finish_scan(result) {
                     self.toasts.error(error);
                 }
+                self.watch_recent_games();
                 let rescan = if self.library.take_rescan_wanted() {
                     self.rescan()
                 } else {
@@ -237,6 +239,7 @@ impl App {
                 if let Err(error) = self.library.finish_check(check) {
                     self.toasts.error(error);
                 }
+                self.watch_recent_games();
                 self.library_selection = None;
             }
             LibraryMessage::DownloadBoxArtToggled(enabled) => {
@@ -442,7 +445,9 @@ impl App {
     /// Keeps `rom` in the browser's library.
     #[cfg(target_arch = "wasm32")]
     fn add_game(&mut self, rom: &Rom) -> Result<(), String> {
-        self.library.add_game(rom)
+        let added = self.library.add_game(rom);
+        self.watch_recent_games();
+        added
     }
 
     /// The desktop's library finds its games in folders instead.
@@ -468,6 +473,7 @@ impl App {
         {
             self.toasts.error(error);
         }
+        self.watch_recent_games();
     }
 
     /// Takes the game at `path` out of the browser's library.
@@ -480,6 +486,7 @@ impl App {
             )),
             Err(error) => self.toasts.error(error),
         }
+        self.watch_recent_games();
         #[cfg(not(target_arch = "wasm32"))]
         let _ = path;
         self.library_selection = None;
@@ -567,6 +574,12 @@ impl App {
             self.window_width,
         );
         self.library_selection = after.same_card(&before, index);
+    }
+
+    /// Works out the games the folder watcher watches besides the folders
+    /// again (`App::watched_games`), after a change to the library's games.
+    pub(super) fn watch_recent_games(&mut self) {
+        self.watched_games = self.recent_games_elsewhere();
     }
 
     /// The games "Continue playing" shows that aren't in a library folder,

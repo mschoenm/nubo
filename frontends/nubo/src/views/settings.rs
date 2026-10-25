@@ -15,7 +15,7 @@ use crate::ui::icons::{Icon, icon};
 use crate::ui::logo::logo;
 use crate::ui::tallest::tallest;
 use crate::ui::theme;
-use crate::ui::widgets::{chip_grid, chips, icon_button, segmented, with_tooltip};
+use crate::ui::widgets::{chip_grid, chips, divider, icon_button, segmented, with_tooltip};
 use crate::version;
 use iced::widget::text::Wrapping;
 use iced::widget::{
@@ -721,15 +721,6 @@ fn small_button<'a>(symbol: Icon, name: &'a str, message: Message) -> Element<'a
 /// A longer explanation in small, soft text.
 fn note_text<'a>(note: impl text::IntoFragment<'a>) -> text::Text<'a> {
     text(note).size(12).style(theme::muted_text)
-}
-
-/// A thin line between the rows of a group.
-fn divider<'a>() -> Element<'a, Message> {
-    container(space())
-        .width(Fill)
-        .height(1)
-        .style(theme::divider)
-        .into()
 }
 
 /// The theme, the colors of Game Boy games, the original screen look, sharp

@@ -10,14 +10,16 @@ use crate::picture::{SCREEN_HEIGHT, SCREEN_WIDTH, encode_png};
 use crate::storage::Unreadable;
 use crate::storage::files::{keep_aside, write_atomically};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-/// The contents of `library.toml`.
+/// The contents of `library.toml`. Saving borrows the games, so they
+/// aren't copied first.
 #[derive(Serialize, Deserialize)]
-struct LibraryFile {
-    games: Vec<LibraryEntry>,
+struct LibraryFile<'a> {
+    games: Cow<'a, [LibraryEntry]>,
 }
 
 /// Reads the known games, or none if there is no library file yet. A file
@@ -38,7 +40,7 @@ pub fn load_entries(cache: &Cache) -> Result<Vec<LibraryEntry>, Unreadable> {
         Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
         Err(error) => return Err(super::unreadable_library(&error.to_string(), None)),
     };
-    parsed.map(|file| file.games).map_err(|error| {
+    parsed.map(|file| file.games.into_owned()).map_err(|error| {
         let kept = keep_aside(&path)
             .map(|kept| kept.display().to_string())
             .map_err(|keep_error| keep_error.to_string());
@@ -49,7 +51,7 @@ pub fn load_entries(cache: &Cache) -> Result<Vec<LibraryEntry>, Unreadable> {
 /// Writes the known games to `library.toml`.
 pub fn save_entries(cache: &Cache, entries: &[LibraryEntry]) -> Result<(), String> {
     let file = LibraryFile {
-        games: entries.to_vec(),
+        games: Cow::Borrowed(entries),
     };
     let contents = toml::to_string(&file).map_err(|error| error.to_string())?;
 

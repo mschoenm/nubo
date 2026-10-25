@@ -23,7 +23,7 @@ use nubo_serializable_derive::Serializable;
 
 /// The serial port's state.
 #[derive(Debug, Clone, Default, Serializable, CopyGetters, Setters)]
-pub struct Serial {
+pub(crate) struct Serial {
     /// SB: the byte being sent, which is replaced bit by bit by the byte received.
     data: u8,
     /// SC bit 1: on the Game Boy Color, shift bits 32 times faster.

@@ -36,7 +36,7 @@ use nubo_frontend::notices::Notices;
 use nubo_frontend::rom::Rom;
 use nubo_frontend::save_states;
 use nubo_frontend::settings::{FastForwardSpeed, ScreenLook};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 pub use dialogs::DialogMessage;
@@ -96,6 +96,11 @@ pub struct App {
     /// With `--speed`: games start fast forwarding at this speed.
     speed: Option<FastForwardSpeed>,
     library: Library,
+    /// The games "Continue playing" shows outside the library folders, which
+    /// the folder watcher watches too (`recent_games_elsewhere`). Worked out
+    /// again whenever the library's played games change, rather than for
+    /// each of the frame rate's calls to `subscription`.
+    watched_games: Vec<PathBuf>,
     /// The text in the library's search field.
     search: String,
     game: Option<Game>,
@@ -267,6 +272,7 @@ impl App {
             sgb_colors_unsaved: false,
             speed: options.speed,
             library,
+            watched_games: Vec::new(),
             search: String::new(),
             game: None,
             settings_tab: None,
@@ -308,6 +314,7 @@ impl App {
             storage_open,
         };
 
+        app.watch_recent_games();
         for error in [settings_error, library_error].into_iter().flatten() {
             app.toasts.error(error);
         }
@@ -374,6 +381,7 @@ impl App {
         }
         let (library, error) = Library::load();
         self.library = library;
+        self.watch_recent_games();
         if let Some(error) = error {
             self.toasts.error(error);
         }
@@ -411,6 +419,7 @@ impl App {
             .library
             .add_game(rom)
             .and_then(|()| self.library.record_played(&rom.path, &header));
+        self.watch_recent_games();
         match kept {
             Ok(()) => Task::perform(
                 nubo_frontend::storage::indexed_db::settled(),
@@ -608,6 +617,7 @@ impl App {
     /// system may skip drawing them. Before the window redrew only for new
     /// frames, `window::frames()` stopped there instead.
     pub fn subscription(&self) -> Subscription<Message> {
+        debug_assert_eq!(self.watched_games, self.recent_games_elsewhere());
         let mut subscriptions = vec![
             keyboard::listen().filter_map(|event| input::to_message(&event)),
             subscriptions::controllers().map(Message::Controller),
@@ -615,7 +625,7 @@ impl App {
             system::theme_changes().map(|mode| WindowMessage::SystemThemeChanged(mode).into()),
             subscriptions::library_changes(
                 &self.settings.shared.library_folders,
-                self.recent_games_elsewhere(),
+                self.watched_games.clone(),
             )
             .map(|event| LibraryMessage::Watch(event).into()),
             window::close_requests().map(|_| WindowMessage::CloseRequested.into()),

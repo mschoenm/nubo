@@ -3,10 +3,9 @@
 
 use crate::suites::Model;
 use image::RgbImage;
+use nubo_core::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use std::path::Path;
 
-pub(crate) const WIDTH: u32 = 160;
-pub(crate) const HEIGHT: u32 = 144;
 /// How far a color channel may be from the reference and still match.
 const CHANNEL_TOLERANCE: u8 = 4;
 /// How far a pixel's brightness may be from a GB Emulator Shootout
@@ -20,8 +19,13 @@ pub(crate) fn load_reference(path: &Path) -> Result<RgbImage, String> {
         .map_err(|error| format!("failed to load {}: {}", path.display(), error))?
         .to_rgb8();
 
-    if image.dimensions() != (WIDTH, HEIGHT) {
-        return Err(format!("{} is not {}x{}", path.display(), WIDTH, HEIGHT));
+    if image.dimensions() != (SCREEN_WIDTH, SCREEN_HEIGHT) {
+        return Err(format!(
+            "{} is not {}x{}",
+            path.display(),
+            SCREEN_WIDTH,
+            SCREEN_HEIGHT
+        ));
     }
     Ok(image)
 }
@@ -41,7 +45,8 @@ pub(crate) fn normalize(frame: &[u8], model: Model) -> RgbImage {
         .iter()
         .flat_map(|pixel| [pixel[0], pixel[1], pixel[2]].map(cgb_channel))
         .collect();
-    RgbImage::from_raw(WIDTH, HEIGHT, pixels).expect("the frame buffer is 160x144 RGBA")
+    RgbImage::from_raw(SCREEN_WIDTH, SCREEN_HEIGHT, pixels)
+        .expect("the frame buffer is 160x144 RGBA")
 }
 
 /// An RGBA frame from the emulator in the colors the app shows it in with
@@ -55,7 +60,8 @@ pub(crate) fn as_shown(frame: &[u8]) -> RgbImage {
         .iter()
         .flat_map(|pixel| [pixel[0], pixel[1], pixel[2]])
         .collect();
-    RgbImage::from_raw(WIDTH, HEIGHT, pixels).expect("the frame buffer is 160x144 RGBA")
+    RgbImage::from_raw(SCREEN_WIDTH, SCREEN_HEIGHT, pixels)
+        .expect("the frame buffer is 160x144 RGBA")
 }
 
 /// A reference screenshot's brightness per pixel, for checking many frames
@@ -180,12 +186,16 @@ mod tests {
 
     /// A white RGBA frame.
     fn white_frame() -> Vec<u8> {
-        [0xFF; 4].repeat((WIDTH * HEIGHT) as usize)
+        [0xFF; 4].repeat((SCREEN_WIDTH * SCREEN_HEIGHT) as usize)
     }
 
     /// A reference screenshot of one gray.
     fn gray_reference(gray: u8) -> GrayscaleReference {
-        GrayscaleReference::new(&RgbImage::from_pixel(WIDTH, HEIGHT, image::Rgb([gray; 3])))
+        GrayscaleReference::new(&RgbImage::from_pixel(
+            SCREEN_WIDTH,
+            SCREEN_HEIGHT,
+            image::Rgb([gray; 3]),
+        ))
     }
 
     #[test]

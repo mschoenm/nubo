@@ -202,11 +202,19 @@ impl LibraryEntry {
     /// Whether the search text matches the game's name, its file name or
     /// its header title, ignoring case.
     pub fn matches(&self, search: &str) -> bool {
-        let search = search.to_lowercase();
+        self.matches_lowercase(&search.to_lowercase())
+    }
+
+    /// Like [`LibraryEntry::matches`], for a search text already in
+    /// lowercase, so a search through the whole library lowercases it once.
+    fn matches_lowercase(&self, search: &str) -> bool {
+        if search.is_empty() {
+            return true;
+        }
         let file_name = self.path.file_stem().unwrap_or_default().to_string_lossy();
-        self.name().to_lowercase().contains(&search)
-            || file_name.to_lowercase().contains(&search)
-            || self.title.to_lowercase().contains(&search)
+        self.name().to_lowercase().contains(search)
+            || file_name.to_lowercase().contains(search)
+            || self.title.to_lowercase().contains(search)
     }
 }
 
@@ -417,8 +425,11 @@ impl Library {
 
     /// The games in the library folders that match `search`, by name.
     pub fn games<'a>(&'a self, search: &'a str) -> impl Iterator<Item = &'a LibraryEntry> {
+        let search = search.to_lowercase();
         self.entries.iter().filter(move |entry| {
-            entry.in_folder && entry.matches(search) && !self.unavailable.contains(&entry.path)
+            entry.in_folder
+                && entry.matches_lowercase(&search)
+                && !self.unavailable.contains(&entry.path)
         })
     }
 
