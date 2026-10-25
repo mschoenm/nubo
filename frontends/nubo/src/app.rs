@@ -549,6 +549,7 @@ impl App {
                 self.library_selection,
                 &self.controllers,
                 self.storage_open,
+                self.keeps_library(),
                 views::library::TopBar {
                     newer_version: self.newer_version.as_deref(),
                     fullscreen: self.fullscreen,
@@ -692,6 +693,7 @@ impl App {
             box_art_problem: self.box_art_problem.as_deref(),
             newer_version: self.newer_version.as_deref(),
             layout: views::settings::SettingsLayout::new(self.window_width),
+            keeps_library: self.keeps_library(),
         }
     }
 

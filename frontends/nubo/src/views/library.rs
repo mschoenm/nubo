@@ -326,7 +326,8 @@ pub fn scroll_id() -> widget::Id {
 
 /// The library screen. `selection` is the card the D-pad is on, if the
 /// player has used it. `window_width` decides how many games "Continue
-/// playing" shows.
+/// playing" shows. `keeps_library` is false in a `--fresh` run, which then
+/// offers no game folders.
 #[expect(
     clippy::too_many_arguments,
     reason = "each is a separate part of the app's state, borrowed only for this view"
@@ -339,6 +340,7 @@ pub fn view<'a>(
     selection: Option<usize>,
     controllers: &'a [String],
     storage_open: bool,
+    keeps_library: bool,
     top: TopBar<'a>,
 ) -> Element<'a, Message> {
     // The browser shows nothing until its library is read, rather than
@@ -350,7 +352,11 @@ pub fn view<'a>(
     let has_folders = has_games(library, settings);
 
     if !library::AVAILABLE || (!has_folders && library.recently_played(1).is_empty()) {
-        return column![bar(None, top), welcome(settings, controllers)].into();
+        return column![
+            bar(None, top),
+            welcome(settings, controllers, keeps_library)
+        ]
+        .into();
     }
 
     let mut content = Column::new().spacing(SECTION_SPACING);
@@ -558,9 +564,20 @@ pub fn has_games(library: &Library, settings: &Settings) -> bool {
 
 /// The first screen a new user sees: what to do first, where to get free
 /// games, and which keys (or, with one connected, which controller buttons)
-/// press the Game Boy's buttons.
-fn welcome<'a>(settings: &'a Settings, controllers: &'a [String]) -> Element<'a, Message> {
-    let actions: Element<'_, Message> = if library::KEEPS_GAMES {
+/// press the Game Boy's buttons. In a run that keeps no library
+/// (`keeps_library` is false with `--fresh`), it only offers to open a game.
+fn welcome<'a>(
+    settings: &'a Settings,
+    controllers: &'a [String],
+    keeps_library: bool,
+) -> Element<'a, Message> {
+    let actions: Element<'_, Message> = if !keeps_library {
+        primary_button(
+            Icon::FolderOpen,
+            "Open game",
+            Message::Game(GameMessage::OpenRom),
+        )
+    } else if library::KEEPS_GAMES {
         row![
             primary_button(
                 Icon::FilePlus,
@@ -600,7 +617,9 @@ fn welcome<'a>(settings: &'a Settings, controllers: &'a [String]) -> Element<'a,
         )
     };
 
-    let description = if library::KEEPS_GAMES {
+    let description = if !keeps_library {
+        "Open a Game Boy or Game Boy Color game to play it. This run keeps no library (--fresh)."
+    } else if library::KEEPS_GAMES {
         "Add your Game Boy games to keep them in this browser, or open a single game."
     } else if library::AVAILABLE {
         "Add the folder with your Game Boy games, or open a single game."
