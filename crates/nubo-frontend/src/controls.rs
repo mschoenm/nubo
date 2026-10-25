@@ -201,6 +201,9 @@ impl<'de, Input: Copy + PartialEq + Deserialize<'de>> Deserialize<'de> for Bindi
 }
 
 impl<Input: Copy + PartialEq> Bindings<Input> {
+    /// Bindings of the given actions to inputs, for the defaults. Unlike
+    /// reading bindings from the settings, it doesn't check that each input
+    /// does one action, so each input must appear once.
     fn from_pairs(pairs: &[(Action, Input)]) -> Self {
         Bindings {
             inputs: pairs.iter().copied().collect(),
