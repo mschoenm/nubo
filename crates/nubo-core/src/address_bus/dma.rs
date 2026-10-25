@@ -45,7 +45,7 @@ pub(super) struct DmaState {
 }
 
 /// How many bytes one OAM DMA transfer copies: the whole of OAM.
-pub(super) const DMA_TRANSFER_BYTES: u8 = 160;
+const DMA_TRANSFER_BYTES: u8 = 160;
 /// M-cycles from a write to the DMA register until its transfer begins.
 const DMA_START_DELAY: u8 = 2;
 const ECHO_RAM_START: u16 = 0xE000;

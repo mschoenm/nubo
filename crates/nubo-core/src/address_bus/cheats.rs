@@ -15,16 +15,16 @@ const CHEAT_LIMIT: usize = 10;
 /// A single active cheat: whenever the game reads `address`, it sees
 /// `new_value` instead of what is really stored there.
 #[derive(Clone, Debug)]
-pub(super) struct Cheat {
+struct Cheat {
     /// The address whose reads the cheat changes.
-    pub address: u16,
+    address: u16,
     /// The value those reads see instead.
-    pub new_value: u8,
+    new_value: u8,
     /// Game Genie codes only apply while the original byte has this value.
-    pub compare_value: Option<u8>,
+    compare_value: Option<u8>,
     /// GameShark codes only apply while this RAM bank is selected. `None`
     /// means the cheat applies whatever bank is selected.
-    pub bank: Option<u8>,
+    bank: Option<u8>,
 }
 
 /// An active cheat and the id the frontend chose for it.
@@ -86,7 +86,7 @@ fn parse_hex_byte(code: &str, range: Range<usize>, field: &'static str) -> Resul
 /// The first byte selects the RAM bank, like SameBoy reads it: `01`, which
 /// almost every code uses, applies to any bank, and otherwise the low digit
 /// is the bank (Game Boy Color codes such as `91...` use work RAM bank 1).
-pub(super) fn parse_gameshark_code(code: &str) -> Result<Cheat, CheatError> {
+fn parse_gameshark_code(code: &str) -> Result<Cheat, CheatError> {
     if code.len() != 8 {
         return Err(CheatError::InvalidGameSharkLength);
     }
@@ -115,7 +115,7 @@ pub(super) fn parse_gameshark_code(code: &str) -> Result<Cheat, CheatError> {
 /// For a code `ABC-DEF-GHI`, `AB` is the new byte and `FCDE` is the address
 /// with the top digit `F` inverted. The optional `G` and `I` hold the
 /// encoded byte the ROM must contain for the cheat to apply; `H` is unused.
-pub(super) fn parse_gamegenie_code(code: &str) -> Result<Cheat, CheatError> {
+fn parse_gamegenie_code(code: &str) -> Result<Cheat, CheatError> {
     if code.len() != 11 && code.len() != 7 {
         return Err(CheatError::InvalidGameGenieLength);
     }
