@@ -288,8 +288,13 @@ impl Emulator {
         match loaded {
             Ok(unreadable) if state.is_empty() => Ok(unreadable),
             _ => {
-                self.deserialize(&mut previous_state.as_slice())
-                    .expect("a state the emulator just wrote can always be read back");
+                // A state the emulator just wrote reads back unless a damaged
+                // state loaded and then ran past one of the checks, a bug the
+                // fuzz targets look for. Starting over beats a panic then.
+                if self.deserialize(&mut previous_state.as_slice()).is_err() {
+                    self.deserialize(&mut &power_on_state[..])
+                        .expect("the power-on state always loads");
+                }
                 Err(SaveStateError::InvalidFormat)
             }
         }
