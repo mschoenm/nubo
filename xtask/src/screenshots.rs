@@ -48,6 +48,16 @@ const FULLSCREEN_SIZE: (u32, u32) = (1920, 1080);
 /// How many times its size the game's picture alone is shown, unless a
 /// screenshot says.
 const GAME_SCALE: u32 = 4;
+/// The window's inside for a `none` or `gnome` screenshot when neither it
+/// nor its scene gives a size: the size most screenshots use.
+const DEFAULT_WINDOW: (u32, u32) = (1000, 800);
+/// The room left on the screen around a window, for GNOME's title bar,
+/// border and shadow.
+const ROOM_AROUND_WINDOW: (u32, u32) = (400, 300);
+/// The smallest screen a window is shown on: the same as [`game_monitor`]'s,
+/// so the windows up to 1520×900 and the game's pictures share one GNOME
+/// Shell, which `gnome::run_plan` starts once for each screen size.
+const SMALLEST_WINDOWED_SCREEN: (u32, u32) = (1920, 1200);
 
 /// The options of `cargo xtask screenshots`.
 #[derive(clap::Args)]
@@ -220,8 +230,11 @@ fn capture_of(
                 arguments.push(String::from("--size"));
                 arguments.push(format!("{width}x{height}"));
             }
-            let (width, height) = window.unwrap_or((1000, 800));
-            (width.max(1520) + 400, height.max(900) + 300)
+            let (width, height) = window.unwrap_or(DEFAULT_WINDOW);
+            (
+                (width + ROOM_AROUND_WINDOW.0).max(SMALLEST_WINDOWED_SCREEN.0),
+                (height + ROOM_AROUND_WINDOW.1).max(SMALLEST_WINDOWED_SCREEN.1),
+            )
         }
     };
     if tile.frame != Frame::Gnome {
