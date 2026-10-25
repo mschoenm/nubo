@@ -720,6 +720,20 @@ fn a_save_state_with_a_vram_dma_length_past_seven_bits_loads_it_cut() {
 }
 
 #[test]
+fn a_state_at_the_most_time_since_power_on_saves_states_that_load_again() {
+    let mut emulator = booted(Model::CgbE, &busy_rom());
+    let mut state = emulator.save_state();
+    let start = field_start(&state, &[b"\x03bus", b"\x0celapsed_dots"]);
+    state[start..start + 8].copy_from_slice(&(1u64 << 62).to_le_bytes());
+    emulator.load_state(&state).unwrap();
+    emulator.run_frame(&mut Vec::new(), &mut Vec::new());
+
+    let again = emulator.save_state();
+    emulator.load_state(&again).unwrap();
+    assert!(emulator.load_state(&state[..state.len() - 1]).is_err());
+}
+
+#[test]
 fn a_save_state_with_low_flag_bits_set_loads_them_cleared() {
     let mut emulator = booted(Model::CgbE, &busy_rom());
     let path: &[&[u8]] = &[b"\x03cpu", b"\x09registers", b"\x01f"];
