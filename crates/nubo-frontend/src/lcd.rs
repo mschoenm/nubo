@@ -8,7 +8,7 @@
 //!   that, so on a modern screen they look too bright and garish.
 //!   [`correct_colors`] makes them look closer to the real screen with a
 //!   simple model of its own: the screen's response to the color's level,
-//!   a little light from each subpixel spilling into its neighbours, and a
+//!   a little light from each subpixel spilling into its neighbors, and a
 //!   slightly lighter black and darker white.
 //! - **Frame blending.** The Game Boy's screen was slow to change, so a
 //!   sprite a game shows only every other frame looked see-through instead
