@@ -459,8 +459,8 @@ impl MapperKind {
     /// The controller in its power-on state, for a cartridge with this ROM,
     /// type byte and RAM size (from the header). Whether it has RAM comes
     /// from the type byte, never from the size of a save file. An MBC3 with
-    /// more ROM or RAM than an MBC3 can address is an MBC30, and its clock
-    /// starts from the state the frontend saved. Without one, it is a new
+    /// more ROM or RAM than an MBC3 can address is an MBC30. An MBC3's clock
+    /// starts from the state the frontend saved or, without one, is a new
     /// clock at 0 that counts from now, on the clock it follows.
     fn create_mapper(
         self,
