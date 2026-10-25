@@ -325,9 +325,10 @@ fn cpu_and_bus_fields(emulator: &mut Emulator) -> Vec<(String, String)> {
 
 /// Fields that save states leave out on purpose and that can differ after
 /// loading one: the address bus's budgets for running ahead (see the save
-/// state notes above `AddressBus::write_save_state_components`), the PPU's hand-over of the finished frame
-/// to the frontend, the samples the APU already made for the frontend, and
-/// how long the rumble motor was on since the frontend last asked.
+/// state notes above `AddressBus::write_save_state_components`), the PPU's
+/// hand-over of the finished frame to the frontend, the samples the APU
+/// already made for the frontend, and how long the rumble motor was on since
+/// the frontend last asked.
 /// The keys the keyboard, the controllers and the frontend hold and the
 /// sample rate are left out on purpose too (they belong to the player and
 /// the sound card, not the console; the joypad stores the buttons the game
