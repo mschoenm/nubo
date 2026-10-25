@@ -695,7 +695,7 @@ pub struct ResetOffers {
     pub delete_save_states: bool,
     pub remove_folders: bool,
     pub clear_recently_played: bool,
-    /// Whether a game is open, which greys out the boxes that delete saves,
+    /// Whether a game is open, which grays out the boxes that delete saves,
     /// with a note to close the game first.
     pub game_open: bool,
 }
