@@ -355,8 +355,9 @@ pub fn stored_layout(write: impl FnOnce() -> Result<()>) -> Result<BTreeSet<Stri
 /// A value that can be written to and read back from a save state.
 ///
 /// Most types get this with `#[derive(Serializable)]` from the
-/// `nubo-serializable-derive` crate, which stores each field with its name (see the
-/// module docs for what that allows).
+/// `nubo-serializable-derive` crate, which stores each field with its name
+/// (see the module docs for what that allows).
+///
 /// `deserialize` overwrites `self` in place, so a component keeps parts of its
 /// state that are not saved, such as the loaded ROM.
 ///

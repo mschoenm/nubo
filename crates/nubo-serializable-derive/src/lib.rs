@@ -4,13 +4,13 @@
 //! `FieldWriter` and `read_fields` in `nubo-core`), except fields marked
 //! `#[serializable(skip)]`, which reading leaves as they are. Reading matches
 //! fields by name and skips ones the struct doesn't have, so fields can be
-//! added, removed and reordered without breaking save states of other
-//! versions. Enums without data store the variant's name, and tell the stored
-//! layout (`stored_layout`) the names of all their variants. The stored name is
-//! the field's or variant's name in the code, or the one given with
+//! added, removed and reordered without breaking save states of other versions.
+//! Enums without data store the variant's name, and tell the stored layout
+//! (`stored_layout`) the names of all their variants. The stored name is the
+//! field's or variant's name in the code, or the one given with
 //! `#[serializable(name = "stored_name")]`, which keeps it when the code is
-//! renamed. Two fields or two variants can't share a stored name: reading
-//! would only fill the first. The generated code names the trait by its full path in
+//! renamed. Two fields or two variants can't share a stored name: reading would
+//! only fill the first. The generated code names the trait by its full path in
 //! `nubo-core` (`crate::serializable::Serializable`), so it only works inside
 //! that crate, and the trait doesn't need to be imported.
 
