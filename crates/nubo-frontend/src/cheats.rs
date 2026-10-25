@@ -84,6 +84,7 @@ impl Cheat {
     /// were checked when the cheat was made or read, and a cheat whose code
     /// failed the check is off (see [`Cheat::check`]), so turning it on
     /// doesn't fail.
+    ///
     /// Each code is known to the emulator by the whole cheat's code and its
     /// own, so two cheats that share a code don't turn each other off.
     pub fn apply_to(&self, emulator: &mut Emulator) {
