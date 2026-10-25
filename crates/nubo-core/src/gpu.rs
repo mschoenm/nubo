@@ -572,8 +572,8 @@ impl Gpu {
         self.sgb.0.as_deref_mut()
     }
 
-    /// On a Super Game Boy, draws the last picture again with the menu's
-    /// settings as they are now (`Sgb::redraw`).
+    /// On a Super Game Boy, draws the last picture again with the menu's settings as they are now
+    /// (`Sgb::redraw`).
     pub(crate) fn redraw_sgb_picture(&mut self) {
         if let Some(sgb) = &mut self.sgb.0 {
             sgb.redraw(&mut self.completed_frame);
@@ -611,8 +611,8 @@ impl Gpu {
         lcd_enabled(self.lcdc)
     }
 
-    /// Whether STAT shows HBlank (mode 0) and the HBlank DMA trigger, which
-    /// comes a couple of dots after the mode change, has passed.
+    /// Whether STAT shows HBlank (mode 0) and the HBlank DMA trigger, which comes a couple of dots
+    /// after the mode change, has passed.
     pub(super) fn hblank_dma_triggered(&self) -> bool {
         self.mode() == HBLANK_MODE && self.hdma_start_delay == 0
     }
