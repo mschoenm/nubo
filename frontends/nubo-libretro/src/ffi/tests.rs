@@ -71,7 +71,7 @@ static RECORD: Mutex<Option<Record>> = Mutex::new(None);
 /// The buttons the pretend player holds, one bit per libretro button.
 static HELD: Mutex<[u16; 4]> = Mutex::new([0; 4]);
 
-/// Changes this test's record, making it first if there is none.
+/// Changes this test's record, creating it if there is none.
 fn record<T>(change: impl FnOnce(&mut Record) -> T) -> T {
     change(lock(&RECORD).get_or_insert_with(Record::default))
 }
