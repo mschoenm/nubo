@@ -496,15 +496,22 @@ impl App {
         Task::none()
     }
 
+    /// Whether the player played a game before this start, which
+    /// [`App::ask_about_updates`] waits for.
+    pub(super) fn played_before(&self) -> bool {
+        !self.library.recently_played(1).is_empty()
+    }
+
     /// Asks whether to look for newer versions, once: on a start after the
-    /// player has played a game, so it never comes on top of the first
-    /// questions.
-    pub(super) fn ask_about_updates(&mut self) {
+    /// player has played a game (`played_before`, from
+    /// [`App::played_before`] before the start's own game, if any, began),
+    /// so it never comes on top of the first questions or the first game.
+    pub(super) fn ask_about_updates(&mut self, played_before: bool) {
         if updates::AVAILABLE
             && !self.fresh
             && self.screen_scale.is_none()
             && self.settings.shared.check_for_updates.is_none()
-            && !self.library.recently_played(1).is_empty()
+            && played_before
         {
             self.open_dialog(DialogKind::Updates);
         }

@@ -331,11 +331,14 @@ impl App {
             });
         }
 
+        // Decided before the command line's game starts, which counts as
+        // played, so the very first start with a game doesn't ask over it.
+        let played_before = app.played_before();
         if let Some(rom) = rom {
             app.open(rom);
         }
         app.ask_about_box_art();
-        app.ask_about_updates();
+        app.ask_about_updates(played_before);
 
         let updates = app.look_for_updates();
         #[cfg(not(target_arch = "wasm32"))]
