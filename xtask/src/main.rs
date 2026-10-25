@@ -12,6 +12,7 @@
 //! more than Rust.
 
 use clap::{Parser, Subcommand};
+use nubo_download::target_dir;
 use std::env;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
@@ -152,12 +153,6 @@ fn workspace_root() -> PathBuf {
         .parent()
         .expect("xtask lives inside the workspace")
         .to_path_buf()
-}
-
-/// Cargo's target folder: `CARGO_TARGET_DIR` when set, otherwise `target/`
-/// in the workspace root.
-fn target_dir() -> PathBuf {
-    env::var_os("CARGO_TARGET_DIR").map_or_else(|| workspace_root().join("target"), PathBuf::from)
 }
 
 /// The cargo that runs xtask, so the same toolchain builds everything, with
