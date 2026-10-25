@@ -7,7 +7,10 @@
 //! `run_frame` keeps to the frame boundaries and hands out every sample, and
 //! that what frontends such as the RetroArch core read and set besides
 //! frames and sound (the cartridge's clock on either time source, the rumble
-//! motor and the memory) is right.
+//! motor and the memory) is right. It also checks that the Super Game Boy's
+//! intro and the player's menu choices survive loading, and that a loaded
+//! state starts from the buttons it stored until the keys held now take
+//! over.
 
 use crate::address_bus::effects::empty_cartridge_effects;
 use crate::{CartridgeEffects, DOTS_PER_FRAME, Emulator, Key, Model, SgbBorder};
@@ -321,8 +324,8 @@ fn cpu_and_bus_fields(emulator: &mut Emulator) -> Vec<(String, String)> {
 }
 
 /// Fields that save states leave out on purpose and that can differ after
-/// loading one: the address bus's budgets for running ahead (see its
-/// `Serializable` implementation), the PPU's hand-over of the finished frame
+/// loading one: the address bus's budgets for running ahead (see the save
+/// state notes above `AddressBus::write_save_state_components`), the PPU's hand-over of the finished frame
 /// to the frontend, the samples the APU already made for the frontend, and
 /// how long the rumble motor was on since the frontend last asked.
 /// The keys the keyboard, the controllers and the frontend hold and the
