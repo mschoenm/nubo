@@ -269,6 +269,7 @@ fn build_wasm_package(package: &str, artifact: &str, profile: &str) -> Result<Pa
     run(cargo()
         .args([
             "build",
+            "--locked",
             "--profile",
             profile,
             "--package",
