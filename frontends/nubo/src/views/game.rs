@@ -652,13 +652,7 @@ fn cheats_page(game: &Game, selection: usize) -> Element<'_, Message> {
     .spacing(8);
 
     if let Some(error) = &form.error {
-        add = add.push(
-            text(error)
-                .size(12)
-                .style(|theme: &iced::Theme| text::Style {
-                    color: Some(theme.palette().danger),
-                }),
-        );
+        add = add.push(text(error).size(12).style(theme::danger_text));
     }
 
     column![

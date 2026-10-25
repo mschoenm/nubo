@@ -155,14 +155,7 @@ pub fn bar_separator<'a, Message: 'a>() -> Element<'a, Message> {
 
 /// A thin line across a menu, between groups of rows.
 pub fn menu_separator<'a, Message: 'a>() -> Element<'a, Message> {
-    container(
-        container(iced::widget::space())
-            .width(Fill)
-            .height(1)
-            .style(theme::divider),
-    )
-    .padding([5, 4])
-    .into()
+    container(divider()).padding([5, 4]).into()
 }
 
 /// The filled accent-colored button for the main action on a screen.
@@ -333,8 +326,9 @@ fn bar_body<'a, Message: 'a>(content: iced::widget::Row<'a, Message>) -> Element
         .into()
 }
 
-/// The one-pixel line under the top bar, across its whole width.
-fn divider<'a, Message: 'a>() -> Element<'a, Message> {
+/// A thin line across the width it gets, such as under the top bar or
+/// between the rows of a group.
+pub fn divider<'a, Message: 'a>() -> Element<'a, Message> {
     container(iced::widget::space())
         .width(Fill)
         .height(1)
