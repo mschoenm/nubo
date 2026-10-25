@@ -13,7 +13,8 @@ permissions:
   contents: read
 
 # A new push to a pull request cancels the checks still running for the old
-# one; runs on main always finish, so every commit there gets deployed.
+# one. A run on main is never cancelled once it has started, but one still
+# waiting gives way to a newer push, whose deploy then includes its commit.
 #
 # Every job here should finish in about a minute, so pull requests get their
 # answer fast. Slower checks belong in nightly.yml, which every release runs
