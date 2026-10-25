@@ -1387,7 +1387,10 @@ impl AddressBus {
                     ));
                 }
             }
-            "vram_dma" => self.hdma.deserialize(bytes)?,
+            "vram_dma" => {
+                self.hdma.deserialize(bytes)?;
+                self.hdma.within_register_widths();
+            }
             "serial" => {
                 self.serial.deserialize(bytes)?;
                 if !self.serial.is_consistent() {
