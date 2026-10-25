@@ -900,12 +900,20 @@ pub extern "C" fn retro_set_input_state(callback: Option<RetroInputState>) {
 pub extern "C" fn retro_set_controller_port_device(_port: c_uint, _device: c_uint) {}
 
 /// Starts the game again, on the model and clock the options pick now.
+///
+/// RetroArch pauses the core while its menu is open, so an option changed
+/// there just before "Restart" reaches no `retro_run` first: the options are
+/// read here too.
 #[unsafe(no_mangle)]
 pub extern "C" fn retro_reset() {
     guard("retro_reset", (), || {
-        let restarted = lock(&CORE)
-            .as_mut()
-            .map(|core| core.reset().map(|()| memory_descriptors(core)));
+        let options = changed_options();
+        let restarted = lock(&CORE).as_mut().map(|core| {
+            if let Some(options) = options {
+                core.set_options(options);
+            }
+            core.reset().map(|()| memory_descriptors(core))
+        });
         match restarted {
             Some(Ok(descriptors)) => set_memory_maps(&descriptors),
             Some(Err(error)) => log(
@@ -915,6 +923,18 @@ pub extern "C" fn retro_reset() {
             None => {}
         }
     });
+}
+
+/// The options as RetroArch has them now, if the player changed any since
+/// they were last read. Called without the lock on `CORE`, since it calls
+/// RetroArch.
+fn changed_options() -> Option<Options> {
+    let mut updated = false;
+    (environment(
+        RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE,
+        (&raw mut updated).cast(),
+    ) && updated)
+        .then(read_options)
 }
 
 /// Runs one frame: reads the buttons, runs the emulator, and hands over the
@@ -928,16 +948,10 @@ pub extern "C" fn retro_reset() {
 #[unsafe(no_mangle)]
 pub extern "C" fn retro_run() {
     guard("retro_run", (), || {
-        let mut updated = false;
-        if environment(
-            RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE,
-            (&raw mut updated).cast(),
-        ) && updated
+        if let Some(options) = changed_options()
+            && let Some(core) = lock(&CORE).as_mut()
         {
-            let options = read_options();
-            if let Some(core) = lock(&CORE).as_mut() {
-                core.set_options(options);
-            }
+            core.set_options(options);
         }
 
         let frontend = frontend();

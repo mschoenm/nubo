@@ -844,7 +844,8 @@ fn a_restart_on_another_model_gives_retroarch_that_models_memory_map() {
     settings.variables = vec![(String::from("nubo_model"), CString::from(c"CGB-E"))];
     settings.variables_updated = true;
     drop(settings);
-    retro_run();
+    // RetroArch's menu pauses the core, so no frame runs between the
+    // option's change and the restart.
     retro_reset();
     let record = take_record();
     assert!(has_color_work_ram(&record.memory_maps), "a Game Boy Color");
