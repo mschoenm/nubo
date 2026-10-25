@@ -15,8 +15,8 @@ const WINDOW_ENABLED_BIT: u8 = 5;
 const WINDOW_TILE_MAP_BIT: u8 = 6;
 const LCD_ENABLED_BIT: u8 = 7;
 
-/// Bit 0. On DMG, clearing it blanks the background and window. On CGB it instead removes the
-/// background's priority over objects.
+/// Bit 0. On DMG, and on a CGB running a DMG game, clearing it blanks the background and window.
+/// In CGB mode it instead removes the background's priority over objects.
 pub(super) fn bg_and_window_enabled(lcdc: u8) -> bool {
     is_bit_set(lcdc, BG_AND_WINDOW_ENABLED_BIT)
 }
