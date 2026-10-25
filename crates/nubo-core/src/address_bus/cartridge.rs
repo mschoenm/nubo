@@ -200,8 +200,8 @@ impl Cartridge {
 
     /// The number GameShark codes compare their bank byte with at
     /// 0xA000-0xBFFF: the RAM bank the controller has selected. On an MBC3
-    /// it is whatever 0xA000-0xBFFF shows, so 0x08-0x0F while a clock
-    /// register is selected, like in SameBoy.
+    /// it is the value written to 0x4000-0x5FFF (its four low bits), like in
+    /// SameBoy, so 0x08-0x0F while a clock register is selected.
     pub fn selected_ram_bank(&self) -> u8 {
         match &self.mapper {
             CartridgeMapper::RomOnly | CartridgeMapper::RomRam | CartridgeMapper::Mbc2(_) => 0,
