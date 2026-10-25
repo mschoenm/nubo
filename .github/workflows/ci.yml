@@ -192,6 +192,11 @@ jobs:
       - name: Check the newest release in the AppStream file is this version
         run: cargo xtask release-notes > /dev/null
 
+      # Here rather than in the dependencies job, which has no xtask build to
+      # reuse. The Flatpak builds with an older Rust than CI (docs/CI.md).
+      - name: Check no crate needs a newer Rust than rust-version
+        run: cargo xtask rust-version
+
   # The one check branch protection requires, so the list of required checks
   # doesn't have to change when the jobs above do.
   passed:

@@ -38,7 +38,7 @@ Run what CI runs, so a pull request is green the first time:
 6. If emulation may have changed: `cargo test-roms`. When results change on purpose, run `cargo test-roms --update` and commit `passing.txt`; when a test in `tools/nubo-test-rom-runner/FAILING_TESTS.md` starts passing, update that file too.
 7. If the CPU changed: `cargo cpu-tests`.
 8. If what save states store changed: `cargo save-states` (it needs the benchmark games: `cargo xtask benchmark-roms` once), and keep a new set with `cargo save-states --record` in the same pull request.
-9. If dependencies changed: `cargo deny check licenses bans sources`, and commit `Cargo.lock`, since CI builds with `--locked`.
+9. If dependencies changed: `cargo deny check licenses bans sources` and `cargo xtask rust-version`, and commit `Cargo.lock`, since CI builds with `--locked`.
 10. If the change must not alter output (an optimization, a refactor): compare fingerprints, as below.
 
 CI runs steps 1 to 9 on every pull request, whatever changed; the slow checks run nightly. What runs where: `docs/CI.md`.
