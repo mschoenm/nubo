@@ -104,6 +104,24 @@ fn a_game_that_keeps_writing_is_saved_after_the_longest_delay() {
 }
 
 #[test]
+fn a_clock_that_keeps_changing_is_saved_after_its_own_longest_delay() {
+    let directory = temporary_saves_directory("busy-clock");
+    let saves = saves_in(&directory);
+    let start = Instant::now();
+    let mut now = start;
+
+    while now < start + LONGEST_CLOCK_DELAY {
+        saves.queue_rtc(&sample_rtc(), now);
+        saves.flush_due(now);
+        assert!(!directory.join("game.rtc").exists());
+        now += SETTLE_TIME / 2;
+    }
+
+    saves.flush_due(start + LONGEST_CLOCK_DELAY);
+    assert!(directory.join("game.rtc").exists());
+}
+
+#[test]
 fn a_clock_that_keeps_changing_doesnt_hold_up_the_ram() {
     let directory = temporary_saves_directory("clock");
     let saves = saves_in(&directory);

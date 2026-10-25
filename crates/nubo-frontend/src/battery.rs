@@ -26,9 +26,18 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 /// How long the game has to stop writing before what it wrote is stored.
 const SETTLE_TIME: Duration = Duration::from_millis(250);
-/// A game that keeps writing is still saved this often: some games use the
-/// battery-backed RAM as scratch space, and some read the clock every frame.
+/// A game that keeps writing its RAM is still saved this often: some games
+/// use the battery-backed RAM as scratch space.
 const LONGEST_DELAY: Duration = Duration::from_secs(1);
+/// A clock that keeps changing is still saved this often. Games such as the
+/// Pokémon ones with a clock read it every frame, which changes it each time,
+/// so a shorter delay would write the file every second for as long as they
+/// run, on the thread that keeps the sound going. Most of those writes only
+/// move the stored time on by the time that passed, which loading the older
+/// file works out again from the wall clock, and the clock is still written
+/// when the game pauses and stops, so a crash can lose at most the last
+/// minute of a change to the clock, such as setting its time.
+const LONGEST_CLOCK_DELAY: Duration = Duration::from_secs(60);
 /// Cartridge RAM sizes are multiples of 512 bytes (MBC2's built-in RAM, the
 /// smallest). Other emulators append an RTC footer of 44 or 48 bytes to
 /// `.sav` files, and rounding down to this size drops it.
@@ -52,12 +61,12 @@ struct Pending<T> {
 }
 
 impl<T> Pending<T> {
-    /// Data the game wrote at `now`.
-    fn new(data: T, now: Instant) -> Self {
+    /// Data the game wrote at `now`, to be written within `longest_delay`.
+    fn new(data: T, now: Instant, longest_delay: Duration) -> Self {
         Pending {
             data,
             settles_at: now + SETTLE_TIME,
-            deadline: now + LONGEST_DELAY,
+            deadline: now + longest_delay,
         }
     }
 
@@ -141,7 +150,8 @@ impl BatterySaves {
     }
 
     /// Writes the saves the game has stopped writing to for `SETTLE_TIME`,
-    /// or has kept writing to for `LONGEST_DELAY`.
+    /// or has kept writing to for `LONGEST_DELAY` (`LONGEST_CLOCK_DELAY` for
+    /// the clock).
     pub fn flush_when_settled(&self) {
         self.flush_due(Instant::now());
     }
@@ -286,7 +296,7 @@ impl BatterySaves {
                 }
                 waiting.written_again(now);
             }
-            None => pending.ram = Some(Pending::new(ram.to_vec(), now)),
+            None => pending.ram = Some(Pending::new(ram.to_vec(), now, LONGEST_DELAY)),
         }
     }
 
@@ -312,7 +322,9 @@ impl BatterySaves {
                 waiting.data = state.to_bytes();
                 waiting.written_again(now);
             }
-            None => pending.rtc = Some(Pending::new(state.to_bytes(), now)),
+            None => {
+                pending.rtc = Some(Pending::new(state.to_bytes(), now, LONGEST_CLOCK_DELAY));
+            }
         }
     }
 }
