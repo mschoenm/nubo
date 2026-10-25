@@ -272,7 +272,8 @@ pub struct AddressBus {
     /// PPU dots (ticks of the 4 MHz clock at normal speed) since power-on,
     /// which a cartridge clock following [`RtcClock::EmulatedTime`] counts.
     /// Save states keep it, so such a clock goes on where it was, and a
-    /// loaded value above `MAX_ELAPSED_DOTS` fails the load.
+    /// loaded value above `MAX_ELAPSED_DOTS` fails the load. A state never
+    /// stores more than that, though one loaded at the limit runs past it.
     elapsed_dots: u64,
 
     /// Dots that have passed but that the PPU hasn't run yet. Running the PPU in
@@ -1310,7 +1311,9 @@ impl AddressBus {
                 bus.field("interrupt_enable", &self.interrupt_enable)?;
                 bus.field("undocumented_registers", &self.undocumented_registers)?;
                 bus.field("extra_oam", &self.extra_oam)?;
-                bus.field("elapsed_dots", &self.elapsed_dots)?;
+                // A state loaded at the limit may have run past it since;
+                // storing the limit keeps every state this writes loadable.
+                bus.field("elapsed_dots", &self.elapsed_dots.min(MAX_ELAPSED_DOTS))?;
                 bus.field("ppu_dot_debt", &self.ppu_dot_debt)?;
                 bus.finish()
             },
