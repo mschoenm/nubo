@@ -71,14 +71,20 @@ pub fn minimal_rom(cartridge_type: u8, rom_size: u8, ram_size: u8, color: bool) 
 
 /// How many boots [`start`] keeps per thread before it forgets them all, so
 /// a long run of the `rom` target, whose headers keep changing, doesn't fill
-/// the memory.
-const BOOTS_KEPT: usize = 1024;
+/// the memory. A booted emulator holds about 1.3 MiB (DMG) to 2.7 MiB (Super
+/// Game Boy) besides its ROM, so 256 of them stay well under libFuzzer's
+/// default memory limit of 2 GB.
+const BOOTS_KEPT: usize = 256;
 
 /// How many bytes of ROM the kept boots may hold together before [`start`]
-/// forgets them all. Each boot keeps its own copy of its ROM, and with real
-/// games as seeds (up to 8 MiB each) [`BOOTS_KEPT`] alone could pass
-/// libFuzzer's default memory limit of 2 GB.
+/// forgets them all. Each boot keeps its own copy of its ROM, padded to at
+/// least 32 KiB, and with real games as seeds (up to 8 MiB each)
+/// [`BOOTS_KEPT`] alone could pass libFuzzer's default memory limit of 2 GB.
 const ROM_BYTES_KEPT: usize = 256 << 20;
+
+/// The size a loaded cartridge pads a shorter ROM to, which is what a boot
+/// keeps of it.
+const SMALLEST_ROM_KEPT: usize = 0x8000;
 
 /// The most CPU steps a boot ROM may take; a real boot takes far fewer.
 const BOOT_STEPS: u64 = 4_000_000;
@@ -123,10 +129,11 @@ pub fn start_on(model: Model, rom: &[u8], clock: RtcClock) -> Option<Emulator> {
         let mut boots = boots.borrow_mut();
         let key = (model, clock == RtcClock::WallClock, input.to_vec());
         if !boots.emulators.contains_key(&key) {
-            if boots.emulators.len() >= BOOTS_KEPT || boots.rom_bytes + rom.len() > ROM_BYTES_KEPT {
+            let rom_bytes = rom.len().max(SMALLEST_ROM_KEPT);
+            if boots.emulators.len() >= BOOTS_KEPT || boots.rom_bytes + rom_bytes > ROM_BYTES_KEPT {
                 *boots = Boots::default();
             }
-            boots.rom_bytes += rom.len();
+            boots.rom_bytes += rom_bytes;
             boots.emulators.insert(key.clone(), boot(model, rom, clock));
         }
         boots.emulators[&key]
