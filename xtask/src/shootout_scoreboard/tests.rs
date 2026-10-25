@@ -1,3 +1,6 @@
+//! Tests for the Shootout scoreboard: the table it writes, its dates and the
+//! file names it downloads.
+
 use super::*;
 use serde_json::json;
 
