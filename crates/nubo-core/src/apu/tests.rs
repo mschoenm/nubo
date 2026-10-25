@@ -304,6 +304,47 @@ fn restores_its_own_save_state() {
     assert_eq!(restored.pcm12(), apu.pcm12());
 }
 
+/// Runs `apu` one M-cycle at a time until its noise counter is about to count
+/// (`counter_countdown` is 2), and with the tick alignment `alignment` when given.
+fn run_until_the_noise_counter_is_due(apu: &mut Apu, clock: &mut Clock, alignment: Option<u8>) {
+    loop {
+        clock.run(apu, 1);
+        apu.catch_up();
+        let noise = &apu.state.noise;
+        if noise.counter_countdown == 2
+            && alignment.is_none_or(|alignment| noise.alignment & 3 == alignment)
+        {
+            return;
+        }
+    }
+}
+
+#[test]
+fn dac_off_writes_carry_the_noise_counter_through_all_16_bits_without_overflow() {
+    let mut apu = powered_apu(false);
+    let mut clock = Clock::new();
+    apu.write_byte(0xFF22, 0x01);
+    while apu.state.noise.counter < 0xFFFF {
+        write_all(&mut apu, &[(0xFF21, 0xF0), (0xFF23, 0x80)]);
+        run_until_the_noise_counter_is_due(&mut apu, &mut clock, None);
+        apu.write_byte(0xFF21, 0x00);
+        if apu.state.noise.counter == 0x8000 {
+            let mut restored = Apu::new();
+            restored
+                .deserialize(&mut serialized(&apu).as_slice())
+                .expect("a state past 15 bits loads");
+            assert_eq!(serialized(&restored), serialized(&apu));
+        }
+    }
+
+    // Retriggering the playing channel just before a count adds one more.
+    write_all(&mut apu, &[(0xFF21, 0xF0), (0xFF23, 0x80)]);
+    run_until_the_noise_counter_is_due(&mut apu, &mut clock, Some(0));
+    assert_eq!(apu.state.noise.counter, 0xFFFF);
+    apu.write_byte(0xFF23, 0x80);
+    assert_eq!(apu.state.noise.counter, 0);
+}
+
 /// An APU for `model` playing all four channels, with the register writes the
 /// scenario below starts with.
 fn playing_apu(model: Model) -> Apu {
