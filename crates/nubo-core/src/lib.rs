@@ -18,8 +18,8 @@ pub use crate::address_bus::{
 pub use crate::controller::{ControllerButton, ControllerMapping, ControllerState};
 pub use crate::cpu::{BusActivityEntry, BusActivityKind, Registers};
 pub use crate::emulator::{
-    BUILD_COMMIT, DOTS_PER_FRAME, Emulator, SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH, SGB_SCREEN_POSITION,
-    SaveStateHeader,
+    BUILD_COMMIT, DOTS_PER_FRAME, Emulator, SCREEN_HEIGHT, SCREEN_WIDTH, SGB_FRAME_HEIGHT,
+    SGB_FRAME_WIDTH, SGB_SCREEN_POSITION, SaveStateHeader,
 };
 pub use crate::error::{CheatError, LoadRomError, SaveStateError};
 pub use crate::gpu::DMG_SHADES;

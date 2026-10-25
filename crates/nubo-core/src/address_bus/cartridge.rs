@@ -200,8 +200,8 @@ impl Cartridge {
 
     /// The number GameShark codes compare their bank byte with at
     /// 0xA000-0xBFFF: the RAM bank the controller has selected. On an MBC3
-    /// it is whatever 0xA000-0xBFFF shows, so 0x08-0x0F while a clock
-    /// register is selected, like in SameBoy.
+    /// it is the value written to 0x4000-0x5FFF (its four low bits), like in
+    /// SameBoy, so 0x08-0x0F while a clock register is selected.
     pub fn selected_ram_bank(&self) -> u8 {
         match &self.mapper {
             CartridgeMapper::RomOnly | CartridgeMapper::RomRam | CartridgeMapper::Mbc2(_) => 0,
@@ -459,8 +459,8 @@ impl MapperKind {
     /// The controller in its power-on state, for a cartridge with this ROM,
     /// type byte and RAM size (from the header). Whether it has RAM comes
     /// from the type byte, never from the size of a save file. An MBC3 with
-    /// more ROM or RAM than an MBC3 can address is an MBC30, and its clock
-    /// starts from the state the frontend saved. Without one, it is a new
+    /// more ROM or RAM than an MBC3 can address is an MBC30. An MBC3's clock
+    /// starts from the state the frontend saved or, without one, is a new
     /// clock at 0 that counts from now, on the clock it follows.
     fn create_mapper(
         self,
@@ -595,7 +595,7 @@ fn read_title(rom: &[u8]) -> String {
 }
 
 /// Returns the name Pan Docs uses for a cartridge type byte.
-pub(super) fn cartridge_type_name(cartridge_type: u8) -> &'static str {
+fn cartridge_type_name(cartridge_type: u8) -> &'static str {
     match cartridge_type {
         0x00 => "ROM ONLY",
         0x01 => "MBC1",

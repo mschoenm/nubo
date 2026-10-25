@@ -37,9 +37,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// The width of the Game Boy's screen in pixels.
-pub const SCREEN_WIDTH: usize = 160;
+pub const SCREEN_WIDTH: usize = nubo_core::SCREEN_WIDTH as usize;
 /// The height of the Game Boy's screen in pixels.
-pub const SCREEN_HEIGHT: usize = 144;
+pub const SCREEN_HEIGHT: usize = nubo_core::SCREEN_HEIGHT as usize;
 /// The widest picture the core hands over: a Super Game Boy's, with its
 /// border.
 pub const MAX_WIDTH: usize = SGB_FRAME_WIDTH as usize;
@@ -116,8 +116,9 @@ pub enum Video<'a> {
 }
 
 /// What the cartridge asked the core to save during a frame. [`CoreEffects`]
-/// sets the flags when the emulator tells it the game saved, and
-/// [`Core::run`] clears them.
+/// sets the flags when the emulator tells it the game saved. [`Core::run`]
+/// clears them once it has passed the saves on, and a loaded state or a
+/// restart, which replace the saves, clears them too.
 #[derive(Debug, Default)]
 struct SaveRequests {
     ram: AtomicBool,
@@ -802,7 +803,7 @@ pub struct MemoryRegion<'a> {
     pub buffer: &'a mut [u8],
     /// The region's length, a power of two that `start` is a multiple of.
     pub length: usize,
-    /// What kind of memory it is: [`MemoryKind`].
+    /// Which libretro descriptor flags the region gets.
     pub kind: MemoryKind,
 }
 
@@ -918,9 +919,9 @@ fn write_changes(
     let mut changed = false;
     for (index, (&byte, &before)) in buffer.iter().zip(written).enumerate() {
         if byte != before
-            && let Some(target) = target_index(index).and_then(|index| target.get_mut(index))
+            && let Some(slot) = target_index(index).and_then(|position| target.get_mut(position))
         {
-            *target = byte;
+            *slot = byte;
             changed = true;
         }
     }

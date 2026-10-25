@@ -161,9 +161,9 @@ impl App {
                 && if library::KEEPS_GAMES {
                     self.library.games("").next().is_some()
                 } else {
-                    library::AVAILABLE && !self.settings.shared.library_folders.is_empty()
+                    !self.settings.shared.library_folders.is_empty()
                 },
-            clear_recently_played: keeps_data && library::AVAILABLE && self.library.any_played(),
+            clear_recently_played: keeps_data && self.library.any_played(),
             game_open: self.game.is_some(),
         }
     }
@@ -702,7 +702,7 @@ pub struct ResetOffers {
     pub delete_save_states: bool,
     pub remove_folders: bool,
     pub clear_recently_played: bool,
-    /// Whether a game is open, which greys out the boxes that delete saves,
+    /// Whether a game is open, which grays out the boxes that delete saves,
     /// with a note to close the game first.
     pub game_open: bool,
 }

@@ -1,8 +1,9 @@
-//! CGB VRAM DMA (also called HDMA): copies data into VRAM (video RAM) in
-//! blocks of 16 bytes. The address bus only routes HDMA1-HDMA5 here on a CGB,
-//! so the registers need no check for the model. It runs either all at once ("general purpose" mode,
-//! the CPU waits until it finishes) or one block per HBlank (the pause at the
-//! end of each screen line). The registers are HDMA1-HDMA5 at 0xFF51-0xFF55.
+//! CGB VRAM DMA (also called HDMA): copies data into VRAM (video RAM) in blocks
+//! of 16 bytes. The address bus only routes HDMA1-HDMA5 here on a CGB, so the
+//! registers need no check for the model. It runs either all at once ("general
+//! purpose" mode, the CPU waits until it finishes) or one block per HBlank (the
+//! pause at the end of each screen line). The registers are HDMA1-HDMA5 at
+//! 0xFF51-0xFF55.
 
 use crate::address_bus::{AddressBus, MemoryMapped};
 use crate::utils::is_bit_set;
@@ -31,7 +32,7 @@ pub(crate) struct HdmaState {
     transfer_mode: VramTransferMode,
     in_progress: bool,
     /// The last transfer copied all its blocks. False while a transfer runs
-    /// and after one was cancelled part-way; HDMA5 reads differently then.
+    /// and after one was canceled part-way; HDMA5 reads differently then.
     completed: bool,
     /// An HBlank started, so an HBlank-mode transfer should copy its next
     /// block.
@@ -45,7 +46,7 @@ pub(crate) struct HdmaState {
     /// The block kept through a speed switch halt starts copying in the
     /// M-cycle the CPU wakes up in, which already ran.
     copy_starts_on_wake: bool,
-    /// The transfer was cancelled while a block was already due, so it stops
+    /// The transfer was canceled while a block was already due, so it stops
     /// once that block is copied.
     cancelled_after_block: bool,
 }
@@ -154,10 +155,6 @@ impl HdmaState {
         }
     }
 
-    pub(super) fn source_address(&self) -> u16 {
-        self.source
-    }
-
     /// Where in VRAM the next byte goes, as an offset from its start.
     fn vram_offset(&self) -> u16 {
         self.destination & VRAM_ADDRESS_MASK
@@ -174,6 +171,7 @@ impl HdmaState {
     }
 
     /// Whether an HBlank started that the transfer hasn't copied a block for yet.
+    #[cfg(test)]
     pub(crate) fn hblank_started(&self) -> bool {
         self.hblank_started
     }
@@ -197,7 +195,7 @@ impl AddressBus {
     fn hdma_transfer_block(&mut self, trailer: bool) {
         for pair in 0..BLOCK_SIZE / 2 {
             for byte in 0..2 {
-                let source = self.hdma.source_address();
+                let source = self.hdma.source;
                 let source_byte = match source {
                     // VRAM DMA only reaches the cartridge and work RAM; from VRAM,
                     // OAM, the I/O registers and HRAM it copies 0xFF (SameBoy,
@@ -261,7 +259,7 @@ impl AddressBus {
     pub(crate) fn hdma_step(&mut self) {
         if self.cgb_mode && self.hdma.in_progress {
             let is_hblank_mode = self.hdma.transfer_mode == VramTransferMode::HBlank;
-            if is_hblank_mode && self.hdma.hblank_started() {
+            if is_hblank_mode && self.hdma.hblank_started {
                 let trailer = !std::mem::take(&mut self.hdma.copy_starts_on_wake);
                 self.hdma_transfer_block(trailer);
                 if std::mem::take(&mut self.hdma.cancelled_after_block) {
@@ -397,11 +395,11 @@ mod tests {
         for dots in 0..2 {
             let mut address_bus = hblank_transfer_after_mode_3(dots);
             assert_eq!(address_bus.gpu.mode(), 0);
-            assert!(!address_bus.hdma.hblank_started());
+            assert!(!address_bus.hdma.hblank_started);
 
             address_bus.gpu.set_lcdc(0);
             address_bus.gpu.step_dots(4, &mut address_bus.hdma);
-            assert!(!address_bus.hdma.hblank_started(), "{dots} dots in");
+            assert!(!address_bus.hdma.hblank_started, "{dots} dots in");
 
             // Halting while the LCD is off is halting inside HBlank (SameBoy's `halt`).
             address_bus.hdma_halt_started();
@@ -414,21 +412,21 @@ mod tests {
             address_bus.hdma_halt_started();
             assert!(!address_bus.hdma.halted_outside_hblank, "{dots} dots in");
             for _ in 0..456 {
-                if address_bus.hdma.hblank_started() {
+                if address_bus.hdma.hblank_started {
                     break;
                 }
                 address_bus.gpu.step_dots(1, &mut address_bus.hdma);
             }
-            assert!(address_bus.hdma.hblank_started());
+            assert!(address_bus.hdma.hblank_started);
             address_bus.hdma_halt_ended();
-            assert!(!address_bus.hdma.hblank_started(), "{dots} dots in");
+            assert!(!address_bus.hdma.hblank_started, "{dots} dots in");
         }
     }
 
     #[test]
     fn hblank_dma_hears_of_the_hblank_two_dots_after_mode_3() {
         let address_bus = hblank_transfer_after_mode_3(2);
-        assert!(address_bus.hdma.hblank_started());
+        assert!(address_bus.hdma.hblank_started);
     }
 
     #[test]
@@ -436,7 +434,7 @@ mod tests {
         let mut hdma = HdmaState::new();
         hdma.set_hdma1(0x71);
         hdma.set_hdma2(0xA2);
-        assert_eq!(hdma.source_address(), 0x71A0);
+        assert_eq!(hdma.source, 0x71A0);
     }
 
     #[test]
@@ -519,7 +517,7 @@ mod tests {
             assert_eq!(address_bus.gpu.video_ram_byte(0x11A0 + i), 0x0);
         }
 
-        assert!(!address_bus.hdma.hblank_started());
+        assert!(!address_bus.hdma.hblank_started);
     }
 
     #[test]

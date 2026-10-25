@@ -19,7 +19,9 @@
 
 use crate::sgb::attraction;
 use crate::sgb::nubo_border::NuboBorder;
-use crate::sgb::{BORDERED_HEIGHT, BORDERED_WIDTH, SCREEN_OFFSET, SgbBorderTime};
+use crate::sgb::{
+    BORDERED_HEIGHT, BORDERED_WIDTH, SCREEN_OFFSET, SCREEN_PIXELS, SCREEN_WIDTH, SgbBorderTime,
+};
 use nubo_serializable_derive::Serializable;
 
 /// The bytes of the border's tiles: 256 tiles of 32 bytes.
@@ -131,14 +133,14 @@ impl BorderPicture {
     }
 }
 
-/// Which border to draw: a game's, or Nubo's in the look for `time`, at a
-/// frame of the attraction mode (`None` when it isn't running).
+/// Which border to draw: a game's, or Nubo's in the look for `time`, with the
+/// attraction mode's clouds in a pose (`None` when it isn't running).
 #[derive(Clone, Copy, Debug)]
 pub(super) enum BorderSource<'a> {
     Game(&'a Border),
     Nubo {
         time: SgbBorderTime,
-        attraction_frame: Option<u32>,
+        attraction_pose: Option<attraction::Pose>,
     },
 }
 
@@ -148,7 +150,7 @@ enum DrawnSource {
     Game(Box<Border>),
     Nubo {
         time: SgbBorderTime,
-        attraction_frame: Option<u32>,
+        attraction_pose: Option<attraction::Pose>,
     },
 }
 
@@ -179,13 +181,13 @@ impl BorderCache {
             (
                 Some(DrawnSource::Nubo {
                     time: drawn_time,
-                    attraction_frame: drawn_frame,
+                    attraction_pose: drawn_pose,
                 }),
                 BorderSource::Nubo {
                     time,
-                    attraction_frame,
+                    attraction_pose,
                 },
-            ) => *drawn_time == time && *drawn_frame == attraction_frame,
+            ) => *drawn_time == time && *drawn_pose == attraction_pose,
             _ => false,
         };
         if up_to_date {
@@ -196,17 +198,20 @@ impl BorderCache {
             BorderSource::Game(border) => BorderPicture::from_border(border),
             BorderSource::Nubo {
                 time,
-                attraction_frame: None,
+                attraction_pose: None,
             } => NuboBorder::get(time).picture.clone(),
             BorderSource::Nubo {
                 time,
-                attraction_frame: Some(frame),
-            } => attraction::draw(NuboBorder::get(time), frame),
+                attraction_pose: Some(pose),
+            } => attraction::draw(NuboBorder::get(time), pose),
         };
         let (screen_left, screen_top) = SCREEN_OFFSET;
-        self.screen_cover = (0..160 * 144)
+        self.screen_cover = (0..SCREEN_PIXELS)
             .filter_map(|index| {
-                let (x, y) = (screen_left + index % 160, screen_top + index / 160);
+                let (x, y) = (
+                    screen_left + index % SCREEN_WIDTH,
+                    screen_top + index / SCREEN_WIDTH,
+                );
                 let color = self.picture.pixels[x + y * BORDERED_WIDTH];
                 (color != TRANSPARENT).then_some((index as u16, color))
             })
@@ -215,12 +220,32 @@ impl BorderCache {
             BorderSource::Game(border) => DrawnSource::Game(Box::new(border.clone())),
             BorderSource::Nubo {
                 time,
-                attraction_frame,
+                attraction_pose,
             } => DrawnSource::Nubo {
                 time,
-                attraction_frame,
+                attraction_pose,
             },
         });
         self.drawn_with = None;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_attraction_mode_draws_the_border_again_only_when_a_cloud_moves() {
+        let source = |frame| BorderSource::Nubo {
+            time: SgbBorderTime::Night,
+            attraction_pose: Some(attraction::pose(frame)),
+        };
+        let mut cache = BorderCache::default();
+        cache.update(source(1_008));
+        cache.drawn_with = Some((0, [0; 4]));
+        cache.update(source(1_009));
+        assert!(cache.drawn_with.is_some());
+        cache.update(source(1_010));
+        assert!(cache.drawn_with.is_none());
     }
 }

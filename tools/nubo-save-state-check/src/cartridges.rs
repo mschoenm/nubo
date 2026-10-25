@@ -48,9 +48,10 @@ const DMG_AND_CGB: &[Model] = &[Model::Dmg, Model::CgbE];
 const DMG: &[Model] = &[Model::Dmg];
 const CGB: &[Model] = &[Model::CgbE];
 
-/// The header's RAM size byte: no RAM (also used by MBC2, whose RAM is inside
-/// the controller), and 8 KiB of RAM.
+/// The header's RAM size byte for no RAM (also used by MBC2, whose RAM is
+/// inside the controller).
 const NO_RAM: u8 = 0x00;
+/// The header's RAM size byte for 8 KiB of RAM.
 const RAM_8_KIB: u8 = 0x02;
 
 pub(crate) const CARTRIDGES: [TestCartridge; 6] = [
@@ -112,7 +113,9 @@ pub(crate) const CARTRIDGES: [TestCartridge; 6] = [
 
 /// Four 16 KiB banks.
 const ROM_SIZE: usize = 0x10000;
+/// The header's ROM size byte for those four banks.
 const ROM_SIZE_BYTE: u8 = 0x01;
+/// Where the program starts, right after the header.
 const PROGRAM_START: usize = 0x0150;
 /// Where the OAM DMA routine is kept, to be copied to HRAM: the CPU can't
 /// read the ROM while OAM DMA copies from work RAM on a Game Boy.
@@ -124,6 +127,8 @@ const OAM_DMA_ROUTINE: [u8; 7] = [
     0x3D, // wait: DEC A
     0x20, 0xFD, // JR NZ, wait
 ];
+/// The addresses the CPU jumps to for each of the five interrupts, each given
+/// a `RETI`.
 const INTERRUPT_VECTORS: [usize; 5] = [0x40, 0x48, 0x50, 0x58, 0x60];
 const RETI: u8 = 0xD9;
 const RET: u8 = 0xC9;

@@ -60,8 +60,9 @@ pub(crate) const SGB_PLAYERS: usize = 4;
 /// on, up to four. Frontends without separate controllers for them, such as
 /// RetroArch's ports, set the other players' keys with `set_player_keys`.
 ///
-/// Save states keep what the game set (the group select bits), the pending
-/// interrupt and the buttons each player held as the game saw them, so a
+/// Save states keep what the game set (the group select bits and, on a
+/// Super Game Boy, how many players it reads and which one is current), the
+/// pending interrupt and the buttons each player held as the game saw them, so a
 /// loaded state goes on as the run it was saved from: the next button
 /// change starts from the saved buttons. They leave out which keys the
 /// keyboard, the controllers and the frontend hold, which belong to the
@@ -72,10 +73,10 @@ pub(crate) const SGB_PLAYERS: usize = 4;
 /// from before Nubo stored the buttons keeps the ones held now, without an
 /// interrupt.
 #[derive(Clone, Debug, CopyGetters, Setters, Serializable)]
-pub struct Joypad {
+pub(crate) struct Joypad {
     /// Bits 4 and 5 of JOYP. Bit 4 low selects the directions, bit 5 low
     /// selects the action buttons.
-    #[getset(get_copy = "pub(super)", set = "pub(super)")]
+    #[getset(get_copy = "pub(super)")]
     group_select: u8,
 
     /// The buttons each player holds as the game reads them.
@@ -422,6 +423,13 @@ impl Joypad {
 
 #[cfg(test)]
 impl Joypad {
+    /// Sets the group select bits (bits 4 and 5 of JOYP) directly, without
+    /// the Super Game Boy player switch or the interrupt a write to JOYP can
+    /// bring.
+    pub(super) fn set_group_select(&mut self, group_select: u8) {
+        self.group_select = group_select;
+    }
+
     /// Sets the first player's action buttons directly (Start, Select, B
     /// and A in bits 3 to 0, with 0 meaning pressed), for tests that need
     /// held buttons without the joypad interrupt pressing them requests.

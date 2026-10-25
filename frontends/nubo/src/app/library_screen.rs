@@ -14,9 +14,7 @@ use iced::widget::scrollable::AbsoluteOffset;
 use nubo_core::Model;
 use nubo_frontend::controls::Action;
 use nubo_frontend::library::box_art::{self, GameList};
-use nubo_frontend::library::{
-    self, DownloadedArt, FileCheck, LoadedPicture, ScanResult, WatchEvent,
-};
+use nubo_frontend::library::{DownloadedArt, FileCheck, LoadedPicture, ScanResult, WatchEvent};
 use nubo_frontend::links;
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::rom::Rom;
@@ -177,6 +175,7 @@ impl App {
                 if let Err(error) = self.library.forget_played(&path) {
                     self.toasts.error(error);
                 }
+                self.watch_recent_games();
                 self.library_selection = None;
                 // A game moving up into "Continue playing" wasn't watched
                 // before, so its file may be gone already.
@@ -223,6 +222,7 @@ impl App {
                 if let Err(error) = self.library.finish_scan(result) {
                     self.toasts.error(error);
                 }
+                self.watch_recent_games();
                 let rescan = if self.library.take_rescan_wanted() {
                     self.rescan()
                 } else {
@@ -239,6 +239,7 @@ impl App {
                 if let Err(error) = self.library.finish_check(check) {
                     self.toasts.error(error);
                 }
+                self.watch_recent_games();
                 self.library_selection = None;
             }
             LibraryMessage::DownloadBoxArtToggled(enabled) => {
@@ -444,7 +445,9 @@ impl App {
     /// Keeps `rom` in the browser's library.
     #[cfg(target_arch = "wasm32")]
     fn add_game(&mut self, rom: &Rom) -> Result<(), String> {
-        self.library.add_game(rom)
+        let added = self.library.add_game(rom);
+        self.watch_recent_games();
+        added
     }
 
     /// The desktop's library finds its games in folders instead.
@@ -470,6 +473,7 @@ impl App {
         {
             self.toasts.error(error);
         }
+        self.watch_recent_games();
     }
 
     /// Takes the game at `path` out of the browser's library.
@@ -482,6 +486,7 @@ impl App {
             )),
             Err(error) => self.toasts.error(error),
         }
+        self.watch_recent_games();
         #[cfg(not(target_arch = "wasm32"))]
         let _ = path;
         self.library_selection = None;
@@ -529,10 +534,10 @@ impl App {
         )
     }
 
-    /// Whether this build keeps a library and this run may use it: not with
-    /// `--fresh`, which leaves the player's library alone.
+    /// Whether this run may use the library: not with `--fresh`, which
+    /// leaves the player's library alone.
     pub(super) fn keeps_library(&self) -> bool {
-        library::AVAILABLE && !self.fresh
+        !self.fresh
     }
 
     /// Reads and decodes the games' saved pictures on a background thread.
@@ -569,6 +574,12 @@ impl App {
             self.window_width,
         );
         self.library_selection = after.same_card(&before, index);
+    }
+
+    /// Works out the games the folder watcher watches besides the folders
+    /// again (`App::watched_games`), after a change to the library's games.
+    pub(super) fn watch_recent_games(&mut self) {
+        self.watched_games = self.recent_games_elsewhere();
     }
 
     /// The games "Continue playing" shows that aren't in a library folder,

@@ -5,7 +5,7 @@
 //! The parts come from the file tree as it is, so new, moved and deleted
 //! files need no list kept up to date. A module (`apu.rs` with its `apu/`
 //! folder) is one part when it is small enough; a larger one splits into its
-//! own file and its child modules, and small neighbours are packed together
+//! own file and its child modules, and small neighbors are packed together
 //! again. The rotation remembers when each file was last reviewed, not each
 //! part, so regrouping the parts as the code changes loses nothing: a part
 //! counts as last reviewed when its least recently reviewed file was. A file
@@ -359,7 +359,7 @@ fn split(module: &Module, parts: &mut Vec<Part>) -> Result {
     Ok(())
 }
 
-/// Joins neighbouring parts while they fit in `PART_LINES` together.
+/// Joins neighboring parts while they fit in `PART_LINES` together.
 fn pack(items: Vec<Part>) -> Vec<Part> {
     let mut packed: Vec<Part> = Vec::new();
     for item in items {

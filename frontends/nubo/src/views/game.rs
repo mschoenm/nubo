@@ -29,7 +29,6 @@ use iced::widget::{
 use iced::{Alignment, ContentFit, Element, Fill, mouse};
 use nubo_frontend::cheats;
 use nubo_frontend::controls::{Action, Device};
-use nubo_frontend::library;
 use nubo_frontend::save_states::{self, Slot, SlotInfo};
 use nubo_frontend::screenshots;
 
@@ -147,13 +146,6 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
             .controls
             .input_label(Device::Keyboard, action)
     };
-    // The browser has no library: leaving a game goes back to the start
-    // screen.
-    let (back_label, back_tip) = if library::AVAILABLE {
-        ("Library", "Back to the library")
-    } else {
-        ("Home", "Back to the start screen")
-    };
     let pause = if game.is_paused() {
         steady_bar_button(
             Icon::Play,
@@ -175,8 +167,8 @@ fn bar<'a>(game: &'a Game, settings: &'a Settings, fullscreen: bool) -> Element<
     top_bar(row![
         bar_button(
             Icon::ArrowLeft,
-            back_label,
-            String::from(back_tip),
+            "Library",
+            String::from("Back to the library"),
             false,
             Message::Game(GameMessage::CloseGame),
         ),
@@ -352,12 +344,7 @@ pub fn main_entries(game: &Game, settings: &Settings, fullscreen: bool) -> Vec<M
         ),
         entry(
             Icon::ArrowLeft,
-            // The browser has no library, as in the bar.
-            if library::AVAILABLE {
-                "Back to library"
-            } else {
-                "Back to the start screen"
-            },
+            "Back to library",
             None,
             Message::Game(GameMessage::CloseGame),
         ),
@@ -652,13 +639,7 @@ fn cheats_page(game: &Game, selection: usize) -> Element<'_, Message> {
     .spacing(8);
 
     if let Some(error) = &form.error {
-        add = add.push(
-            text(error)
-                .size(12)
-                .style(|theme: &iced::Theme| text::Style {
-                    color: Some(theme.palette().danger),
-                }),
-        );
+        add = add.push(text(error).size(12).style(theme::danger_text));
     }
 
     column![

@@ -83,8 +83,8 @@ pub fn with_tooltip<'a, Message: 'a>(
 }
 
 /// A top bar button with an icon and its name, for the buttons a player has
-/// to find at a glance (Library, Pause, Open ROM), and a tooltip below it
-/// with `tip`, such as the shortcut. `primary` fills it with the accent
+/// to find at a glance, such as Library and Open game, and a tooltip below
+/// it with `tip`, such as the shortcut. `primary` fills it with the accent
 /// color, as the Resume button is while the game is paused.
 pub fn bar_button<'a, Message: Clone + 'a>(
     icon: Icon,
@@ -93,7 +93,7 @@ pub fn bar_button<'a, Message: Clone + 'a>(
     primary: bool,
     on_press: Message,
 ) -> Element<'a, Message> {
-    let button = labelled_button(icon, label)
+    let button = labeled_button(icon, label)
         .padding([6, 12])
         .style(bar_button_style(primary))
         .on_press(on_press);
@@ -155,14 +155,7 @@ pub fn bar_separator<'a, Message: 'a>() -> Element<'a, Message> {
 
 /// A thin line across a menu, between groups of rows.
 pub fn menu_separator<'a, Message: 'a>() -> Element<'a, Message> {
-    container(
-        container(iced::widget::space())
-            .width(Fill)
-            .height(1)
-            .style(theme::divider),
-    )
-    .padding([5, 4])
-    .into()
+    container(divider()).padding([5, 4]).into()
 }
 
 /// The filled accent-colored button for the main action on a screen.
@@ -171,7 +164,7 @@ pub fn primary_button<'a, Message: Clone + 'a>(
     label: impl text::IntoFragment<'a>,
     on_press: Message,
 ) -> Element<'a, Message> {
-    labelled_button(icon, label)
+    labeled_button(icon, label)
         .padding([10, 18])
         .style(theme::primary_button)
         .on_press(on_press)
@@ -184,7 +177,7 @@ pub fn secondary_button<'a, Message: Clone + 'a>(
     label: impl text::IntoFragment<'a>,
     on_press: Message,
 ) -> Element<'a, Message> {
-    labelled_button(icon, label)
+    labeled_button(icon, label)
         .padding([7, 14])
         .style(theme::secondary_button)
         .on_press(on_press)
@@ -193,7 +186,7 @@ pub fn secondary_button<'a, Message: Clone + 'a>(
 
 /// A button showing `icon` before `label`, without a style or an action
 /// yet.
-fn labelled_button<'a, Message: 'a>(
+fn labeled_button<'a, Message: 'a>(
     icon: Icon,
     label: impl text::IntoFragment<'a>,
 ) -> button::Button<'a, Message> {
@@ -333,8 +326,9 @@ fn bar_body<'a, Message: 'a>(content: iced::widget::Row<'a, Message>) -> Element
         .into()
 }
 
-/// The one-pixel line under the top bar, across its whole width.
-fn divider<'a, Message: 'a>() -> Element<'a, Message> {
+/// A thin line across the width it gets, such as under the top bar or
+/// between the rows of a group.
+pub fn divider<'a, Message: 'a>() -> Element<'a, Message> {
     container(iced::widget::space())
         .width(Fill)
         .height(1)

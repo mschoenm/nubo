@@ -72,7 +72,7 @@ fn only_what_is_offered_gets_a_box() {
 }
 
 #[test]
-fn an_open_game_greys_out_deleting_saves_and_says_why() {
+fn an_open_game_grays_out_deleting_saves_and_says_why() {
     let offers = ResetOffers {
         game_open: true,
         ..EVERYTHING
@@ -182,7 +182,7 @@ fn the_controls_alone_can_be_reset() {
 }
 
 #[test]
-fn nothing_ticked_greys_the_button_out() {
+fn nothing_ticked_grays_the_button_out() {
     let nothing = ResetChoices {
         reset_settings: false,
         ..ResetChoices::default()

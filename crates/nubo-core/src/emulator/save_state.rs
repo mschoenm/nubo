@@ -217,13 +217,13 @@ impl Emulator {
 
     /// Restores a state captured by [`Emulator::save_state`].
     ///
-    /// The save state must come from the same game (the same title and
-    /// header checksum, so not another revision or a patched copy) and the
-    /// same hardware model, and its data must be read to the last byte. It may come from
-    /// another version of Nubo: values it doesn't have start as they do right
-    /// after power-on, and values this version doesn't know, or can't read,
-    /// are skipped (see [`Emulator::load_state_with_report`]). If it can't be
-    /// loaded, the emulator is left exactly as it was.
+    /// The save state must come from the same game (the same title and header
+    /// checksum, so not another revision or a patched copy) and the same
+    /// hardware model, and its data must be read to the last byte. It may come
+    /// from another version of Nubo: values it doesn't have start as they do
+    /// right after power-on, and values this version doesn't know, or can't
+    /// read, are skipped (see [`Emulator::load_state_with_report`]). If it
+    /// can't be loaded, the emulator is left exactly as it was.
     ///
     /// Loading a state replaces the cartridge RAM and clock, but doesn't pass
     /// them to the frontend to save (see

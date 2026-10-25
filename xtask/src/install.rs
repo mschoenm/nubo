@@ -350,7 +350,7 @@ fn close_running_nubo() -> Result {
 /// The process ids of the installed Nubo this user runs on macOS or Linux:
 /// the app in `/Applications`, or the Flatpak. A Nubo started from a build
 /// folder isn't one, and neither is another user's, which this user can't
-/// close (Linux doesn't show this user their programs' paths either).
+/// close (Linux doesn't show the paths of other users' programs either).
 fn running_nubo() -> Result<Vec<String>> {
     if cfg!(target_os = "macos") {
         let output = Command::new("ps")

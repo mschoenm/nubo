@@ -1,3 +1,5 @@
+//! Tests for reading the version or commit to build and finding its release.
+
 use super::*;
 
 #[test]

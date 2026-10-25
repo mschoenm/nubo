@@ -203,7 +203,7 @@ impl Settings {
     #[must_use]
     pub fn reset(&self) -> Settings {
         Settings {
-            shared: self.shared.reset(false),
+            shared: self.shared.reset(),
             window_size: self.window_size,
             ..Settings::default()
         }

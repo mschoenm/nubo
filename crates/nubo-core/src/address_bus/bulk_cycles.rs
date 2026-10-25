@@ -19,15 +19,15 @@ use crate::clock::{SYSTEM_COUNTER_TICKS_PER_M_CYCLE, dots_per_m_cycle};
 
 impl AddressBus {
     /// How many M-cycles can run in one go, or 0 when they have to go one at a
-    /// time. None of them may request an interrupt: the PPU
-    /// stays within the dots it may be left behind (what `Gpu::run_dots` returns),
-    /// TIMA doesn't overflow and no serial transfer that this side clocks is
-    /// running. Nothing may need attention every M-cycle: OAM DMA, a speed
-    /// switch, the PPU dots a register write owes, an APU that has to run
-    /// M-cycle by M-cycle, or the APU's frame sequencer, which steps when a DIV
-    /// bit changes. The audio buffer may only fill up in the last of them, so
-    /// the emulator stops where it would have, and they end at the dot limit
-    /// of `Emulator::run_frame`.
+    /// time. None of them may request an interrupt: the PPU stays within the
+    /// dots it may be left behind (what `Gpu::run_dots` returns), TIMA doesn't
+    /// overflow and no serial transfer that this side clocks is running.
+    /// Nothing may need attention every M-cycle: OAM DMA, a speed switch, the
+    /// PPU dots a register write owes, an APU that has to run M-cycle by
+    /// M-cycle, or the APU's frame sequencer, which steps when a DIV bit
+    /// changes. The audio buffer may only fill up in the last of them, so the
+    /// emulator stops where it would have, and they end at the dot limit of
+    /// `Emulator::run_frame`.
     pub(crate) fn bulk_cycles_available(&self) -> u32 {
         let ppu_cycles =
             self.ppu_quiet_dots.saturating_sub(self.ppu_owed_dots) / self.dots_per_cycle();
@@ -54,10 +54,10 @@ impl AddressBus {
     }
 
     /// Runs `cycles` M-cycles at once, which `bulk_cycles_available` allows.
-    /// `sampled_mid_cycle` is set when the CPU
-    /// samples interrupts halfway through each M-cycle (a halted DMG), where the
-    /// timers only run in the second half, so the serial port sees the system
-    /// counter as it was before each M-cycle.
+    /// `sampled_mid_cycle` is set when the CPU samples interrupts halfway
+    /// through each M-cycle (a halted DMG), where the timers only run in the
+    /// second half, so the serial port sees the system counter as it was before
+    /// each M-cycle.
     ///
     /// The timers and the serial clock count the edges of their system
     /// counter bits over the whole stretch, and the APU moves on with

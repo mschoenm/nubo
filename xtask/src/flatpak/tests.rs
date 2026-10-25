@@ -1,3 +1,5 @@
+//! Tests for reading the Flathub runtime listing and the SDK's Rust check.
+
 use super::{check_rust_version_command, newest_runtime, runtime_release};
 
 #[test]

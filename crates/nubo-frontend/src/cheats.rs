@@ -10,6 +10,7 @@
 use crate::storage::{self, Entry, Storage, Unreadable};
 use nubo_core::{Emulator, validate_gamegenie_code, validate_gameshark_code};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::path::Path;
 
 /// Whether this build can keep cheats: the desktop and browser builds can.
@@ -84,6 +85,7 @@ impl Cheat {
     /// were checked when the cheat was made or read, and a cheat whose code
     /// failed the check is off (see [`Cheat::check`]), so turning it on
     /// doesn't fail.
+    ///
     /// Each code is known to the emulator by the whole cheat's code and its
     /// own, so two cheats that share a code don't turn each other off.
     pub fn apply_to(&self, emulator: &mut Emulator) {
@@ -176,10 +178,11 @@ fn kind_of(code: &str) -> Result<CheatKind, String> {
     Err(error.unwrap_or_else(|| String::from("That isn't a valid code")))
 }
 
-/// The contents of a cheats file.
+/// The contents of a cheats file. Saving borrows the cheats, so they
+/// aren't copied first.
 #[derive(Serialize, Deserialize)]
-struct CheatsFile {
-    cheats: Vec<Cheat>,
+struct CheatsFile<'a> {
+    cheats: Cow<'a, [Cheat]>,
 }
 
 /// The cheats of the game at `rom_path`, from this build's storage; none if
@@ -231,7 +234,7 @@ pub fn load_from(storage: &dyn Storage, rom_path: &Path) -> Result<Vec<Cheat>, U
 /// Saves the cheats of the game at `rom_path` in `storage`.
 pub fn save_to(storage: &dyn Storage, rom_path: &Path, cheats: &[Cheat]) -> Result<(), String> {
     let file = CheatsFile {
-        cheats: cheats.to_vec(),
+        cheats: Cow::Borrowed(cheats),
     };
     toml::to_string(&file)
         .map_err(|error| error.to_string())
@@ -247,7 +250,7 @@ fn parse_list(bytes: Vec<u8>) -> Result<Vec<Cheat>, String> {
     let contents =
         String::from_utf8(bytes).map_err(|_| String::from("stream did not contain valid UTF-8"))?;
     let mut cheats = toml::from_str::<CheatsFile>(&contents)
-        .map(|file| file.cheats)
+        .map(|file| file.cheats.into_owned())
         .map_err(|error| error.to_string())?;
     for cheat in &mut cheats {
         match split_codes(&cheat.code) {

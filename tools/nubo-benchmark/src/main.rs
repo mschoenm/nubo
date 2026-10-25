@@ -17,11 +17,12 @@
 //! `--check-save-states` also checks that a save state taken halfway through
 //! each run, loaded into a new emulator, goes on exactly like the run it was
 //! taken from. `--shard` runs one of several equal parts of the ROMs, so the
-//! nightly CI can split these checks over several machines.
+//! nightly CI can split these checks over several machines; `--compare` then
+//! needs a file recorded with the same `--shard`.
 
 use clap::Parser;
 use image::RgbaImage;
-use nubo_core::{Emulator, Key, Model, NoSaves, RtcClock};
+use nubo_core::{Emulator, Key, Model, NoSaves, RtcClock, SCREEN_HEIGHT, SCREEN_WIDTH};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::fs;
@@ -37,8 +38,6 @@ const SAMPLE_RATE: u32 = 44100;
 const SAMPLES_PER_BUFFER: u32 = 512;
 /// The Game Boy's frame rate.
 const FRAMES_PER_SECOND: f64 = 4_194_304.0 / 70224.0;
-const SCREEN_WIDTH: u32 = 160;
-const SCREEN_HEIGHT: u32 = 144;
 
 /// Benchmark the emulator core on a set of games
 #[derive(Parser)]
@@ -457,8 +456,8 @@ fn run_name(job: &Run) -> String {
     format!("{} [{}]", job.rom.display(), job.model)
 }
 
-/// The key a run's fingerprints are recorded under: the ROM's path, the model and the length of
-/// the run.
+/// The key a run's fingerprints are recorded under: the ROM's path, the model
+/// and the length of the run.
 fn fingerprint_key(job: &Run, seconds: f64) -> String {
     format!("{} [{}] {seconds}s", job.rom.display(), job.model)
 }

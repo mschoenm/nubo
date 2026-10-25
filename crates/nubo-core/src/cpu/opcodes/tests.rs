@@ -1,3 +1,6 @@
+//! Unit tests for single instructions: each runs from a small ROM and checks
+//! the registers, memory and time it takes.
+
 use crate::address_bus::AddressBus;
 use crate::address_bus::constants::*;
 use crate::address_bus::effects::empty_cartridge_effects;
@@ -22,10 +25,10 @@ fn init_cpu_from_rom(rom: Vec<u8>) -> Cpu {
         .unwrap();
     cpu.address_bus.set_in_boot_rom(false);
 
-    // The Game Boy actually uses a decode/execute/prefetch loop, where fetching
-    // the next instruction is the last step. Initially, the first instruction is always a NOP.
+    // The CPU fetches the next opcode at the end of each instruction, and the
+    // first fetch is a NOP's. So this first step runs that NOP and fetches the
+    // opcode under test; each test's own step then runs it.
     // Source: https://gist.github.com/SonoSooS/c0055300670d678b5ae8433e20bea595#fetch-and-stuff
-    // This is why we need to step twice to get to the first opcode under test.
     cpu.step();
 
     cpu

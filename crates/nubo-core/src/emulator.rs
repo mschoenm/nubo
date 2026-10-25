@@ -3,6 +3,7 @@
 //! [`Emulator`] owns the CPU, which owns the address bus and through it the
 //! rest of the hardware, and offers everything frontends can do with them.
 
+use crate::address_bus::constants::HEADER_END_ADDRESS;
 use crate::address_bus::{
     AddressBus, CartridgeEffects, CartridgeHeader, MemoryMut, RtcClock, RtcState, read_header,
 };
@@ -28,6 +29,10 @@ const SGB_HEADER_END: usize = 0x0150;
 /// multiple of it since power-on.
 pub const DOTS_PER_FRAME: u64 = crate::gpu::DOTS_PER_FRAME as u64;
 
+/// The width of the Game Boy screen ([`Emulator::frame_buffer`]), in pixels.
+pub const SCREEN_WIDTH: u32 = crate::gpu::GB_SCREEN_WIDTH;
+/// The height of the Game Boy screen, in pixels.
+pub const SCREEN_HEIGHT: u32 = crate::gpu::GB_SCREEN_HEIGHT;
 /// The width of a Super Game Boy's picture with its border
 /// ([`Emulator::frame_with_border`]), in pixels.
 pub const SGB_FRAME_WIDTH: u32 = crate::sgb::BORDERED_WIDTH as u32;
@@ -146,9 +151,12 @@ impl Emulator {
     /// Reads the cartridge header of a ROM file or a zip archive containing
     /// one, without loading it. Frontends use it to list games and to pick
     /// the hardware model before starting one. It fails like
-    /// [`Emulator::load_rom`] would.
+    /// [`Emulator::load_rom`] would, except that a zip archive damaged past
+    /// the header fails only when the game loads: only the header's bytes
+    /// are unpacked.
     pub fn read_rom_header(rom: &[u8]) -> Result<CartridgeHeader, LoadRomError> {
-        read_header(&rom_archive::extract_rom_borrowed(rom)?)
+        let header_bytes = HEADER_END_ADDRESS as u64 + 1;
+        read_header(&rom_archive::extract_rom_borrowed(rom, Some(header_bytes))?)
     }
 
     /// Replaces the contents of the cartridge RAM, for example with a save file.

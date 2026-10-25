@@ -1,5 +1,5 @@
 /*
-    The length counters' quirks are ported from SameBoy's apu.c
+    The length counters' quirks are mostly ported from SameBoy's apu.c
     (https://github.com/LIJI32/SameBoy, Expat License, see the notice in apu.rs).
 */
 

@@ -11,7 +11,7 @@
 //! 0x6000-0x7FFF latches (games write 0 and then 1): that is when Nubo brings
 //! the clock up to date with the frontend's clock (or, with
 //! [`RtcClock::EmulatedTime`], with the time the emulator has run). The bank
-//! and latch behaviour follows SameBoy (<https://github.com/LIJI32/SameBoy>,
+//! and latch behavior follows SameBoy (<https://github.com/LIJI32/SameBoy>,
 //! Expat License, see the notice in `apu.rs`) and
 //! CasualPokePlayer's latch-rtc-test and rtc-invalid-banks-test.
 
@@ -204,10 +204,10 @@ pub(super) struct Mbc3CartridgeMapper {
     latched_rtc: LatchedRtc,
     /// The clock `rtc.base_timestamp` is a time on. A state made on the other
     /// clock is moved over to this emulator's when it loads
-    /// (`Mbc3CartridgeMapper::finish_loading_save_state`). A state from before this field
-    /// lacks it and keeps the value the load starts from: the power-on
-    /// state, already moved over to this emulator's clock, so its clock
-    /// loads as it is, as it did before.
+    /// (`Mbc3CartridgeMapper::finish_loading_save_state`). A state from before
+    /// this field lacks it and keeps the value the load starts from: the
+    /// power-on state, already moved over to this emulator's clock, so its
+    /// clock loads as it is, as it did before.
     rtc_clock: RtcClock,
     /// Whether the cartridge type has RAM, which the game can then enable.
     #[serializable(skip)]
@@ -417,7 +417,9 @@ impl Mbc3CartridgeMapper {
         [0, u16::from(self.rom_bank_number)]
     }
 
-    /// What 0xA000-0xBFFF shows: a RAM bank, or a clock register 0x08-0x0F.
+    /// The four low bits last written to 0x4000-0x5FFF, which pick a RAM
+    /// bank or a clock register 0x08-0x0F (see `selected` for what
+    /// 0xA000-0xBFFF then shows).
     pub(super) fn ram_bank_or_rtc_register(&self) -> u8 {
         self.ram_bank_or_rtc_register
     }

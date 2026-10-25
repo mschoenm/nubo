@@ -212,10 +212,11 @@ impl Cpu {
         self.is_flag_set(CARRY_FLAG)
     }
 
-    /// Whether a 16-bit increment, decrement or stack access at `address` can
-    /// trigger the OAM bug. OAM (object attribute memory, 0xFE00-0xFE9F) holds the
-    /// sprite table; on the DMG, touching this range with 16-bit register
-    /// arithmetic while the PPU scans OAM corrupts it.
+    /// Whether a 16-bit increment, decrement or stack access at `address`
+    /// (0xFE00-0xFEFF: OAM, the object attribute memory that holds the
+    /// sprite table, and the unusable area after it) can trigger the OAM bug,
+    /// which on monochrome models corrupts OAM while the PPU scans it. The
+    /// PPU decides whether the bug applies (`gpu/oam_bug.rs`).
     fn can_trigger_oam_bug(&self, address: u16) -> bool {
         !self.address_bus.processor_test_mode() && (0xFE00..=0xFEFF).contains(&address)
     }

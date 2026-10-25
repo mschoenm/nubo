@@ -1110,6 +1110,19 @@ fn a_revision_other_than_the_most_common_shows_unfolded_and_b_goes_back() {
 }
 
 #[test]
+fn the_folder_watcher_follows_the_played_games_outside_the_folders() {
+    let (mut app, path, folder) = app_with_color_game("watch");
+    test_data_folder();
+    app.fresh = false;
+    app.watch_recent_games();
+    assert_eq!(app.watched_games, std::slice::from_ref(&path));
+
+    let _ = app.update(LibraryMessage::RemoveRecent(path).into());
+    assert!(app.watched_games.is_empty());
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+#[test]
 fn a_games_menu_offers_to_delete_its_save_states_until_they_are_deleted() {
     let (mut app, path, folder) = app_with_color_game("save-states");
     test_data_folder();

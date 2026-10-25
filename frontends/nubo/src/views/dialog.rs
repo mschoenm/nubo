@@ -10,7 +10,7 @@ use crate::app::Message;
 use crate::dialog::{Choice, ChoiceStyle, Dialog, DialogContent, Layout, Notice};
 use crate::ui::icons::{Icon, icon};
 use crate::ui::theme;
-use crate::ui::widgets::menu_separator;
+use crate::ui::widgets::{divider, menu_separator};
 use iced::widget::{Column, Row, button, column, container, row, scrollable, space, text};
 use iced::{Alignment, Element, Fill, widget};
 
@@ -237,12 +237,7 @@ fn checkboxes<'a>(boxes: Vec<(usize, Choice)>, selection: usize) -> Element<'a, 
     let mut card = Column::new();
     for (place, (index, choice)) in boxes.into_iter().enumerate() {
         if place > 0 {
-            card = card.push(
-                container(space())
-                    .width(Fill)
-                    .height(1)
-                    .style(theme::divider),
-            );
+            card = card.push(divider());
         }
         let mark = if choice.checked {
             icon(Icon::SquareCheckBig).style(theme::accent_text)

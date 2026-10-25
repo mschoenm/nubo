@@ -279,8 +279,8 @@ impl Machine {
     }
 
     /// Carries out a command from the UI. Returns whether it changed the
-    /// frame on screen, which the app then has to be shown even while the
-    /// game is paused.
+    /// frame on screen, which the app then has to show even while the game
+    /// is paused.
     fn handle(&mut self, command: Command) -> bool {
         match command {
             Command::Press(key) => self.emulator.press_key(key),
@@ -354,7 +354,7 @@ impl Machine {
 
     /// Emulates one audio buffer's worth of time and queues its sound.
     /// Returns how long that sound takes to play, and whether a frame
-    /// finished meanwhile (see `Frame::latest`).
+    /// finished meanwhile (see `Machine::frame_finished`).
     fn play_buffer(&mut self) -> (Duration, bool) {
         let (left, right) = self.emulator.step_until_next_audio_buffer();
         let playing_time = self.audio.queue(left, right);

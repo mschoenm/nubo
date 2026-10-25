@@ -429,11 +429,11 @@ impl FastForward {
 /// Copies the emulator's finished frame into the shared buffer for the app,
 /// keeping the one before it, and calls the app's callback if it listens. A
 /// call the app hasn't handled yet already covers this frame, since the app
-/// always takes the newest one and the one before it. Once
-/// the picture stops changing, the first frame like the one before is still
-/// handed on, so a picture mixed with the frame before it (frame blending)
-/// settles; the ones after it are skipped, so still screens such as menus
-/// and text boxes don't redraw the window.
+/// always takes the newest one and the one before it. Once the picture stops
+/// changing, the first frame like the one before is still handed on, so a
+/// picture mixed with the frame before it (frame blending) settles; the ones
+/// after it are skipped, so still screens such as menus and text boxes don't
+/// redraw the window.
 fn publish_frame(frame: &Mutex<SharedFrame>, emulator: &Emulator) {
     publish(frame, |frames| frames.update(emulator));
 }

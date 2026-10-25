@@ -567,6 +567,7 @@ impl App {
                 {
                     self.toasts.error(error);
                 }
+                self.watch_recent_games();
                 self.game = Some(game);
                 self.settings_tab = None;
                 self.capture = None;

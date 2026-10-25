@@ -161,7 +161,9 @@ impl Square {
         self.register(NR14)
     }
 
-    /// Channel 1's register `channel_1_register` for this channel.
+    /// The offset of this channel's register that matches channel 1's
+    /// register `channel_1_register`: NR1y itself, or NR2y for channel 2,
+    /// five addresses on.
     const fn register(self, channel_1_register: usize) -> usize {
         match self {
             Square::Channel1 => channel_1_register,

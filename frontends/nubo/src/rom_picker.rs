@@ -1,9 +1,10 @@
-//! The file pickers for opening a ROM and adding a ROM folder to the
-//! library, with rfd: the system's file dialog on the desktop and the
-//! browser's file picker on the web. The picked files are read with the same
-//! size limit and errors as every other way of opening a game. Reading a ROM
-//! from a path is in `nubo_frontend::rom`, and scanning a folder in
-//! `nubo_frontend::library`.
+//! The file pickers for opening a game, adding several games to the
+//! browser's library and adding a folder of games to the desktop's library,
+//! with rfd: the system's file dialog on the desktop and the browser's file
+//! picker on the web, which can't pick a folder (`pick_folder` gives `None`
+//! there). The picked files are read with the same size limit and errors as
+//! every other way of opening a game. Reading a ROM from a path is in
+//! `nubo_frontend::rom`, and scanning a folder in `nubo_frontend::library`.
 
 use nubo_frontend::rom::{EXTENSIONS, Rom};
 use std::path::PathBuf;

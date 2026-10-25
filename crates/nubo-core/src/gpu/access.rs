@@ -142,19 +142,26 @@ impl Gpu {
         (&mut self.video_ram, &mut self.object_attribute_memory)
     }
 
+    /// The byte at `index` of the 8 KiB VRAM window the CPU sees (0x8000-0x9FFF), from the bank
+    /// VBK selects on a CGB.
     pub(crate) fn video_ram_byte(&self, index: u16) -> u8 {
         self.video_ram[self.banked_video_ram_index(index) as usize]
     }
 
+    /// Writes the byte at `index` of the 8 KiB VRAM window the CPU sees (0x8000-0x9FFF), in the
+    /// bank VBK selects on a CGB.
     pub(crate) fn set_video_ram_byte(&mut self, index: u16, value: u8) {
         let banked_index = self.banked_video_ram_index(index);
         self.video_ram[banked_index as usize] = value;
     }
 
+    /// The byte at `index` (below 0xA0) of OAM, the object attribute memory at 0xFE00-0xFE9F.
     pub(crate) fn object_attribute_memory_byte(&self, index: u16) -> u8 {
         self.object_attribute_memory[index as usize]
     }
 
+    /// Writes the byte at `index` (below 0xA0) of OAM, the object attribute memory at
+    /// 0xFE00-0xFE9F.
     pub(crate) fn set_object_attribute_memory_byte(&mut self, index: u16, value: u8) {
         self.object_attribute_memory[index as usize] = value;
     }
