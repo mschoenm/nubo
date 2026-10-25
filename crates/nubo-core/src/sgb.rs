@@ -905,7 +905,8 @@ impl Sgb {
                 && self.idle_frames >= attraction::IDLE_FRAMES;
             BorderSource::Nubo {
                 time: self.border_time,
-                attraction_frame: attraction.then(|| self.idle_frames - attraction::IDLE_FRAMES),
+                attraction_pose: attraction
+                    .then(|| attraction::pose(self.idle_frames - attraction::IDLE_FRAMES)),
             }
         };
         let cache = &mut self.border_cache;

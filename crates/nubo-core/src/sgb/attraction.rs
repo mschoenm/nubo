@@ -24,7 +24,7 @@ pub(super) const IDLE_FRAMES: u32 = 25_086;
 const FADE_IN_FRAMES: u32 = 64;
 /// The part of the logo's design square the cloud fills, eyes included: its
 /// left and top edges, width and height, in design units.
-const CLOUD_AREA: (f32, f32, f32, f32) = (12.0, 15.0, 40.0, 33.0);
+pub(super) const CLOUD_AREA: (f32, f32, f32, f32) = (12.0, 15.0, 40.0, 33.0);
 /// How many samples per pixel edge a cloud is drawn with, to smooth its
 /// edges.
 const SAMPLES: usize = 4;
@@ -52,25 +52,46 @@ pub(super) struct Cloud {
     pixels: Vec<[u8; 4]>,
     /// Its top edge in the 256×224 picture.
     top: usize,
-    /// How many frames it takes to move a pixel to the right.
-    frames_per_pixel: u32,
-    /// How many pixels along its way it starts, its way being from just off
-    /// the left edge of the picture to just off the right.
-    start: usize,
+}
+
+/// What the attraction mode's picture at a frame depends on: how far the
+/// clouds have faded in, and where each cloud is along its way. The clouds
+/// move a pixel only every few frames, so frames with the same pose draw the
+/// same picture, and the border is only drawn again when the pose changes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct Pose {
+    /// How many of the `FADE_IN_FRAMES` the clouds have faded in for.
+    fade_in: u32,
+    /// How many pixels along its way each cloud is, in the order of
+    /// `CLOUDS`, its way being from just off the left edge of the picture to
+    /// just off the right.
+    positions: [usize; CLOUDS.len()],
 }
 
 /// The attraction mode's clouds, drawn once.
 pub(super) fn clouds() -> Vec<Cloud> {
     CLOUDS
         .iter()
-        .map(|&(width, top, frames_per_pixel, start)| Cloud {
+        .map(|&(width, top, _, _)| Cloud {
             width,
             pixels: draw_cloud(width),
             top,
-            frames_per_pixel,
-            start,
         })
         .collect()
+}
+
+/// The pose at `frame` of the attraction mode, counting from 0 when it
+/// starts: the clouds fade in and then drift on, each coming back in from
+/// the left once it has left the picture on the right.
+pub(super) fn pose(frame: u32) -> Pose {
+    Pose {
+        fade_in: frame.min(FADE_IN_FRAMES),
+        positions: CLOUDS.map(|(width, _, frames_per_pixel, start)| {
+            let way = BORDERED_WIDTH + width;
+            let along = (frame / frames_per_pixel) as usize % way;
+            (along + start) % way
+        }),
+    }
 }
 
 /// Draws the cloud of Nubo's logo, with its eyes but without the purple
@@ -112,19 +133,14 @@ fn draw_cloud(width: usize) -> Vec<[u8; 4]> {
         .collect()
 }
 
-/// Nubo's border at `frame` of the attraction mode, counting from 0 when it
-/// starts: the clouds fade in and then drift on, each coming back in from
-/// the left once it has left the picture on the right.
-pub(super) fn draw(border: &NuboBorder, frame: u32) -> BorderPicture {
+/// Nubo's border with the attraction mode's clouds in `pose`.
+pub(super) fn draw(border: &NuboBorder, pose: Pose) -> BorderPicture {
     let mut picture = border.picture.clone();
-    let visibility = frame.min(FADE_IN_FRAMES) as f32 / FADE_IN_FRAMES as f32;
+    let visibility = pose.fade_in as f32 / FADE_IN_FRAMES as f32;
     if visibility == 0.0 {
         return picture;
     }
-    for cloud in &border.clouds {
-        let way = BORDERED_WIDTH + cloud.width;
-        let along = (frame / cloud.frames_per_pixel) as usize % way;
-        let position = (along + cloud.start) % way;
+    for (cloud, &position) in border.clouds.iter().zip(&pose.positions) {
         for (index, pixel) in cloud.pixels.iter().enumerate() {
             let Some(x) = (position + index % cloud.width)
                 .checked_sub(cloud.width)
@@ -150,14 +166,14 @@ pub(super) fn draw(border: &NuboBorder, frame: u32) -> BorderPicture {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sgb::{BORDERED_HEIGHT, SCREEN_OFFSET, SgbBorderTime};
+    use crate::sgb::{BORDERED_HEIGHT, SCREEN_HEIGHT, SCREEN_OFFSET, SCREEN_WIDTH, SgbBorderTime};
 
     #[test]
     fn the_clouds_fade_in_over_the_open_sky_only() {
         let border = NuboBorder::get(SgbBorderTime::Day);
-        assert_eq!(draw(border, 0).pixels, border.picture.pixels);
+        assert_eq!(draw(border, pose(0)).pixels, border.picture.pixels);
 
-        let picture = draw(border, 5_000);
+        let picture = draw(border, pose(5_000));
         let changed: Vec<_> = (0..BORDERED_WIDTH * BORDERED_HEIGHT)
             .filter(|&index| picture.pixels[index] != border.picture.pixels[index])
             .collect();
@@ -166,14 +182,34 @@ mod tests {
             let (x, y) = (index % BORDERED_WIDTH, index / BORDERED_WIDTH);
             assert!(border.open_sky[index] > 0.0, "{x}, {y}");
             let (left, top) = SCREEN_OFFSET;
-            assert!(!((left..left + 160).contains(&x) && (top..top + 144).contains(&y)));
+            assert!(
+                !((left..left + SCREEN_WIDTH).contains(&x)
+                    && (top..top + SCREEN_HEIGHT).contains(&y))
+            );
         }
     }
 
     #[test]
     fn the_clouds_keep_moving() {
         let border = NuboBorder::get(SgbBorderTime::Night);
-        assert_ne!(draw(border, 1_000).pixels, draw(border, 1_100).pixels);
+        assert_ne!(
+            draw(border, pose(1_000)).pixels,
+            draw(border, pose(1_100)).pixels
+        );
+    }
+
+    #[test]
+    fn the_pose_changes_only_when_the_picture_can() {
+        assert_ne!(pose(10), pose(11));
+        // 1,008 is a multiple of every cloud's frames per pixel but 5, so no
+        // cloud moves to the next frame, and the cloud taking 5 moves after.
+        assert_eq!(pose(1_008), pose(1_009));
+        assert_ne!(pose(1_009), pose(1_010));
+        let border = NuboBorder::get(SgbBorderTime::Night);
+        assert_eq!(
+            draw(border, pose(1_008)).pixels,
+            draw(border, pose(1_009)).pixels
+        );
     }
 
     #[test]

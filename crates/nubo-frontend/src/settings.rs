@@ -185,19 +185,15 @@ impl Default for Settings {
 
 impl Settings {
     /// These settings put back to how they start, as "Start over" leaves
-    /// them: the library folders stay unless `remove_folders`, and the
-    /// controls stay with their `controls_revision`, since "Start over"
-    /// resets them only when the player ticks that separately. The
-    /// questions about box art and new versions count as unanswered again,
-    /// so nothing is downloaded until the player answers them.
+    /// them: the library folders and the controls (with their
+    /// `controls_revision`) stay, since "Start over" removes or resets them
+    /// only when the player ticks that separately. The questions about box
+    /// art and new versions count as unanswered again, so nothing is
+    /// downloaded until the player answers them.
     #[must_use]
-    pub fn reset(&self, remove_folders: bool) -> Settings {
+    pub fn reset(&self) -> Settings {
         Settings {
-            library_folders: if remove_folders {
-                Vec::new()
-            } else {
-                self.library_folders.clone()
-            },
+            library_folders: self.library_folders.clone(),
             controls: self.controls.clone(),
             controls_revision: self.controls_revision,
             ..Settings::default()

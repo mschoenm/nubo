@@ -6,13 +6,9 @@
 //! The logo fades in on a dark purple, stays, and fades out again before the
 //! game's picture takes over.
 
-use crate::sgb::INTRO_FRAMES;
 use crate::sgb::nubo_border::nubo_colors;
+use crate::sgb::{INTRO_FRAMES, SCREEN_HEIGHT, SCREEN_WIDTH};
 
-/// The screen's width in pixels.
-const SCREEN_WIDTH: usize = 160;
-/// The screen's height in pixels.
-const SCREEN_HEIGHT: usize = 144;
 /// The logo's size in pixels.
 const LOGO_SIZE: usize = 64;
 /// The color behind the logo: the dark rim around the screen in Nubo's

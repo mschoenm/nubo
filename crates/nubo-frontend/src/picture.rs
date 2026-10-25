@@ -13,10 +13,7 @@ use std::any::Any;
 use std::fmt;
 use std::sync::{Arc, OnceLock};
 
-/// How many pixels wide the Game Boy screen is.
-pub const SCREEN_WIDTH: u32 = 160;
-/// How many pixels high the Game Boy screen is.
-pub const SCREEN_HEIGHT: u32 = 144;
+pub use nubo_core::{SCREEN_HEIGHT, SCREEN_WIDTH};
 
 /// A frame as the emulator finished it, before the player's palette or
 /// choices change it: the Game Boy screen, or on a Super Game Boy the TV

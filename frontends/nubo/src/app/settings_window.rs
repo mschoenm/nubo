@@ -238,6 +238,7 @@ impl App {
         {
             self.toasts.error(error);
         }
+        self.watch_recent_games();
         if choices.clear_recently_played {
             done.push("Continue playing cleared");
         }
@@ -246,6 +247,8 @@ impl App {
             if let Err(error) = self.library.remove_all_games() {
                 self.toasts.error(error);
             }
+            #[cfg(target_arch = "wasm32")]
+            self.watch_recent_games();
             done.push(if library::KEEPS_GAMES {
                 "games removed"
             } else {
@@ -321,6 +324,7 @@ impl App {
         {
             self.toasts.error(error);
         }
+        self.watch_recent_games();
         self.toasts.info("Put back as it was");
         self.settings_replaced()
     }

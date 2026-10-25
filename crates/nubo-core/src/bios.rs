@@ -20,7 +20,7 @@
 /// Game Boy Color's, it is mapped at 0x0000-0x00FF and 0x0200-0x08FF while it
 /// runs, leaving the cartridge header at 0x0100-0x01FF visible. It keeps
 /// Bootix's timing to the cycle and leaves the same state behind.
-pub const DMG_BOOT: [u8; 2304] = [
+pub(crate) const DMG_BOOT: [u8; 2304] = [
     49, 254, 255, 33, 255, 159, 175, 50, 203, 124, 32, 250, 14, 17, 33, 38, 255, 62, 128, 50, 226,
     12, 62, 243, 50, 226, 12, 62, 119, 50, 226, 17, 4, 1, 33, 16, 128, 26, 205, 99, 0, 26, 203, 55,
     205, 99, 0, 19, 123, 254, 52, 32, 240, 17, 119, 0, 6, 8, 26, 19, 34, 35, 5, 32, 249, 33, 4,
@@ -125,7 +125,7 @@ pub const DMG_BOOT: [u8; 2304] = [
 /// the cartridge header at 0x0100-0x01FF visible; real ones end at 0x08FF and
 /// Nubo's part lives after that. It keeps the timing of the version Nubo used
 /// before to the cycle and leaves the same state behind.
-pub const CGB_BOOT: [u8; 3072] = [
+pub(crate) const CGB_BOOT: [u8; 3072] = [
     49, 254, 255, 205, 223, 5, 38, 254, 14, 160, 34, 13, 32, 252, 14, 16, 33, 48, 255, 34, 47, 13,
     32, 251, 224, 193, 224, 128, 62, 128, 224, 38, 224, 17, 62, 243, 224, 18, 224, 37, 62, 119,
     224, 36, 62, 252, 224, 71, 17, 4, 1, 33, 16, 128, 26, 71, 205, 170, 5, 19, 123, 254, 52, 32,

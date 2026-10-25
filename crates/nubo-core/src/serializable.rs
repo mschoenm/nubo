@@ -52,7 +52,7 @@ use std::io::{Error, ErrorKind, Read, Result, Write};
 /// other versions of Nubo can find the ones they know and skip the others.
 /// [`read_fields`] reads them back. Derived implementations use it for every
 /// struct, and manual ones should too.
-pub struct FieldWriter<'a> {
+pub(crate) struct FieldWriter<'a> {
     writer: &'a mut dyn Write,
     /// The bytes of the field being written, which are only written once
     /// their length is known.
@@ -62,7 +62,7 @@ pub struct FieldWriter<'a> {
 impl<'a> FieldWriter<'a> {
     /// Starts writing a struct's fields to `writer`; [`FieldWriter::finish`]
     /// ends it.
-    pub fn new(writer: &'a mut dyn Write) -> Self {
+    pub(crate) fn new(writer: &'a mut dyn Write) -> Self {
         FieldWriter {
             writer,
             value: Vec::new(),
@@ -70,7 +70,7 @@ impl<'a> FieldWriter<'a> {
     }
 
     /// Writes `value` as the field `name`.
-    pub fn field<T: Serializable>(&mut self, name: &str, value: &T) -> Result<()> {
+    pub(crate) fn field<T: Serializable>(&mut self, name: &str, value: &T) -> Result<()> {
         self.field_with(name, T::encoding, |writer| value.serialize(writer))
     }
 
@@ -78,7 +78,7 @@ impl<'a> FieldWriter<'a> {
     /// isn't one `Serializable` value, such as the items of an array.
     /// `encoding` says how they are stored, as [`Serializable::encoding`]
     /// does for a value (see [`array_encoding`]).
-    pub fn field_with(
+    pub(crate) fn field_with(
         &mut self,
         name: &str,
         encoding: impl FnOnce() -> String,
@@ -98,7 +98,7 @@ impl<'a> FieldWriter<'a> {
     }
 
     /// Ends the struct's fields.
-    pub fn finish(self) -> Result<()> {
+    pub(crate) fn finish(self) -> Result<()> {
         0u8.serialize(self.writer)
     }
 }
@@ -111,7 +111,7 @@ impl<'a> FieldWriter<'a> {
 /// value it had, and one that leaves bytes over keeps what it read from the
 /// start of them; both are noted for [`collect_unreadable`]. Damaged data and
 /// values a component's checks reject fail the whole read.
-pub fn read_fields(
+pub(crate) fn read_fields(
     reader: &mut dyn Read,
     mut read_field: impl FnMut(&str, &mut &[u8]) -> Result<bool>,
 ) -> Result<()> {
@@ -156,7 +156,7 @@ pub fn read_fields(
 
 /// Writes a name of 1 to 255 bytes, preceded by its length. Fields and enum
 /// variants are stored by name.
-pub fn write_name(writer: &mut dyn Write, name: &str) -> Result<()> {
+pub(crate) fn write_name(writer: &mut dyn Write, name: &str) -> Result<()> {
     let length = u8::try_from(name.len())
         .map_err(|_| Error::new(ErrorKind::InvalidInput, "a name is too long to save"))?;
     length.serialize(writer)?;
@@ -165,7 +165,7 @@ pub fn write_name(writer: &mut dyn Write, name: &str) -> Result<()> {
 
 /// How `count` values of type `T` stored one after another are stored, such
 /// as `4 × f32`, for [`FieldWriter::field_with`].
-pub fn array_encoding<T: Serializable>(count: usize) -> String {
+pub(crate) fn array_encoding<T: Serializable>(count: usize) -> String {
     format!("{count} × {}", T::encoding())
 }
 
@@ -173,7 +173,11 @@ pub fn array_encoding<T: Serializable>(count: usize) -> String {
 /// them), by its name. [`stored_layout`] lists all the variants, so a variant
 /// renamed in the code without keeping its stored name shows up even when no
 /// state uses it.
-pub fn write_variant(writer: &mut dyn Write, variant: &str, variants: &[&str]) -> Result<()> {
+pub(crate) fn write_variant(
+    writer: &mut dyn Write,
+    variant: &str,
+    variants: &[&str],
+) -> Result<()> {
     note_variants(variants);
     write_name(writer, variant)
 }
@@ -181,7 +185,7 @@ pub fn write_variant(writer: &mut dyn Write, variant: &str, variants: &[&str]) -
 /// Notes that the value being written is one of `variants`, for
 /// [`stored_layout`]. [`write_variant`] does this; values that store a choice
 /// from a fixed list in another way call it themselves.
-pub fn note_variants(variants: &[&str]) {
+pub(crate) fn note_variants(variants: &[&str]) {
     TRACKING.with_borrow_mut(|tracking| {
         let path = tracking.path.join(".");
         if let Some(layout) = &mut tracking.layout {
@@ -192,7 +196,7 @@ pub fn note_variants(variants: &[&str]) {
 
 /// Reads a name written by [`write_name`], or the empty name that ends a
 /// struct's fields.
-pub fn read_name(reader: &mut dyn Read) -> Result<String> {
+pub(crate) fn read_name(reader: &mut dyn Read) -> Result<String> {
     let mut length = 0u8;
     length.deserialize(reader)?;
     let mut bytes = vec![0; usize::from(length)];
@@ -203,7 +207,7 @@ pub fn read_name(reader: &mut dyn Read) -> Result<String> {
 /// The error for a value this version can't read from its bytes, such as an
 /// enum variant it doesn't have. [`read_fields`] leaves such a value as it was
 /// instead of failing.
-pub fn unreadable_value(message: impl Into<String>) -> Error {
+pub(crate) fn unreadable_value(message: impl Into<String>) -> Error {
     Error::new(ErrorKind::InvalidData, UnreadableValue(message.into()))
 }
 
@@ -322,7 +326,7 @@ fn note_unreadable() {
 /// Runs `read` and returns the paths of the values it couldn't read from
 /// their bytes and left as they were, such as `ppu.line_state`. A state from
 /// this version, or one whose changes all followed the module docs, has none.
-pub fn collect_unreadable(read: impl FnOnce() -> Result<()>) -> Result<Vec<String>> {
+pub(crate) fn collect_unreadable(read: impl FnOnce() -> Result<()>) -> Result<Vec<String>> {
     TRACKING.with_borrow_mut(|tracking| {
         *tracking = Tracking {
             unreadable: Some(Vec::new()),
@@ -340,7 +344,7 @@ pub fn collect_unreadable(read: impl FnOnce() -> Result<()>) -> Result<Vec<Strin
 /// as, such as `cpu.run_state = Halted`. A field of the items of a `Vec`
 /// appears once, and the fields of an empty `Vec`'s items or of a `None` are
 /// listed too.
-pub fn stored_layout(write: impl FnOnce() -> Result<()>) -> Result<BTreeSet<String>> {
+pub(crate) fn stored_layout(write: impl FnOnce() -> Result<()>) -> Result<BTreeSet<String>> {
     TRACKING.with_borrow_mut(|tracking| {
         *tracking = Tracking {
             layout: Some(BTreeSet::new()),
@@ -365,7 +369,7 @@ pub fn stored_layout(write: impl FnOnce() -> Result<()>) -> Result<BTreeSet<Stri
 /// are always zero between `Emulator` calls, are marked
 /// `#[serializable(skip)]`, or left out of a hand-written implementation with
 /// a comment saying why.
-pub trait Serializable {
+pub(crate) trait Serializable {
     /// Appends this value's bytes to `writer`.
     fn serialize(&self, writer: &mut dyn Write) -> Result<()>;
 

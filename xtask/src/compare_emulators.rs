@@ -28,6 +28,7 @@ use crate::{Result, benchmark_roms, build_commit, on_path, target_dir};
 use clap::builder::PossibleValue;
 use clap::{Args, ValueEnum};
 use image::RgbImage;
+use nubo_core::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::fs;
@@ -44,8 +45,6 @@ const DEFAULT_SECONDS: f64 = 30.0;
 /// shorter runs by default.
 const DEFAULT_INSTRUCTION_SECONDS: f64 = 10.0;
 const DEFAULT_ROUNDS: u32 = 3;
-const SCREEN_WIDTH: u32 = 160;
-const SCREEN_HEIGHT: u32 = 144;
 
 /// An emulator the comparison can run.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
