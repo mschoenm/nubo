@@ -200,12 +200,36 @@ fn every_game_in_the_published_screenshots_is_credited() {
     let root = workspace_root();
     let list = ScreenshotList::read(&root.join(SCREENSHOTS_FILE)).unwrap();
     let games = GameList::read(&root.join(GAMES_FILE)).unwrap();
+    assert!(!list.screenshots.is_empty() && !games.games.is_empty());
     check_credits(&root, &list, &games).unwrap();
+}
+
+#[test]
+fn a_list_that_cant_be_read_is_an_error_but_a_missing_one_is_empty() {
+    let folder = std::env::temp_dir();
+    // Bytes that aren't UTF-8 fail the read the same way on every system,
+    // where reading a folder doesn't.
+    let unreadable = folder.join(format!("nubo-unreadable-list-{}.toml", std::process::id()));
+    std::fs::write(&unreadable, [0xFF, 0xFE, 0xFD]).unwrap();
+    let screenshots = ScreenshotList::read(&unreadable);
+    let games = GameList::read(&unreadable);
+    std::fs::remove_file(&unreadable).unwrap();
+    assert!(screenshots.is_err());
+    assert!(games.is_err());
+    let missing = folder.join("nubo-no-such-list.toml");
+    assert!(
+        ScreenshotList::read(&missing)
+            .unwrap()
+            .screenshots
+            .is_empty()
+    );
+    assert!(GameList::read(&missing).unwrap().games.is_empty());
 }
 
 #[test]
 fn the_games_list_names_each_file_once() {
     let games = GameList::read(&workspace_root().join(GAMES_FILE)).unwrap();
+    assert!(!games.games.is_empty());
     let mut files: Vec<&str> = games.games.iter().map(|game| game.file.as_str()).collect();
     files.sort_unstable();
     let count = files.len();

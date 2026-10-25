@@ -431,6 +431,7 @@ jobs:
           if git clone --depth 1 "https://github.com/${{ github.repository }}.wiki.git" "$wiki"; then
             git -C "$wiki" rev-parse HEAD > "$RUNNER_TEMP/wiki-base"
           else
+            echo "::warning::Couldn't clone the wiki (git's error is above), so tonight won't be recorded there."
             mkdir -p "$wiki"
           fi
           cargo xtask metrics append "$wiki/metrics.jsonl" "$RUNNER_TEMP/night.json"
@@ -484,9 +485,13 @@ jobs:
         run: |
           files="$RUNNER_TEMP/metrics"
           wiki="$RUNNER_TEMP/wiki"
-          if [ -z "$WIKI_TOKEN" ] || [ ! -f "$files/wiki-base" ]; then
-            echo "::warning::The wiki wasn't updated: it needs the WIKI_TOKEN secret and a first page."
+          if [ -z "$WIKI_TOKEN" ]; then
+            echo "::warning::The wiki wasn't updated: it needs the WIKI_TOKEN secret."
             exit 0
+          fi
+          if [ ! -f "$files/wiki-base" ]; then
+            echo "::error::The Metrics job couldn't clone the wiki, so tonight wasn't recorded. Its log says why; a wiki without a first page needs one made by hand."
+            exit 1
           fi
           git clone --depth 1 "https://github.com/${{ github.repository }}.wiki.git" "$wiki"
           if [ "$(git -C "$wiki" rev-parse HEAD)" != "$(cat "$files/wiki-base")" ]; then

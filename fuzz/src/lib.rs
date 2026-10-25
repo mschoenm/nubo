@@ -24,8 +24,8 @@ pub const MODELS: [Model; 12] = [
     Model::CgbD,
 ];
 
-/// The Nintendo logo every cartridge header holds at 0x0104, which the boot
-/// ROM checks.
+/// The Nintendo logo every cartridge header holds at 0x0104. A real
+/// console's boot ROM checks it; the ones Nubo ships don't.
 const LOGO: [u8; 48] = [
     0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
     0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
@@ -45,9 +45,9 @@ pub fn effects_on(clock: RtcClock) -> Box<NoSaves> {
     Box::new(NoSaves { rtc_clock: clock })
 }
 
-/// A cartridge the boot ROM accepts (the Nintendo logo and a right header
-/// checksum) and that does nothing, with the given cartridge type and ROM
-/// and RAM size codes from its header.
+/// A cartridge with a header a real console accepts (the Nintendo logo and
+/// a right header checksum) and that does nothing, with the given cartridge
+/// type and ROM and RAM size codes from its header.
 pub fn minimal_rom(cartridge_type: u8, rom_size: u8, ram_size: u8, color: bool) -> Vec<u8> {
     let banks = 2usize << rom_size.min(8);
     let mut rom = vec![0u8; 0x4000 * banks];
@@ -71,30 +71,31 @@ pub fn minimal_rom(cartridge_type: u8, rom_size: u8, ram_size: u8, color: bool) 
 
 /// How many boots [`start`] keeps per thread before it forgets them all, so
 /// a long run of the `rom` target, whose headers keep changing, doesn't fill
-/// the memory.
-const BOOTS_KEPT: usize = 4096;
+/// the memory. A booted emulator holds about 1.3 MiB (DMG) to 2.7 MiB (Super
+/// Game Boy) besides its ROM, so 256 of them stay well under libFuzzer's
+/// default memory limit of 2 GB.
+const BOOTS_KEPT: usize = 256;
+
+/// How many bytes of ROM the kept boots may hold together before [`start`]
+/// forgets them all. Each boot keeps its own copy of its ROM, padded to at
+/// least 32 KiB, and with real games as seeds (up to 8 MiB each)
+/// [`BOOTS_KEPT`] alone could pass libFuzzer's default memory limit of 2 GB.
+const ROM_BYTES_KEPT: usize = 256 << 20;
+
+/// The size a loaded cartridge pads a shorter ROM to, which is what a boot
+/// keeps of it.
+const SMALLEST_ROM_KEPT: usize = 0x8000;
 
 /// The most CPU steps a boot ROM may take; a real boot takes far fewer.
 const BOOT_STEPS: u64 = 4_000_000;
 
 /// The boots [`start_on`] keeps: one per model, cartridge clock (whether it
 /// is the wall clock) and part of a ROM the boot ROM reads, `None` for one
-/// that didn't finish.
-type Boots = HashMap<(Model, bool, Vec<u8>), Option<Emulator>>;
-
-/// Whether the boot ROM accepts `rom`'s header: the Nintendo logo and the
-/// header checksum. One it rejects hangs it, as it does a real console, so
-/// such a cartridge never starts and isn't worth a boot. (Game Boy Color boot
-/// ROMs check only half the logo, so this skips a few headers they would
-/// start.)
-fn header_boots(rom: &[u8]) -> bool {
-    let Some(header) = rom.get(0x134..0x14E) else {
-        return false;
-    };
-    let checksum = header[..0x19]
-        .iter()
-        .fold(0u8, |sum, &byte| sum.wrapping_sub(byte).wrapping_sub(1));
-    rom.get(0x104..0x134) == Some(&LOGO[..]) && header[0x19] == checksum
+/// that didn't finish, and how many bytes of ROM they hold together.
+#[derive(Default)]
+struct Boots {
+    emulators: HashMap<(Model, bool, Vec<u8>), Option<Emulator>>,
+    rom_bytes: usize,
 }
 
 /// An emulator of `model` with `rom` inserted that has just run its boot ROM,
@@ -110,32 +111,32 @@ pub fn start(model: Model, rom: &[u8]) -> Option<Emulator> {
 /// ([`Emulator::boot_rom_input`]), so a boot is run once for each model,
 /// clock and such part, as the test ROM runner does, and copied with
 /// [`Emulator::clone_with_rom`] after that: every ROM starts exactly where a
-/// player's would. A zip file is unpacked by loading it, so it is booted on
-/// its own every time.
+/// player's would. Nubo's boot ROMs check neither the logo nor the header
+/// checksum, so every header boots, as it would for a player. A zip file is
+/// unpacked by loading it, and a ROM too short to hold that part fails to
+/// load, so both are booted on their own every time.
 pub fn start_on(model: Model, rom: &[u8], clock: RtcClock) -> Option<Emulator> {
     thread_local! {
-        static BOOTS: RefCell<Boots> = RefCell::new(HashMap::new());
+        static BOOTS: RefCell<Boots> = RefCell::new(Boots::default());
     }
     if rom.starts_with(b"PK\x03\x04") {
         return boot(model, rom, clock);
     }
-    if !header_boots(rom) {
-        // A real console hangs on this cartridge, so only loading it is
-        // checked: the boot and the run are skipped.
-        let _ = Emulator::new(model).load_rom(rom, effects_on(clock));
-        return None;
-    }
-    let input = rom.get(Emulator::boot_rom_input(model))?.to_vec();
+    let Some(input) = rom.get(Emulator::boot_rom_input(model)) else {
+        return boot(model, rom, clock);
+    };
     BOOTS.with(|boots| {
         let mut boots = boots.borrow_mut();
-        let key = (model, clock == RtcClock::WallClock, input);
-        if !boots.contains_key(&key) {
-            if boots.len() >= BOOTS_KEPT {
-                boots.clear();
+        let key = (model, clock == RtcClock::WallClock, input.to_vec());
+        if !boots.emulators.contains_key(&key) {
+            let rom_bytes = rom.len().max(SMALLEST_ROM_KEPT);
+            if boots.emulators.len() >= BOOTS_KEPT || boots.rom_bytes + rom_bytes > ROM_BYTES_KEPT {
+                *boots = Boots::default();
             }
-            boots.insert(key.clone(), boot(model, rom, clock));
+            boots.rom_bytes += rom_bytes;
+            boots.emulators.insert(key.clone(), boot(model, rom, clock));
         }
-        boots[&key]
+        boots.emulators[&key]
             .as_ref()?
             .clone_with_rom(rom, effects_on(clock))
             .ok()

@@ -315,8 +315,11 @@ fn emulate(
     } = boot_cache
         .boot(rom, test.model, progress)
         .map_err(|error| match error {
-            BootError::TimedOut => Failure {
-                reason: "timed out in the boot ROM".to_string(),
+            BootError::Stalled => Failure {
+                reason: format!(
+                    "emulated time stopped advancing in the boot ROM for {} seconds of wall-clock time",
+                    STALL_LIMIT.as_secs()
+                ),
                 screen: None,
                 stalled: true,
             },

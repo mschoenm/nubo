@@ -1,8 +1,7 @@
 //! Downloads the CPU tests at a pinned commit and checks them against the
 //! SHA-256 checksums in `v2.sha256`.
 
-use nubo_download::{download_all, has_checksum};
-use std::env;
+use nubo_download::{download_all, has_checksum, target_dir};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -68,13 +67,7 @@ pub(crate) fn ensure_cpu_tests() -> Result<PathBuf, String> {
 
 /// `json-cpu-tests` in Cargo's target directory.
 fn work_dir() -> PathBuf {
-    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .ancestors()
-        .nth(2)
-        .expect("the runner lives in tools/nubo-json-test-runner");
-    let target_dir = env::var_os("CARGO_TARGET_DIR")
-        .map_or_else(|| workspace_root.join("target"), PathBuf::from);
-    target_dir.join("json-cpu-tests")
+    target_dir().join("json-cpu-tests")
 }
 
 /// The entries of `MANIFEST`.
