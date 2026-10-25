@@ -2,7 +2,7 @@
 
 use crate::address_bus::MemoryMapped;
 use crate::address_bus::hdma::HdmaState;
-use crate::gpu::Gpu;
+use crate::gpu::{Gpu, OamDmaAccess};
 use crate::model::Model;
 use crate::serializable::Serializable;
 
@@ -197,6 +197,16 @@ fn should_reset_ly_and_keep_lyc_flag_when_lcd_is_turned_off() {
 
     assert_eq!(gpu.ly, 0);
     assert_eq!(gpu.read_byte(0xFF41), 0b1000_0100);
+}
+
+#[test]
+fn oam_dma_access_settles_when_a_transfer_ends_with_the_lcd_off() {
+    let mut gpu = initialize_test_gpu();
+    gpu.set_oam_dma_access(OamDmaAccess::Running { destination: 5 }, 2);
+    tick_dots(&mut gpu, 4);
+    gpu.set_lcdc(0);
+    gpu.set_oam_dma_access(OamDmaAccess::Free, 2);
+    assert!(gpu.oam_dma_access_settled());
 }
 
 #[test]
