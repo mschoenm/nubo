@@ -139,7 +139,7 @@ When every branch has passed its checks and its second-reviewer rounds:
 
 ## 10. Report and pull requests
 
-1. **The report:** write it from `report-template.md` as `docs/reviews/<date>.md`, add its line to `docs/reviews/README.md`, and commit both on the docs branch.
+1. **The report:** write it from `report-template.md` as `docs/reviews/<date>.md`, add its line to `docs/reviews/README.md` and bring the earlier rows' Still open column up to date (the issues of each still open, with today's date), and commit both on the docs branch.
 2. **The report page:** publish it as a private artifact (the Artifact tool, with its `artifact-design` skill), linking the pull requests and issues.
 3. **The pull requests:** open the five, without waiting for each other, in their merge order:
    1. docs
