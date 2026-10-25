@@ -12,8 +12,9 @@
 //! likely leaves a whole save behind, not half of one.
 //!
 //! A save that is there but can't be read (a file the player may not read,
-//! a broken localStorage entry) is never written over: the game starts
-//! without it, the player is told, and nothing is saved to it that run.
+//! a broken localStorage entry, a file too short to hold any RAM or a clock
+//! of the wrong size) is never written over: the game starts without it, the
+//! player is told, and nothing is saved to it that run.
 
 use crate::notices::Notices;
 use crate::storage::{self, Entry, Storage};
@@ -245,11 +246,31 @@ impl BatterySaves {
         }
     }
 
+    /// Reports that what is kept for `entry` was read but isn't a save
+    /// Nubo can use, and leaves it alone as [`BatterySaves::read`] does one
+    /// it can't read.
+    fn leave_unusable_alone(&self, entry: Entry<'_>) {
+        self.left_alone(entry).store(true, Ordering::Relaxed);
+        let location = self.storage.location(entry);
+        self.notices.report(format!(
+            "The in-game save at {location} isn't one Nubo can read, so Nubo leaves it as it is and saves nothing to it this time"
+        ));
+    }
+
     /// Reads the saved RAM, dropping any footer that isn't part of the RAM.
+    /// An empty save counts as none; one too short to hold any RAM is left
+    /// alone ([`BatterySaves::leave_unusable_alone`]).
     fn load_ram(&self) -> Option<Vec<u8>> {
         let mut ram = self.read(self.ram_entry())?;
+        if ram.is_empty() {
+            return None;
+        }
         ram.truncate(ram.len() / RAM_SIZE_GRANULARITY * RAM_SIZE_GRANULARITY);
-        (!ram.is_empty()).then_some(ram)
+        if ram.is_empty() {
+            self.leave_unusable_alone(self.ram_entry());
+            return None;
+        }
+        Some(ram)
     }
 
     /// Queues RAM the game wrote at `now`, reusing the queued buffer if
@@ -269,8 +290,18 @@ impl BatterySaves {
         }
     }
 
+    /// Reads the saved clock. An empty save counts as none; one of another
+    /// size is left alone ([`BatterySaves::leave_unusable_alone`]).
     fn load_rtc(&self) -> Option<RtcState> {
-        RtcState::from_bytes(&self.read(self.clock_entry())?)
+        let bytes = self.read(self.clock_entry())?;
+        if bytes.is_empty() {
+            return None;
+        }
+        let state = RtcState::from_bytes(&bytes);
+        if state.is_none() {
+            self.leave_unusable_alone(self.clock_entry());
+        }
+        state
     }
 
     /// Queues the clock state the game left at `now`.
