@@ -86,11 +86,7 @@ pub fn parse_frames(time: &str) -> Result<u32> {
         return Err(mistake());
     }
     let frames = (seconds * DOTS_PER_SECOND / DOTS_PER_FRAME as f64).round();
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "an hour at most, so a few hundred thousand frames"
-    )]
+    // An hour at most, so a few hundred thousand frames.
     Ok(frames as u32)
 }
 

@@ -72,11 +72,12 @@ impl GrayscaleReference {
         }
     }
 
-    /// Whether every pixel of the emulator's RGBA `frame`, in the colors
-    /// the app shows it in with `--raw-screen` (unlike [`normalize`], which rounds Game Boy
-    /// Color colors as the screenshots store them), is within `GRAYSCALE_TOLERANCE`
-    /// of the reference's brightness, as the Shootout's harness compares a
-    /// screenshot of the app. Stops at the first pixel that isn't.
+    /// Whether every pixel of the emulator's RGBA `frame`, in the colors the
+    /// app shows it in with `--raw-screen` (unlike [`normalize`], which rounds
+    /// Game Boy Color colors as the screenshots store them), is within
+    /// `GRAYSCALE_TOLERANCE` of the reference's brightness, as the Shootout's
+    /// harness compares a screenshot of the app. Stops at the first pixel that
+    /// isn't.
     pub(crate) fn matches_as_shown(&self, frame: &[u8]) -> bool {
         frame
             .as_chunks::<4>()

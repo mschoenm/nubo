@@ -1,8 +1,9 @@
-//! CGB VRAM DMA (also called HDMA): copies data into VRAM (video RAM) in
-//! blocks of 16 bytes. The address bus only routes HDMA1-HDMA5 here on a CGB,
-//! so the registers need no check for the model. It runs either all at once ("general purpose" mode,
-//! the CPU waits until it finishes) or one block per HBlank (the pause at the
-//! end of each screen line). The registers are HDMA1-HDMA5 at 0xFF51-0xFF55.
+//! CGB VRAM DMA (also called HDMA): copies data into VRAM (video RAM) in blocks
+//! of 16 bytes. The address bus only routes HDMA1-HDMA5 here on a CGB, so the
+//! registers need no check for the model. It runs either all at once ("general
+//! purpose" mode, the CPU waits until it finishes) or one block per HBlank (the
+//! pause at the end of each screen line). The registers are HDMA1-HDMA5 at
+//! 0xFF51-0xFF55.
 
 use crate::address_bus::{AddressBus, MemoryMapped};
 use crate::utils::is_bit_set;
@@ -31,7 +32,7 @@ pub(crate) struct HdmaState {
     transfer_mode: VramTransferMode,
     in_progress: bool,
     /// The last transfer copied all its blocks. False while a transfer runs
-    /// and after one was cancelled part-way; HDMA5 reads differently then.
+    /// and after one was canceled part-way; HDMA5 reads differently then.
     completed: bool,
     /// An HBlank started, so an HBlank-mode transfer should copy its next
     /// block.
@@ -45,7 +46,7 @@ pub(crate) struct HdmaState {
     /// The block kept through a speed switch halt starts copying in the
     /// M-cycle the CPU wakes up in, which already ran.
     copy_starts_on_wake: bool,
-    /// The transfer was cancelled while a block was already due, so it stops
+    /// The transfer was canceled while a block was already due, so it stops
     /// once that block is copied.
     cancelled_after_block: bool,
 }

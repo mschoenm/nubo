@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 pub(crate) const AUDIO_BUFFERS_PER_SECOND: u32 = 128;
 /// T-cycles (ticks of the 4 MHz clock) in one frame of the LCD.
 const T_CYCLES_PER_FRAME: u32 = 70224;
+/// T-cycles in one audio buffer.
 const T_CYCLES_PER_AUDIO_BUFFER: u32 = 4_194_304 / AUDIO_BUFFERS_PER_SECOND;
 
 /// The model's name as used in test IDs and `passing.txt`, such as "dmg",
@@ -540,8 +541,9 @@ const BLARGG_TESTS: [BlarggTest; 9] = [
     },
 ];
 
-/// Lists every test case, sorted by ID. Fails if two cases share an ID, since the run's results
-/// and `passing.txt` are kept by ID: a passing case would hide a failing one with its ID.
+/// Lists every test case, sorted by ID. Fails if two cases share an ID, since
+/// the run's results and `passing.txt` are kept by ID: a passing case would
+/// hide a failing one with its ID.
 pub(crate) fn discover(dirs: &RomDirs) -> Result<Vec<TestCase>, String> {
     let root = dirs.root(Source::Collection);
     let mut tests = blargg();
@@ -1082,7 +1084,8 @@ fn super_game_boy(root: &Path) -> Vec<TestCase> {
     same_suite.chain(packet_protocol).collect()
 }
 
-/// The path of a Mealybug reference screenshot, such as `m3_scx_low_3_bits_cgb_d.png`.
+/// The path of a Mealybug reference screenshot, such as
+/// `m3_scx_low_3_bits_cgb_d.png`.
 fn reference_screen(rom: &Path, revision: &str) -> PathBuf {
     let stem = rom.file_stem().unwrap_or_default().to_string_lossy();
     rom.with_file_name(format!("{stem}_{revision}.png"))

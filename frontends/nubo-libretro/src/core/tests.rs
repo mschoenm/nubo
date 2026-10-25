@@ -13,18 +13,22 @@ use std::time::Instant;
 /// runs.
 const BOOT_FRAMES: usize = 200;
 
+/// A core with `rom` loaded, with the default options.
 fn load(rom: &[u8]) -> Core {
     load_with(rom, Options::default())
 }
 
+/// A core with `rom` loaded with `options`, drawing in XRGB8888.
 fn load_with(rom: &[u8], options: Options) -> Core {
     Core::load(rom, options, PixelFormat::Xrgb8888).unwrap()
 }
 
+/// Runs `frames` frames with no button held.
 fn run(core: &mut Core, frames: usize) {
     run_holding(core, frames, 0);
 }
 
+/// Runs `frames` frames holding `buttons` (see [`buttons`]).
 fn run_holding(core: &mut Core, frames: usize, buttons: u16) {
     for _ in 0..frames {
         core.run(buttons);
@@ -44,6 +48,7 @@ fn work_ram(core: &mut Core, address: u16) -> u8 {
     core.system_ram()[usize::from(address - 0xC000)]
 }
 
+/// The last frame's XRGB8888 pixels, copied.
 fn frame(core: &Core) -> Vec<u32> {
     match core.video() {
         Video::Xrgb8888(pixels) => pixels.to_vec(),
@@ -409,6 +414,8 @@ fn real_seconds_since(started: Instant) -> i64 {
     i64::try_from(started.elapsed().as_secs()).unwrap() + 1
 }
 
+/// The options with the cartridge clock on emulated time instead of the
+/// computer's clock.
 fn emulated_time() -> Options {
     Options {
         rtc_clock: RtcClock::EmulatedTime,
@@ -416,6 +423,8 @@ fn emulated_time() -> Options {
     }
 }
 
+/// A core with the [`CLOCK`] program on an MBC3 cartridge with a clock,
+/// loaded with `options`.
 fn clock_game(options: Options) -> Core {
     load_with(
         &cartridge(MBC3_TIMER_RAM_BATTERY, RAM_32_KIB, false, CLOCK),

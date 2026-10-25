@@ -385,9 +385,11 @@ enum Phase {
     ExtraFetcherStep,
     /// Reads the object's tile number and flags from OAM.
     ReadObjectAttributes,
+    /// The dot after `ReadObjectAttributes`, in which the object fetch waits.
     ObjectAttributesWait,
     /// Reads the low byte of the object's tile row.
     ReadObjectLow,
+    /// The dot after `ReadObjectLow`, in which the object fetch waits.
     ObjectLowWait,
     /// Reads the high byte of the object's tile row.
     ReadObjectHigh,

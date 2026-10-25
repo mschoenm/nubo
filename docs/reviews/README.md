@@ -1,6 +1,6 @@
 # Full reviews
 
-Each full review of the repository (the `full-review` skill, `.claude/skills/full-review/SKILL.md`) leaves its report here, named by the day it started, and a line in this table. A report is a record of its day and isn't kept up to date; the issues it filed, labelled `code-review`, are. The next review starts by reading the last report and the issues still open.
+Each full review of the repository (the `full-review` skill, `.claude/skills/full-review/SKILL.md`) leaves its report here, named by the day it started, and a line in this table. A report is a record of its day and isn't kept up to date; the issues it filed, labeled `code-review`, are. The next review starts by reading the last report and the issues still open.
 
 | Report | `main` reviewed | Findings | Fixed | Pull requests | Issues filed | Still open |
 | --- | --- | --- | --- | --- | --- | --- |

@@ -23,7 +23,7 @@ Ask the maintainer once, in one question each with the default first:
 
 - **Fixes:** only small, safe ones (default), or larger ones too?
 - **Pull requests:** one per theme (default; the five themes are in step 5)?
-- **Issues:** one for each real finding that isn't fixed, labelled `code-review` (default)?
+- **Issues:** one for each real finding that isn't fixed, labeled `code-review` (default)?
 
 These are never asked, because they're fixed:
 - **Scope:** the whole repository.
@@ -32,7 +32,7 @@ These are never asked, because they're fixed:
 
 List the open pull requests and the files they change. A file an open pull request changes is left alone until it merges. Ask the maintainer whether to wait for it, then do the findings that need it after it merges, from the new `main`.
 
-Read the last report in `docs/reviews/` (the list is `docs/reviews/README.md`), the open issues labelled `code-review` and the open issues labelled `nightly`.
+Read the last report in `docs/reviews/` (the list is `docs/reviews/README.md`), the open issues labeled `code-review` and the open issues labeled `nightly`.
 
 ## 2. Set up and record a baseline
 
@@ -114,7 +114,7 @@ Run these one at a time, each in the background with its output in the work fold
 
 ## 8. File the issues
 
-One issue per `ISSUE` finding, labelled `code-review`, after searching the open issues for one that already covers it. Closely related findings can share one issue. Every issue says:
+One issue per `ISSUE` finding, labeled `code-review`, after searching the open issues for one that already covers it. Closely related findings can share one issue. Every issue says:
 - **What:** what is wrong, and a concrete case;
 - **Where:** the files and lines;
 - **Fix proposed:** the fix, and why the review didn't make it;

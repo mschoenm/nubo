@@ -17,7 +17,7 @@ pub(crate) const FRAMES_AFTER_BOOT: u32 = 15;
 ///
 /// The tiles were read from Nubo's own screen, not taken from Gambatte's
 /// source (GPL-2.0-only): the top-left tiles of every Gambatte test that
-/// expects a number were captured after its frames had run, each labelled
+/// expects a number were captured after its frames had run, each labeled
 /// with the digit its file name expects there. Every digit showed a single
 /// pattern (B the fewest times, in two tiles). A second agent that had seen
 /// neither this table nor any Gambatte source then wrote the table from those

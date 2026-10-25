@@ -995,7 +995,7 @@ mod tests {
     }
 
     #[test]
-    fn roms_that_share_a_name_are_labelled_by_their_path() {
+    fn roms_that_share_a_name_are_labeled_by_their_path() {
         let roms = [
             PathBuf::from("originals/game.gb"),
             PathBuf::from("hacks/game.gb"),

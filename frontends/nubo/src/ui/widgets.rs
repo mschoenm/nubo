@@ -93,7 +93,7 @@ pub fn bar_button<'a, Message: Clone + 'a>(
     primary: bool,
     on_press: Message,
 ) -> Element<'a, Message> {
-    let button = labelled_button(icon, label)
+    let button = labeled_button(icon, label)
         .padding([6, 12])
         .style(bar_button_style(primary))
         .on_press(on_press);
@@ -171,7 +171,7 @@ pub fn primary_button<'a, Message: Clone + 'a>(
     label: impl text::IntoFragment<'a>,
     on_press: Message,
 ) -> Element<'a, Message> {
-    labelled_button(icon, label)
+    labeled_button(icon, label)
         .padding([10, 18])
         .style(theme::primary_button)
         .on_press(on_press)
@@ -184,7 +184,7 @@ pub fn secondary_button<'a, Message: Clone + 'a>(
     label: impl text::IntoFragment<'a>,
     on_press: Message,
 ) -> Element<'a, Message> {
-    labelled_button(icon, label)
+    labeled_button(icon, label)
         .padding([7, 14])
         .style(theme::secondary_button)
         .on_press(on_press)
@@ -193,7 +193,7 @@ pub fn secondary_button<'a, Message: Clone + 'a>(
 
 /// A button showing `icon` before `label`, without a style or an action
 /// yet.
-fn labelled_button<'a, Message: 'a>(
+fn labeled_button<'a, Message: 'a>(
     icon: Icon,
     label: impl text::IntoFragment<'a>,
 ) -> button::Button<'a, Message> {

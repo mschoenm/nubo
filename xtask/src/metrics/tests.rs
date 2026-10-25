@@ -1,3 +1,6 @@
+//! Tests for the nightly metrics log: the regressions it finds and the report
+//! it writes.
+
 use super::*;
 use serde_json::json;
 
