@@ -1,5 +1,5 @@
-//! Finding and downloading box art (the `desktop` feature), with `ureq`. The game
-//! lists are kept in `box_art/lists` in the user's data folder.
+//! Finding and downloading box art (the `desktop` feature), with `ureq`. The
+//! game lists are kept in `box_art/lists` in the user's data folder.
 
 use super::names::{
     GAME_BOY, GAME_BOY_COLOR, GameList, MAX_DOWNLOAD_SIZE, box_art_url, list_url, shrink, systems,

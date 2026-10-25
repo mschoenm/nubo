@@ -146,8 +146,8 @@ impl Session {
     /// refresh, and writes battery saves once they stop changing. The app
     /// calls it on each frame tick. The time of the screen's latest refresh
     /// comes from the session's own clock (see `refresh_clock.rs`), not from
-    /// the app's ticks, which come too unevenly. To fast forward, it emulates the
-    /// speed's multiplier of frames for every one due, and only plays the
+    /// the app's ticks, which come too unevenly. To fast forward, it emulates
+    /// the speed's multiplier of frames for every one due, and only plays the
     /// sound of the last.
     pub fn run_due_frames(&mut self) {
         if self.machine.playback.running {
