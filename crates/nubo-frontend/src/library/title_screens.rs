@@ -103,7 +103,9 @@ impl Capture {
             if self.steps >= step_limit {
                 return None;
             }
-            self.emulator.step();
+            // One instruction, as `Emulator::step` runs it, but dropping the
+            // sound once a buffer of it is full, so it can't pile up.
+            self.emulator.step_toward_next_audio_buffer(1);
             self.steps += 1;
 
             // The boot ROM's logo is the same for every game, so the moments

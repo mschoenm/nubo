@@ -252,6 +252,13 @@ impl Emulator {
     /// cycle (four clock ticks), or, while the CPU is halted and nothing can
     /// wake it for a while, that whole stretch at once (up to about a thousand
     /// machine cycles), so the time one step covers varies.
+    ///
+    /// The sound a step makes stays queued until a call hands it out
+    /// ([`Emulator::step_until_next_audio_buffer`], [`Emulator::run_frame`])
+    /// or drops a full buffer of it
+    /// ([`Emulator::step_toward_next_audio_buffer`]), so a caller that runs
+    /// for long with `step` alone should use one of those now and then, or
+    /// the samples pile up in memory.
     pub fn step(&mut self) {
         self.start_running();
         self.cpu.step();
