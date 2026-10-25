@@ -14,9 +14,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 const SAMPLE_FRAMES: [u32; 4] = [150, 300, 450, 600];
 /// Gives up on games that stop drawing frames, such as ones that crash.
 const MAX_STEPS: u32 = 40_000_000;
-/// The most instructions one piece of a capture runs (see [`Capture::run`]),
-/// about 15 frames' worth, so a game that stops drawing frames still lets
-/// the browser draw the page between pieces.
+/// The most instructions one piece of a capture runs (see [`Capture::run`]).
+/// An instruction takes at least one machine cycle, so that is at least 17
+/// frames' worth (half that in a Game Boy Color game's double speed), and
+/// usually two or three times as many. The limit lets the browser draw the
+/// page between pieces even while a game stops drawing frames.
 const MAX_STEPS_AT_ONCE: u32 = 300_000;
 /// The sample rate the emulator makes its (unused) sound at.
 const SAMPLE_RATE: u32 = 32_768;
