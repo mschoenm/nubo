@@ -12,15 +12,17 @@ use super::{Cache, LibraryEntry, PictureKind};
 use crate::picture::{SCREEN_HEIGHT, SCREEN_WIDTH, encode_png};
 use crate::storage::{Unreadable, indexed_db, kept_name};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::path::Path;
 
 /// The entry that lists the known games.
 const LIBRARY: &str = "library.toml";
 
-/// The contents of `library.toml`.
+/// The contents of `library.toml`. Saving borrows the games, so they
+/// aren't copied first.
 #[derive(Serialize, Deserialize)]
-struct LibraryFile {
-    games: Vec<LibraryEntry>,
+struct LibraryFile<'a> {
+    games: Cow<'a, [LibraryEntry]>,
 }
 
 /// Reads the known games, or none if there is no library entry yet. An
@@ -36,7 +38,7 @@ pub fn load_entries(_cache: &Cache) -> Result<Vec<LibraryEntry>, Unreadable> {
         .and_then(|contents| {
             toml::from_str::<LibraryFile>(contents).map_err(|error| error.to_string())
         })
-        .map(|file| file.games)
+        .map(|file| file.games.into_owned())
         .map_err(|error| super::unreadable_library(&error, Some(keep_aside())))
 }
 
@@ -57,7 +59,7 @@ fn keep_aside() -> Result<String, String> {
 /// Writes the known games to `library.toml`.
 pub fn save_entries(_cache: &Cache, entries: &[LibraryEntry]) -> Result<(), String> {
     let file = LibraryFile {
-        games: entries.to_vec(),
+        games: Cow::Borrowed(entries),
     };
     let contents = toml::to_string(&file).map_err(|error| error.to_string())?;
     indexed_db::write(LIBRARY, contents.as_bytes())
