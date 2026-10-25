@@ -225,8 +225,10 @@ pub(crate) struct Gpu {
     /// doesn't request an interrupt there, while one that was already enabled still blocks the
     /// others.
     stat_at_line_start: u8,
-    /// In double speed, the line the LY=LYC interrupt source compares LYC with after a write in
-    /// the last dots of a line, until the comparison itself reaches that line.
+    /// On DMG and in double speed, the line the LY=LYC interrupt source compares LYC with after a
+    /// write around a change of line (in a line's last dots or first two, or on line 153 before it
+    /// compares with 0), until the comparison itself reaches that line (see
+    /// `Gpu::adjust_lyc_source_after_write`).
     lyc_source_line: Option<u8>,
 
     /// Dots counted while the PPU doesn't draw (the LCD is off, or STOP stopped a monochrome
