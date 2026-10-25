@@ -20,7 +20,7 @@ const UNUSED_CONTROL_BITS: u8 = 0xF8;
 /// `write_byte`, which handles the reload and the falling edges a write can
 /// cause.
 #[derive(Clone, Default, Serializable, Debug)]
-pub struct TimerRegisters {
+pub(crate) struct TimerRegisters {
     /// The internal counter that DIV is the upper byte of. The APU and the
     /// serial port keep copies to find the edges of its bits; the address bus
     /// passes them every change (`AddressBus::step_timers`,

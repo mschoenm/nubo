@@ -72,7 +72,7 @@ pub(crate) const SGB_PLAYERS: usize = 4;
 /// from before Nubo stored the buttons keeps the ones held now, without an
 /// interrupt.
 #[derive(Clone, Debug, CopyGetters, Setters, Serializable)]
-pub struct Joypad {
+pub(crate) struct Joypad {
     /// Bits 4 and 5 of JOYP. Bit 4 low selects the directions, bit 5 low
     /// selects the action buttons.
     #[getset(get_copy = "pub(super)")]
