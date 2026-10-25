@@ -228,9 +228,9 @@ function busy(n) {
 function workingHtml() {
   const rows = Object.values(statuses).filter((s) => s.state !== "Klaar").sort((a, b) => a.n - b.n);
   if (!rows.length) return "";
-  return `<h3 class="group-title">Bezig</h3><div class="list">${rows.map((s) => `<article class="card compact">
+  return `<h2 class="group-title">Bezig</h2><div class="list">${rows.map((s) => `<article class="card compact">
     <span class="num"><a href="${REPO}${s.n}" target="_blank" rel="noopener">#${s.n}</a></span>
-    <h2 class="title">${esc(issueTitle(s.n) || "Issue #" + s.n)}</h2>
+    <h3 class="title">${esc(issueTitle(s.n) || "Issue #" + s.n)}</h3>
     <div class="status">${statusParts(s)}</div></article>`).join("")}</div>`;
 }
 
@@ -260,7 +260,7 @@ function card(i) {
   return `<article class="card${i.status === "opgelost" ? " closed-on-main" : ""}" data-n="${i.n}">
     <div class="head">
       <span class="num"><a href="${REPO}${i.n}" target="_blank" rel="noopener">#${i.n}</a> · ${esc(areaOf(i))}</span>
-      <h2 class="title">${esc(i.title)}</h2>
+      <h3 class="title">${esc(i.title)}</h3>
       <div class="badges"><span class="badge ${vk}">${vl}</span><span class="badge plain">${esc(i.size)}</span>${statusBadge}</div>
     </div>
     <p class="verdict">${rich(i.opinion)}</p>
@@ -282,7 +282,7 @@ function closedCard(i) {
   const s = statuses[i.n];
   return `<article class="card compact closed-on-main">
     <span class="num"><a href="${REPO}${i.n}" target="_blank" rel="noopener">#${i.n}</a> · ${esc(areaOf(i))}</span>
-    <h2 class="title">${esc(i.title)}</h2>
+    <h3 class="title">${esc(i.title)}</h3>
     <div class="status"><span class="badge done">Gesloten${i.closed_by ? " · " + esc(i.closed_by) : ""}</span>${s ? prBadge(s) : ""}</div>
   </article>`;
 }
@@ -297,12 +297,12 @@ function renderList() {
   for (const area of AREAS) {
     const group = items.filter((i) => areaOf(i) === area);
     if (!group.length) continue;
-    html += `<h3 class="group-title">${esc(area)}</h3><div class="list">${group.map(card).join("")}</div>`;
+    html += `<h2 class="group-title">${esc(area)}</h2><div class="list">${group.map(card).join("")}</div>`;
   }
   if (!listed().length) html += `<p class="msg">Er staan geen open issues. Dien er een in op GitHub; binnen een uur staat hij hier.</p>`;
   else if (!items.length) html += `<p class="msg">Niets in dit filter.</p>`;
   const closed = ISSUES.filter((i) => i.closed).sort((a, b) => b.n - a.n);
-  if (closed.length && filter === "alles") html += `<h3 class="group-title">Onlangs gesloten</h3><div class="list">${closed.map(closedCard).join("")}</div>`;
+  if (closed.length && filter === "alles") html += `<h2 class="group-title">Onlangs gesloten</h2><div class="list">${closed.map(closedCard).join("")}</div>`;
   $("main").innerHTML = html;
   open.forEach((id) => { const d = document.getElementById(id); if (d) d.open = true; });
   if (focus && document.getElementById(focus)) document.getElementById(focus).focus();
