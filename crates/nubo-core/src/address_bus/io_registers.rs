@@ -54,7 +54,13 @@ impl AddressBus {
     pub(super) fn write_io_register(&mut self, address: u16, value: u8) {
         match address & 0xFF {
             0x00 => self.write_joyp(value),
-            0x01..=0x02 => self.serial.write_byte(address, value),
+            0x01 => self.serial.write_byte(address, value),
+            // SC's clock speed bit only exists in CGB mode (Pan Docs); in DMG
+            // compatibility mode the serial port keeps its normal clock.
+            0x02 if !self.cgb_registers_enabled() => {
+                self.serial.write_byte(address, value & !0x02);
+            }
+            0x02 => self.serial.write_byte(address, value),
             0x10..=0x26 | 0x30..=0x3F => self.apu.write_byte(address, value),
             0x40..=0x45 | 0x47..=0x4B => self.gpu.write_byte(address, value),
             0x46 => self.dma.start_dma(value),

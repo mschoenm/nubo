@@ -1005,8 +1005,9 @@ impl AddressBus {
         palettes.set_obp1(power_on_value);
     }
 
-    /// Turns CGB mode (a Game Boy Color running a game made for it) on or
-    /// off, here and in the serial port, which only has its fast clock then.
+    /// Sets whether the console is a CGB, here and in the serial port, which
+    /// only has its fast clock on a CGB (and once the boot ROM is done, only
+    /// for a game made for it: `write_io_register` clears the bit otherwise).
     fn set_cgb_mode(&mut self, value: bool) {
         self.cgb_mode = value;
         self.serial.set_cgb_mode(value);

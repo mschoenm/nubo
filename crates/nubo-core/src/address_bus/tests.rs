@@ -513,6 +513,18 @@ fn ignores_vbk_and_opri_on_dmg() {
 }
 
 #[test]
+fn only_cgb_mode_picks_the_fast_serial_clock() {
+    for (key0, high_speed_bit) in [(0x00, 0x02), (0x04, 0x00)] {
+        let mut address_bus = address_bus_with_model(Model::CgbE);
+        address_bus.in_boot_rom = true;
+        address_bus.poke(0xFF4C, key0);
+        address_bus.in_boot_rom = false;
+        address_bus.poke(0xFF02, 0x83);
+        assert_eq!(address_bus.serial.read_byte(0xFF02) & 0x02, high_speed_bit);
+    }
+}
+
+#[test]
 fn reads_zero_from_unusable_oam_on_dmg() {
     let mut address_bus = address_bus_with_model(Model::Dmg);
     address_bus.poke(0xFEA5, 0x12);
