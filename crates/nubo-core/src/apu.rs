@@ -336,7 +336,9 @@ struct NoiseChannel {
     /// Ticks left before `counter` increments.
     counter_countdown: u8,
     /// A 14-bit counter; the LFSR steps when the bit NR43 selects goes from 0
-    /// to 1. Turning the DAC off can carry it past 0x3FFF (see `write_nr42`).
+    /// to 1. Repeated DAC-off writes can carry it past 0x3FFF, up to the full
+    /// 16 bits, until the next count masks it back to 14 bits (see
+    /// `write_nr42`).
     counter: u16,
     /// Counts 2 MHz ticks (wrapping around); its low bits give the phase that
     /// many noise quirks depend on.
@@ -461,11 +463,8 @@ impl ApuState {
             && wave.period <= MAX_PERIOD
             && wave.volume_shift <= 4;
         let noise = &self.noise;
-        let noise_valid = noise.length.is_valid(Channel::Noise.full_length())
-            && noise.envelope.is_valid()
-            // 14 bits, which NR42's increments without the wrap (see
-            // `write_nr42`) can carry a little past.
-            && noise.counter < 0x8000;
+        let noise_valid =
+            noise.length.is_valid(Channel::Noise.full_length()) && noise.envelope.is_valid();
         let sweep_valid = self.sweep_pace_counter <= 7
             && self.square_sweep_calculate_countdown <= 7
             && self.square_sweep_calculate_countdown_reload_timer <= 4

@@ -280,10 +280,14 @@ pub fn rows(tab: SettingsTab, settings: &Settings, state: &PageState<'_>) -> Vec
             );
         }
         SettingsTab::Library => {
-            if !library::KEEPS_GAMES {
-                rows.extend((0..settings.shared.library_folders.len()).map(SettingsRow::Folder));
+            if state.keeps_library {
+                if !library::KEEPS_GAMES {
+                    rows.extend(
+                        (0..settings.shared.library_folders.len()).map(SettingsRow::Folder),
+                    );
+                }
+                rows.push(SettingsRow::AddFolder);
             }
-            rows.push(SettingsRow::AddFolder);
             if box_art::AVAILABLE {
                 rows.push(SettingsRow::BoxArt);
                 if state.box_art_problem.is_some() {
@@ -333,6 +337,9 @@ pub struct PageState<'a> {
     pub newer_version: Option<&'a str>,
     /// How the window arranges itself for the app window's width.
     pub layout: SettingsLayout,
+    /// Whether this run keeps a library: not with `--fresh`, whose Library
+    /// tab then offers no game folders, which it would never scan.
+    pub keeps_library: bool,
 }
 
 /// How the settings window arranges itself in an app window of a given
@@ -562,7 +569,7 @@ fn page<'a>(
             rings,
         ),
         SettingsTab::Controls => controls(settings, state, rings),
-        SettingsTab::Library => library_page(settings, library, state.box_art_problem, rings),
+        SettingsTab::Library => library_page(settings, library, state, rings),
         SettingsTab::About => about(settings, state.newer_version, rings),
     }
 }
@@ -1427,10 +1434,13 @@ fn binding_row(
 fn library_page<'a>(
     settings: &'a Settings,
     library: &'a Library,
-    box_art_problem: Option<&'a str>,
+    state: &PageState<'a>,
     rings: &Rings,
 ) -> Element<'a, Message> {
-    let mut page = column![if library::KEEPS_GAMES {
+    let box_art_problem = state.box_art_problem;
+    let mut page = column![if !state.keeps_library {
+        no_library()
+    } else if library::KEEPS_GAMES {
         kept_games(library, rings)
     } else {
         game_folders(settings, library, rings)
@@ -1473,6 +1483,23 @@ fn library_page<'a>(
     }
 
     page.into()
+}
+
+/// What the Library tab shows instead of the games in a run that keeps no
+/// library (`--fresh`).
+fn no_library<'a>() -> Element<'a, Message> {
+    group(
+        "Games",
+        None,
+        vec![group_row(
+            text("This run keeps no library (--fresh). Open a game to play it.")
+                .size(14)
+                .style(theme::muted_text),
+            ROW_PADDING,
+            false,
+        )],
+        None,
+    )
 }
 
 /// The library's folders, each with a menu, and a row that adds one.

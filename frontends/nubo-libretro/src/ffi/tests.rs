@@ -764,6 +764,21 @@ fn a_super_game_boy_border_changes_the_pictures_size() {
 }
 
 #[test]
+fn the_next_game_after_a_bordered_one_announces_its_size_again() {
+    for _ in 0..2 {
+        let _turn = start(Settings {
+            variables: vec![(String::from("nubo_model"), CString::from(c"SGB"))],
+            ..default_settings()
+        });
+        assert!(load_game(&cartridge(ROM_ONLY, 0, false, JOYPAD)));
+        take_record();
+        retro_run();
+        assert_eq!(take_record().geometries, [(256, 224)]);
+        finish();
+    }
+}
+
+#[test]
 fn older_frontends_get_the_options_in_the_form_they_know() {
     {
         let _turn = start(Settings {
@@ -865,7 +880,8 @@ fn a_restart_on_another_model_gives_retroarch_that_models_memory_map() {
     settings.variables = vec![(String::from("nubo_model"), CString::from(c"CGB-E"))];
     settings.variables_updated = true;
     drop(settings);
-    retro_run();
+    // RetroArch's menu pauses the core, so no frame runs between the
+    // option's change and the restart.
     retro_reset();
     let record = take_record();
     assert!(has_color_work_ram(&record.memory_maps), "a Game Boy Color");

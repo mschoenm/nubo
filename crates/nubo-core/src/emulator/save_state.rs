@@ -188,6 +188,9 @@ impl Serializable for Emulator {
         read_fields(reader, |name, bytes| {
             if name == "cpu" {
                 self.cpu.deserialize(bytes)?;
+                // F's low four bits always read as zero, so a damaged state
+                // can't set them.
+                self.cpu.registers_mut().f &= 0xF0;
                 Ok(true)
             } else {
                 self.address_bus_mut()

@@ -351,12 +351,22 @@ impl Joypad {
         self.pressed_buttons.players.iter().any(|&keys| keys != 0)
     }
 
-    /// Finishes loading a save state. A state that stores the buttons keeps
-    /// them until the keys held now take over (see `Joypad`); one from a
-    /// version that didn't store them gives each player the keys held now
-    /// at once, with the players a Super Game Boy reads in the state, and
-    /// without an interrupt.
-    pub(super) fn finish_loading_save_state(&mut self) {
+    /// Finishes loading a save state. First it cuts what a damaged state
+    /// could hold beyond what a game can set: JOYP's select bits to bits 4
+    /// and 5, and the players to the 1 to 4 an `MLT_REQ` asks for on a Super
+    /// Game Boy (`sgb`), or to 1 on other models. A state that stores the
+    /// buttons keeps them until the keys held now take over (see `Joypad`);
+    /// one from a version that didn't store them gives each player the keys
+    /// held now at once, with the players a Super Game Boy reads in the
+    /// state, and without an interrupt.
+    pub(super) fn finish_loading_save_state(&mut self, sgb: bool) {
+        self.group_select &= 0x30;
+        self.sgb_player_count = if sgb {
+            self.sgb_player_count.clamp(1, 4)
+        } else {
+            1
+        };
+        self.sgb_current_player &= self.sgb_player_mask();
         if std::mem::take(&mut self.pressed_buttons.loaded) {
             self.keys_pending = self.combined_keys() != self.pressed_buttons.players;
         } else {
@@ -842,7 +852,7 @@ mod tests {
             controller_pressing(ControllerButton::East),
         ]);
         joypad.deserialize(&mut bytes.as_slice()).unwrap();
-        joypad.finish_loading_save_state();
+        joypad.finish_loading_save_state(true);
         assert!(joypad.apply_held_keys_after_load());
         joypad.write_byte(0x10);
         assert_eq!(
@@ -850,6 +860,30 @@ mod tests {
             0x0F,
             "the second controller isn't the first player's"
         );
+    }
+
+    #[test]
+    fn a_damaged_state_is_cut_to_what_a_game_can_set() {
+        let mut joypad = Joypad::new();
+        for (sgb, players, expected_players, expected_player) in [
+            (true, 0, 1, 0),
+            (true, 9, 4, 3),
+            (true, 2, 2, 1),
+            (false, 2, 1, 0),
+        ] {
+            joypad.group_select = 0xFF;
+            joypad.sgb_player_count = players;
+            joypad.sgb_current_player = 0xFF;
+            joypad.finish_loading_save_state(sgb);
+            assert_eq!(
+                (
+                    joypad.group_select,
+                    joypad.sgb_player_count,
+                    joypad.sgb_current_player
+                ),
+                (0x30, expected_players, expected_player)
+            );
+        }
     }
 
     /// Loads `state` the way `Emulator::load_state` does: over the state of
@@ -861,7 +895,7 @@ mod tests {
         Joypad::new().serialize(&mut power_on).unwrap();
         for state in [power_on.as_slice(), state] {
             joypad.deserialize(&mut &state[..]).unwrap();
-            joypad.finish_loading_save_state();
+            joypad.finish_loading_save_state(true);
         }
     }
 

@@ -53,3 +53,37 @@ fn leaves_the_thread_asleep_while_the_queue_stays_low() {
 
     assert!(!was_woken());
 }
+
+#[test]
+fn a_device_that_goes_away_leaves_the_queue_to_drain_by_the_clock() {
+    let mut output = AudioOutput::with_silent_device();
+    let samples = vec![0.0; 10_000];
+    output.queue(&samples, &samples);
+    thread::sleep(Duration::from_millis(20));
+    assert_eq!(output.queued_samples(), 10_000, "the device drains it");
+
+    let notices = Notices::default();
+    report_stream_error(
+        &cpal::Error::new(ErrorKind::DeviceNotAvailable),
+        &output.queue,
+        &notices,
+    );
+    assert_eq!(notices.take().len(), 1);
+    // The clock drains it from when the emulator thread next looks.
+    assert_eq!(output.queued_samples(), 10_000);
+    thread::sleep(Duration::from_millis(20));
+    assert!(output.queued_samples() < 10_000);
+}
+
+#[test]
+fn a_passing_sound_error_leaves_the_device_draining_the_queue() {
+    let mut output = AudioOutput::with_silent_device();
+    let samples = vec![0.0; 10_000];
+    output.queue(&samples, &samples);
+
+    let notices = Notices::default();
+    report_stream_error(&cpal::Error::new(ErrorKind::Xrun), &output.queue, &notices);
+    assert_eq!(notices.take().len(), 1);
+    thread::sleep(Duration::from_millis(20));
+    assert_eq!(output.queued_samples(), 10_000);
+}

@@ -544,12 +544,14 @@ impl AddressBus {
     }
 
     /// Reads plain memory (see `reads_plain_memory`), including active cheats: the
-    /// boot ROM where it is mapped, the cartridge ROM, work RAM or HRAM.
+    /// boot ROM where it is mapped, the cartridge ROM, work RAM or HRAM. Cheats
+    /// never change the boot ROM, which is inside the console, out of reach of
+    /// a cheat device on the cartridge's bus.
     #[inline]
     pub(super) fn read_plain_memory(&self, address: u16) -> u8 {
         let byte = match address {
             0x0000..=0x7FFF if self.in_boot_rom && self.boot_rom_covers(address) => {
-                self.boot_rom[usize::from(address)]
+                return self.boot_rom[usize::from(address)];
             }
             0x0000..=0x7FFF => self.read_cartridge_rom(address),
             0xC000..=0xFDFF => self.working_ram[self.working_ram_index(address)],
@@ -1005,8 +1007,9 @@ impl AddressBus {
         palettes.set_obp1(power_on_value);
     }
 
-    /// Turns CGB mode (a Game Boy Color running a game made for it) on or
-    /// off, here and in the serial port, which only has its fast clock then.
+    /// Sets whether the console is a CGB, here and in the serial port, which
+    /// only has its fast clock on a CGB (and once the boot ROM is done, only
+    /// for a game made for it: `write_io_register` clears the bit otherwise).
     fn set_cgb_mode(&mut self, value: bool) {
         self.cgb_mode = value;
         self.serial.set_cgb_mode(value);
@@ -1386,7 +1389,10 @@ impl AddressBus {
                     ));
                 }
             }
-            "vram_dma" => self.hdma.deserialize(bytes)?,
+            "vram_dma" => {
+                self.hdma.deserialize(bytes)?;
+                self.hdma.within_register_widths();
+            }
             "serial" => {
                 self.serial.deserialize(bytes)?;
                 if !self.serial.is_consistent() {
@@ -1420,7 +1426,8 @@ impl AddressBus {
     pub(crate) fn finish_loading_save_state(&mut self) -> std::io::Result<()> {
         self.check_loaded_copies()?;
         self.cartridge.finish_loading_save_state(self.elapsed_dots);
-        self.joypad.finish_loading_save_state();
+        self.joypad
+            .finish_loading_save_state(self.gpu.sgb().is_some());
         self.show_sgb_buttons_held();
         if let Some(sgb) = self.gpu.sgb_mut() {
             sgb.finish_loading_save_state();

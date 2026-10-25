@@ -17,8 +17,9 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 /// The longest the emulator thread waits for the sound card. The card's
-/// callback and commands wake it sooner; this only matters if the callback
-/// stops coming, such as when the sound device goes away.
+/// callback and commands wake it sooner, as does the device going away (see
+/// `AudioOutput`); this only matters if the callback stops coming without a
+/// word from the device.
 const LONGEST_SLEEP: Duration = Duration::from_secs(1);
 
 /// The two newest finished frames, shared between the two threads.

@@ -24,8 +24,9 @@ const EARLY_NR43_RELOAD_OFFSETS: [u8; 4] = [2, 1, 4, 3];
 /// How long a DMG delays a noise trigger written out of phase with the counter.
 const DMG_DELAYED_START_TICKS: u8 = 6;
 /// The noise counter is 14 bits wide, so NR43 shifts from this one up select a
-/// bit it never sets in counting (only an NR42 write can carry it into bit 14,
-/// see `write_nr42`, and the next count clears it again).
+/// bit it never sets in counting (only NR42 writes can carry it past 0x3FFF, up
+/// to the full 16 bits, see `write_nr42`, and the next count masks it back to
+/// 14 bits).
 const NOISE_COUNTER_BITS: u32 = 14;
 /// The LFSR shifts right on every step, and the bit each step shifts in only
 /// reaches bit 0 on the 15th step after it, or the 7th in narrow mode, where it
@@ -350,7 +351,7 @@ impl Apu {
             && (noise.counter_countdown == 1
                 || (noise.counter_countdown == 2 && active && early_revision_double_speed))
         {
-            noise.counter = (noise.counter + 1) & 0x3FFF;
+            noise.counter = noise.counter.wrapping_add(1) & 0x3FFF;
         } else if noise.counter_countdown == 2 && noise.alignment & 3 == 0 && active {
             if divider_code == 0 {
                 divider_code = 8;
@@ -360,7 +361,7 @@ impl Apu {
                 }
                 let mask = 1u32 << counter_shift(nr43);
                 let old_bit = u32::from(noise.counter) & mask != 0;
-                noise.counter = (noise.counter + 1) & 0x3FFF;
+                noise.counter = noise.counter.wrapping_add(1) & 0x3FFF;
                 let new_bit = u32::from(noise.counter) & mask != 0;
                 instant_step = new_bit && !old_bit;
             }
@@ -699,7 +700,9 @@ impl Apu {
                     // Without the 14-bit wrap of the other increments, as
                     // SameBoy: 0x3FFF becomes 0x4000, whose bit 14 never
                     // steps the LFSR (only the NR43 write glitches can see
-                    // it), and the next count wraps it to 0x0001.
+                    // it), and the next count wraps it to 0x0001. Repeated
+                    // DAC-off writes before a count can carry it up to the
+                    // full 16 bits, until the next count masks it back.
                     self.state.noise.counter = self.state.noise.counter.wrapping_add(1);
                 }
                 self.state.noise_counting = NoiseCounting::Stopped;

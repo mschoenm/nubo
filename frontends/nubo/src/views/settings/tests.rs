@@ -12,6 +12,7 @@ fn state(restart_needed: bool, device: Device, box_art_problem: bool) -> PageSta
         box_art_problem: box_art_problem.then_some("offline"),
         newer_version: None,
         layout: SettingsLayout::new(936.0),
+        keeps_library: true,
     }
 }
 
@@ -251,4 +252,26 @@ fn the_d_pad_follows_the_tabs_along_the_sidebar_or_the_row() {
     assert!(!row.enters_page(Action::Right));
     assert!(row.enters_page(Action::Start));
     assert!(row.up_leaves_page());
+}
+
+#[test]
+fn a_run_that_keeps_no_library_offers_no_game_folders() {
+    let mut settings = Settings::default();
+    settings.shared.library_folders.push(LibraryFolder {
+        path: "a".into(),
+        include_subfolders: true,
+    });
+    let state = PageState {
+        keeps_library: false,
+        ..state(false, Device::Keyboard, false)
+    };
+
+    let rows = rows(SettingsTab::Library, &settings, &state);
+    assert!(
+        !rows
+            .iter()
+            .any(|row| matches!(row, SettingsRow::Folder(_) | SettingsRow::AddFolder)),
+        "{rows:?}"
+    );
+    assert_eq!(drawn_rows(SettingsTab::Library, &settings, &state), rows);
 }

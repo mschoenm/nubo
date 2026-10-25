@@ -4,8 +4,8 @@
 
 use crate::gpu::constants::{GB_SCREEN_HEIGHT, GB_SCREEN_WIDTH};
 use crate::gpu::{
-    DOTS_PER_FRAME, DOTS_PER_LINE, FRAME_SCANLINE_COUNT, Gpu, LAST_LINE, LineState, TimingVariant,
-    VBLANK_START_LINE, VRAM_MODE,
+    DOTS_PER_FRAME, DOTS_PER_LINE, FRAME_SCANLINE_COUNT, Gpu, LAST_LINE, LineState, StopBlocks,
+    TimingVariant, VBLANK_START_LINE, VRAM_MODE,
 };
 use crate::serializable::{FieldWriter, Serializable, read_fields, unreadable_value};
 use crate::sgb::Sgb;
@@ -100,8 +100,9 @@ impl Gpu {
     /// frame, a line state or LY that doesn't fit the line, a line outside the frame for LYC to be
     /// compared with, a mode STAT can't show, timing of another model (the address bus checks the
     /// speed against its own once everything has loaded), a frame buffer of the wrong size, an OAM
-    /// DMA write outside OAM, a renderer state that doesn't fit (`Pipeline::is_consistent`), or a
-    /// Super Game Boy on a model without one, or none on a model with one.
+    /// DMA write outside OAM, a renderer state that doesn't fit (`Pipeline::is_consistent`), a
+    /// Super Game Boy on a model without one, or none on a model with one, or memory cut off by
+    /// STOP outside a CGB's STOP mode, which only leaving STOP mode would give back.
     fn check_loaded_state(&self) -> std::io::Result<()> {
         let line_state_fits = match self.line_state {
             LineState::OamScan | LineState::Drawing | LineState::HBlank => {
@@ -124,7 +125,8 @@ impl Gpu {
                 .pending_dma_oam_write
                 .is_none_or(|write| usize::from(write.index) < self.object_attribute_memory.len())
             && self.pipeline.is_consistent(drawing_line)
-            && self.sgb.0.is_some() == self.model.is_sgb();
+            && self.sgb.0.is_some() == self.model.is_sgb()
+            && (self.stop_blocks == StopBlocks::default() || (self.stopped && self.is_cgb()));
         if valid {
             Ok(())
         } else {

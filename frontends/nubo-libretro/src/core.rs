@@ -24,9 +24,9 @@
 
 use crate::options::Options;
 use nubo_core::{
-    CartridgeEffects, CartridgeHeader, DOTS_PER_FRAME, Emulator, Key, LoadRomError, Model,
-    RtcClock, RtcState, SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH, SaveStateError, SgbBorder, extract_rom,
-    validate_gamegenie_code,
+    CartridgeEffects, CartridgeHeader, CheatError, DOTS_PER_FRAME, Emulator, Key, LoadRomError,
+    Model, RtcClock, RtcState, SGB_FRAME_HEIGHT, SGB_FRAME_WIDTH, SaveStateError, SgbBorder,
+    extract_rom, validate_gamegenie_code,
 };
 use nubo_frontend::picture::Frame;
 use nubo_frontend::sgb_menu::{BorderClock, DEFAULT_OWN_PALETTE};
@@ -184,11 +184,16 @@ impl Cheat {
     }
 }
 
-/// A cheat code, as RetroArch sent it, that the emulator rejected: it is
-/// neither a Game Genie nor a GameShark code, it changes an address its kind
-/// of code can't change, or too many cheats are already on.
+/// A cheat code, as RetroArch sent it, that the emulator rejected, and why:
+/// it is neither a Game Genie nor a GameShark code, it changes an address its
+/// kind of code can't change, or too many cheats are already on.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InvalidCheat(pub String);
+pub struct InvalidCheat {
+    /// The code as RetroArch sent it.
+    pub code: String,
+    /// Why the emulator rejected it.
+    pub reason: CheatError,
+}
 
 /// A loaded game and everything the core keeps for RetroArch while it runs.
 pub struct Core {
@@ -649,7 +654,10 @@ impl Core {
             };
             match cheat.register(&mut self.emulator) {
                 Ok(()) => cheats.push(cheat),
-                Err(_) => invalid.push(InvalidCheat(String::from(code))),
+                Err(reason) => invalid.push(InvalidCheat {
+                    code: String::from(code),
+                    reason,
+                }),
             }
         }
         if !cheats.is_empty() {

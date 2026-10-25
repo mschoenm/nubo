@@ -266,8 +266,8 @@ impl Cache {
             if let Some(saved) = cache.saved_title_screen(&rom_path) {
                 return Some(saved);
             }
-            let rom = std::fs::read(&rom_path).ok()?;
-            title_screens::capture(&rom)
+            let rom = crate::rom::Rom::read(&rom_path).ok()?;
+            title_screens::capture(&rom.bytes)
         });
         async move { capture.await.ok().flatten() }
     }
