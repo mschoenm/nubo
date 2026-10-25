@@ -19,7 +19,9 @@
 
 use crate::sgb::attraction;
 use crate::sgb::nubo_border::NuboBorder;
-use crate::sgb::{BORDERED_HEIGHT, BORDERED_WIDTH, SCREEN_OFFSET, SgbBorderTime};
+use crate::sgb::{
+    BORDERED_HEIGHT, BORDERED_WIDTH, SCREEN_OFFSET, SCREEN_PIXELS, SCREEN_WIDTH, SgbBorderTime,
+};
 use nubo_serializable_derive::Serializable;
 
 /// The bytes of the border's tiles: 256 tiles of 32 bytes.
@@ -204,9 +206,12 @@ impl BorderCache {
             } => attraction::draw(NuboBorder::get(time), frame),
         };
         let (screen_left, screen_top) = SCREEN_OFFSET;
-        self.screen_cover = (0..160 * 144)
+        self.screen_cover = (0..SCREEN_PIXELS)
             .filter_map(|index| {
-                let (x, y) = (screen_left + index % 160, screen_top + index / 160);
+                let (x, y) = (
+                    screen_left + index % SCREEN_WIDTH,
+                    screen_top + index / SCREEN_WIDTH,
+                );
                 let color = self.picture.pixels[x + y * BORDERED_WIDTH];
                 (color != TRANSPARENT).then_some((index as u16, color))
             })

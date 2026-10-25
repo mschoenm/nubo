@@ -17,7 +17,9 @@
 
 use crate::sgb::attraction::{self, Cloud};
 use crate::sgb::border::{BorderPicture, TRANSPARENT};
-use crate::sgb::{BORDERED_HEIGHT, BORDERED_WIDTH, SCREEN_OFFSET, SgbBorderTime};
+use crate::sgb::{
+    BORDERED_HEIGHT, BORDERED_WIDTH, SCREEN_HEIGHT, SCREEN_OFFSET, SCREEN_WIDTH, SgbBorderTime,
+};
 use nubo_logo::{Part, SHAPES};
 use std::sync::OnceLock;
 
@@ -717,7 +719,8 @@ fn box_blur(values: &[f32], radius: usize) -> Vec<f32> {
 /// Whether `x`, `y` in the 256×224 picture is on the game screen.
 fn in_game_screen(x: usize, y: usize) -> bool {
     let (screen_left, screen_top) = SCREEN_OFFSET;
-    (screen_left..screen_left + 160).contains(&x) && (screen_top..screen_top + 144).contains(&y)
+    (screen_left..screen_left + SCREEN_WIDTH).contains(&x)
+        && (screen_top..screen_top + SCREEN_HEIGHT).contains(&y)
 }
 
 /// The RGB555 color for `color` at `x`, `y` in the picture. Where a channel

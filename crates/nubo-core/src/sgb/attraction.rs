@@ -150,7 +150,7 @@ pub(super) fn draw(border: &NuboBorder, frame: u32) -> BorderPicture {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sgb::{BORDERED_HEIGHT, SCREEN_OFFSET, SgbBorderTime};
+    use crate::sgb::{BORDERED_HEIGHT, SCREEN_HEIGHT, SCREEN_OFFSET, SCREEN_WIDTH, SgbBorderTime};
 
     #[test]
     fn the_clouds_fade_in_over_the_open_sky_only() {
@@ -166,7 +166,10 @@ mod tests {
             let (x, y) = (index % BORDERED_WIDTH, index / BORDERED_WIDTH);
             assert!(border.open_sky[index] > 0.0, "{x}, {y}");
             let (left, top) = SCREEN_OFFSET;
-            assert!(!((left..left + 160).contains(&x) && (top..top + 144).contains(&y)));
+            assert!(
+                !((left..left + SCREEN_WIDTH).contains(&x)
+                    && (top..top + SCREEN_HEIGHT).contains(&y))
+            );
         }
     }
 
