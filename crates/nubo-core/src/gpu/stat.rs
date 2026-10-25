@@ -38,9 +38,9 @@ const DMG_HBLANK_SOURCE_END_DOT: u16 = 1;
 /// reaches the comparison, too late for the CPU to see it in the M-cycle where the comparison
 /// changes (measured against Gambatte; Gambatte's `lycEnable` `lyc_ff45_trigger_delay` tests).
 const CGB_LYC_INTERRUPT_DELAY_DOTS: u8 = 1;
-/// The STAT interrupt sources a CGB STAT write at normal speed keeps active for
-/// `CGB_STAT_CLEAR_DELAY_DOTS` more dots when it disables them (see
-/// `Gpu::cgb_late_cleared_stat_sources`).
+/// The STAT interrupt sources a CGB STAT write at normal speed always keeps active for
+/// `CGB_STAT_CLEAR_DELAY_DOTS` more dots when it disables them
+/// (`Gpu::cgb_late_cleared_stat_sources` adds mode 1 while STAT shows it).
 const CGB_LATE_CLEARED_STAT_SOURCES: u8 =
     (1 << LYC_STAT_SOURCE_BIT) | (1 << HBLANK_MODE_STAT_SOURCE_BIT);
 /// On CGB at normal speed an LYC write in the last dots of a line that moves a match on to the

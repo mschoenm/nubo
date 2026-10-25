@@ -116,8 +116,9 @@ pub enum Video<'a> {
 }
 
 /// What the cartridge asked the core to save during a frame. [`CoreEffects`]
-/// sets the flags when the emulator tells it the game saved, and
-/// [`Core::run`] clears them.
+/// sets the flags when the emulator tells it the game saved. [`Core::run`]
+/// clears them once it has passed the saves on, and a loaded state or a
+/// restart, which replace the saves, clears them too.
 #[derive(Debug, Default)]
 struct SaveRequests {
     ram: AtomicBool,
@@ -794,7 +795,7 @@ pub struct MemoryRegion<'a> {
     pub buffer: &'a mut [u8],
     /// The region's length, a power of two that `start` is a multiple of.
     pub length: usize,
-    /// What kind of memory it is: [`MemoryKind`].
+    /// Which libretro descriptor flags the region gets.
     pub kind: MemoryKind,
 }
 

@@ -60,8 +60,9 @@ pub(crate) const SGB_PLAYERS: usize = 4;
 /// on, up to four. Frontends without separate controllers for them, such as
 /// RetroArch's ports, set the other players' keys with `set_player_keys`.
 ///
-/// Save states keep what the game set (the group select bits), the pending
-/// interrupt and the buttons each player held as the game saw them, so a
+/// Save states keep what the game set (the group select bits and, on a
+/// Super Game Boy, how many players it reads and which one is current), the
+/// pending interrupt and the buttons each player held as the game saw them, so a
 /// loaded state goes on as the run it was saved from: the next button
 /// change starts from the saved buttons. They leave out which keys the
 /// keyboard, the controllers and the frontend hold, which belong to the

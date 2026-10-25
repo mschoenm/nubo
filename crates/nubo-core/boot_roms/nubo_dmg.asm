@@ -1,5 +1,5 @@
-; Nubo's boot ROM for the Game Boy models without Color hardware (DMG, MGB,
-; SGB and SGB2).
+; Nubo's boot ROM for the Game Boy models without Color hardware (DMG-0,
+; DMG, MGB, SGB and SGB2).
 ;
 ; Based on Bootix by Hacktix (https://github.com/Hacktix/Bootix), released into
 ; the public domain under CC0-1.0.

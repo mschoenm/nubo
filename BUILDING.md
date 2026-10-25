@@ -67,6 +67,8 @@ cargo test                          # The emulator's own tests
 cargo test --workspace              # Every crate, the apps and tools included
 cargo test-roms                     # Download and run the test ROM suites (about 30 s)
 cargo cpu-tests                     # Every CPU instruction but STOP, HALT, DI and EI, checked cycle by cycle
+cargo xtask benchmark-roms          # Once: download the free games the benchmark and the save state check use
+cargo save-states                   # Older versions' save states still load, and the stored layout is unchanged
 ```
 
 [docs/ACCURACY.md](docs/ACCURACY.md) lists the test ROM suites, the results and the tests that aren't run.

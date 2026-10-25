@@ -6,7 +6,7 @@ needs nothing from this folder. You only need it to change a boot ROM.
 
 | File | What it is |
 | --- | --- |
-| `nubo_dmg.asm` | The boot ROM of the DMG, MGB, SGB and SGB2 models, based on [Bootix](https://github.com/Hacktix/Bootix) (CC0-1.0) |
+| `nubo_dmg.asm` | The boot ROM of the DMG-0, DMG, MGB, SGB and SGB2 models, based on [Bootix](https://github.com/Hacktix/Bootix) (CC0-1.0) |
 | `nubo_cgb.asm` | The boot ROM of the CGB and AGB models, based on [SameBoy](https://github.com/LIJI32/SameBoy)'s `cgb_boot.asm` at commit 6705401 (Expat License, see the notice in `../src/apu.rs`) |
 | `sameboot.inc` | SameBoy's definitions for `nubo_cgb.asm`, from the same commit (Expat License) |
 | `hardware.inc` | Names for the hardware registers, from [gbdev/hardware.inc](https://github.com/gbdev/hardware.inc) (CC0-1.0) |

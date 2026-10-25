@@ -349,7 +349,7 @@ pub fn view<'a>(
     let shelves = Shelves::new(library, settings, search, window_width);
     let has_folders = has_games(library, settings);
 
-    if !library::AVAILABLE || (!has_folders && library.recently_played(1).is_empty()) {
+    if !has_folders && library.recently_played(1).is_empty() {
         return column![bar(None, top), welcome(settings, controllers)].into();
     }
 
@@ -576,7 +576,7 @@ fn welcome<'a>(settings: &'a Settings, controllers: &'a [String]) -> Element<'a,
         .spacing(10)
         .align_y(Alignment::Center)
         .into()
-    } else if library::AVAILABLE {
+    } else {
         row![
             primary_button(
                 Icon::FolderPlus,
@@ -592,20 +592,12 @@ fn welcome<'a>(settings: &'a Settings, controllers: &'a [String]) -> Element<'a,
         .spacing(10)
         .align_y(Alignment::Center)
         .into()
-    } else {
-        primary_button(
-            Icon::FolderOpen,
-            "Open game",
-            Message::Game(GameMessage::OpenRom),
-        )
     };
 
     let description = if library::KEEPS_GAMES {
         "Add your Game Boy games to keep them in this browser, or open a single game."
-    } else if library::AVAILABLE {
-        "Add the folder with your Game Boy games, or open a single game."
     } else {
-        "Open a Game Boy or Game Boy Color game to start."
+        "Add the folder with your Game Boy games, or open a single game."
     };
 
     let free_games = button(

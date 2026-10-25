@@ -417,7 +417,9 @@ impl Mbc3CartridgeMapper {
         [0, u16::from(self.rom_bank_number)]
     }
 
-    /// What 0xA000-0xBFFF shows: a RAM bank, or a clock register 0x08-0x0F.
+    /// The four low bits last written to 0x4000-0x5FFF, which pick a RAM
+    /// bank or a clock register 0x08-0x0F (see `selected` for what
+    /// 0xA000-0xBFFF then shows).
     pub(super) fn ram_bank_or_rtc_register(&self) -> u8 {
         self.ram_bank_or_rtc_register
     }

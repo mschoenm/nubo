@@ -225,8 +225,10 @@ pub(crate) struct Gpu {
     /// doesn't request an interrupt there, while one that was already enabled still blocks the
     /// others.
     stat_at_line_start: u8,
-    /// In double speed, the line the LY=LYC interrupt source compares LYC with after a write in
-    /// the last dots of a line, until the comparison itself reaches that line.
+    /// On DMG and in double speed, the line the LY=LYC interrupt source compares LYC with after a
+    /// write around a change of line (in a line's last dots or first two, or on line 153 before it
+    /// compares with 0), until the comparison itself reaches that line (see
+    /// `Gpu::adjust_lyc_source_after_write`).
     lyc_source_line: Option<u8>,
 
     /// Dots counted while the PPU doesn't draw (the LCD is off, or STOP stopped a monochrome
@@ -430,8 +432,8 @@ const HDMA_START_DELAY_DOTS: u8 = 2;
 const HBLANK_DMA_START_END_DOT: u16 = 453;
 const DOUBLE_SPEED_HBLANK_DMA_START_END_DOT: u16 = 455;
 
-/// How many more dots the LY=LYC and mode 0 STAT interrupt sources stay active after a CGB STAT
-/// write at normal speed disables them.
+/// How many more dots the STAT interrupt sources a CGB STAT write at normal speed disables stay
+/// active (see `Gpu::cgb_late_cleared_stat_sources`).
 pub(super) const CGB_STAT_CLEAR_DELAY_DOTS: u8 = 2;
 
 const LYC_STAT_SOURCE_BIT: u8 = 6;
@@ -1104,9 +1106,10 @@ impl Gpu {
     }
 
     /// Places the line timeline at `dot` of `line`, to match where the boot ROM leaves the PPU.
-    /// Only for positions where no line is being drawn: VBlank, OAM scan, or HBlank once mode 3
-    /// would be over (dot 252 or later). It doesn't set the renderer up for a line in progress,
-    /// so tests that place it elsewhere don't draw.
+    /// Only for positions where no line is being drawn and no OAM scan has started: VBlank, the
+    /// first dot of OAM scan (dot 0), or HBlank once mode 3 would be over (dot 252 or later). It
+    /// doesn't set the renderer up for a line in progress, so tests that place it elsewhere don't
+    /// draw.
     pub(super) fn set_frame_position(&mut self, line: u8, dot: u16) {
         self.line = line;
         self.line_dot = dot;

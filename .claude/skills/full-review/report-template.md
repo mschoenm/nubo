@@ -29,4 +29,4 @@ Each full review's report is `docs/reviews/<YYYY-MM-DD>.md`, dated by the day th
 7. **Merging:** the order, and each conflict between the pull requests with how to resolve it.
 8. **Recommendations:** at most a handful, the most important first.
 
-Add the review's line to the table in `docs/reviews/README.md` in the same pull request as the report.
+Add the review's line to the table in `docs/reviews/README.md` in the same pull request as the report, and bring the earlier rows' Still open column up to date (the issues of each still open, with today's date).
