@@ -1074,7 +1074,10 @@ pub unsafe extern "C" fn retro_cheat_set(index: c_uint, enabled: bool, code: *co
         for invalid in invalid_codes {
             log(
                 RETRO_LOG_WARN,
-                &format!("the cheat code {} can't be used", invalid.0),
+                &format!(
+                    "the cheat code {} can't be used: {}",
+                    invalid.code, invalid.reason
+                ),
             );
         }
     });

@@ -769,12 +769,31 @@ fn invalid_cheat_codes_are_reported_and_the_valid_ones_still_work() {
     assert_eq!(
         invalid,
         [
-            InvalidCheat(String::from("nonsense")),
-            InvalidCheat(String::from("0142FFFF"))
+            InvalidCheat {
+                code: String::from("nonsense"),
+                reason: CheatError::InvalidDigits {
+                    field: "bank byte",
+                    digits: String::from("no"),
+                },
+            },
+            InvalidCheat {
+                code: String::from("0142FFFF"),
+                reason: CheatError::InvalidAddress(0xFFFF),
+            }
         ]
     );
     run(&mut core, 2);
     assert_eq!(cheated(&mut core), (0x42, ROM_BYTE_AT_0200));
+
+    // One code is on, so the tenth of these is one too many.
+    let invalid = core.cheat_set(1, true, &["014300C1"; 10].join("+"));
+    assert_eq!(
+        invalid,
+        [InvalidCheat {
+            code: String::from("014300C1"),
+            reason: CheatError::TooManyCheats { limit: 10 },
+        }]
+    );
 }
 
 #[test]
