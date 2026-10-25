@@ -13,4 +13,4 @@ cargo benchmark <roms> --record lazy.txt                     # Then the lazy sho
 cargo run --release -p nubo-benchmark --features nubo-core/eager -- <roms> --compare lazy.txt
 ```
 
-Record and compare with the same ROMs, seconds and models; `--shard 2/4` runs only the second of four equal parts of the ROMs, as the nightly run does to split the work over machines.
+Record and compare with the same ROMs, seconds, models and `--shard`, since a part's run reports every other part's fingerprints as missing. `--shard 2/4` runs only the second of four equal parts of the ROMs, as the nightly run does to split the work over machines.

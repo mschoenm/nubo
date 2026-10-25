@@ -17,7 +17,8 @@
 //! `--check-save-states` also checks that a save state taken halfway through
 //! each run, loaded into a new emulator, goes on exactly like the run it was
 //! taken from. `--shard` runs one of several equal parts of the ROMs, so the
-//! nightly CI can split these checks over several machines.
+//! nightly CI can split these checks over several machines; `--compare` then
+//! needs a file recorded with the same `--shard`.
 
 use clap::Parser;
 use image::RgbaImage;
