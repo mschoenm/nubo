@@ -94,24 +94,15 @@ pub enum SettingsTab {
 }
 
 impl SettingsTab {
-    /// The tabs to show. The browser build has no library to set up.
+    /// The tabs to show, in order.
     pub fn all() -> &'static [SettingsTab] {
-        if library::AVAILABLE {
-            &[
-                SettingsTab::Display,
-                SettingsTab::Playing,
-                SettingsTab::Controls,
-                SettingsTab::Library,
-                SettingsTab::About,
-            ]
-        } else {
-            &[
-                SettingsTab::Display,
-                SettingsTab::Playing,
-                SettingsTab::Controls,
-                SettingsTab::About,
-            ]
-        }
+        &[
+            SettingsTab::Display,
+            SettingsTab::Playing,
+            SettingsTab::Controls,
+            SettingsTab::Library,
+            SettingsTab::About,
+        ]
     }
 
     fn label(self) -> &'static str {

@@ -14,9 +14,7 @@ use iced::widget::scrollable::AbsoluteOffset;
 use nubo_core::Model;
 use nubo_frontend::controls::Action;
 use nubo_frontend::library::box_art::{self, GameList};
-use nubo_frontend::library::{
-    self, DownloadedArt, FileCheck, LoadedPicture, ScanResult, WatchEvent,
-};
+use nubo_frontend::library::{DownloadedArt, FileCheck, LoadedPicture, ScanResult, WatchEvent};
 use nubo_frontend::links;
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::rom::Rom;
@@ -529,10 +527,10 @@ impl App {
         )
     }
 
-    /// Whether this build keeps a library and this run may use it: not with
-    /// `--fresh`, which leaves the player's library alone.
+    /// Whether this run may use the library: not with `--fresh`, which
+    /// leaves the player's library alone.
     pub(super) fn keeps_library(&self) -> bool {
-        library::AVAILABLE && !self.fresh
+        !self.fresh
     }
 
     /// Reads and decodes the games' saved pictures on a background thread.
