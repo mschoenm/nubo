@@ -173,7 +173,8 @@ impl HdmaState {
         self.in_progress && self.transfer_mode == VramTransferMode::HBlank
     }
 
-    pub(super) fn hblank_started(&self) -> bool {
+    /// Whether an HBlank started that the transfer hasn't copied a block for yet.
+    pub(crate) fn hblank_started(&self) -> bool {
         self.hblank_started
     }
 }
