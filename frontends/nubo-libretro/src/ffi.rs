@@ -1188,11 +1188,11 @@ pub extern "C" fn retro_get_memory_data(id: c_uint) -> *mut c_void {
         let Some(core) = core.as_mut() else {
             return ptr::null_mut();
         };
-        let memory = memory(core, id);
-        if memory.is_empty() {
+        let buffer = memory(core, id);
+        if buffer.is_empty() {
             ptr::null_mut()
         } else {
-            memory.as_mut_ptr().cast()
+            buffer.as_mut_ptr().cast()
         }
     })
 }

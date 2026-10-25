@@ -910,9 +910,9 @@ fn write_changes(
     let mut changed = false;
     for (index, (&byte, &before)) in buffer.iter().zip(written).enumerate() {
         if byte != before
-            && let Some(target) = target_index(index).and_then(|index| target.get_mut(index))
+            && let Some(slot) = target_index(index).and_then(|position| target.get_mut(position))
         {
-            *target = byte;
+            *slot = byte;
             changed = true;
         }
     }
