@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 /// The commit of adtennant/GameboyCPUTests the tests are taken from.
 const COMMIT: &str = "d1c8fd48c9e543995397fbd20e55bcbd524d029f";
+/// Where that repository's files are downloaded from, by commit and path.
 const BASE_URL: &str = "https://raw.githubusercontent.com/adtennant/GameboyCPUTests";
 /// Each test file's SHA-256 checksum and name, one per line, as written by
 /// `sha256sum`.

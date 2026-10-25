@@ -13,8 +13,12 @@ use std::path::{Path, PathBuf};
 /// The pinned release of the test ROM collection, which names its download
 /// and the folder it is unpacked to.
 const VERSION: &str = "v7.0";
+/// The SHA-256 checksum of that release's archive.
 const ARCHIVE_SHA256: &str = "b9a9d7a1075aa35a3d07c07c34974048672d8520dca9e07a50178f5860c3832c";
+/// The commit of the Shootout's repository the tests and screenshots are
+/// downloaded from.
 const SHOOTOUT_COMMIT: &str = "38b926bdbc26993d1b4c43e97979ecc66287bf02";
+/// Where the Shootout's files are downloaded from, by commit and path.
 const SHOOTOUT_URL: &str = "https://raw.githubusercontent.com/gbdev/GBEmulatorShootout";
 /// The shootout files the runner uses, one `<sha256>  <path>` line each, with
 /// paths relative to the repository's `testroms` folder.

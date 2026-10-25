@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 pub(crate) const AUDIO_BUFFERS_PER_SECOND: u32 = 128;
 /// T-cycles (ticks of the 4 MHz clock) in one frame of the LCD.
 const T_CYCLES_PER_FRAME: u32 = 70224;
+/// T-cycles in one audio buffer.
 const T_CYCLES_PER_AUDIO_BUFFER: u32 = 4_194_304 / AUDIO_BUFFERS_PER_SECOND;
 
 /// The model's name as used in test IDs and `passing.txt`, such as "dmg",

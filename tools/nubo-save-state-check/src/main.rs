@@ -34,6 +34,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// The sample rate the core makes sound at, in samples per second.
 const SAMPLE_RATE: u32 = 44100;
 /// The audio buffer the core fills on each `step_until_next_audio_buffer`.
 const SAMPLES_PER_BUFFER: u32 = 512;

@@ -18,12 +18,15 @@ use std::time::{Duration, Instant};
 
 /// How many audio buffers of the final frame a sound test listens to.
 const SOUND_CHECK_AUDIO_BUFFERS: u32 = 2;
-/// GBMicrotest's result byte in high RAM and the values it writes there.
+/// GBMicrotest's result byte in high RAM.
 const HIGH_RAM_RESULT_ADDRESS: u16 = 0xFF82;
+/// What GBMicrotest writes there when it passes.
 const HIGH_RAM_PASS: u8 = 0x01;
+/// What GBMicrotest writes there when it fails.
 const HIGH_RAM_FAIL: u8 = 0xFF;
-/// LCDC (0xFF40) and its bit that turns the screen on.
+/// LCDC, the LCD control register.
 const LCDC_ADDRESS: u16 = 0xFF40;
+/// LCDC's bit that turns the screen on.
 const LCDC_SCREEN_ON: u8 = 0x80;
 /// Mooneye-style tests signal success by loading the Fibonacci numbers
 /// 3, 5, 8, 13, 21, 34 into registers B, C, D, E, H, L...
@@ -34,10 +37,11 @@ const FAIL_REGISTERS: [u8; 6] = [0x42; 6];
 /// result on screen before the screen is saved.
 const FAILURE_SCREEN_AUDIO_BUFFERS: u32 = 16;
 /// Audio buffers after the boot ROM before a test's first button press (a
-/// second, by which games have drawn their menu or title screen), how long
-/// each press lasts, and the pause after it.
+/// second, by which games have drawn their menu or title screen).
 const INPUT_DELAY_AUDIO_BUFFERS: u32 = 128;
+/// Audio buffers each button press lasts.
 const KEY_PRESS_AUDIO_BUFFERS: u32 = 16;
+/// Audio buffers of the pause after each button press.
 const KEY_RELEASE_AUDIO_BUFFERS: u32 = 16;
 /// Real time one audio buffer (1/128 of an emulated second) may take before
 /// the test counts as hung, because its emulated time has stopped advancing.
