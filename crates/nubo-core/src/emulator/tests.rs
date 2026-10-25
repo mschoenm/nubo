@@ -708,6 +708,13 @@ fn a_save_state_with_a_vram_dma_length_past_seven_bits_loads_it_cut() {
     assert_eq!(field_once_loaded(&mut emulator, path, &[0xFF]), [0x7F]);
 }
 
+#[test]
+fn a_save_state_with_low_flag_bits_set_loads_them_cleared() {
+    let mut emulator = booted(Model::CgbE, &busy_rom());
+    let path: &[&[u8]] = &[b"\x03cpu", b"\x09registers", b"\x01f"];
+    assert_eq!(field_once_loaded(&mut emulator, path, &[0xFF]), [0xF0]);
+}
+
 const CARTRIDGE_TYPE_MBC3_TIMER_RAM_BATTERY: u8 = 0x10;
 const CARTRIDGE_TYPE_MBC5_RUMBLE: u8 = 0x1C;
 /// A wall-clock time in milliseconds, about 2001.

@@ -1424,7 +1424,8 @@ impl AddressBus {
     pub(crate) fn finish_loading_save_state(&mut self) -> std::io::Result<()> {
         self.check_loaded_copies()?;
         self.cartridge.finish_loading_save_state(self.elapsed_dots);
-        self.joypad.finish_loading_save_state();
+        self.joypad
+            .finish_loading_save_state(self.gpu.sgb().is_some());
         self.show_sgb_buttons_held();
         if let Some(sgb) = self.gpu.sgb_mut() {
             sgb.finish_loading_save_state();
