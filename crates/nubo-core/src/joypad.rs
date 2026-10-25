@@ -75,7 +75,7 @@ pub(crate) const SGB_PLAYERS: usize = 4;
 pub struct Joypad {
     /// Bits 4 and 5 of JOYP. Bit 4 low selects the directions, bit 5 low
     /// selects the action buttons.
-    #[getset(get_copy = "pub(super)", set = "pub(super)")]
+    #[getset(get_copy = "pub(super)")]
     group_select: u8,
 
     /// The buttons each player holds as the game reads them.
@@ -412,6 +412,13 @@ impl Joypad {
 
 #[cfg(test)]
 impl Joypad {
+    /// Sets the group select bits (bits 4 and 5 of JOYP) directly, without
+    /// the Super Game Boy player switch or the interrupt a write to JOYP can
+    /// bring.
+    pub(super) fn set_group_select(&mut self, group_select: u8) {
+        self.group_select = group_select;
+    }
+
     /// Sets the first player's action buttons directly (Start, Select, B
     /// and A in bits 3 to 0, with 0 meaning pressed), for tests that need
     /// held buttons without the joypad interrupt pressing them requests.
