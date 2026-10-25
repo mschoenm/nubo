@@ -543,12 +543,14 @@ impl AddressBus {
     }
 
     /// Reads plain memory (see `reads_plain_memory`), including active cheats: the
-    /// boot ROM where it is mapped, the cartridge ROM, work RAM or HRAM.
+    /// boot ROM where it is mapped, the cartridge ROM, work RAM or HRAM. Cheats
+    /// never change the boot ROM, which is inside the console, out of reach of
+    /// a cheat device on the cartridge's bus.
     #[inline]
     pub(super) fn read_plain_memory(&self, address: u16) -> u8 {
         let byte = match address {
             0x0000..=0x7FFF if self.in_boot_rom && self.boot_rom_covers(address) => {
-                self.boot_rom[usize::from(address)]
+                return self.boot_rom[usize::from(address)];
             }
             0x0000..=0x7FFF => self.read_cartridge_rom(address),
             0xC000..=0xFDFF => self.working_ram[self.working_ram_index(address)],

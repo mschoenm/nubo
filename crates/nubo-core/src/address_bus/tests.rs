@@ -130,6 +130,18 @@ fn reads_from_bios() {
 }
 
 #[test]
+fn game_genie_codes_change_the_cartridge_but_not_the_boot_rom() {
+    let mut address_bus = setup_test_address_bus();
+    address_bus
+        .cheats_mut()
+        .register_gamegenie_cheat("boot", "420-02F")
+        .unwrap();
+    assert_eq!(address_bus.peek(0x02), 0x42);
+    address_bus.in_boot_rom = true;
+    assert_eq!(address_bus.peek(0x02), 0x03);
+}
+
+#[test]
 fn reads_from_rom_in_bank_zero() {
     let address_bus = setup_test_address_bus();
     assert_eq!(address_bus.peek(0x02), 0x01);
