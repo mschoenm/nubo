@@ -747,7 +747,8 @@ pub extern "C" fn retro_api_version() -> c_uint {
 #[unsafe(no_mangle)]
 pub extern "C" fn retro_init() {}
 
-/// Called once before the library is unloaded: drops the game, if any.
+/// Called once before the library is unloaded: drops the game, if any, and
+/// forgets RetroArch's callbacks.
 #[unsafe(no_mangle)]
 pub extern "C" fn retro_deinit() {
     guard("retro_deinit", (), || {
