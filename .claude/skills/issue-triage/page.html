@@ -85,8 +85,8 @@ h1 { font-size: 26px; line-height: 1.2; margin: 0; text-wrap: balance; }
 .badge.no { background: var(--no-bg); color: var(--no); }
 .badge.plain { background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 400; }
 .badge.done { background: var(--done-bg); color: var(--done); }
-.verdict { margin: 8px 14px 0 56px; font-size: 15px; }
-details { margin: 4px 14px 12px 56px; }
+.verdict { margin: 8px 14px 0; font-size: 15px; }
+details { margin: 4px 14px 12px; }
 summary { cursor: pointer; color: var(--accent); font-weight: 700; font-size: 14.5px; padding-block: 8px; list-style: none; }
 summary::-webkit-details-marker { display: none; }
 summary::after { content: " ▾"; }
@@ -95,7 +95,7 @@ dl { margin: 4px 0 0; display: flex; flex-direction: column; gap: 10px; }
 dt { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
 dd { margin: 2px 0 0; overflow-wrap: anywhere; }
 code { font-family: var(--font-mono); font-size: 0.86em; background: var(--bg); padding: 1px 4px; border-radius: 4px; overflow-wrap: anywhere; }
-.status { margin: 0 14px 12px 56px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
+.status { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
 .status a { color: var(--done); font-weight: 700; }
 
 .btn { font: inherit; font-weight: 700; font-size: 15px; border-radius: 10px; padding: 10px 14px; cursor: pointer; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
@@ -105,16 +105,13 @@ code { font-family: var(--font-mono); font-size: 0.86em; background: var(--bg); 
 .msg.ok { color: var(--yes); }
 .msg.err { color: var(--accent); }
 .foot { color: var(--muted); font-size: 13px; margin-top: 12px; }
-.verdict, details, .status, .cardfoot { margin-left: 14px; margin-right: 14px; }
-.cardfoot { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-.cardfoot .status { margin: 0; }
+.cardfoot { margin: 0 14px 12px; display: flex; flex-direction: column; gap: 8px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .actions .btn { flex: 1 1 140px; }
 details.notebox { margin: 0; }
 details.notebox summary { font-size: 14px; color: var(--muted); font-weight: 400; padding-block: 4px; }
 details.notebox textarea { font: inherit; font-size: 15px; width: 100%; min-height: 64px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--bg); color: var(--fg); margin-top: 4px; }
 .card.compact { padding: 12px 14px; gap: 6px; }
-.card.compact .status { margin: 0; }
 a.badge { text-decoration: none; }
 .badge.pr-open { background: var(--maybe-bg); color: var(--maybe); }
 .badge.pr-merged { background: var(--yes-bg); color: var(--yes); }
