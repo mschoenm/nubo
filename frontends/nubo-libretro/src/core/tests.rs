@@ -505,7 +505,8 @@ fn loading_a_state_puts_its_clock_in_the_buffer_and_keeps_it_there() {
 
 #[test]
 fn a_restart_keeps_the_save_and_the_clock() {
-    let mut core = clock_game(Options::default());
+    // On emulated time, so a slow run can't carry the minutes on.
+    let mut core = clock_game(emulated_time());
     core.rtc_memory()
         .copy_from_slice(&ten_twenty_thirty().to_bytes());
     core.save_ram()[0] = 0x5A;
