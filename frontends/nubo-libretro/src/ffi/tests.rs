@@ -743,6 +743,21 @@ fn a_super_game_boy_border_changes_the_pictures_size() {
 }
 
 #[test]
+fn the_next_game_after_a_bordered_one_announces_its_size_again() {
+    for _ in 0..2 {
+        let _turn = start(Settings {
+            variables: vec![(String::from("nubo_model"), CString::from(c"SGB"))],
+            ..default_settings()
+        });
+        assert!(load_game(&cartridge(ROM_ONLY, 0, false, JOYPAD)));
+        take_record();
+        retro_run();
+        assert_eq!(take_record().geometries, [(256, 224)]);
+        finish();
+    }
+}
+
+#[test]
 fn older_frontends_get_the_options_in_the_form_they_know() {
     {
         let _turn = start(Settings {

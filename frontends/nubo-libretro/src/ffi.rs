@@ -747,12 +747,14 @@ pub extern "C" fn retro_api_version() -> c_uint {
 #[unsafe(no_mangle)]
 pub extern "C" fn retro_init() {}
 
-/// Called once before the library is unloaded: drops the game, if any.
+/// Called once before the library is unloaded: drops the game, if any,
+/// forgets RetroArch's callbacks and the picture's size.
 #[unsafe(no_mangle)]
 pub extern "C" fn retro_deinit() {
     guard("retro_deinit", (), || {
         *lock(&CORE) = None;
         *lock(&FRONTEND) = Frontend::NONE;
+        *lock(&GEOMETRY) = (SCREEN_WIDTH, SCREEN_HEIGHT);
     });
 }
 
@@ -1156,11 +1158,12 @@ pub extern "C" fn retro_load_game_special(
     false
 }
 
-/// Unloads the game.
+/// Unloads the game, and forgets the size of its picture.
 #[unsafe(no_mangle)]
 pub extern "C" fn retro_unload_game() {
     guard("retro_unload_game", (), || {
         *lock(&CORE) = None;
+        *lock(&GEOMETRY) = (SCREEN_WIDTH, SCREEN_HEIGHT);
         let frontend = frontend();
         if frontend.rumble != 0
             && let Some(set_rumble_state) = frontend.set_rumble_state
