@@ -45,7 +45,7 @@ Use `CARGO_INCREMENTAL=0`. Run them after every few commits and at the end; all 
    - `cargo cpu-tests` passes;
    - the fingerprints match the baseline your task names: `cargo benchmark target/benchmark-roms --compare <baseline>/games.txt` and `cargo benchmark target/test-roms/v7.0 --seconds 4 --jobs 2 --compare <baseline>/testroms.txt`. A difference means your change altered emulation: take it back unless the finding is about changing output, and report it.
 8. `cargo save-states`, if anything save states store or check changed.
-9. `cargo deny check licenses bans sources`, if a dependency or a feature changed.
+9. `cargo deny check licenses bans sources` and `cargo xtask rust-version`, if a dependency or a feature changed.
 
 Copy the test ROMs and benchmark games from the main checkout's `target/` into your worktree's `target/` instead of downloading them again.
 
