@@ -37,7 +37,7 @@ const CRATES_IO: &str = "registry+https://github.com/rust-lang/crates.io-index";
 const GENERATED_FILES: &str = "flatpak-files";
 
 /// What the app may reach outside its sandbox.
-const FINISH_ARGS: [&str; 11] = [
+const FINISH_ARGS: [&str; 12] = [
     // The window, drawn with the graphics card.
     "--share=ipc",
     "--socket=wayland",
@@ -46,7 +46,10 @@ const FINISH_ARGS: [&str; 11] = [
     // Sound, which goes from ALSA through the sound server.
     "--socket=pulseaudio",
     // Controllers, which gilrs finds by watching /dev/input inside a Flatpak.
+    // Flatpak before 1.15.6 has no `input` device and gets every device
+    // instead, as Flathub asks (Flatpak 1.17 and later read the condition).
     "--device=input",
+    "--device-if=all:!has-input-device",
     // Box art downloads.
     "--share=network",
     // ROM folders anywhere in the home folder or on external drives, which

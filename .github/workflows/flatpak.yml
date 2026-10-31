@@ -23,7 +23,8 @@ jobs:
       matrix:
         include:
           # Ubuntu 26.04's Flatpak is new enough for --device=input, which
-          # gives the app its controllers.
+          # gives the app its controllers, and for --device-if, which gives
+          # older Flatpaks every device instead.
           - arch: x86_64
             runner: ubuntu-26.04
           - arch: aarch64
@@ -31,7 +32,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     env:
-      LINTER: ghcr.io/flathub/flatpak-builder-lint@sha256:16ed64e78b69eaf97275c2d2bdebd89982d2410ea6d99745f1e0bee795226ae4
+      LINTER: ghcr.io/flathub/flatpak-builder-lint@sha256:fa11d9cf5044a1e251643f4abe58a2d456965bdc76372dc82c57d4f540cacd37
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -97,14 +98,18 @@ jobs:
           docker run --rm -v "$PWD/frontends/nubo/linux:/linux:ro" "$LINTER"
           appstream /linux/io.github.mschoenm.nubo.metainfo.xml
 
-      # Lists what Flathub's linter would still flag in the build, such as
-      # its permissions, without failing: the Flathub submission will have a
-      # manifest of its own. It reads a copy of the repository, since ostree
-      # may want to write to it.
-      - name: Report what Flathub's linter would flag in the build
+      # The build must pass Flathub's checks too, so a check Flathub adds
+      # fails the nightly run. The two screenshot checks are left out
+      # (flatpak-lint-exceptions.json): only Flathub's own build copies the
+      # screenshots to its server and points the AppStream data there, and
+      # doing that here would show players of these files no screenshots.
+      # It reads a copy of the repository, since ostree may want to write to
+      # it.
+      - name: Check the build with Flathub's linter
         if: matrix.arch == 'x86_64'
-        continue-on-error: true
         shell: bash
         run: |
           cp -a target/flatpak/repo "$RUNNER_TEMP/repo"
-          docker run --rm -v "$RUNNER_TEMP/repo:/repo" "$LINTER" repo /repo
+          docker run --rm -v "$RUNNER_TEMP/repo:/repo" \
+            -v "$PWD/.github/flatpak-lint-exceptions.json:/exceptions.json:ro" \
+            "$LINTER" --exceptions --user-exceptions /exceptions.json repo /repo
