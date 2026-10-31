@@ -1425,9 +1425,11 @@ impl AddressBus {
     /// whether a Super Game Boy sees a button held, and the PPU and M-cycles
     /// caught up (see above). First rejects a state whose components disagree
     /// on the copies they keep of the address bus's state (see
-    /// `check_loaded_copies`).
+    /// `check_loaded_copies`), and fits it to DMG compatibility mode (see
+    /// `fit_to_dmg_compatibility_mode`).
     pub(crate) fn finish_loading_save_state(&mut self) -> std::io::Result<()> {
         self.check_loaded_copies()?;
+        self.fit_to_dmg_compatibility_mode()?;
         self.cartridge.finish_loading_save_state(self.elapsed_dots);
         self.joypad
             .finish_loading_save_state(self.gpu.sgb().is_some());
@@ -1448,6 +1450,31 @@ impl AddressBus {
         self.ppu_quiet_dots = 0;
         self.deferred_cycles = 0;
         self.deferral_budget = 0;
+        Ok(())
+    }
+
+    /// In DMG compatibility mode (a Game Boy Color running a game made for
+    /// the original Game Boy, once its boot ROM has finished) the CGB-only
+    /// registers are locked, so a game can't select SC's fast serial clock or
+    /// arm a speed switch through KEY1. A loaded save state can still hold
+    /// them, since a state is only checked against the console. This cuts
+    /// the fast clock and the armed switch, as an SC or KEY1 write in this
+    /// mode would, and rejects a state at double speed or in the middle of a
+    /// switch: the PPU and APU keep copies of the speed, so it can't be cut.
+    /// Nubo never saves such a state. It runs once every component has
+    /// loaded, since KEY0, which selects the mode, is the PPU's.
+    fn fit_to_dmg_compatibility_mode(&mut self) -> std::io::Result<()> {
+        if self.cgb_registers_enabled() {
+            return Ok(());
+        }
+        if self.speed_switch.is_double_speed_or_switching() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "double speed or a speed switch in DMG compatibility mode",
+            ));
+        }
+        self.speed_switch.disarm();
+        self.serial.use_normal_clock();
         Ok(())
     }
 
