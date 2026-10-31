@@ -49,16 +49,23 @@ pub enum DialogKind {
         configured: Model,
         remembers: bool,
     },
+    /// Asks whether the game picked as the path, which the browser keeps
+    /// another file of under the same file name and title, is a new version
+    /// of that game (keeping its saves) or another game (with saves of its
+    /// own). The game waits in `App::same_title_waiting` meanwhile.
+    SameTitle(PathBuf),
 }
 
 impl DialogKind {
     /// Whether the dialog closes when a game starts: the menus and questions
     /// of the library and the settings, which the game replaces, and a game
     /// waiting to be asked about, which the started one replaces. The box
-    /// art and updates questions have nothing to do with the game and stay.
+    /// art and updates questions have nothing to do with the game and stay,
+    /// and so does the question about a game with the same title, whose
+    /// game waits for the answer.
     pub fn closes_when_game_starts(&self) -> bool {
         match self {
-            DialogKind::BoxArt | DialogKind::Updates => false,
+            DialogKind::BoxArt | DialogKind::Updates | DialogKind::SameTitle(_) => false,
             DialogKind::SortMenu
             | DialogKind::GameMenu(..)
             | DialogKind::FolderMenu(_)

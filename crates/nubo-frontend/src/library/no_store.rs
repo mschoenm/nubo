@@ -32,7 +32,12 @@ pub fn read_picture(
     None
 }
 
-pub fn current_picture(_cache: &Cache, _kind: PictureKind, _rom_path: &Path) -> Option<Vec<u8>> {
+pub fn current_picture(
+    _cache: &Cache,
+    _kind: PictureKind,
+    _pictures_as: &Path,
+    _rom_path: &Path,
+) -> Option<Vec<u8>> {
     None
 }
 

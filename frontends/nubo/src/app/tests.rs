@@ -1163,3 +1163,46 @@ fn a_games_menu_offers_to_delete_its_save_states_until_they_are_deleted() {
     assert!(!offers_deleting(&app));
     let _ = std::fs::remove_dir_all(&folder);
 }
+
+#[test]
+fn games_with_the_same_title_are_asked_about_in_turn() {
+    let mut app = playing_app();
+    let waiting = |name: &str| Rom {
+        path: PathBuf::from(name),
+        bytes: Arc::from(vec![0; 0x8000]),
+    };
+    app.same_title_waiting
+        .extend([(waiting("first.gb"), false), (waiting("second.gb"), false)]);
+    app.ask_about_same_title();
+
+    assert_eq!(
+        app.dialog.as_ref().map(|dialog| &dialog.kind),
+        Some(&DialogKind::SameTitle(PathBuf::from("first.gb")))
+    );
+    let content = app.dialog_content().unwrap();
+    assert_eq!(content.title, "Is this a new version of first?");
+    assert_eq!(
+        content
+            .choices
+            .iter()
+            .map(|choice| choice.label.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "New version of this game (keeps its saves)",
+            "Another game (saves of its own)"
+        ]
+    );
+    // A game starting doesn't close the question its game waits on.
+    start_other_game(&mut app);
+    assert!(app.dialog.is_some());
+
+    let _ = app.update(content.dismiss.into_message());
+    assert_eq!(
+        app.dialog.as_ref().map(|dialog| &dialog.kind),
+        Some(&DialogKind::SameTitle(PathBuf::from("second.gb")))
+    );
+    let dismiss = app.dialog_content().unwrap().dismiss;
+    let _ = app.update(dismiss.into_message());
+    assert!(app.dialog.is_none());
+    assert!(app.same_title_waiting.is_empty());
+}

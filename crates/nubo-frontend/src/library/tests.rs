@@ -612,6 +612,195 @@ fn only_a_library_kept_aside_is_safe_to_save_over() {
     assert!(!unreadable_library("permission denied", None).saving_is_safe);
 }
 
+#[test]
+fn a_game_beside_another_of_the_same_name_has_its_title_hashed_in() {
+    // FNV-1a of "a" is e40c292c; the name is permanent, so the hash must be too.
+    assert_eq!(
+        path_beside(Path::new("game.gb"), "a"),
+        Path::new("game (e40c292c).gb")
+    );
+    assert_eq!(
+        path_beside(Path::new("game.gb"), ""),
+        Path::new("game (811c9dc5).gb")
+    );
+    assert_eq!(
+        path_beside(Path::new("game"), "a"),
+        Path::new("game (e40c292c)")
+    );
+    assert_ne!(
+        path_beside(Path::new("game.gb"), "ZELDA"),
+        path_beside(Path::new("game.gb"), "TETRIS")
+    );
+    assert_eq!(
+        crate::rom::display_name(&path_beside(Path::new("game.gb"), "ZELDA")),
+        "game"
+    );
+}
+
+#[cfg(feature = "desktop")]
+#[test]
+fn games_with_the_same_file_name_keep_pictures_of_their_own() {
+    let root = temporary_folder("same-file-name");
+    let data = root.join("data");
+    let games = root.join("Games");
+    let first = games.join("Jam A").join("game.gb");
+    let second = games.join("Jam B").join("game.gb");
+    write_rom(&first, "FIRST", false);
+    write_rom(&second, "SECOND", false);
+    let folders = [folder(&games, true)];
+    let (mut library, _) = Library::load_from(Cache::in_folder(data.clone()));
+    let result = scan::scan(1, &folders, Vec::new());
+    library.replace_entries(result.entries);
+    for entry in &mut library.entries {
+        entry.title_screen_checked = true;
+    }
+
+    // Before either starts, neither takes the plain name for its pictures.
+    let first_before = library.pictures_as(&first);
+    let second_before = library.pictures_as(&second);
+    assert_ne!(first_before, first);
+    assert_ne!(second_before, second);
+    assert_ne!(first_before.file_name(), second_before.file_name());
+
+    // An old picture under the plain name may be either game's, so the
+    // first game to claim the name makes its own again.
+    let plain_picture = data.join("title_screens").join("game.gb.png");
+    fs::create_dir_all(plain_picture.parent().unwrap()).unwrap();
+    fs::write(&plain_picture, b"old").unwrap();
+    let header = nubo_core::Emulator::read_rom_header(&fs::read(&first).unwrap()).unwrap();
+    library.claim_names(&first, &header, &folders).unwrap();
+    assert_eq!(library.pictures_as(&first), first);
+    assert!(!plain_picture.exists());
+    assert!(!library.entry(&first).unwrap().title_screen_checked);
+
+    let header = nubo_core::Emulator::read_rom_header(&fs::read(&second).unwrap()).unwrap();
+    library.claim_names(&second, &header, &folders).unwrap();
+    assert_eq!(library.pictures_as(&second), second_before);
+    assert!(library.entry(&second).unwrap().title_screen_checked);
+}
+
+#[cfg(feature = "desktop")]
+#[test]
+fn a_game_on_an_unplugged_library_folder_keeps_its_saves() {
+    let root = temporary_folder("unplugged");
+    let data = root.join("data");
+    let stick = root.join("USB stick");
+    let owner = stick.join("game.gb");
+    let other = root.join("Disk").join("game.gb");
+    write_rom(&owner, "GAME", false);
+    write_rom(&other, "GAME", false);
+    let folders = [folder(&stick, false)];
+    let (mut library, _) = Library::load_from(Cache::in_folder(data.clone()));
+    let header = nubo_core::Emulator::read_rom_header(&fs::read(&owner).unwrap()).unwrap();
+    library.claim_names(&owner, &header, &folders).unwrap();
+    fs::remove_dir_all(&stick).unwrap();
+
+    library.claim_names(&other, &header, &folders).unwrap();
+
+    assert_ne!(library.pictures_as(&other), other);
+    assert_eq!(crate::storage::names::stored_path(&data, &owner), owner);
+}
+
+/// A game the browser keeps at `path`, with `title`, the CRC-32 `checksum`
+/// (`None` as kept by a version that didn't keep it) and `size` bytes.
+fn kept(path: &str, title: &str, checksum: Option<u32>, size: u64) -> LibraryEntry {
+    LibraryEntry {
+        title: title.to_owned(),
+        checksum,
+        size,
+        ..LibraryEntry::example(path)
+    }
+}
+
+/// A library of `entries`.
+fn library_of(entries: Vec<LibraryEntry>) -> Library {
+    let mut library = Library::default();
+    library.replace_entries(entries);
+    library
+}
+
+#[test]
+fn the_browser_keeps_a_new_game_under_its_own_file_name() {
+    let library = library_of(Vec::new());
+    let path = Path::new("game.gb");
+
+    assert_eq!(
+        library.place_for(path, "GAME", 1, 10, SameTitle::Ask),
+        Some(PathBuf::from("game.gb"))
+    );
+}
+
+#[test]
+fn the_browser_keeps_the_same_file_where_it_kept_it() {
+    let beside = crate::storage::name_with_hash(Path::new("game.gb"), 7);
+    let library = library_of(vec![
+        kept("game.gb", "GAME", Some(1), 10),
+        kept(beside.to_str().unwrap(), "GAME", Some(7), 10),
+    ]);
+
+    assert_eq!(
+        library.place_for(Path::new("game.gb"), "GAME", 1, 10, SameTitle::Ask),
+        Some(PathBuf::from("game.gb"))
+    );
+    assert_eq!(
+        library.place_for(Path::new("game.gb"), "GAME", 7, 10, SameTitle::Ask),
+        Some(beside)
+    );
+}
+
+#[test]
+fn the_browser_keeps_a_game_with_another_title_beside_the_kept_one() {
+    let library = library_of(vec![kept("game.gb", "ZELDA", Some(1), 10)]);
+
+    assert_eq!(
+        library.place_for(Path::new("game.gb"), "TETRIS", 2, 10, SameTitle::Ask),
+        Some(path_beside(Path::new("game.gb"), "TETRIS"))
+    );
+}
+
+#[test]
+fn the_browser_asks_about_other_contents_with_the_same_title() {
+    let library = library_of(vec![kept("game.gb", "GAME", Some(1), 10)]);
+    let path = Path::new("game.gb");
+
+    assert_eq!(library.place_for(path, "GAME", 2, 10, SameTitle::Ask), None);
+    assert_eq!(
+        library.place_for(path, "GAME", 2, 10, SameTitle::NewVersion),
+        Some(PathBuf::from("game.gb"))
+    );
+    assert_eq!(
+        library.place_for(path, "GAME", 2, 10, SameTitle::AnotherGame),
+        Some(PathBuf::from("game (00000002).gb"))
+    );
+    assert_eq!(
+        crate::rom::display_name(Path::new("game (00000002).gb")),
+        "game"
+    );
+}
+
+#[test]
+fn a_game_kept_before_checksums_is_the_same_file_when_its_size_is() {
+    let library = library_of(vec![kept("game.gb", "GAME", None, 10)]);
+    let path = Path::new("game.gb");
+
+    assert_eq!(
+        library.place_for(path, "GAME", 2, 10, SameTitle::Ask),
+        Some(PathBuf::from("game.gb"))
+    );
+    assert_eq!(library.place_for(path, "GAME", 2, 20, SameTitle::Ask), None);
+}
+
+#[test]
+fn only_hashed_names_beside_a_file_name_are_kept_as_it() {
+    let path = Path::new("game.gb");
+
+    assert!(is_kept_as(path, path));
+    assert!(is_kept_as(Path::new("game (0a1b2c3d).gb"), path));
+    assert!(!is_kept_as(Path::new("game (Rev 1).gb"), path));
+    assert!(!is_kept_as(Path::new("game (0a1b2c3d).gbc"), path));
+    assert!(!is_kept_as(Path::new("other (0a1b2c3d).gb"), path));
+}
+
 /// A zip file holding `rom` uncompressed as `game.gb`, with a checksum that
 /// doesn't match its data: it is damaged past the header, so reading the
 /// header works but unpacking the whole ROM fails.
@@ -668,7 +857,7 @@ fn the_browser_keeps_no_zip_damaged_past_its_header() {
     };
     assert!(nubo_core::Emulator::read_rom_header(&damaged.bytes).is_ok());
 
-    let error = library.add_game(&damaged).unwrap_err();
+    let error = library.add_game(&damaged, SameTitle::Ask).unwrap_err();
     assert!(error.contains("isn't a game Nubo can play"), "{error}");
     assert!(!library.keeps_file_of(&damaged.path));
     assert_eq!(library.games("").count(), 0);
@@ -677,6 +866,6 @@ fn the_browser_keeps_no_zip_damaged_past_its_header() {
         path: PathBuf::from("Good.gb"),
         bytes: vec![0; 0x8000].into(),
     };
-    library.add_game(&good).unwrap();
+    library.add_game(&good, SameTitle::Ask).unwrap();
     assert!(library.keeps_file_of(&good.path));
 }

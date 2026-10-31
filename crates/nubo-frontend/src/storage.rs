@@ -47,6 +47,9 @@ pub enum Entry<'a> {
 
 impl Entry<'_> {
     /// The entry's file name, such as `game.sav` for the RAM of `game.gb`.
+    /// On the desktop a game's entries go by the name it owns instead, which
+    /// may differ from its ROM's file name (see `names`, used by
+    /// `files::Files::path`).
     pub fn file_name(&self) -> PathBuf {
         match self {
             Entry::Settings => PathBuf::from("settings.toml"),
@@ -170,6 +173,30 @@ impl Storage for NoStorage {
     }
 }
 
+/// The 32-bit FNV-1a hash of `bytes`, which the names of a game's own saves
+/// carry (see `names::hashed_name` and the browser's `Library::add_game`).
+/// Players' saves are named after it, so it must never change.
+#[cfg(any(test, feature = "desktop", feature = "web"))]
+pub(crate) fn fnv1a(bytes: &[u8]) -> u32 {
+    bytes.iter().fold(0x811C_9DC5_u32, |hash, &byte| {
+        (hash ^ u32::from(byte)).wrapping_mul(0x0100_0193)
+    })
+}
+
+/// `path` with `hash` in lowercase hex in brackets after its file stem:
+/// `game.gb` becomes `game (1a2b3c4d).gb`. The game's shown name leaves the
+/// brackets out (see `rom::game_name`).
+#[cfg(any(test, feature = "desktop", feature = "web"))]
+pub(crate) fn name_with_hash(path: &Path, hash: u32) -> PathBuf {
+    let mut file_name = path.file_stem().unwrap_or_default().to_os_string();
+    file_name.push(format!(" ({hash:08x})"));
+    if let Some(extension) = path.extension() {
+        file_name.push(".");
+        file_name.push(extension);
+    }
+    path.with_file_name(file_name)
+}
+
 /// Why some entries couldn't be deleted: how many, and the first reason.
 /// `Ok` when every one was.
 #[cfg(any(feature = "desktop", feature = "web"))]
@@ -188,5 +215,7 @@ pub mod files;
 #[cfg(any(feature = "web", test))]
 pub mod indexed_db;
 pub mod local_storage;
+#[cfg(feature = "desktop")]
+pub mod names;
 #[cfg(test)]
 mod tests;
