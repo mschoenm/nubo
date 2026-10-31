@@ -445,7 +445,7 @@ impl App {
     /// Keeps `rom` in the browser's library.
     #[cfg(target_arch = "wasm32")]
     fn add_game(&mut self, rom: &Rom) -> Result<(), String> {
-        let added = self.library.add_game(rom);
+        let added = self.library.add_game(rom).map(drop);
         self.watch_recent_games();
         added
     }
@@ -461,19 +461,24 @@ impl App {
     }
 
     /// Keeps a game the player picked to open in the browser's library, so
-    /// it shows up there next time, replacing any game kept under the same
-    /// file name: the player picked this file, which may be another version.
-    /// A game that isn't one the emulator can start isn't kept, and says why
-    /// when it fails to start. Games started from the library come from
-    /// what it keeps, so they aren't kept again.
+    /// it shows up there next time, and returns it under the name it is kept
+    /// as, which its saves go by. A game kept under the same file name with
+    /// the same title is replaced: the player picked this file, which may be
+    /// another version. One with another title is another game, so this one
+    /// is kept beside it (see `Library::add_game`). A game that isn't one the
+    /// emulator can start isn't kept, and says why when it fails to start.
+    /// Games started from the library come from what it keeps, so they
+    /// aren't kept again.
     #[cfg(target_arch = "wasm32")]
-    pub(super) fn keep_game(&mut self, rom: &Rom) {
-        if nubo_core::Emulator::read_rom_header(&rom.bytes).is_ok()
-            && let Err(error) = self.library.add_game(rom)
-        {
-            self.toasts.error(error);
+    pub(super) fn keep_game(&mut self, mut rom: Rom) -> Rom {
+        if nubo_core::Emulator::read_rom_header(&rom.bytes).is_ok() {
+            match self.library.add_game(&rom) {
+                Ok(path) => rom.path = path,
+                Err(error) => self.toasts.error(error),
+            }
         }
         self.watch_recent_games();
+        rom
     }
 
     /// Takes the game at `path` out of the browser's library.

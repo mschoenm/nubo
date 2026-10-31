@@ -611,3 +611,28 @@ fn only_a_library_kept_aside_is_safe_to_save_over() {
 
     assert!(!unreadable_library("permission denied", None).saving_is_safe);
 }
+
+#[test]
+fn a_game_beside_another_of_the_same_name_has_its_title_hashed_in() {
+    // FNV-1a of "a" is e40c292c; the name is permanent, so the hash must be too.
+    assert_eq!(
+        path_beside(Path::new("game.gb"), "a"),
+        Path::new("game (e40c292c).gb")
+    );
+    assert_eq!(
+        path_beside(Path::new("game.gb"), ""),
+        Path::new("game (811c9dc5).gb")
+    );
+    assert_eq!(
+        path_beside(Path::new("game"), "a"),
+        Path::new("game (e40c292c)")
+    );
+    assert_ne!(
+        path_beside(Path::new("game.gb"), "ZELDA"),
+        path_beside(Path::new("game.gb"), "TETRIS")
+    );
+    assert_eq!(
+        crate::rom::display_name(&path_beside(Path::new("game.gb"), "ZELDA")),
+        "game"
+    );
+}

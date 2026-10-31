@@ -95,7 +95,8 @@ pub fn read_picture(
 }
 
 /// The saved picture of the game at `rom_path` as a PNG, if there is one.
-/// Adding another file under the same name (another size or header title)
+/// Adding another version under the same name (another size; a game with
+/// another header title is kept beside it, see `Library::add_game`)
 /// deletes its pictures (see [`delete_pictures`]), so any that is left is of
 /// the file kept now.
 pub fn current_picture(_cache: &Cache, kind: PictureKind, rom_path: &Path) -> Option<Vec<u8>> {

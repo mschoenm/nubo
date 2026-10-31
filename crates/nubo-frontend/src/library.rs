@@ -867,37 +867,47 @@ impl Library {
 
     /// Keeps the file of `rom` in the library, as the browser build does
     /// for every game the player adds or opens (see [`KEEPS_GAMES`]), and
-    /// lists it among all games. A game kept before under the same file
-    /// name is replaced; its pictures go unless it is the same game, so they
-    /// are made again. Fails, keeping nothing, if `rom` isn't a game the
-    /// emulator can start.
+    /// lists it among all games. Returns the path it is kept under, which
+    /// its saves, save states and cheats are named after.
+    ///
+    /// A game kept before under the same file name with the same header
+    /// title is another version of it, so it is replaced and its saves carry
+    /// over; its pictures go unless the file is the same too, so they are
+    /// made again. A game with another title is another game, so `rom` is
+    /// kept beside it under `path_beside`'s name and never takes its
+    /// saves. Fails, keeping nothing, if `rom` isn't a game the emulator can
+    /// start.
     #[cfg(all(feature = "web", not(feature = "desktop")))]
-    pub fn add_game(&mut self, rom: &crate::rom::Rom) -> Result<(), String> {
+    pub fn add_game(&mut self, rom: &crate::rom::Rom) -> Result<PathBuf, String> {
         let header = nubo_core::Emulator::read_rom_header(&rom.bytes)
             .map_err(|error| format!("{} isn't a game Nubo can play: {error}", rom.name()))?;
+        let path = match self.entry(&rom.path) {
+            Some(known) if known.title != header.title => path_beside(&rom.path, &header.title),
+            _ => rom.path.clone(),
+        };
         let keep_error = |error| format!("{} couldn't be kept in the browser: {error}", rom.name());
-        store::save_rom(&rom.path, &rom.bytes).map_err(keep_error)?;
+        store::save_rom(&path, &rom.bytes).map_err(keep_error)?;
 
         let now = seconds_since_epoch(SystemTime::now());
-        let mut entry = scan::entry_for(&rom.path, &header);
+        let mut entry = scan::entry_for(&path, &header);
         entry.in_folder = true;
         entry.size = rom.bytes.len() as u64;
         entry.modified = now;
         entry.added = Some(now);
 
-        let previous = self.entries.iter().position(|known| known.path == rom.path);
+        let previous = self.entries.iter().position(|known| known.path == path);
         if let Some(index) = previous {
             let previous = &self.entries[index];
             let unchanged = previous.size == entry.size && previous.title == entry.title;
             entry.keep_from(previous, unchanged);
             if !unchanged {
-                store::delete_pictures(&rom.path).map_err(keep_error)?;
+                store::delete_pictures(&path).map_err(keep_error)?;
                 for pictures in [
                     &mut self.box_art,
                     &mut self.title_screens,
                     &mut self.thumbnails,
                 ] {
-                    pictures.remove(&rom.path);
+                    pictures.remove(&path);
                 }
             }
         }
@@ -907,7 +917,8 @@ impl Library {
         }
         entries.push(entry);
         self.replace_entries(entries);
-        self.save()
+        self.save()?;
+        Ok(path)
     }
 
     /// Whether the library keeps the file of the game at `path` (see
@@ -1140,6 +1151,28 @@ fn keeps_file(path: &Path) -> bool {
 #[cfg(not(all(feature = "web", not(feature = "desktop"))))]
 fn keeps_file(_path: &Path) -> bool {
     true
+}
+
+/// Where the browser keeps a game whose file name `path` already belongs to
+/// another game, one with another header title: `game.gb` becomes
+/// `game (1a2b3c4d).gb`, with a hash of `title` in brackets, which the
+/// game's shown name leaves out (see `rom::game_name`). The same title always
+/// gives the same name, so a newer version of that game replaces it, and a
+/// game added again after it was removed gets its saves back. Players' saves
+/// are named after it, so the name must never change: the hash is 32-bit
+/// FNV-1a of the title's UTF-8 bytes, in lowercase hex.
+#[cfg(any(test, all(feature = "web", not(feature = "desktop"))))]
+fn path_beside(path: &Path, title: &str) -> PathBuf {
+    let hash = title.bytes().fold(0x811C_9DC5_u32, |hash, byte| {
+        (hash ^ u32::from(byte)).wrapping_mul(0x0100_0193)
+    });
+    let mut file_name = path.file_stem().unwrap_or_default().to_os_string();
+    file_name.push(format!(" ({hash:08x})"));
+    if let Some(extension) = path.extension() {
+        file_name.push(".");
+        file_name.push(extension);
+    }
+    path.with_file_name(file_name)
 }
 
 /// A picture of a frame of the Game Boy screen.

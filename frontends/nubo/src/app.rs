@@ -421,7 +421,7 @@ impl App {
         let kept = self
             .library
             .add_game(rom)
-            .and_then(|()| self.library.record_played(&rom.path, &header));
+            .and_then(|path| self.library.record_played(&path, &header));
         self.watch_recent_games();
         match kept {
             Ok(()) => Task::perform(
