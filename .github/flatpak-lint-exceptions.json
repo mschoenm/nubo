@@ -1,0 +1,7 @@
+{
+    "io.github.mschoenm.nubo": [
+        "appstream-external-screenshot-url",
+        "appstream-screenshots-not-mirrored-in-ostree",
+        "finish-args-no-required-flatpak"
+    ]
+}
