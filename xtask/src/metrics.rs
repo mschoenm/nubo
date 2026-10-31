@@ -7,7 +7,10 @@
 //! A night looks like `{"date": "2026-10-14", "commit": "90d6ef3", "tests":
 //! {"verify_boot": "success", ...}, "test_roms_passed": 2412, "speed":
 //! {"tobudx-dmg": 118.1, ...}, ...}`: every number in it, however deep, is
-//! a metric named by its path, such as `speed.tobudx-dmg`.
+//! a metric named by its path, such as `speed.tobudx-dmg`. Its `cpu` names
+//! the processor model of the machine that measured it, such as "AMD EPYC
+//! 7763 64-Core Processor" (from `/proc/cpuinfo`); nights logged before
+//! the field was added have none.
 //!
 //! Its `shootout` holds Nubo's score on the GB Emulator Shootout's published
 //! tests and the rank it would have there, with the publication it was
@@ -26,6 +29,11 @@ use std::path::{Path, PathBuf};
 /// How many nights before the latest one each median covers, shortest
 /// window first.
 const MEDIAN_NIGHTS: [usize; 3] = [14, 90, 365];
+/// How many earlier nights on the latest night's CPU model the speed check
+/// needs. With fewer, speed isn't judged at all: GitHub's machines differ by
+/// up to twice in speed from model to model, so a median over other models
+/// would raise false alarms (issue #314).
+const MIN_SAME_CPU_NIGHTS: usize = 5;
 /// How many nights the history table shows.
 const HISTORY_NIGHTS: usize = 30;
 /// The metrics the history table shows, if a night has them.
@@ -43,7 +51,8 @@ const HISTORY_COLUMNS: [(&str, &str); 7] = [
 ];
 
 /// Which way a metric gets worse, and how far it may move from its 14-night
-/// median before it counts as a regression.
+/// median before it counts as a regression. Speed is compared only with
+/// nights on the same CPU model (`compared_nights`).
 enum Threshold {
     /// Worse when lower, by more than this share.
     Lower(f64),
@@ -58,7 +67,8 @@ enum Threshold {
 /// CI, and the history shows the trend.
 fn threshold(key: &str) -> Threshold {
     if key.starts_with("speed.") {
-        // Shared cloud machines vary by 10% from night to night.
+        // Shared cloud machines of one CPU model vary by 10% from night
+        // to night.
         Threshold::Lower(0.10)
     } else if key.starts_with("instructions_per_emulated_second.") {
         Threshold::Higher(0.02)
@@ -158,9 +168,13 @@ fn report(nights: &[Value]) -> String {
         return page;
     };
 
+    let on_cpu = match cpu(latest) {
+        Some(cpu) => format!(" on {cpu}"),
+        None => String::new(),
+    };
     let _ = writeln!(
         page,
-        "Latest night: {} at commit `{}`. Written by the nightly CI; see `docs/NIGHTLY_REVIEW.md` in the repository.\n",
+        "Latest night: {} at commit `{}`{on_cpu}. Written by the nightly CI; see `docs/NIGHTLY_REVIEW.md` in the repository. Speed is compared only with nights on the same CPU model.\n",
         text(latest, "date"),
         text(latest, "commit"),
     );
@@ -182,6 +196,9 @@ fn report(nights: &[Value]) -> String {
         }
         page.push('\n');
     }
+    if let Some(note) = unjudged_speed_note(latest, earlier) {
+        let _ = writeln!(page, "{note}\n");
+    }
 
     page.push_str("## Latest night\n\n| Metric | Latest |");
     for nights in MEDIAN_NIGHTS {
@@ -195,7 +212,7 @@ fn report(nights: &[Value]) -> String {
     for (key, value) in numbers(latest) {
         let _ = write!(page, "| {key} | {} |", format_number(value));
         for nights in MEDIAN_NIGHTS {
-            let median = median_of(earlier, &key, nights);
+            let median = median_of(&compared_nights(latest, earlier, &key), &key, nights);
             let _ = write!(page, " {} |", median.map_or(String::new(), format_number));
         }
         page.push('\n');
@@ -207,12 +224,12 @@ fn report(nights: &[Value]) -> String {
 
     let _ = write!(
         page,
-        "\n## Last {HISTORY_NIGHTS} nights\n\n| Date | Commit | Tests |"
+        "\n## Last {HISTORY_NIGHTS} nights\n\n| Date | Commit | CPU | Tests |"
     );
     for (_, title) in HISTORY_COLUMNS {
         let _ = write!(page, " {title} |");
     }
-    page.push_str("\n| --- | --- | --- |");
+    page.push_str("\n| --- | --- | --- | --- |");
     for _ in HISTORY_COLUMNS {
         page.push_str(" --- |");
     }
@@ -229,9 +246,10 @@ fn report(nights: &[Value]) -> String {
         };
         let _ = write!(
             page,
-            "| {} | `{}` | {tests} |",
+            "| {} | `{}` | {} | {tests} |",
             text(night, "date"),
-            text(night, "commit")
+            text(night, "commit"),
+            cpu(night).unwrap_or("")
         );
         for (key, _) in HISTORY_COLUMNS {
             let value = number(night, key);
@@ -293,7 +311,11 @@ fn regressions(latest: &Value, earlier: &[Value]) -> Vec<String> {
         ));
     }
     for (key, value) in numbers(latest) {
-        let Some(median) = median_of(earlier, &key, MEDIAN_NIGHTS[0]) else {
+        let compared = compared_nights(latest, earlier, &key);
+        if key.starts_with("speed.") && nights_with(&compared, &key) < MIN_SAME_CPU_NIGHTS {
+            continue;
+        }
+        let Some(median) = median_of(&compared, &key, MEDIAN_NIGHTS[0]) else {
             continue;
         };
         let worse = match threshold(&key) {
@@ -302,8 +324,13 @@ fn regressions(latest: &Value, earlier: &[Value]) -> Vec<String> {
             Threshold::None => false,
         };
         if worse {
+            let same_cpu = if key.starts_with("speed.") {
+                " on the same CPU model"
+            } else {
+                ""
+            };
             found.push(format!(
-                "`{key}`: {} against a {}-night median of {}",
+                "`{key}`: {} against a {}-night median{same_cpu} of {}",
                 format_number(value),
                 MEDIAN_NIGHTS[0],
                 format_number(median)
@@ -313,13 +340,53 @@ fn regressions(latest: &Value, earlier: &[Value]) -> Vec<String> {
     found
 }
 
-/// The median of the metric `key` over the last `nights` of `earlier`, or
-/// `None` if none of them has it.
-fn median_of(earlier: &[Value], key: &str, nights: usize) -> Option<f64> {
-    let mut values: Vec<f64> = earlier
+/// Why speed isn't judged on `latest`, if too few of the nights in
+/// `earlier` ran on its CPU model, such as "Speed isn't judged tonight: only
+/// 2 earlier nights ran on AMD EPYC 7763 64-Core Processor, and it takes 5."
+fn unjudged_speed_note(latest: &Value, earlier: &[Value]) -> Option<String> {
+    let key = numbers(latest)
+        .into_iter()
+        .map(|(key, _)| key)
+        .find(|key| key.starts_with("speed."))?;
+    let count = nights_with(&compared_nights(latest, earlier, &key), &key);
+    if count >= MIN_SAME_CPU_NIGHTS {
+        return None;
+    }
+    let model = cpu(latest).unwrap_or("a machine of unknown CPU model");
+    Some(format!(
+        "Speed isn't judged tonight: only {count} earlier nights ran on {model}, and it takes {MIN_SAME_CPU_NIGHTS}."
+    ))
+}
+
+/// The nights of `earlier`, oldest first, that the metric `key` of `latest`
+/// is compared with. Speed depends on the machine's processor, so a `speed.`
+/// metric is compared only with nights on the same CPU model as `latest`
+/// (nights without a model count as one model of their own); every other
+/// metric is compared with all nights.
+fn compared_nights<'a>(latest: &Value, earlier: &'a [Value], key: &str) -> Vec<&'a Value> {
+    if key.starts_with("speed.") {
+        let model = cpu(latest);
+        earlier.iter().filter(|night| cpu(night) == model).collect()
+    } else {
+        earlier.iter().collect()
+    }
+}
+
+/// How many of `nights` have the metric `key`.
+fn nights_with(nights: &[&Value], key: &str) -> usize {
+    nights
+        .iter()
+        .filter(|night| number(night, key).is_some())
+        .count()
+}
+
+/// The median of the metric `key` over the last `count` of `nights` (oldest
+/// first), or `None` if none of them has it.
+fn median_of(nights: &[&Value], key: &str, count: usize) -> Option<f64> {
+    let mut values: Vec<f64> = nights
         .iter()
         .rev()
-        .take(nights)
+        .take(count)
         .filter_map(|night| number(night, key))
         .collect();
     if values.is_empty() {
@@ -391,6 +458,14 @@ fn number(night: &Value, key: &str) -> Option<f64> {
     key.split('.')
         .try_fold(night, |value, part| value.get(part))
         .and_then(Value::as_f64)
+}
+
+/// The CPU model that measured `night`, if it was recorded.
+fn cpu(night: &Value) -> Option<&str> {
+    night
+        .get("cpu")
+        .and_then(Value::as_str)
+        .filter(|model| !model.is_empty())
 }
 
 /// The text at `key` in `night`, or an empty string.

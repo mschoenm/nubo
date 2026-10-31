@@ -19,6 +19,15 @@ fn night(date: &str, speed: f64, instructions: f64, wakeups: f64) -> Value {
     })
 }
 
+/// `night` as measured on a machine with the CPU model `cpu`.
+fn on_cpu(mut night: Value, cpu: &str) -> Value {
+    night["cpu"] = json!(cpu);
+    night
+}
+
+const SLOW_CPU: &str = "AMD EPYC 7763 64-Core Processor";
+const FAST_CPU: &str = "AMD EPYC 9V74 80-Core Processor";
+
 /// Fourteen ordinary nights.
 fn ordinary_nights() -> Vec<Value> {
     (1..=14)
@@ -64,10 +73,93 @@ fn a_failed_test_job_and_fewer_passing_test_roms_are_regressions() {
     assert!(found[1].contains("2,400 to 2,399"));
 }
 
+/// Fourteen nights: ten on the slow CPU model at 108 times real speed, and
+/// four on a twice as fast one among them, as in issue #314.
+fn mixed_cpu_nights() -> Vec<Value> {
+    (1..=14)
+        .map(|day| {
+            let date = format!("2026-10-{day:02}");
+            if day == 4 || day == 9 || day == 12 || day == 13 {
+                on_cpu(night(&date, 210.0, 50_000_000.0, 86.0), FAST_CPU)
+            } else {
+                on_cpu(night(&date, 108.0, 50_000_000.0, 86.0), SLOW_CPU)
+            }
+        })
+        .collect()
+}
+
+#[test]
+fn a_slow_night_on_the_slow_cpu_model_is_not_a_regression() {
+    let earlier = mixed_cpu_nights();
+    let latest = on_cpu(night("2026-10-15", 98.5, 50_000_000.0, 86.0), SLOW_CPU);
+    assert_eq!(regressions(&latest, &earlier), Vec::<String>::new());
+}
+
+#[test]
+fn a_real_drop_on_the_same_cpu_model_is_a_regression() {
+    let earlier = mixed_cpu_nights();
+    let latest = on_cpu(night("2026-10-15", 90.0, 50_000_000.0, 86.0), SLOW_CPU);
+    let found = regressions(&latest, &earlier);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(
+        found[0].contains(
+            "`speed.tobudx-dmg`: 90 against a 14-night median on the same CPU model of 108"
+        ),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_slow_night_on_the_fast_cpu_model_is_judged_against_fast_nights() {
+    let mut earlier = mixed_cpu_nights();
+    earlier.push(on_cpu(
+        night("2026-10-15", 205.0, 50_000_000.0, 86.0),
+        FAST_CPU,
+    ));
+    let latest = on_cpu(night("2026-10-16", 180.0, 50_000_000.0, 86.0), FAST_CPU);
+    let found = regressions(&latest, &earlier);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(
+        found[0].contains("median on the same CPU model of 210"),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn speed_is_not_judged_with_too_few_nights_on_the_same_cpu_model() {
+    let earlier = ordinary_nights();
+    let latest = on_cpu(night("2026-10-15", 50.0, 50_000_000.0, 86.0), SLOW_CPU);
+    assert_eq!(regressions(&latest, &earlier), Vec::<String>::new());
+    let mut nights = earlier;
+    nights.push(latest);
+    let page = report(&nights);
+    assert!(
+        page.contains(
+            "Speed isn't judged tonight: only 0 earlier nights ran on AMD EPYC 7763 64-Core Processor, and it takes 5."
+        ),
+        "{page}"
+    );
+    assert!(
+        page.contains("| speed.tobudx-dmg | 50 |  |  |  |"),
+        "{page}"
+    );
+    assert!(page.contains(&format!("| 2026-10-15 | `abc1234` | {SLOW_CPU} | passed |")));
+}
+
+#[test]
+fn other_metrics_are_compared_across_cpu_models() {
+    let earlier = mixed_cpu_nights();
+    let latest = on_cpu(night("2026-10-15", 108.0, 52_000_000.0, 86.0), SLOW_CPU);
+    let found = regressions(&latest, &earlier);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].contains("instructions_per_emulated_second.tobudx-dmg"));
+}
+
 #[test]
 fn medians_take_only_the_latest_nights() {
     let mut earlier = vec![night("2026-09-01", 10.0, 1.0, 1.0); 20];
     earlier.extend(ordinary_nights());
+    let earlier: Vec<&Value> = earlier.iter().collect();
     assert_eq!(median_of(&earlier, "speed.tobudx-dmg", 14), Some(120.0));
     assert_eq!(median_of(&earlier, "speed.tobudx-dmg", 90), Some(10.0));
     assert_eq!(median_of(&earlier, "speed.missing", 14), None);
@@ -81,7 +173,7 @@ fn the_report_lists_the_latest_night_and_its_history() {
     assert!(page.contains("Latest night: 2026-10-15"));
     assert!(page.contains("None against the 14-night medians."));
     assert!(page.contains("| speed.tobudx-dmg | 121.5 | 120 | 120 | 120 |"));
-    assert!(page.contains("| 2026-10-15 | `abc1234` | passed | 2,400 | 258 | 121.5 |"));
+    assert!(page.contains("| 2026-10-15 | `abc1234` |  | passed | 2,400 | 258 | 121.5 |"));
 }
 
 #[test]
@@ -97,7 +189,7 @@ fn the_report_starts_with_the_shootout_standing() {
         ),
         "{page}"
     );
-    assert!(page.contains("| Date | Commit | Tests | Test ROMs passed | Shootout |"));
+    assert!(page.contains("| Date | Commit | CPU | Tests | Test ROMs passed | Shootout |"));
 }
 
 #[test]
@@ -106,7 +198,7 @@ fn a_night_without_the_shootout_leaves_its_line_and_column_empty() {
     latest.as_object_mut().unwrap().remove("shootout");
     let page = report(&[latest]);
     assert!(!page.contains("GB Emulator Shootout"));
-    assert!(page.contains("| 2026-10-15 | `abc1234` | passed | 2,400 |  | 120 |"));
+    assert!(page.contains("| 2026-10-15 | `abc1234` |  | passed | 2,400 |  | 120 |"));
 }
 
 #[test]

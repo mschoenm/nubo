@@ -69,7 +69,7 @@ fn pictures_read_back_and_are_deleted_together() {
     let (width, height, read) = read_picture(&cache, PictureKind::LastScreen, rom).unwrap();
     assert_eq!((width, height), (SCREEN_WIDTH, SCREEN_HEIGHT));
     assert_eq!(read, pixels);
-    assert!(current_picture(&cache, PictureKind::TitleScreen, rom).is_some());
+    assert!(current_picture(&cache, PictureKind::TitleScreen, rom, rom).is_some());
     assert!(size(&[]) > 0);
 
     delete_pictures(rom).unwrap();
@@ -86,7 +86,7 @@ fn box_art_is_kept_as_downloaded() {
     save_box_art(&cache, rom, b"png").unwrap();
 
     assert_eq!(
-        current_picture(&cache, PictureKind::BoxArt, rom).unwrap(),
+        current_picture(&cache, PictureKind::BoxArt, rom, rom).unwrap(),
         b"png"
     );
 }

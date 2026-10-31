@@ -195,6 +195,18 @@ fn is_unreachable(path: &Path, folders: &[LibraryFolder]) -> bool {
     }
 }
 
+/// Whether `path` is in one of the library `folders` that can't be reached
+/// now, such as one on an unplugged drive: what is in it hasn't moved or
+/// gone, it is only out of reach.
+#[cfg(feature = "desktop")]
+pub fn is_on_unreachable_folder(path: &Path, folders: &[LibraryFolder]) -> bool {
+    folders
+        .iter()
+        .filter(|folder| path.starts_with(&folder.path))
+        .max_by_key(|folder| folder.path.components().count())
+        .is_some_and(|folder| !folder.path.is_dir())
+}
+
 /// A library entry for the ROM at `path` with the given header, found
 /// outside the library folders.
 pub fn entry_for(path: &Path, header: &CartridgeHeader) -> LibraryEntry {
@@ -213,6 +225,7 @@ pub fn entry_for(path: &Path, header: &CartridgeHeader) -> LibraryEntry {
         added: None,
         size,
         modified,
+        checksum: None,
     }
 }
 
@@ -268,7 +281,9 @@ fn file_stamp(path: &Path) -> Option<(u64, u64)> {
 }
 
 /// Reads the ROM's header, or returns `None` if it isn't a ROM Nubo can
-/// run.
+/// run. Only the header of a zip file is unpacked, to keep the scan quick,
+/// so a zip file damaged past its header is listed and fails when the
+/// player starts it.
 fn read_entry(path: &Path, size: u64) -> Option<LibraryEntry> {
     if size > MAX_FILE_SIZE {
         return None;

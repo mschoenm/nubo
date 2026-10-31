@@ -124,7 +124,7 @@ impl AddressBus {
     /// Most CGB registers are only available while the CGB boot ROM runs or
     /// when a CGB game runs. In DMG compatibility mode (a CGB running an
     /// original Game Boy game) they are locked after the boot ROM exits.
-    fn cgb_registers_enabled(&self) -> bool {
+    pub(super) fn cgb_registers_enabled(&self) -> bool {
         self.cgb_mode && (self.in_boot_rom || !self.gpu.in_dmg_compatibility_mode())
     }
 
