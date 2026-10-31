@@ -131,6 +131,19 @@ mod tests {
     }
 
     #[test]
+    fn a_zip_damaged_past_the_header_fails_only_the_whole_check() {
+        let rom = vec![0x00; 0x8000];
+        let zip = build_zip(&[("game.gb", &rom, CompressionMethod::Stored)]);
+        assert!(crate::Emulator::check_rom(&zip).is_ok());
+
+        let mut damaged = zip;
+        let middle_of_the_rom = damaged.len() / 2;
+        damaged[middle_of_the_rom] ^= 0xFF;
+        assert!(crate::Emulator::read_rom_header(&damaged).is_ok());
+        assert!(crate::Emulator::check_rom(&damaged).is_err());
+    }
+
+    #[test]
     fn fails_on_a_zipped_rom_over_8_mib_even_when_unpacking_its_start() {
         let rom = vec![0x00; LARGEST_ROM_SIZE as usize + 1];
         let zip = build_zip(&[("game.gb", &rom, CompressionMethod::Deflated)]);
