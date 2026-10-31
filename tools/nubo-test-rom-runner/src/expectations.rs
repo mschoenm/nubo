@@ -5,6 +5,8 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// The comment line at the top of `passing.txt`, written back on every
+/// `--update`.
 const HEADER: &str = "# Test ROMs that pass. Update with `cargo test-roms --update`.";
 
 /// The location of `passing.txt` in the runner's source directory.

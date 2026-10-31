@@ -223,7 +223,8 @@ impl Emulator {
     /// from another version of Nubo: values it doesn't have start as they do
     /// right after power-on, and values this version doesn't know, or can't
     /// read, are skipped (see [`Emulator::load_state_with_report`]). If it
-    /// can't be loaded, the emulator is left exactly as it was.
+    /// can't be loaded, the emulator is left exactly as it was, unless
+    /// putting it back fails too, a bug: then it starts again from power-on.
     ///
     /// Loading a state replaces the cartridge RAM and clock, but doesn't pass
     /// them to the frontend to save (see

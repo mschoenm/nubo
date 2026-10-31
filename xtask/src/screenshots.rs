@@ -56,7 +56,8 @@ const DEFAULT_WINDOW: (u32, u32) = (1000, 800);
 const ROOM_AROUND_WINDOW: (u32, u32) = (400, 300);
 /// The smallest screen a window is shown on: the same as [`game_monitor`]'s,
 /// so the windows up to 1520×900 and the game's pictures share one GNOME
-/// Shell, which `gnome::run_plan` starts once for each screen size.
+/// Shell, which `gnome::run_session` starts once for each screen size and
+/// style.
 const SMALLEST_WINDOWED_SCREEN: (u32, u32) = (1920, 1200);
 
 /// The options of `cargo xtask screenshots`.
@@ -253,12 +254,12 @@ fn capture_of(
 }
 
 /// The screen a picture of the game alone, `scale` times its size, is taken
-/// on: 1920×1200, or bigger when the largest picture, a Super Game Boy's with
+/// on: [`SMALLEST_WINDOWED_SCREEN`], or bigger when the largest picture, a Super Game Boy's with
 /// its border, wouldn't fit on it.
 fn game_monitor(scale: u32) -> (u32, u32) {
     (
-        (SGB_FRAME_WIDTH * scale).max(1920),
-        (SGB_FRAME_HEIGHT * scale).max(1200),
+        (SGB_FRAME_WIDTH * scale).max(SMALLEST_WINDOWED_SCREEN.0),
+        (SGB_FRAME_HEIGHT * scale).max(SMALLEST_WINDOWED_SCREEN.1),
     )
 }
 

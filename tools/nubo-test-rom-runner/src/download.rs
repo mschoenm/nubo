@@ -147,7 +147,7 @@ fn ensure_shootout() -> Result<PathBuf, String> {
     }
 
     fs::write(&marker, manifest_checksum)
-        .map_err(|error| format!("failed to write to {}: {error}", shootout_dir.display()))?;
+        .map_err(|error| format!("failed to write {}: {error}", marker.display()))?;
     Ok(shootout_dir)
 }
 
@@ -162,8 +162,9 @@ fn extract(archive: &Path, destination: &Path) -> Result<(), String> {
     zip.extract(destination)
         .map_err(|error| format!("failed to extract {}: {error}", archive.display()))?;
 
-    fs::write(destination.join(COMPLETE_MARKER), VERSION)
-        .map_err(|error| format!("failed to write to {}: {error}", destination.display()))
+    let marker = destination.join(COMPLETE_MARKER);
+    fs::write(&marker, VERSION)
+        .map_err(|error| format!("failed to write {}: {error}", marker.display()))
 }
 
 #[cfg(test)]

@@ -330,7 +330,7 @@ fn the_raw_screen_is_the_look_with_every_effect_off() {
 }
 
 #[test]
-fn a_reset_keeps_only_the_folders_unless_asked_and_the_controls_and_asks_the_questions_again() {
+fn a_reset_keeps_the_folders_and_the_controls_and_asks_the_questions_again() {
     let folders = vec![LibraryFolder {
         path: PathBuf::from("/games/gb"),
         include_subfolders: false,

@@ -85,7 +85,7 @@ pub fn with_tooltip<'a, Message: 'a>(
 /// A top bar button with an icon and its name, for the buttons a player has
 /// to find at a glance, such as Library and Open game, and a tooltip below
 /// it with `tip`, such as the shortcut. `primary` fills it with the accent
-/// color, as the Resume button is while the game is paused.
+/// color, as [`steady_bar_button`] does for Resume while the game is paused.
 pub fn bar_button<'a, Message: Clone + 'a>(
     icon: Icon,
     label: &'a str,
