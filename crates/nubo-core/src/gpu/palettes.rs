@@ -8,7 +8,6 @@
 
 use crate::serializable::{FieldWriter, Serializable, read_fields};
 use crate::utils::is_bit_set;
-use std::io::{Read, Write};
 
 /// An RGBA color as stored in the frame buffer.
 pub(super) type Color = [u8; 4];
@@ -151,7 +150,7 @@ impl Default for Palettes {
 /// Save states keep the palette registers and memory; the colors made from them are worked out
 /// again after loading.
 impl Serializable for Palettes {
-    fn serialize(&self, writer: &mut dyn Write) -> std::io::Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> std::io::Result<()> {
         let mut fields = FieldWriter::new(writer);
         fields.field("bgp", &self.bgp)?;
         fields.field("obp0", &self.obp0)?;
@@ -163,7 +162,7 @@ impl Serializable for Palettes {
         fields.finish()
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> std::io::Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> std::io::Result<()> {
         read_fields(reader, |name, bytes| {
             match name {
                 "bgp" => self.bgp.deserialize(bytes)?,

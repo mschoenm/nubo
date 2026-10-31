@@ -111,13 +111,13 @@ fn struct_impl(name: &Ident, generics: &Generics, data: &DataStruct) -> syn::Res
 
     Ok(quote! {
         impl #impl_generics crate::serializable::Serializable for #name #type_generics #where_clause {
-            fn serialize(&self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+            fn serialize(&self, writer: &mut Vec<u8>) -> std::io::Result<()> {
                 let mut fields = crate::serializable::FieldWriter::new(writer);
                 #(fields.field(#field_names, &self.#field_idents)?;)*
                 fields.finish()
             }
 
-            fn deserialize(&mut self, reader: &mut dyn std::io::Read) -> std::io::Result<()> {
+            fn deserialize(&mut self, reader: &mut &[u8]) -> std::io::Result<()> {
                 crate::serializable::read_fields(reader, |name, bytes| {
                     match name {
                         #(#field_names => crate::serializable::Serializable::deserialize(
@@ -163,16 +163,16 @@ fn enum_impl(name: &Ident, generics: &Generics, data: &DataEnum) -> syn::Result<
 
     Ok(quote! {
         impl #impl_generics crate::serializable::Serializable for #name #type_generics #where_clause {
-            fn serialize(&self, writer: &mut dyn std::io::Write) -> std::io::Result<()> {
+            fn serialize(&self, writer: &mut Vec<u8>) -> std::io::Result<()> {
                 let variant = match self {
                     #(#name::#variant_idents => #variant_names,)*
                 };
                 crate::serializable::write_variant(writer, variant, &[#(#variant_names),*])
             }
 
-            fn deserialize(&mut self, reader: &mut dyn std::io::Read) -> std::io::Result<()> {
+            fn deserialize(&mut self, reader: &mut &[u8]) -> std::io::Result<()> {
                 let variant = crate::serializable::read_name(reader)?;
-                *self = match variant.as_str() {
+                *self = match variant {
                     #(#variant_names => #name::#variant_idents,)*
                     _ => {
                         return Err(crate::serializable::unreadable_value(format!(

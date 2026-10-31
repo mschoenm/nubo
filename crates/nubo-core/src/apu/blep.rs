@@ -10,7 +10,7 @@
 
 use crate::serializable::{FieldWriter, Serializable, array_encoding, read_fields};
 use std::f64::consts::PI;
-use std::io::{self, Read, Write};
+use std::io;
 use std::sync::LazyLock;
 
 /// How many output samples each step is spread over.
@@ -135,7 +135,7 @@ impl BlepBuffer {
 /// output samples, so they are heard after loading just as they would have
 /// been.
 impl Serializable for BlepBuffer {
-    fn serialize(&self, writer: &mut dyn Write) -> io::Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> io::Result<()> {
         let mut fields = FieldWriter::new(writer);
         let buffer_encoding = || array_encoding::<f32>(self.buffer.len());
         fields.field_with("buffer", buffer_encoding, |writer| {
@@ -151,7 +151,7 @@ impl Serializable for BlepBuffer {
         fields.finish()
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> io::Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> io::Result<()> {
         let mut position = u8::try_from(self.position).unwrap_or(u8::MAX);
         read_fields(reader, |name, bytes| {
             match name {

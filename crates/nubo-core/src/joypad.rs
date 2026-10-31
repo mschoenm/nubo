@@ -24,7 +24,7 @@ use crate::controller::{ControllerMapping, ControllerState};
 use crate::serializable::Serializable;
 use getset::{CopyGetters, Setters};
 use nubo_serializable_derive::Serializable;
-use std::io::{self, Read, Write};
+use std::io;
 
 /// A Game Boy button.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -139,11 +139,11 @@ struct PressedButtons {
 }
 
 impl Serializable for PressedButtons {
-    fn serialize(&self, writer: &mut dyn Write) -> io::Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> io::Result<()> {
         self.players.serialize(writer)
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> io::Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> io::Result<()> {
         self.players.deserialize(reader)?;
         self.loaded = true;
         Ok(())

@@ -52,21 +52,19 @@ use std::io::{Error, ErrorKind, Read, Result, Write};
 /// other versions of Nubo can find the ones they know and skip the others.
 /// [`read_fields`] reads them back. Derived implementations use it for every
 /// struct, and manual ones should too.
+///
+/// Each value is written in place, after room for its length, which is filled
+/// in once the value is written. So a value is written once, however deeply
+/// it is nested.
 pub(crate) struct FieldWriter<'a> {
-    writer: &'a mut dyn Write,
-    /// The bytes of the field being written, which are only written once
-    /// their length is known.
-    value: Vec<u8>,
+    writer: &'a mut Vec<u8>,
 }
 
 impl<'a> FieldWriter<'a> {
     /// Starts writing a struct's fields to `writer`; [`FieldWriter::finish`]
     /// ends it.
-    pub(crate) fn new(writer: &'a mut dyn Write) -> Self {
-        FieldWriter {
-            writer,
-            value: Vec::new(),
-        }
+    pub(crate) fn new(writer: &'a mut Vec<u8>) -> Self {
+        FieldWriter { writer }
     }
 
     /// Writes `value` as the field `name`.
@@ -82,19 +80,21 @@ impl<'a> FieldWriter<'a> {
         &mut self,
         name: &str,
         encoding: impl FnOnce() -> String,
-        write: impl FnOnce(&mut dyn Write) -> Result<()>,
+        write: impl FnOnce(&mut Vec<u8>) -> Result<()>,
     ) -> Result<()> {
         debug_assert!(!name.is_empty(), "an empty name ends the fields");
-        self.value.clear();
+        write_name(self.writer, name)?;
+        let length_at = self.writer.len();
+        self.writer.extend_from_slice(&[0; size_of::<u32>()]);
         within_field(name, || {
             note_field(encoding);
-            write(&mut self.value)
+            write(self.writer)
         })?;
-        let length = u32::try_from(self.value.len())
+        let value_at = length_at + size_of::<u32>();
+        let length = u32::try_from(self.writer.len() - value_at)
             .map_err(|_| Error::new(ErrorKind::InvalidInput, "a field is too long to save"))?;
-        write_name(self.writer, name)?;
-        length.serialize(self.writer)?;
-        self.writer.write_all(&self.value)
+        self.writer[length_at..value_at].copy_from_slice(&length.to_le_bytes());
+        Ok(())
     }
 
     /// Ends the struct's fields.
@@ -112,10 +112,9 @@ impl<'a> FieldWriter<'a> {
 /// start of them; both are noted for [`collect_unreadable`]. Damaged data and
 /// values a component's checks reject fail the whole read.
 pub(crate) fn read_fields(
-    reader: &mut dyn Read,
+    reader: &mut &[u8],
     mut read_field: impl FnMut(&str, &mut &[u8]) -> Result<bool>,
 ) -> Result<()> {
-    let mut value = Vec::new();
     loop {
         let name = read_name(reader).map_err(damaged)?;
         if name.is_empty() {
@@ -124,22 +123,16 @@ pub(crate) fn read_fields(
         let mut length = 0u32;
         length.deserialize(reader).map_err(damaged)?;
 
-        // Read through `take` rather than into a buffer of the stored length,
-        // so a damaged length can't make it allocate gigabytes.
-        value.clear();
-        (&mut *reader)
-            .take(u64::from(length))
-            .read_to_end(&mut value)
-            .map_err(damaged)?;
-        if u32::try_from(value.len()) != Ok(length) {
-            return Err(damaged(Error::new(
-                ErrorKind::UnexpectedEof,
-                format!("the saved {name} ends early"),
-            )));
-        }
-
-        let mut bytes = value.as_slice();
-        within_field(&name, || match read_field(&name, &mut bytes) {
+        let mut bytes = usize::try_from(length)
+            .ok()
+            .and_then(|length| take_bytes(reader, length))
+            .ok_or_else(|| {
+                damaged(Error::new(
+                    ErrorKind::UnexpectedEof,
+                    format!("the saved {name} ends early"),
+                ))
+            })?;
+        within_field(name, || match read_field(name, &mut bytes) {
             Ok(true) if !bytes.is_empty() => {
                 note_unreadable();
                 Ok(())
@@ -156,7 +149,7 @@ pub(crate) fn read_fields(
 
 /// Writes a name of 1 to 255 bytes, preceded by its length. Fields and enum
 /// variants are stored by name.
-pub(crate) fn write_name(writer: &mut dyn Write, name: &str) -> Result<()> {
+pub(crate) fn write_name(writer: &mut Vec<u8>, name: &str) -> Result<()> {
     let length = u8::try_from(name.len())
         .map_err(|_| Error::new(ErrorKind::InvalidInput, "a name is too long to save"))?;
     length.serialize(writer)?;
@@ -173,11 +166,7 @@ pub(crate) fn array_encoding<T: Serializable>(count: usize) -> String {
 /// them), by its name. [`stored_layout`] lists all the variants, so a variant
 /// renamed in the code without keeping its stored name shows up even when no
 /// state uses it.
-pub(crate) fn write_variant(
-    writer: &mut dyn Write,
-    variant: &str,
-    variants: &[&str],
-) -> Result<()> {
+pub(crate) fn write_variant(writer: &mut Vec<u8>, variant: &str, variants: &[&str]) -> Result<()> {
     note_variants(variants);
     write_name(writer, variant)
 }
@@ -196,12 +185,11 @@ pub(crate) fn note_variants(variants: &[&str]) {
 
 /// Reads a name written by [`write_name`], or the empty name that ends a
 /// struct's fields.
-pub(crate) fn read_name(reader: &mut dyn Read) -> Result<String> {
+pub(crate) fn read_name<'a>(reader: &mut &'a [u8]) -> Result<&'a str> {
     let mut length = 0u8;
     length.deserialize(reader)?;
-    let mut bytes = vec![0; usize::from(length)];
-    reader.read_exact(&mut bytes)?;
-    String::from_utf8(bytes).map_err(|_| unreadable_value("a name isn't text"))
+    let bytes = read_bytes(reader, usize::from(length))?;
+    std::str::from_utf8(bytes).map_err(|_| unreadable_value("a name isn't text"))
 }
 
 /// The error for a value this version can't read from its bytes, such as an
@@ -308,7 +296,7 @@ fn note_field(encoding: impl FnOnce() -> String) {
 /// fields whatever the value is.
 fn note_layout_of<T: Serializable + Default>() -> Result<()> {
     if TRACKING.with_borrow(|tracking| tracking.layout.is_some()) {
-        T::default().serialize(&mut std::io::sink())?;
+        T::default().serialize(&mut Vec::new())?;
     }
     Ok(())
 }
@@ -371,11 +359,11 @@ pub(crate) fn stored_layout(write: impl FnOnce() -> Result<()>) -> Result<BTreeS
 /// a comment saying why.
 pub(crate) trait Serializable {
     /// Appends this value's bytes to `writer`.
-    fn serialize(&self, writer: &mut dyn Write) -> Result<()>;
+    fn serialize(&self, writer: &mut Vec<u8>) -> Result<()>;
 
     /// Replaces this value with one read from `reader`. Fails when the data
     /// ends early or holds a value this type can't have.
-    fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()>;
+    fn deserialize(&mut self, reader: &mut &[u8]) -> Result<()>;
 
     /// How the value is stored, as [`stored_layout`] lists it next to its
     /// field: `u8`, `bool`, `text`, `16 bytes`, `list of u16`, `optional
@@ -392,7 +380,7 @@ pub(crate) trait Serializable {
     /// Appends `items` one after the other, as a `Vec` stores them. Types
     /// stored as their plain bytes write them all at once, which is the
     /// same bytes, only faster.
-    fn serialize_items(items: &[Self], writer: &mut dyn Write) -> Result<()>
+    fn serialize_items(items: &[Self], writer: &mut Vec<u8>) -> Result<()>
     where
         Self: Sized,
     {
@@ -403,7 +391,7 @@ pub(crate) trait Serializable {
     }
 
     /// Reads `count` items written by [`Serializable::serialize_items`].
-    fn deserialize_items(count: u32, reader: &mut dyn Read) -> Result<Vec<Self>>
+    fn deserialize_items(count: u32, reader: &mut &[u8]) -> Result<Vec<Self>>
     where
         Self: Sized + Default,
     {
@@ -417,16 +405,19 @@ pub(crate) trait Serializable {
     }
 }
 
-/// Reads exactly `length` bytes, or fails like `read_exact` when they run
-/// out. It reads through `take`, so a damaged length can't make it allocate
-/// gigabytes.
-fn read_bytes(reader: &mut dyn Read, length: u64) -> Result<Vec<u8>> {
-    let mut bytes = Vec::new();
-    reader.take(length).read_to_end(&mut bytes)?;
-    if bytes.len() as u64 != length {
-        return Err(Error::new(ErrorKind::UnexpectedEof, "the data ends early"));
-    }
-    Ok(bytes)
+/// Takes the next `length` bytes off the front of `reader`, without copying
+/// them, or `None` when fewer are left (and then takes nothing).
+fn take_bytes<'a>(reader: &mut &'a [u8], length: usize) -> Option<&'a [u8]> {
+    let (bytes, rest) = reader.split_at_checked(length)?;
+    *reader = rest;
+    Some(bytes)
+}
+
+/// Takes the next `length` bytes off the front of `reader`, or fails like
+/// `read_exact` when they run out.
+fn read_bytes<'a>(reader: &mut &'a [u8], length: usize) -> Result<&'a [u8]> {
+    take_bytes(reader, length)
+        .ok_or_else(|| Error::new(ErrorKind::UnexpectedEof, "the data ends early"))
 }
 
 /// Implements `Serializable` for number types by storing their little-endian bytes.
@@ -434,11 +425,11 @@ macro_rules! impl_serializable_for_numbers {
     ($($number:ty),*) => {
         $(
             impl Serializable for $number {
-                fn serialize(&self, writer: &mut dyn Write) -> Result<()> {
+                fn serialize(&self, writer: &mut Vec<u8>) -> Result<()> {
                     writer.write_all(&self.to_le_bytes())
                 }
 
-                fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
+                fn deserialize(&mut self, reader: &mut &[u8]) -> Result<()> {
                     let mut bytes = [0; size_of::<$number>()];
                     reader.read_exact(&mut bytes)?;
                     *self = <$number>::from_le_bytes(bytes);
@@ -456,11 +447,11 @@ macro_rules! impl_serializable_for_numbers {
 impl_serializable_for_numbers!(u16, u32, u64, i16, f32, f64);
 
 impl Serializable for u8 {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> Result<()> {
         writer.write_all(&[*self])
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> Result<()> {
         let mut bytes = [0];
         reader.read_exact(&mut bytes)?;
         *self = bytes[0];
@@ -471,22 +462,22 @@ impl Serializable for u8 {
         String::from("u8")
     }
 
-    fn serialize_items(items: &[Self], writer: &mut dyn Write) -> Result<()> {
+    fn serialize_items(items: &[Self], writer: &mut Vec<u8>) -> Result<()> {
         writer.write_all(items)
     }
 
-    fn deserialize_items(count: u32, reader: &mut dyn Read) -> Result<Vec<Self>> {
-        read_bytes(reader, u64::from(count))
+    fn deserialize_items(count: u32, reader: &mut &[u8]) -> Result<Vec<Self>> {
+        read_bytes(reader, count as usize).map(<[u8]>::to_vec)
     }
 }
 
 /// A `bool` is one byte: 1 for true and 0 for false. Any non-zero byte reads as true.
 impl Serializable for bool {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> Result<()> {
         u8::from(*self).serialize(writer)
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> Result<()> {
         let mut value = 0u8;
         value.deserialize(reader)?;
         *self = value != 0;
@@ -500,15 +491,13 @@ impl Serializable for bool {
 
 /// A byte array is stored as its bytes, without a length.
 impl<const N: usize> Serializable for [u8; N] {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> Result<()> {
         writer.write_all(self)
     }
 
-    /// Changes nothing if the bytes run out (on the heap, since some arrays
-    /// are larger than the stack allows in debug builds).
-    fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
-        let bytes = read_bytes(reader, N as u64)?;
-        self.copy_from_slice(&bytes);
+    /// Changes nothing if the bytes run out.
+    fn deserialize(&mut self, reader: &mut &[u8]) -> Result<()> {
+        self.copy_from_slice(read_bytes(reader, N)?);
         Ok(())
     }
 
@@ -516,31 +505,35 @@ impl<const N: usize> Serializable for [u8; N] {
         format!("{N} bytes")
     }
 
-    fn serialize_items(items: &[Self], writer: &mut dyn Write) -> Result<()> {
+    fn serialize_items(items: &[Self], writer: &mut Vec<u8>) -> Result<()> {
         writer.write_all(items.as_flattened())
     }
 
-    fn deserialize_items(count: u32, reader: &mut dyn Read) -> Result<Vec<Self>> {
-        let bytes = read_bytes(reader, u64::from(count) * N as u64)?;
-        Ok(bytes.as_chunks::<N>().0.to_vec())
+    fn deserialize_items(count: u32, reader: &mut &[u8]) -> Result<Vec<Self>> {
+        let length = (count as usize)
+            .checked_mul(N)
+            .ok_or_else(|| Error::new(ErrorKind::UnexpectedEof, "the data ends early"))?;
+        Ok(read_bytes(reader, length)?.as_chunks::<N>().0.to_vec())
     }
 }
 
 /// A string is stored as its length in bytes (a `u32`) followed by its UTF-8
 /// bytes.
 impl Serializable for String {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> Result<()> {
         let length = u32::try_from(self.len())
             .map_err(|_| Error::new(ErrorKind::InvalidInput, "a string is too long to save"))?;
         length.serialize(writer)?;
         writer.write_all(self.as_bytes())
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> Result<()> {
         let mut length = 0u32;
         length.deserialize(reader)?;
-        let bytes = read_bytes(reader, u64::from(length))?;
-        *self = String::from_utf8(bytes).map_err(|_| unreadable_value("a string isn't UTF-8"))?;
+        let bytes = read_bytes(reader, length as usize)?;
+        *self = std::str::from_utf8(bytes)
+            .map_err(|_| unreadable_value("a string isn't UTF-8"))?
+            .to_owned();
         Ok(())
     }
 
@@ -551,7 +544,7 @@ impl Serializable for String {
 
 /// A `Vec` is stored as its length (a `u32`) followed by its items.
 impl<T: Serializable + Default> Serializable for Vec<T> {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> Result<()> {
         let length = u32::try_from(self.len())
             .map_err(|_| Error::new(ErrorKind::InvalidInput, "Vec is too long to save"))?;
         length.serialize(writer)?;
@@ -562,7 +555,7 @@ impl<T: Serializable + Default> Serializable for Vec<T> {
     }
 
     /// Changes nothing if an item can't be read.
-    fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> Result<()> {
         let mut length = 0u32;
         length.deserialize(reader)?;
         *self = T::deserialize_items(length, reader)?;
@@ -576,11 +569,11 @@ impl<T: Serializable + Default> Serializable for Vec<T> {
 
 /// A `Box` is stored as the value it holds.
 impl<T: Serializable> Serializable for Box<T> {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> Result<()> {
         (**self).serialize(writer)
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> Result<()> {
         (**self).deserialize(reader)
     }
 
@@ -597,7 +590,7 @@ impl<T: Serializable> Serializable for Box<T> {
 /// made again on every load. Stored values are still all replaced: a load
 /// first reads the power-on state, then the saved one.
 impl<T: Serializable + Default> Serializable for Option<T> {
-    fn serialize(&self, writer: &mut dyn Write) -> Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> Result<()> {
         match self {
             Some(value) => {
                 1u8.serialize(writer)?;
@@ -610,7 +603,7 @@ impl<T: Serializable + Default> Serializable for Option<T> {
         }
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> Result<()> {
         let mut tag = 0u8;
         tag.deserialize(reader)?;
 
@@ -686,6 +679,37 @@ mod tests {
                 0,    // the end of the fields
             ]
         );
+    }
+
+    #[test]
+    fn a_nested_struct_is_stored_inside_its_field_with_its_length() {
+        #[derive(Debug, Default, PartialEq, Serializable)]
+        struct Inner {
+            a: u8,
+        }
+        #[derive(Debug, Default, PartialEq, Serializable)]
+        struct Outer {
+            inner: Inner,
+            b: u8,
+        }
+        let outer = Outer {
+            inner: Inner { a: 7 },
+            b: 9,
+        };
+        let bytes = saved(&outer);
+        assert_eq!(
+            bytes,
+            [
+                5, b'i', b'n', b'n', b'e', b'r', 8, 0, 0, 0, // inner
+                1, b'a', 1, 0, 0, 0, 7, // inner.a
+                0, // the end of inner's fields
+                1, b'b', 1, 0, 0, 0, 9, // b
+                0, // the end of the fields
+            ]
+        );
+        let mut read = Outer::default();
+        read.deserialize(&mut bytes.as_slice()).unwrap();
+        assert_eq!(read, outer);
     }
 
     #[test]
@@ -931,7 +955,7 @@ mod tests {
             maybe: None,
             items: Vec::new(),
         };
-        let layout = stored_layout(|| outer.serialize(&mut std::io::sink())).unwrap();
+        let layout = stored_layout(|| outer.serialize(&mut Vec::new())).unwrap();
         assert!(layout.contains("maybe: optional fields"));
         assert!(layout.contains("maybe.counter: u16"));
         assert!(layout.contains("items: list of fields"));
@@ -949,7 +973,7 @@ mod tests {
             inner: original(),
             items: vec![original(), original()],
         };
-        let layout = stored_layout(|| outer.serialize(&mut std::io::sink())).unwrap();
+        let layout = stored_layout(|| outer.serialize(&mut Vec::new())).unwrap();
         assert!(layout.contains("inner: fields"));
         assert!(layout.contains("inner.counter: u16"));
         assert!(layout.contains("inner.bytes: 4 bytes"));
@@ -975,8 +999,8 @@ mod tests {
         struct Wide {
             value: u16,
         }
-        let layout_of = |value: &dyn Fn(&mut dyn Write) -> Result<()>| {
-            stored_layout(|| value(&mut std::io::sink())).unwrap()
+        let layout_of = |value: &dyn Fn(&mut Vec<u8>) -> Result<()>| {
+            stored_layout(|| value(&mut Vec::new())).unwrap()
         };
         let narrow = layout_of(&|writer| Narrow { value: 1 }.serialize(writer));
         let wide = layout_of(&|writer| Wide { value: 1 }.serialize(writer));

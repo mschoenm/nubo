@@ -38,7 +38,7 @@ use crate::model::Model;
 use crate::serializable::{FieldWriter, Serializable, array_encoding, read_fields};
 use crate::utils::is_bit_set;
 use nubo_serializable_derive::Serializable;
-use std::io::{self, Read, Write};
+use std::io;
 
 const FIFO_LENGTH: usize = 8;
 const MAX_VISIBLE_OBJECTS: usize = 10;
@@ -195,7 +195,7 @@ impl BackgroundFifo {
 }
 
 impl Serializable for BackgroundFifo {
-    fn serialize(&self, writer: &mut dyn Write) -> io::Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> io::Result<()> {
         let mut fields = FieldWriter::new(writer);
         fields.field("lower", &self.lower)?;
         fields.field("upper", &self.upper)?;
@@ -207,7 +207,7 @@ impl Serializable for BackgroundFifo {
         fields.finish()
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> io::Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> io::Result<()> {
         read_fields(reader, |name, bytes| {
             match name {
                 "lower" => self.lower.deserialize(bytes)?,
@@ -227,14 +227,14 @@ impl Serializable for BackgroundFifo {
 }
 
 /// Writes a FIFO's size or head, which the FIFOs keep as a `usize` for indexing, as a byte.
-fn write_fifo_index(index: usize, writer: &mut dyn Write) -> io::Result<()> {
+fn write_fifo_index(index: usize, writer: &mut Vec<u8>) -> io::Result<()> {
     u8::try_from(index)
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "FIFO index out of range"))?
         .serialize(writer)
 }
 
 /// Reads a FIFO's size or head written by `write_fifo_index`, rejecting one above `max`.
-fn read_fifo_index(reader: &mut dyn Read, max: usize) -> io::Result<usize> {
+fn read_fifo_index(reader: &mut &[u8], max: usize) -> io::Result<usize> {
     let mut index = 0u8;
     index.deserialize(reader)?;
     if usize::from(index) > max {
@@ -259,7 +259,7 @@ struct Fifo {
 }
 
 impl Serializable for Fifo {
-    fn serialize(&self, writer: &mut dyn Write) -> io::Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> io::Result<()> {
         let mut fields = FieldWriter::new(writer);
         let items_encoding = || array_encoding::<FifoItem>(self.items.len());
         fields.field_with("items", items_encoding, |writer| {
@@ -276,7 +276,7 @@ impl Serializable for Fifo {
         fields.finish()
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> io::Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> io::Result<()> {
         read_fields(reader, |name, bytes| {
             match name {
                 "items" => self

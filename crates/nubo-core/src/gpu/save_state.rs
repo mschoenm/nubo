@@ -9,7 +9,6 @@ use crate::gpu::{
 };
 use crate::serializable::{FieldWriter, Serializable, read_fields, unreadable_value};
 use crate::sgb::Sgb;
-use std::io::{Read, Write};
 
 /// The PPU's Super Game Boy, which only the Super Game Boy models have. It is stored like an
 /// `Option`, but a load never adds or drops it: a state that has one where the model has none,
@@ -20,11 +19,11 @@ use std::io::{Read, Write};
 pub(super) struct ModelSgb(pub(super) Option<Box<Sgb>>);
 
 impl Serializable for ModelSgb {
-    fn serialize(&self, writer: &mut dyn Write) -> std::io::Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> std::io::Result<()> {
         self.0.serialize(writer)
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> std::io::Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> std::io::Result<()> {
         let mut tag = 0u8;
         tag.deserialize(reader)?;
         match (tag, &mut self.0) {
@@ -55,14 +54,14 @@ macro_rules! impl_serializable_with_check {
         check: $check:ident
     }) => {
         impl Serializable for $type {
-            fn serialize(&self, writer: &mut dyn Write) -> std::io::Result<()> {
+            fn serialize(&self, writer: &mut Vec<u8>) -> std::io::Result<()> {
                 let $type { $($saved,)* $($skipped: _,)* } = self;
                 let mut fields = FieldWriter::new(writer);
                 $(fields.field(stringify!($saved), $saved)?;)*
                 fields.finish()
             }
 
-            fn deserialize(&mut self, reader: &mut dyn Read) -> std::io::Result<()> {
+            fn deserialize(&mut self, reader: &mut &[u8]) -> std::io::Result<()> {
                 let $type { $($saved,)* $($skipped: _,)* } = self;
                 read_fields(reader, |name, bytes| {
                     match name {

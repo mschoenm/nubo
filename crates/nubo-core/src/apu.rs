@@ -98,7 +98,7 @@ use crate::model::Model;
 use crate::serializable::{FieldWriter, Serializable, array_encoding, read_fields};
 use crate::utils::is_bit_set;
 use nubo_serializable_derive::Serializable;
-use std::io::{self, Read, Write};
+use std::io;
 
 const CHANNEL_COUNT: usize = 4;
 
@@ -1532,7 +1532,7 @@ impl MemoryMapped for Apu {
 /// over as many samples at the new rate (each still adds up to its full size,
 /// so nothing clicks).
 impl Serializable for Apu {
-    fn serialize(&self, writer: &mut dyn Write) -> io::Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> io::Result<()> {
         if self.pending_cycles > 0 {
             return self.caught_up().serialize(writer);
         }
@@ -1558,7 +1558,7 @@ impl Serializable for Apu {
         fields.finish()
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> io::Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> io::Result<()> {
         self.prepare_for_change();
         read_fields(reader, |name, bytes| {
             match name {
@@ -1605,7 +1605,7 @@ impl Serializable for Apu {
 }
 
 /// Writes each channel's last mixed level.
-fn write_levels(levels: &[f32; CHANNEL_COUNT], writer: &mut dyn Write) -> io::Result<()> {
+fn write_levels(levels: &[f32; CHANNEL_COUNT], writer: &mut Vec<u8>) -> io::Result<()> {
     levels.iter().try_for_each(|level| level.serialize(writer))
 }
 
@@ -1615,7 +1615,7 @@ fn levels_encoding() -> String {
 }
 
 /// Reads the levels `write_levels` wrote.
-fn read_levels(levels: &mut [f32; CHANNEL_COUNT], reader: &mut dyn Read) -> io::Result<()> {
+fn read_levels(levels: &mut [f32; CHANNEL_COUNT], reader: &mut &[u8]) -> io::Result<()> {
     levels
         .iter_mut()
         .try_for_each(|level| level.deserialize(reader))
