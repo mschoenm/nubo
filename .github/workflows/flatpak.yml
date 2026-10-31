@@ -23,8 +23,7 @@ jobs:
       matrix:
         include:
           # Ubuntu 26.04's Flatpak is new enough for --device=input, which
-          # gives the app its controllers, and for --device-if, which gives
-          # older Flatpaks every device instead.
+          # gives the app its controllers.
           - arch: x86_64
             runner: ubuntu-26.04
           - arch: aarch64
@@ -99,10 +98,10 @@ jobs:
           appstream /linux/io.github.mschoenm.nubo.metainfo.xml
 
       # The build must pass Flathub's checks too, so a check Flathub adds
-      # fails the nightly run. The two screenshot checks are left out
-      # (flatpak-lint-exceptions.json): only Flathub's own build copies the
-      # screenshots to its server and points the AppStream data there, and
-      # doing that here would show players of these files no screenshots.
+      # fails the nightly run. Three checks are left out
+      # (flatpak-lint-exceptions.json, explained in docs/CI.md): the two
+      # screenshot checks, which only Flathub's own build can pass, and the
+      # minimum Flatpak version for --device=input.
       # It reads a copy of the repository, since ostree may want to write to
       # it.
       - name: Check the build with Flathub's linter
