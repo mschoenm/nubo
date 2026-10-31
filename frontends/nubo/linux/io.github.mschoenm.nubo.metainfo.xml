@@ -71,6 +71,26 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.14.0" date="2026-10-31">
+      <description>
+        <p>Games with the same file name now get saves of their own, save states load several times faster, and many small fixes make saves, the library and the emulation more dependable.</p>
+        <ul>
+          <li>Two games with the same file name in different folders no longer share their battery saves, save states, cheats and pictures; your existing saves keep their names</li>
+          <li>In the browser, a different game with the same file name is kept beside the one you have, and Nubo asks whether a game with the same title is a new version of it or another game</li>
+          <li>Save states load about four times faster and save about twice as fast, which helps RetroArch's run-ahead and rewind</li>
+          <li>Save states store the buttons you hold, so a loaded state goes on the same way whatever you held before, which keeps netplay in sync</li>
+          <li>Frame blending mixes the two frames the emulator drew in a row, also while fast forwarding</li>
+          <li>The library notices folders with a dot in their name, such as "Mr. Do", moving in or out</li>
+          <li>The browser refuses a zip file damaged past its header when you add it, instead of failing every time you start it</li>
+          <li>A game's menu says when the --model option picks the console for this run</li>
+          <li>A new MBC3 clock starts at zero instead of counting 56 years at its first read; a ROM without RAM loads whatever its RAM size byte says; MBC5 turns its RAM on only for the exact value games use</li>
+          <li>Game Genie codes no longer change the boot ROM, and DMG games on a Game Boy Color keep the normal serial speed</li>
+          <li>Save states are checked more closely on load, so a damaged one is refused or cut back instead of leaving the game in a state no real Game Boy can reach</li>
+          <li>Saving over a slot keeps the old picture exactly as it was for Undo</li>
+          <li>Save states made by Nubo 0.4.0 to 0.13.0 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.13.0" date="2026-10-21">
       <description>
         <p>A new version is now one click from its download, picking a game's console is simpler, and the app uses your system's font again.</p>
