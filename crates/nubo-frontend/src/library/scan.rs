@@ -268,7 +268,9 @@ fn file_stamp(path: &Path) -> Option<(u64, u64)> {
 }
 
 /// Reads the ROM's header, or returns `None` if it isn't a ROM Nubo can
-/// run.
+/// run. Only the header of a zip file is unpacked, to keep the scan quick,
+/// so a zip file damaged past its header is listed and fails when the
+/// player starts it.
 fn read_entry(path: &Path, size: u64) -> Option<LibraryEntry> {
     if size > MAX_FILE_SIZE {
         return None;

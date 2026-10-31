@@ -611,3 +611,72 @@ fn only_a_library_kept_aside_is_safe_to_save_over() {
 
     assert!(!unreadable_library("permission denied", None).saving_is_safe);
 }
+
+/// A zip file holding `rom` uncompressed as `game.gb`, with a checksum that
+/// doesn't match its data: it is damaged past the header, so reading the
+/// header works but unpacking the whole ROM fails.
+#[cfg(all(feature = "web", not(feature = "desktop")))]
+fn zip_with_a_wrong_checksum(rom: &[u8]) -> Vec<u8> {
+    const NAME: &[u8] = b"game.gb";
+    let size = u32::try_from(rom.len()).unwrap().to_le_bytes();
+    let name_length = u16::try_from(NAME.len()).unwrap().to_le_bytes();
+    let wrong_checksum = [0xDE, 0xAD, 0xBE, 0xEF];
+    let file_details = [
+        &[0; 8][..],
+        &wrong_checksum,
+        &size,
+        &size,
+        &name_length,
+        &[0, 0],
+    ]
+    .concat();
+
+    let mut zip = [b"PK\x03\x04", &[20, 0][..], &file_details, NAME, rom].concat();
+    let directory_start = u32::try_from(zip.len()).unwrap().to_le_bytes();
+    let directory = [
+        b"PK\x01\x02",
+        &[20, 0, 20, 0][..],
+        &file_details,
+        &[0; 14],
+        NAME,
+    ]
+    .concat();
+    let directory_size = u32::try_from(directory.len()).unwrap().to_le_bytes();
+    zip.extend_from_slice(&directory);
+    zip.extend_from_slice(
+        &[
+            b"PK\x05\x06",
+            &[0, 0, 0, 0, 1, 0, 1, 0][..],
+            &directory_size,
+            &directory_start,
+            &[0, 0],
+        ]
+        .concat(),
+    );
+    zip
+}
+
+#[cfg(all(feature = "web", not(feature = "desktop")))]
+#[test]
+fn the_browser_keeps_no_zip_damaged_past_its_header() {
+    use crate::rom::Rom;
+
+    let (mut library, _) = Library::load();
+    let damaged = Rom {
+        path: PathBuf::from("Damaged.zip"),
+        bytes: zip_with_a_wrong_checksum(&[0; 0x8000]).into(),
+    };
+    assert!(nubo_core::Emulator::read_rom_header(&damaged.bytes).is_ok());
+
+    let error = library.add_game(&damaged).unwrap_err();
+    assert!(error.contains("isn't a game Nubo can play"), "{error}");
+    assert!(!library.keeps_file_of(&damaged.path));
+    assert_eq!(library.games("").count(), 0);
+
+    let good = Rom {
+        path: PathBuf::from("Good.gb"),
+        bytes: vec![0; 0x8000].into(),
+    };
+    library.add_game(&good).unwrap();
+    assert!(library.keeps_file_of(&good.path));
+}

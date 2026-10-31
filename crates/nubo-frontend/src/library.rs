@@ -870,10 +870,12 @@ impl Library {
     /// lists it among all games. A game kept before under the same file
     /// name is replaced; its pictures go unless it is the same game, so they
     /// are made again. Fails, keeping nothing, if `rom` isn't a game the
-    /// emulator can start.
+    /// emulator can start: a zip file is unpacked whole to check it
+    /// ([`nubo_core::Emulator::check_rom`]), so one damaged past the
+    /// header isn't kept either.
     #[cfg(all(feature = "web", not(feature = "desktop")))]
     pub fn add_game(&mut self, rom: &crate::rom::Rom) -> Result<(), String> {
-        let header = nubo_core::Emulator::read_rom_header(&rom.bytes)
+        let header = nubo_core::Emulator::check_rom(&rom.bytes)
             .map_err(|error| format!("{} isn't a game Nubo can play: {error}", rom.name()))?;
         let keep_error = |error| format!("{} couldn't be kept in the browser: {error}", rom.name());
         store::save_rom(&rom.path, &rom.bytes).map_err(keep_error)?;

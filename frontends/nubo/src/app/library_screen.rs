@@ -463,12 +463,13 @@ impl App {
     /// Keeps a game the player picked to open in the browser's library, so
     /// it shows up there next time, replacing any game kept under the same
     /// file name: the player picked this file, which may be another version.
-    /// A game that isn't one the emulator can start isn't kept, and says why
-    /// when it fails to start. Games started from the library come from
-    /// what it keeps, so they aren't kept again.
+    /// A game that isn't one the emulator can start, such as a zip file
+    /// damaged past the header, isn't kept, and says why when it fails to
+    /// start. Games started from the library come from what it keeps, so
+    /// they aren't kept again.
     #[cfg(target_arch = "wasm32")]
     pub(super) fn keep_game(&mut self, rom: &Rom) {
-        if nubo_core::Emulator::read_rom_header(&rom.bytes).is_ok()
+        if nubo_core::Emulator::check_rom(&rom.bytes).is_ok()
             && let Err(error) = self.library.add_game(rom)
         {
             self.toasts.error(error);
