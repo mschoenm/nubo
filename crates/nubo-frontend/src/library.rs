@@ -104,6 +104,12 @@ pub struct LibraryEntry {
     /// was read, so a scan can tell whether to read it again. In the browser,
     /// when the game was kept.
     modified: u64,
+    /// The CRC-32 of the file the browser keeps, so adding a game with the
+    /// same file name and title can tell the same file from a different
+    /// one (see `Library::add_game`). `None` on the desktop, and for a
+    /// game kept by a version that didn't keep it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    checksum: Option<u32>,
 }
 
 impl LibraryEntry {
@@ -196,6 +202,7 @@ impl LibraryEntry {
             added: None,
             size: 0,
             modified: 0,
+            checksum: None,
         }
     }
 
@@ -252,18 +259,24 @@ impl Cache {
     }
 
     /// The title screen of the game at `rom_path` as RGBA pixels: the one
-    /// saved for it if it was made after the ROM file last changed (for
-    /// example when a folder is added back to the library), else one
-    /// captured by running the game (see [`title_screens::capture`]).
+    /// saved for it (under `pictures_as`'s name, see
+    /// [`Library::pictures_as`]) if it was made after the ROM file last
+    /// changed (for example when a folder is added back to the library),
+    /// else one captured by running the game (see
+    /// [`title_screens::capture`]).
     /// `None` if the game showed nothing worth a picture. This is slow: on
     /// the desktop it runs on a thread of its own ([`background::run`]),
     /// and in the browser a few frames at a time, letting the page draw in
     /// between. Hand the result to [`Library::finish_capture`].
     #[cfg(not(all(feature = "web", not(feature = "desktop"))))]
-    pub fn title_screen(&self, rom_path: PathBuf) -> impl Future<Output = Option<Vec<u8>>> + use<> {
+    pub fn title_screen(
+        &self,
+        rom_path: PathBuf,
+        pictures_as: PathBuf,
+    ) -> impl Future<Output = Option<Vec<u8>>> + use<> {
         let cache = self.clone();
         let capture = background::run(move || {
-            if let Some(saved) = cache.saved_title_screen(&rom_path) {
+            if let Some(saved) = cache.saved_title_screen(&rom_path, &pictures_as) {
                 return Some(saved);
             }
             let rom = crate::rom::Rom::read(&rom_path).ok()?;
@@ -274,10 +287,14 @@ impl Cache {
 
     /// See the desktop's version above.
     #[cfg(all(feature = "web", not(feature = "desktop")))]
-    pub fn title_screen(&self, rom_path: PathBuf) -> impl Future<Output = Option<Vec<u8>>> + use<> {
+    pub fn title_screen(
+        &self,
+        rom_path: PathBuf,
+        pictures_as: PathBuf,
+    ) -> impl Future<Output = Option<Vec<u8>>> + use<> {
         let cache = self.clone();
         async move {
-            if let Some(saved) = cache.saved_title_screen(&rom_path) {
+            if let Some(saved) = cache.saved_title_screen(&rom_path, &pictures_as) {
                 return Some(saved);
             }
             let rom = crate::rom::load(rom_path).await.ok()?;
@@ -294,8 +311,9 @@ impl Cache {
         }
     }
 
-    /// The box art of the game at `rom_path`: the one saved for it if it
-    /// was saved after the ROM file last changed, else the one looked up in
+    /// The box art of the game at `rom_path`: the one saved for it (under
+    /// `pictures_as`'s name, see [`Library::pictures_as`]) if it was saved
+    /// after the ROM file last changed, else the one looked up in
     /// `games` and downloaded (see [`box_art::find`]). `None` if the
     /// collection has none. This is slow: on the desktop it runs on a thread
     /// of its own ([`background::run`]). Hand the result to
@@ -303,6 +321,7 @@ impl Cache {
     pub fn box_art(
         &self,
         rom_path: PathBuf,
+        pictures_as: PathBuf,
         supports_cgb: bool,
         games: Arc<GameList>,
     ) -> impl Future<Output = Result<Option<DownloadedArt>, String>> + use<> {
@@ -310,7 +329,7 @@ impl Cache {
         #[cfg(not(all(feature = "web", not(feature = "desktop"))))]
         {
             let work = background::run(move || {
-                if let Some(saved) = cache.saved_box_art(&rom_path) {
+                if let Some(saved) = cache.saved_box_art(&rom_path, &pictures_as) {
                     return Ok(Some(saved));
                 }
                 box_art::find(&rom_path, supports_cgb, &games)
@@ -320,7 +339,7 @@ impl Cache {
         }
         #[cfg(all(feature = "web", not(feature = "desktop")))]
         async move {
-            if let Some(saved) = cache.saved_box_art(&rom_path) {
+            if let Some(saved) = cache.saved_box_art(&rom_path, &pictures_as) {
                 return Ok(Some(saved));
             }
             box_art::find(&rom_path, supports_cgb, &games)
@@ -329,19 +348,25 @@ impl Cache {
         }
     }
 
-    /// The title screen saved for the game at `rom_path` as RGBA pixels, if
-    /// it was made after the ROM file last changed, so it needn't be
-    /// captured again.
-    fn saved_title_screen(&self, rom_path: &Path) -> Option<Vec<u8>> {
-        let png = store::current_picture(self, PictureKind::TitleScreen, rom_path)?;
+    /// The title screen saved for the game at `rom_path` under
+    /// `pictures_as`'s name as RGBA pixels, if it was made after the ROM
+    /// file last changed, so it needn't be captured again.
+    fn saved_title_screen(&self, rom_path: &Path, pictures_as: &Path) -> Option<Vec<u8>> {
+        let png = store::current_picture(self, PictureKind::TitleScreen, pictures_as, rom_path)?;
         let (width, height, pixels) = store::decode_png(&png)?;
         (width == SCREEN_WIDTH && height == SCREEN_HEIGHT).then_some(pixels)
     }
 
-    /// The box art saved for the game at `rom_path`, if it was saved after
-    /// the ROM file last changed, so it needn't be downloaded again.
-    fn saved_box_art(&self, rom_path: &Path) -> Option<DownloadedArt> {
-        DownloadedArt::decode(store::current_picture(self, PictureKind::BoxArt, rom_path)?)
+    /// The box art saved for the game at `rom_path` under `pictures_as`'s
+    /// name, if it was saved after the ROM file last changed, so it needn't
+    /// be downloaded again.
+    fn saved_box_art(&self, rom_path: &Path, pictures_as: &Path) -> Option<DownloadedArt> {
+        DownloadedArt::decode(store::current_picture(
+            self,
+            PictureKind::BoxArt,
+            pictures_as,
+            rom_path,
+        )?)
     }
 }
 
@@ -512,6 +537,7 @@ impl Library {
         result: Result<Option<DownloadedArt>, String>,
     ) -> Result<(), String> {
         self.downloads.finish(path);
+        let pictures_as = self.pictures_as(path);
 
         let picture = match result {
             Ok(picture) => picture,
@@ -526,7 +552,7 @@ impl Library {
             entry.box_art_checked = true;
 
             if let Some(art) = picture {
-                saved = store::save_box_art(&self.cache, path, &art.png);
+                saved = store::save_box_art(&self.cache, &pictures_as, &art.png);
                 self.box_art.insert(path.to_path_buf(), art.picture);
             }
         }
@@ -549,13 +575,14 @@ impl Library {
         palette: DmgPalette,
     ) -> Result<(), String> {
         self.captures.finish(path);
+        let pictures_as = self.pictures_as(path);
 
         let mut saved = Ok(());
         if let Some(entry) = self.entries.iter_mut().find(|entry| entry.path == path) {
             entry.title_screen_checked = true;
 
             if let Some(mut pixels) = pixels {
-                saved = store::save_title_screen(&self.cache, path, &pixels);
+                saved = store::save_title_screen(&self.cache, &pictures_as, &pixels);
                 if !entry.supports_cgb {
                     palette.recolor(&mut pixels);
                 }
@@ -589,18 +616,20 @@ impl Library {
         show_box_art: bool,
         missing_only: bool,
     ) -> impl Future<Output = Result<Vec<LoadedPicture>, String>> + use<> {
-        let games: Vec<LibraryEntry> = self
+        let games: Vec<(LibraryEntry, PathBuf)> = self
             .entries
             .iter()
             .filter(|entry| !missing_only || !self.has_picture(&entry.path))
-            .cloned()
+            .map(|entry| (entry.clone(), self.pictures_as(&entry.path)))
             .collect();
         let cache = self.cache.clone();
 
         background::run(move || {
             games
                 .into_iter()
-                .filter_map(|entry| best_picture(&cache, &entry, palette, show_box_art))
+                .filter_map(|(entry, pictures_as)| {
+                    best_picture(&cache, &entry, &pictures_as, palette, show_box_art)
+                })
                 .collect()
         })
     }
@@ -818,6 +847,71 @@ impl Library {
         self.entries.iter().find(|entry| entry.path == path)
     }
 
+    /// The path the pictures of the game at `path` are named after. On the
+    /// desktop that is the name the game owns in the data folder (see
+    /// `storage::names`); a game that hasn't started yet and shares its file
+    /// name with another game in the library doesn't take a plain name
+    /// nobody owns, so the two don't show each other's pictures. The browser
+    /// keeps each game under a name of its own already, so it is `path`.
+    pub fn pictures_as(&self, path: &Path) -> PathBuf {
+        #[cfg(feature = "desktop")]
+        if let Some(folder) = &self.cache.data_folder {
+            let shared = self
+                .entries
+                .iter()
+                .filter(|entry| entry.path.file_name() == path.file_name())
+                .take(2)
+                .any(|entry| entry.path != path);
+            return crate::storage::names::picture_path(folder, path, shared);
+        }
+        path.to_path_buf()
+    }
+
+    /// Claims the names the data of the game at `path` goes by, as it
+    /// starts, now that its `header` reads: its battery saves, save states,
+    /// cheats and pictures (see `storage::names`). Call it before the game
+    /// reads any of them. A name whose owner is on one of `folders` that
+    /// can't be reached now (an unplugged drive) is never handed to another
+    /// game. When the game's pictures go by another name now, it gets them
+    /// again from there, and the ones under a plain name nobody owned,
+    /// which may show another game of that file name, are made again.
+    /// Returns why the record of names couldn't be read or saved; the names
+    /// still hold for this run. The browser keeps each game under a name of
+    /// its own already (see `Library::add_game`), so it claims nothing.
+    pub fn claim_names(
+        &mut self,
+        path: &Path,
+        header: &CartridgeHeader,
+        folders: &[LibraryFolder],
+    ) -> Result<(), String> {
+        #[cfg(feature = "desktop")]
+        if let Some(data_folder) = self.cache.data_folder.clone() {
+            let before = self.pictures_as(path);
+            let claim = crate::storage::names::claim(&data_folder, path, &header.title, |owner| {
+                scan::is_on_unreachable_folder(owner, folders)
+            });
+            if claim.stored != before {
+                if claim.how == crate::storage::names::How::Plain {
+                    store::delete_pictures(&self.cache, path);
+                }
+                for pictures in [
+                    &mut self.box_art,
+                    &mut self.title_screens,
+                    &mut self.thumbnails,
+                ] {
+                    pictures.remove(path);
+                }
+                if let Some(entry) = self.entries.iter_mut().find(|entry| entry.path == path) {
+                    entry.title_screen_checked = false;
+                    entry.box_art_checked = false;
+                }
+            }
+            return claim.problem.map_or(Ok(()), Err);
+        }
+        let _ = (path, header, folders);
+        Ok(())
+    }
+
     /// Takes the game at `path` off the recently played games, for a player
     /// who doesn't want it there. A game in a library folder stays among
     /// all games; one opened from elsewhere is forgotten at the next scan,
@@ -867,37 +961,70 @@ impl Library {
 
     /// Keeps the file of `rom` in the library, as the browser build does
     /// for every game the player adds or opens (see [`KEEPS_GAMES`]), and
-    /// lists it among all games. A game kept before under the same file
-    /// name is replaced; its pictures go unless it is the same game, so they
-    /// are made again. Fails, keeping nothing, if `rom` isn't a game the
-    /// emulator can start.
+    /// lists it among all games. Returns the path it is kept under, which
+    /// its saves, save states and cheats are named after, or that the player
+    /// must answer `same_title`'s question first.
+    ///
+    /// The same file kept before, under any of its names, is kept again
+    /// there. A game kept before under the same file name with another
+    /// header title is another game, so `rom` is kept beside it under
+    /// `path_beside`'s name and never takes its saves. One with the same
+    /// title but other contents may be a newer version of it or another
+    /// game with a title alike (homebrew games often have an empty or
+    /// generic one), which only the player can tell: `same_title` says
+    /// which, or to ask. A newer version replaces it and its saves carry
+    /// over; another game is kept beside it under a name with the CRC-32 of
+    /// its contents in it. A game kept by a version that didn't keep
+    /// checksums is taken as the same file when its size is the same, as
+    /// before. Pictures go unless the file is the same, so they are made
+    /// again. Fails, keeping nothing, if `rom` isn't a game the emulator can
+    /// start: a zip file is unpacked whole to check it
+    /// ([`nubo_core::Emulator::check_rom`]), so one damaged past the header
+    /// isn't kept either.
     #[cfg(all(feature = "web", not(feature = "desktop")))]
-    pub fn add_game(&mut self, rom: &crate::rom::Rom) -> Result<(), String> {
-        let header = nubo_core::Emulator::read_rom_header(&rom.bytes)
+    pub fn add_game(
+        &mut self,
+        rom: &crate::rom::Rom,
+        same_title: SameTitle,
+    ) -> Result<Kept, String> {
+        let header = nubo_core::Emulator::check_rom(&rom.bytes)
             .map_err(|error| format!("{} isn't a game Nubo can play: {error}", rom.name()))?;
+        let checksum = crc32fast::hash(&rom.bytes);
+        let Some(path) = self.place_for(
+            &rom.path,
+            &header.title,
+            checksum,
+            rom.bytes.len() as u64,
+            same_title,
+        ) else {
+            return Ok(Kept::Ask);
+        };
         let keep_error = |error| format!("{} couldn't be kept in the browser: {error}", rom.name());
-        store::save_rom(&rom.path, &rom.bytes).map_err(keep_error)?;
+        store::save_rom(&path, &rom.bytes).map_err(keep_error)?;
 
         let now = seconds_since_epoch(SystemTime::now());
-        let mut entry = scan::entry_for(&rom.path, &header);
+        let mut entry = scan::entry_for(&path, &header);
         entry.in_folder = true;
         entry.size = rom.bytes.len() as u64;
         entry.modified = now;
         entry.added = Some(now);
+        entry.checksum = Some(checksum);
 
-        let previous = self.entries.iter().position(|known| known.path == rom.path);
+        let previous = self.entries.iter().position(|known| known.path == path);
         if let Some(index) = previous {
             let previous = &self.entries[index];
-            let unchanged = previous.size == entry.size && previous.title == entry.title;
+            let unchanged = previous.size == entry.size
+                && previous.title == entry.title
+                && previous.checksum.is_none_or(|known| known == checksum);
             entry.keep_from(previous, unchanged);
             if !unchanged {
-                store::delete_pictures(&rom.path).map_err(keep_error)?;
+                store::delete_pictures(&path).map_err(keep_error)?;
                 for pictures in [
                     &mut self.box_art,
                     &mut self.title_screens,
                     &mut self.thumbnails,
                 ] {
-                    pictures.remove(&rom.path);
+                    pictures.remove(&path);
                 }
             }
         }
@@ -907,7 +1034,47 @@ impl Library {
         }
         entries.push(entry);
         self.replace_entries(entries);
-        self.save()
+        self.save()?;
+        Ok(Kept::As(path))
+    }
+
+    /// Where the browser keeps a game picked as `path` with the header
+    /// `title`, whose file has the CRC-32 `checksum` and is `size` bytes
+    /// long, as `Library::add_game` explains; `None` when `same_title`
+    /// says to ask the player first.
+    #[cfg(any(test, all(feature = "web", not(feature = "desktop"))))]
+    fn place_for(
+        &self,
+        path: &Path,
+        title: &str,
+        checksum: u32,
+        size: u64,
+        same_title: SameTitle,
+    ) -> Option<PathBuf> {
+        if let Some(same) = self.entries.iter().find(|entry| {
+            entry.checksum == Some(checksum)
+                && entry.title == title
+                && is_kept_as(&entry.path, path)
+        }) {
+            return Some(same.path.clone());
+        }
+
+        let beside = path_beside(path, title);
+        let version_of = [path, beside.as_path()]
+            .into_iter()
+            .find_map(|kept| self.entry(kept).filter(|entry| entry.title == title));
+        match version_of {
+            None if self.entry(path).is_none() => Some(path.to_path_buf()),
+            None => Some(beside),
+            Some(known) if known.checksum.is_none() && known.size == size => {
+                Some(known.path.clone())
+            }
+            Some(known) => match same_title {
+                SameTitle::Ask => None,
+                SameTitle::NewVersion => Some(known.path.clone()),
+                SameTitle::AnotherGame => Some(crate::storage::name_with_hash(path, checksum)),
+            },
+        }
     }
 
     /// Whether the library keeps the file of the game at `path` (see
@@ -980,7 +1147,7 @@ impl Library {
         if KEEPS_GAMES && self.entry(path).is_none() {
             return Ok(());
         }
-        let saved = store::save_thumbnail(&self.cache, path, &pixels);
+        let saved = store::save_thumbnail(&self.cache, &self.pictures_as(path), &pixels);
         self.thumbnails
             .insert(path.to_path_buf(), screen_picture(pixels));
         saved
@@ -1009,6 +1176,33 @@ impl Library {
 /// [`Library::snapshot`]).
 #[derive(Debug, Clone)]
 pub struct LibrarySnapshot(Vec<LibraryEntry>);
+
+/// What `Library::add_game` does with a game whose file name and header
+/// title are those of a game the browser keeps already, but whose contents
+/// differ.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SameTitle {
+    /// Keeps nothing yet and says the player must answer first
+    /// ([`Kept::Ask`]).
+    Ask,
+    /// It is a newer version of the kept game: it replaces that one, and
+    /// the saves carry over.
+    NewVersion,
+    /// It is another game whose title happens to be the same: it is kept
+    /// beside the other one, with saves of its own.
+    AnotherGame,
+}
+
+/// What `Library::add_game` did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Kept {
+    /// It kept the game under this path, which its saves go by.
+    As(PathBuf),
+    /// It kept nothing: the browser keeps another file with the same file
+    /// name and title, and the player must say whether this one is a new
+    /// version of that game or another game ([`SameTitle`]).
+    Ask,
+}
 
 /// News from watching the library folders (see `watch`).
 #[derive(Debug, Clone)]
@@ -1101,6 +1295,7 @@ impl DownloadedArt {
 fn best_picture(
     cache: &Cache,
     entry: &LibraryEntry,
+    pictures_as: &Path,
     palette: DmgPalette,
     show_box_art: bool,
 ) -> Option<LoadedPicture> {
@@ -1111,13 +1306,13 @@ fn best_picture(
     };
 
     if show_box_art
-        && let Some(picture) = store::read_picture(cache, PictureKind::BoxArt, &entry.path)
+        && let Some(picture) = store::read_picture(cache, PictureKind::BoxArt, pictures_as)
     {
         return Some(loaded(PictureKind::BoxArt, picture));
     }
 
     if let Some((width, height, mut pixels)) =
-        store::read_picture(cache, PictureKind::TitleScreen, &entry.path)
+        store::read_picture(cache, PictureKind::TitleScreen, pictures_as)
     {
         if !entry.supports_cgb {
             palette.recolor(&mut pixels);
@@ -1125,7 +1320,7 @@ fn best_picture(
         return Some(loaded(PictureKind::TitleScreen, (width, height, pixels)));
     }
 
-    store::read_picture(cache, PictureKind::LastScreen, &entry.path)
+    store::read_picture(cache, PictureKind::LastScreen, pictures_as)
         .map(|picture| loaded(PictureKind::LastScreen, picture))
 }
 
@@ -1140,6 +1335,41 @@ fn keeps_file(path: &Path) -> bool {
 #[cfg(not(all(feature = "web", not(feature = "desktop"))))]
 fn keeps_file(_path: &Path) -> bool {
     true
+}
+
+/// Whether the browser keeps a game picked as `path` under `kept`: the
+/// same name, or the same with a hash in brackets after the stem, as
+/// [`path_beside`] and [`SameTitle::AnotherGame`] name them.
+#[cfg(any(test, all(feature = "web", not(feature = "desktop"))))]
+fn is_kept_as(kept: &Path, path: &Path) -> bool {
+    if kept == path {
+        return true;
+    }
+    let hash = kept
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .zip(path.file_stem().and_then(|stem| stem.to_str()))
+        .and_then(|(kept, stem)| kept.strip_prefix(stem))
+        .and_then(|rest| rest.strip_prefix(" ("))
+        .and_then(|rest| rest.strip_suffix(')'));
+    kept.parent() == path.parent()
+        && kept.extension() == path.extension()
+        && hash.is_some_and(|hash| {
+            hash.len() == 8 && hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+        })
+}
+
+/// Where the browser keeps a game whose file name `path` already belongs to
+/// another game, one with another header title: `game.gb` becomes
+/// `game (1a2b3c4d).gb`, with a hash of `title` in brackets, which the
+/// game's shown name leaves out (see `rom::game_name`). The same title always
+/// gives the same name, so a newer version of that game replaces it, and a
+/// game added again after it was removed gets its saves back. Players' saves
+/// are named after it, so the name must never change: the hash is 32-bit
+/// FNV-1a of the title's UTF-8 bytes, in lowercase hex.
+#[cfg(any(test, all(feature = "web", not(feature = "desktop"))))]
+fn path_beside(path: &Path, title: &str) -> PathBuf {
+    crate::storage::name_with_hash(path, crate::storage::fnv1a(title.as_bytes()))
 }
 
 /// A picture of a frame of the Game Boy screen.

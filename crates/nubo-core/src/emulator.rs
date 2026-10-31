@@ -159,6 +159,15 @@ impl Emulator {
         read_header(&rom_archive::extract_rom_borrowed(rom, Some(header_bytes))?)
     }
 
+    /// Reads the cartridge header like [`Emulator::read_rom_header`], but
+    /// unpacks a zip archive whole first, so it fails exactly when
+    /// [`Emulator::load_rom`] would, also for a zip archive damaged past the
+    /// header. Frontends use it before keeping a game they have in memory
+    /// anyway, such as the browser's library does.
+    pub fn check_rom(rom: &[u8]) -> Result<CartridgeHeader, LoadRomError> {
+        read_header(&rom_archive::extract_rom_borrowed(rom, None)?)
+    }
+
     /// Replaces the contents of the cartridge RAM, for example with a save file.
     pub fn set_cartridge_ram(&mut self, ram: &[u8]) {
         self.address_bus_mut().set_cartridge_ram(ram.to_vec());

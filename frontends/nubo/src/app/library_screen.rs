@@ -13,8 +13,12 @@ use iced::widget;
 use iced::widget::scrollable::AbsoluteOffset;
 use nubo_core::Model;
 use nubo_frontend::controls::Action;
+#[cfg(target_arch = "wasm32")]
+use nubo_frontend::library::Kept;
 use nubo_frontend::library::box_art::{self, GameList};
-use nubo_frontend::library::{DownloadedArt, FileCheck, LoadedPicture, ScanResult, WatchEvent};
+use nubo_frontend::library::{
+    DownloadedArt, FileCheck, LoadedPicture, SameTitle, ScanResult, WatchEvent,
+};
 use nubo_frontend::links;
 use nubo_frontend::model::ModelPreference;
 use nubo_frontend::rom::Rom;
@@ -44,6 +48,11 @@ pub enum LibraryMessage {
     AddGames,
     /// The player picked these games to keep.
     GamesPicked(Vec<Result<Rom, String>>),
+    /// The player said whether the first game in `App::same_title_waiting`
+    /// is a new version of the kept game with its file name and title, or
+    /// another game; `None` when they closed the question, which keeps
+    /// nothing.
+    SameTitleAnswered(Option<SameTitle>),
     /// Asks whether to take this game out of the browser's library.
     AskRemoveGame(PathBuf),
     /// Takes this game out of the browser's library, as the player
@@ -148,6 +157,7 @@ impl App {
                 });
             }
             LibraryMessage::GamesPicked(roms) => return self.add_games(&roms),
+            LibraryMessage::SameTitleAnswered(answer) => return self.answer_same_title(answer),
             LibraryMessage::AskRemoveGame(path) => {
                 self.open_dialog(DialogKind::RemoveGame(path));
             }
@@ -378,7 +388,9 @@ impl App {
         }
         Task::batch(self.library.next_captures().into_iter().map(|path| {
             Task::perform(
-                self.library.cache().title_screen(path.clone()),
+                self.library
+                    .cache()
+                    .title_screen(path.clone(), self.library.pictures_as(&path)),
                 move |pixels| LibraryMessage::TitleScreenCaptured(path, pixels).into(),
             )
         }))
@@ -423,8 +435,12 @@ impl App {
         }
         let mut added = 0;
         for rom in roms {
-            match rom.clone().and_then(|rom| self.add_game(&rom)) {
-                Ok(()) => added += 1,
+            match rom
+                .clone()
+                .and_then(|rom| self.add_game(&rom).map(|kept| (rom, kept)))
+            {
+                Ok((_, true)) => added += 1,
+                Ok((rom, false)) => self.same_title_waiting.push((rom, false)),
                 Err(error) => self.toasts.error(error),
             }
         }
@@ -434,6 +450,7 @@ impl App {
             _ => self.toasts.info(format!("Added {added} games")),
         }
         self.library_selection = None;
+        self.ask_about_same_title();
         self.ask_about_box_art();
         Task::batch([
             self.load_pictures(true),
@@ -442,12 +459,14 @@ impl App {
         ])
     }
 
-    /// Keeps `rom` in the browser's library.
+    /// Keeps `rom` in the browser's library, or returns `false` when the
+    /// player must first say whether it is a new version of the game kept
+    /// under its file name and title (see `DialogKind::SameTitle`).
     #[cfg(target_arch = "wasm32")]
-    fn add_game(&mut self, rom: &Rom) -> Result<(), String> {
-        let added = self.library.add_game(rom);
+    fn add_game(&mut self, rom: &Rom) -> Result<bool, String> {
+        let added = self.library.add_game(rom, SameTitle::Ask);
         self.watch_recent_games();
-        added
+        added.map(|kept| kept != Kept::Ask)
     }
 
     /// The desktop's library finds its games in folders instead.
@@ -456,24 +475,91 @@ impl App {
         clippy::unused_self,
         reason = "the browser build's version keeps the game in the library"
     )]
-    fn add_game(&mut self, _rom: &Rom) -> Result<(), String> {
+    fn add_game(&mut self, _rom: &Rom) -> Result<bool, String> {
         Err(String::from("Add a folder of games instead"))
     }
 
-    /// Keeps a game the player picked to open in the browser's library, so
-    /// it shows up there next time, replacing any game kept under the same
-    /// file name: the player picked this file, which may be another version.
-    /// A game that isn't one the emulator can start isn't kept, and says why
-    /// when it fails to start. Games started from the library come from
-    /// what it keeps, so they aren't kept again.
+    /// Keeps or starts the first game in `App::same_title_waiting` as the
+    /// player answered (nothing when they closed the question), then asks
+    /// about the next one.
+    fn answer_same_title(&mut self, answer: Option<SameTitle>) -> Task<Message> {
+        if self.same_title_waiting.is_empty() {
+            return Task::none();
+        }
+        let (rom, starts) = self.same_title_waiting.remove(0);
+        let task = match answer {
+            Some(answer) => self.keep_as_answered(rom, starts, answer),
+            None => Task::none(),
+        };
+        self.ask_about_same_title();
+        task
+    }
+
+    /// Keeps `rom` in the browser's library as the player's `answer` says,
+    /// and starts it if it `starts` (it was opened rather than added).
     #[cfg(target_arch = "wasm32")]
-    pub(super) fn keep_game(&mut self, rom: &Rom) {
-        if nubo_core::Emulator::read_rom_header(&rom.bytes).is_ok()
-            && let Err(error) = self.library.add_game(rom)
-        {
-            self.toasts.error(error);
+    fn keep_as_answered(&mut self, mut rom: Rom, starts: bool, answer: SameTitle) -> Task<Message> {
+        let kept = self.library.add_game(&rom, answer);
+        self.watch_recent_games();
+        match kept {
+            Ok(Kept::As(path)) => {
+                rom.path = path;
+                if starts {
+                    self.start_game(rom, true);
+                    return Task::none();
+                }
+                self.toasts.info(format!("Added {}", rom.name()));
+                Task::batch([
+                    self.load_pictures(true),
+                    self.capture_title_screens(),
+                    self.download_box_art(),
+                ])
+            }
+            Ok(Kept::Ask) => Task::none(),
+            Err(error) => {
+                self.toasts.error(error);
+                Task::none()
+            }
+        }
+    }
+
+    /// The desktop's library keeps no games, so it never asks.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[expect(
+        clippy::unused_self,
+        reason = "the browser build's version keeps the game in the library"
+    )]
+    fn keep_as_answered(&mut self, _rom: Rom, _starts: bool, _answer: SameTitle) -> Task<Message> {
+        Task::none()
+    }
+
+    /// Keeps a game the player picked to open in the browser's library, so
+    /// it shows up there next time, and returns it under the name it is kept
+    /// as, which its saves go by. The same file is kept where it was. One
+    /// with another title than the game kept under its file name is another
+    /// game, so it is kept beside it (see `Library::add_game`). One with the
+    /// same title but other contents may be a new version or another game:
+    /// it waits for the player to say which (`DialogKind::SameTitle`), and
+    /// this returns `None`; the answer starts it. A game that isn't one the
+    /// emulator can start, such as a zip file damaged past the header, isn't
+    /// kept, and says why when it fails to start.
+    /// Games started from the library come from what it keeps, so they
+    /// aren't kept again.
+    #[cfg(target_arch = "wasm32")]
+    pub(super) fn keep_game(&mut self, mut rom: Rom) -> Option<Rom> {
+        if nubo_core::Emulator::check_rom(&rom.bytes).is_ok() {
+            match self.library.add_game(&rom, SameTitle::Ask) {
+                Ok(Kept::As(path)) => rom.path = path,
+                Ok(Kept::Ask) => {
+                    self.same_title_waiting.push((rom, true));
+                    self.ask_about_same_title();
+                    return None;
+                }
+                Err(error) => self.toasts.error(error),
+            }
         }
         self.watch_recent_games();
+        Some(rom)
     }
 
     /// Takes the game at `path` out of the browser's library.
@@ -526,10 +612,12 @@ impl App {
                 .map(|(path, supports_cgb)| {
                     let list = list.clone();
                     let rom_path = path.clone();
+                    let pictures_as = self.library.pictures_as(&path);
                     let cache = self.library.cache().clone();
-                    Task::perform(cache.box_art(rom_path, supports_cgb, list), move |result| {
-                        LibraryMessage::BoxArtDownloaded(path, result).into()
-                    })
+                    Task::perform(
+                        cache.box_art(rom_path, pictures_as, supports_cgb, list),
+                        move |result| LibraryMessage::BoxArtDownloaded(path, result).into(),
+                    )
                 }),
         )
     }

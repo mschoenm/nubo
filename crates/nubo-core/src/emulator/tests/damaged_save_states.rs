@@ -1204,6 +1204,60 @@ fn states_whose_copies_of_the_speed_or_system_counter_differ_are_refused() {
     assert!(emulator.load_state(&fast_serial_clock).is_err());
 }
 
+/// In DMG compatibility mode, a Game Boy Color running a game made for the original Game Boy,
+/// SC's fast serial clock and KEY1 are locked. A loaded state that still sets the fast clock or
+/// arms a speed switch has them cut, as a write would, and one at double speed or in the middle
+/// of a switch is refused.
+#[test]
+fn a_state_in_dmg_compatibility_mode_holds_no_fast_serial_clock_or_speed_switch() {
+    let rom = busy_game(Model::Dmg, 0x03);
+    let mut emulator = booted(Model::CgbE, &rom);
+    let (mut left, mut right) = (Vec::new(), Vec::new());
+    for _ in 0..WARM_UP_FRAMES {
+        emulator.run_frame(&mut left, &mut right);
+    }
+    let layout = Layout::of(&emulator);
+    let state = StoredState::read(emulator.save_state(), &layout);
+    let view = StateView {
+        bytes: &state.bytes,
+        layout: &layout,
+    };
+    assert_eq!(view.number("speed_switch.cgb_double_speed"), 0);
+
+    for path in ["serial.is_high_speed_clock", "speed_switch.armed"] {
+        emulator
+            .load_state(&with_value(&state, path, vec![1]))
+            .unwrap_or_else(|error| panic!("a state with {path} set was refused: {error}"));
+        let saved = emulator.save_state();
+        let view = StateView {
+            bytes: &saved,
+            layout: &layout,
+        };
+        assert_eq!(view.number(path), 0, "{path} was kept");
+    }
+
+    let mut double_speed = state.bytes.clone();
+    for (path, bytes) in [
+        ("speed_switch.cgb_double_speed", vec![1]),
+        ("apu.cgb_double_speed", vec![1]),
+        ("ppu.timing", variant_bytes("CgbDoubleSpeed")),
+    ] {
+        let stored = StoredState::read(double_speed, &layout);
+        double_speed = with_value(&stored, path, bytes);
+    }
+    let halting = with_value(
+        &state,
+        "speed_switch.halt_units",
+        0x100_u32.to_le_bytes().to_vec(),
+    );
+    for (case, damaged) in [("double speed", double_speed), ("a switch's halt", halting)] {
+        assert!(
+            emulator.load_state(&damaged).is_err(),
+            "a state at {case} loaded"
+        );
+    }
+}
+
 /// A refused state that lacks the Super Game Boy leaves what save states don't keep as it was:
 /// the player's border, its look and palette, and the last frame with its border.
 #[test]

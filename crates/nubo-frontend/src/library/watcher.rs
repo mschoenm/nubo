@@ -197,7 +197,8 @@ fn affects(path: &Path, folders: &[LibraryFolder], games: &[PathBuf]) -> bool {
 /// Whether a change at `path` can affect the library: a ROM, or a folder
 /// (which may hold ROMs). Other files, such as a browser's downloads in
 /// progress or hidden files, are ignored, so a busy folder doesn't keep
-/// causing rescans.
+/// causing rescans. A folder's name may have a dot in it (`Mr. Do`), so a
+/// folder is told by asking the disk, not by its name.
 fn matters(path: &Path) -> bool {
     let hidden = path
         .file_name()
@@ -206,14 +207,15 @@ fn matters(path: &Path) -> bool {
         return false;
     }
 
-    match path.extension() {
-        Some(extension) => EXTENSIONS
+    let rom = path.extension().is_some_and(|extension| {
+        EXTENSIONS
             .iter()
-            .any(|known| extension.eq_ignore_ascii_case(known)),
-        // A removed folder can't be asked whether it was one, so anything
-        // without an extension counts.
-        None => true,
-    }
+            .any(|known| extension.eq_ignore_ascii_case(known))
+    });
+    // A path that is gone (removed, or moved out) can't be asked whether it
+    // was a folder, and the change notification doesn't always say, so it
+    // counts unless it is a file now.
+    rom || !path.is_file()
 }
 
 #[cfg(test)]
@@ -232,18 +234,40 @@ mod tests {
 
     #[test]
     fn roms_and_folders_matter() {
+        let root =
+            std::env::temp_dir().join(format!("nubo-watcher-folders-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("Mr. Do")).unwrap();
+        let dotted_folder = matters(&root.join("Mr. Do"));
+        std::fs::remove_dir_all(&root).unwrap();
+
         assert!(matters(Path::new("/games/Tetris.gb")));
         assert!(matters(Path::new("/games/Zelda.GBC")));
         assert!(matters(Path::new("/games/Pokemon.zip")));
+        assert!(dotted_folder);
+    }
+
+    #[test]
+    fn removed_folders_matter_whatever_their_name() {
         assert!(matters(Path::new("/games/New folder")));
+        assert!(matters(Path::new("/games/Mr. Do")));
+        assert!(!matters(Path::new("/games/.hidden")));
     }
 
     #[test]
     fn other_and_hidden_files_dont() {
-        assert!(!matters(Path::new("/games/notes.txt")));
-        assert!(!matters(Path::new("/games/Tetris.gb.part")));
-        assert!(!matters(Path::new("/games/.DS_Store")));
-        assert!(!matters(Path::new("/games/.hidden.gb")));
+        let root = std::env::temp_dir().join(format!("nubo-watcher-files-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let names = ["notes.txt", "Tetris.gb.part", ".DS_Store", ".hidden.gb"];
+        for name in names {
+            std::fs::write(root.join(name), []).unwrap();
+        }
+        let mattering: Vec<&str> = names
+            .into_iter()
+            .filter(|name| matters(&root.join(name)))
+            .collect();
+        std::fs::remove_dir_all(&root).unwrap();
+
+        assert!(mattering.is_empty(), "{mattering:?} count");
     }
 
     fn folder(path: &str, include_subfolders: bool) -> LibraryFolder {
@@ -373,6 +397,49 @@ mod tests {
         assert!(
             matches!(after_writing, Ok(WatchEvent::Changed)),
             "writing reported {after_writing:?}"
+        );
+    }
+
+    #[test]
+    fn a_folder_with_a_dot_in_its_name_moving_in_or_out_counts() {
+        let root = std::env::temp_dir().join(format!("nubo-watcher-moves-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("games")).unwrap();
+        std::fs::create_dir_all(root.join("elsewhere").join("Mr. Do")).unwrap();
+        // macOS's temporary folder is behind a symbolic link, and its change
+        // notifications name the real path.
+        let root = std::fs::canonicalize(root).unwrap();
+        let (outside, inside) = (
+            root.join("elsewhere").join("Mr. Do"),
+            root.join("games").join("Mr. Do"),
+        );
+        std::fs::write(outside.join("Game.gb"), [0; 16]).unwrap();
+        let folders = [LibraryFolder {
+            path: root.join("games"),
+            include_subfolders: true,
+        }];
+        let (sender, events) = mpsc::channel();
+        let watching = watch(&folders, &[], move |event| {
+            let _ = sender.send(event);
+        });
+        assert!(watching.failures.is_empty(), "{:?}", watching.failures);
+        while events.recv_timeout(QUIET_TIME * 2).is_ok() {}
+
+        std::fs::rename(&outside, &inside).unwrap();
+        let after_moving_in = events.recv_timeout(QUIET_TIME * 5);
+        while events.recv_timeout(QUIET_TIME * 2).is_ok() {}
+
+        std::fs::rename(&inside, &outside).unwrap();
+        let after_moving_out = events.recv_timeout(QUIET_TIME * 5);
+
+        drop(watching);
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(
+            matches!(after_moving_in, Ok(WatchEvent::Changed)),
+            "moving in reported {after_moving_in:?}"
+        );
+        assert!(
+            matches!(after_moving_out, Ok(WatchEvent::Changed)),
+            "moving out reported {after_moving_out:?}"
         );
     }
 }

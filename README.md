@@ -157,6 +157,16 @@ Everything Nubo keeps (settings, the library, in-game saves, save states, cheats
 
 Screenshots go to your Pictures folder, in `Pictures/Nubo`.
 
+A game's saves are named after its file: `Tetris.gb` keeps its in-game save in `saves/Tetris.sav`, its save states in `states/Tetris.gb/` and its cheats in `cheats/Tetris.gb.toml`. When two different games have the same file name in different folders, the first one you play keeps those names, and the other gets names of its own with a short code in brackets, such as `saves/Tetris (3f2a91c0).sav`. Nubo remembers which file each name belongs to in `names.toml`, so:
+
+- a game you move to another folder keeps its saves (play it once from the new place);
+- a copy of a game in another folder gets saves of its own;
+- a game on a drive that isn't plugged in keeps its saves for when it's back.
+
+Renaming a game's file starts it without its saves; rename the save files to match to get them back.
+
+In the browser, a game you add with the same file name as a game you have, but another title, is kept next to it with saves of its own. If the title is the same too but the file is different, Nubo asks whether it's a new version of that game, which keeps its saves, or another game.
+
 </details>
 
 <details>
