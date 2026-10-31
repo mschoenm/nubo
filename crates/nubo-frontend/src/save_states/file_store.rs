@@ -1,5 +1,7 @@
 //! Save states as files in `states/<rom file name>/` in the per-user data
-//! folder (the `desktop` feature).
+//! folder (the `desktop` feature), named after the name the game owns there
+//! (see `storage::names`). The `_in` functions take the folder and the name
+//! to go by as they are.
 //!
 //! A `.state` file is exactly the core's save state (`Emulator::save_state`),
 //! whose header names the model it was made on, so there is one format to
@@ -20,7 +22,7 @@ pub fn save(
     state: &SaveState,
     pixels: Option<&[u8]>,
 ) -> Result<(), String> {
-    save_in(&states_directory()?, rom_path, slot, state, pixels)
+    save_in(&states_directory()?, &stored(rom_path), slot, state, pixels)
 }
 
 /// Saves a state with a picture file as it is stored, like
@@ -31,19 +33,19 @@ pub fn save_png(
     state: &SaveState,
     png: Option<&[u8]>,
 ) -> Result<(), String> {
-    save_png_in(&states_directory()?, rom_path, slot, state, png)
+    save_png_in(&states_directory()?, &stored(rom_path), slot, state, png)
 }
 
 /// Reads a state, like [`load_in`], from the player's `states/` folder.
 pub fn load(rom_path: &Path, slot: Slot) -> Result<Option<SaveState>, String> {
-    load_in(&states_directory()?, rom_path, slot)
+    load_in(&states_directory()?, &stored(rom_path), slot)
 }
 
 /// Describes a slot, like [`slot_info_in`], in the player's `states/`
 /// folder; an empty slot if the system has no data folder.
 pub fn slot_info(rom_path: &Path, slot: Slot) -> SlotInfo {
     match states_directory() {
-        Ok(directory) => slot_info_in(&directory, rom_path, slot),
+        Ok(directory) => slot_info_in(&directory, &stored(rom_path), slot),
         Err(_) => SlotInfo {
             slot,
             saved_at: None,
@@ -102,7 +104,7 @@ pub fn load_in(directory: &Path, rom_path: &Path, slot: Slot) -> Result<Option<S
 
 /// Deletes a slot, like [`delete_in`], in the player's `states/` folder.
 pub fn delete(rom_path: &Path, slot: Slot) -> Result<(), String> {
-    delete_in(&states_directory()?, rom_path, slot)
+    delete_in(&states_directory()?, &stored(rom_path), slot)
 }
 
 /// Deletes a slot's state and picture in `directory` (the folder for every
@@ -135,7 +137,7 @@ pub fn delete_all_in(directory: &Path) -> Result<(), String> {
 /// Moves a slot's state aside, like [`keep_aside_in`], in the player's
 /// `states/` folder.
 pub fn keep_aside(rom_path: &Path, slot: Slot) -> Result<PathBuf, String> {
-    keep_aside_in(&states_directory()?, rom_path, slot)
+    keep_aside_in(&states_directory()?, &stored(rom_path), slot)
 }
 
 /// Moves a slot's state and picture in `directory` (the folder for every
@@ -179,7 +181,7 @@ pub fn slot_info_in(directory: &Path, rom_path: &Path, slot: Slot) -> SlotInfo {
 /// Reads a slot's picture, like [`thumbnail_in`], from the player's
 /// `states/` folder.
 pub fn thumbnail(rom_path: &Path, slot: Slot) -> Option<Picture> {
-    thumbnail_in(&states_directory().ok()?, rom_path, slot)
+    thumbnail_in(&states_directory().ok()?, &stored(rom_path), slot)
 }
 
 /// Reads and decodes the picture of a slot in `directory`, anew each time,
@@ -193,7 +195,7 @@ pub fn thumbnail_in(directory: &Path, rom_path: &Path, slot: Slot) -> Option<Pic
 /// Reads a slot's picture file, like [`picture_png_in`], from the player's
 /// `states/` folder.
 pub fn picture_png(rom_path: &Path, slot: Slot) -> Option<Vec<u8>> {
-    picture_png_in(&states_directory().ok()?, rom_path, slot)
+    picture_png_in(&states_directory().ok()?, &stored(rom_path), slot)
 }
 
 /// Reads the picture file of a slot in `directory` as it is stored, without
@@ -208,6 +210,15 @@ fn slot_path(directory: &Path, rom_path: &Path, slot: Slot, extension: &str) -> 
         .join(rom_path.file_name().unwrap_or_default())
         .join(file_stem(slot))
         .with_extension(extension)
+}
+
+/// The path the states of the ROM at `rom_path` go by in the player's data
+/// folder: the name the game owns there (see `storage::names`).
+fn stored(rom_path: &Path) -> PathBuf {
+    match data_folder() {
+        Some(folder) => crate::storage::names::stored_path(&folder, rom_path),
+        None => rom_path.to_path_buf(),
+    }
 }
 
 /// The folder for every game's states: `states/` in the player's data

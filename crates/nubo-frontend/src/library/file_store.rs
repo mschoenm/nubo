@@ -95,7 +95,9 @@ pub fn read_picture(
 
 /// Where the picture of `kind` of the game at `rom_path` is kept: named
 /// after the ROM's file name, like battery saves, such as `Tetris.gb.png`,
-/// in the `box_art`, `title_screens` or `thumbnails` folder.
+/// in the `box_art`, `title_screens` or `thumbnails` folder. The library
+/// passes the path its pictures go by (`Library::pictures_as`), whose file
+/// name is the name the game owns.
 fn picture_path(cache: &Cache, kind: PictureKind, rom_path: &Path) -> Result<PathBuf, String> {
     let folder = match kind {
         PictureKind::BoxArt => "box_art",
@@ -107,11 +109,16 @@ fn picture_path(cache: &Cache, kind: PictureKind, rom_path: &Path) -> Result<Pat
     Ok(data_directory(cache)?.join(folder).join(file_name))
 }
 
-/// The saved picture of the game at `rom_path` as a PNG, if there is one
-/// made after the ROM file last changed. A picture of an older version of
-/// the file is ignored, so it is made again.
-pub fn current_picture(cache: &Cache, kind: PictureKind, rom_path: &Path) -> Option<Vec<u8>> {
-    let path = picture_path(cache, kind, rom_path).ok()?;
+/// The saved picture of the game at `rom_path`, kept under `pictures_as`'s
+/// name, as a PNG, if there is one made after the ROM file last changed. A
+/// picture of an older version of the file is ignored, so it is made again.
+pub fn current_picture(
+    cache: &Cache,
+    kind: PictureKind,
+    pictures_as: &Path,
+    rom_path: &Path,
+) -> Option<Vec<u8>> {
+    let path = picture_path(cache, kind, pictures_as).ok()?;
     let modified = |path: &Path| {
         fs::metadata(path)
             .and_then(|metadata| metadata.modified())
@@ -128,6 +135,21 @@ pub fn current_picture(cache: &Cache, kind: PictureKind, rom_path: &Path) -> Opt
 pub fn save_box_art(cache: &Cache, rom_path: &Path, png: &[u8]) -> Result<(), String> {
     write_atomically(&picture_path(cache, PictureKind::BoxArt, rom_path)?, png)
         .map_err(|error| format!("Box art couldn't be saved: {error}"))
+}
+
+/// Deletes every picture kept under the name of `rom_path`, so they are
+/// made again. One that can't be deleted stays: it may show another game's
+/// picture until then, nothing worse.
+pub fn delete_pictures(cache: &Cache, rom_path: &Path) {
+    for kind in [
+        PictureKind::BoxArt,
+        PictureKind::TitleScreen,
+        PictureKind::LastScreen,
+    ] {
+        if let Ok(path) = picture_path(cache, kind, rom_path) {
+            let _ = fs::remove_file(path);
+        }
+    }
 }
 
 /// The cache's data folder, or why there is none.

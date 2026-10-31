@@ -100,7 +100,9 @@ impl Files {
         }
     }
 
-    /// The file that holds `entry`, or why there is none.
+    /// The file that holds `entry`, or why there is none. A game's battery
+    /// saves and cheats go by the name it owns in the data folder (see
+    /// [`super::names`]).
     pub fn path(&self, entry: Entry<'_>) -> Result<PathBuf, String> {
         let (folder, subfolder, missing) = match entry {
             Entry::Settings => (&self.config_folder, None, "no config folder for us"),
@@ -116,9 +118,23 @@ impl Files {
             .as_ref()
             .ok_or_else(|| format!("the system has {missing}"))?;
 
+        // A game's data goes by the name the game owns (see `names`).
+        let stored = match entry {
+            Entry::BatteryRam(rom_path)
+            | Entry::BatteryClock(rom_path)
+            | Entry::Cheats(rom_path) => super::names::stored_path(folder, rom_path),
+            Entry::Settings | Entry::LastGame => PathBuf::new(),
+        };
+        let file_name = match entry {
+            Entry::BatteryRam(_) => Entry::BatteryRam(&stored).file_name(),
+            Entry::BatteryClock(_) => Entry::BatteryClock(&stored).file_name(),
+            Entry::Cheats(_) => Entry::Cheats(&stored).file_name(),
+            Entry::Settings | Entry::LastGame => entry.file_name(),
+        };
+
         Ok(match subfolder {
-            Some(subfolder) => folder.join(subfolder).join(entry.file_name()),
-            None => folder.join(entry.file_name()),
+            Some(subfolder) => folder.join(subfolder).join(file_name),
+            None => folder.join(file_name),
         })
     }
 }

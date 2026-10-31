@@ -636,3 +636,67 @@ fn a_game_beside_another_of_the_same_name_has_its_title_hashed_in() {
         "game"
     );
 }
+
+#[cfg(feature = "desktop")]
+#[test]
+fn games_with_the_same_file_name_keep_pictures_of_their_own() {
+    let root = temporary_folder("same-file-name");
+    let data = root.join("data");
+    let games = root.join("Games");
+    let first = games.join("Jam A").join("game.gb");
+    let second = games.join("Jam B").join("game.gb");
+    write_rom(&first, "FIRST", false);
+    write_rom(&second, "SECOND", false);
+    let folders = [folder(&games, true)];
+    let (mut library, _) = Library::load_from(Cache::in_folder(data.clone()));
+    let result = scan::scan(1, &folders, Vec::new());
+    library.replace_entries(result.entries);
+    for entry in &mut library.entries {
+        entry.title_screen_checked = true;
+    }
+
+    // Before either starts, neither takes the plain name for its pictures.
+    let first_before = library.pictures_as(&first);
+    let second_before = library.pictures_as(&second);
+    assert_ne!(first_before, first);
+    assert_ne!(second_before, second);
+    assert_ne!(first_before.file_name(), second_before.file_name());
+
+    // An old picture under the plain name may be either game's, so the
+    // first game to claim the name makes its own again.
+    let plain_picture = data.join("title_screens").join("game.gb.png");
+    fs::create_dir_all(plain_picture.parent().unwrap()).unwrap();
+    fs::write(&plain_picture, b"old").unwrap();
+    let header = nubo_core::Emulator::read_rom_header(&fs::read(&first).unwrap()).unwrap();
+    library.claim_names(&first, &header, &folders).unwrap();
+    assert_eq!(library.pictures_as(&first), first);
+    assert!(!plain_picture.exists());
+    assert!(!library.entry(&first).unwrap().title_screen_checked);
+
+    let header = nubo_core::Emulator::read_rom_header(&fs::read(&second).unwrap()).unwrap();
+    library.claim_names(&second, &header, &folders).unwrap();
+    assert_eq!(library.pictures_as(&second), second_before);
+    assert!(library.entry(&second).unwrap().title_screen_checked);
+}
+
+#[cfg(feature = "desktop")]
+#[test]
+fn a_game_on_an_unplugged_library_folder_keeps_its_saves() {
+    let root = temporary_folder("unplugged");
+    let data = root.join("data");
+    let stick = root.join("USB stick");
+    let owner = stick.join("game.gb");
+    let other = root.join("Disk").join("game.gb");
+    write_rom(&owner, "GAME", false);
+    write_rom(&other, "GAME", false);
+    let folders = [folder(&stick, false)];
+    let (mut library, _) = Library::load_from(Cache::in_folder(data.clone()));
+    let header = nubo_core::Emulator::read_rom_header(&fs::read(&owner).unwrap()).unwrap();
+    library.claim_names(&owner, &header, &folders).unwrap();
+    fs::remove_dir_all(&stick).unwrap();
+
+    library.claim_names(&other, &header, &folders).unwrap();
+
+    assert_ne!(library.pictures_as(&other), other);
+    assert_eq!(crate::storage::names::stored_path(&data, &owner), owner);
+}

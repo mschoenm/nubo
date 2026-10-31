@@ -378,7 +378,9 @@ impl App {
         }
         Task::batch(self.library.next_captures().into_iter().map(|path| {
             Task::perform(
-                self.library.cache().title_screen(path.clone()),
+                self.library
+                    .cache()
+                    .title_screen(path.clone(), self.library.pictures_as(&path)),
                 move |pixels| LibraryMessage::TitleScreenCaptured(path, pixels).into(),
             )
         }))
@@ -531,10 +533,12 @@ impl App {
                 .map(|(path, supports_cgb)| {
                     let list = list.clone();
                     let rom_path = path.clone();
+                    let pictures_as = self.library.pictures_as(&path);
                     let cache = self.library.cache().clone();
-                    Task::perform(cache.box_art(rom_path, supports_cgb, list), move |result| {
-                        LibraryMessage::BoxArtDownloaded(path, result).into()
-                    })
+                    Task::perform(
+                        cache.box_art(rom_path, pictures_as, supports_cgb, list),
+                        move |result| LibraryMessage::BoxArtDownloaded(path, result).into(),
+                    )
                 }),
         )
     }

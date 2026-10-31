@@ -195,6 +195,17 @@ fn is_unreachable(path: &Path, folders: &[LibraryFolder]) -> bool {
     }
 }
 
+/// Whether `path` is in one of the library `folders` that can't be reached
+/// now, such as one on an unplugged drive: what is in it hasn't moved or
+/// gone, it is only out of reach.
+pub fn is_on_unreachable_folder(path: &Path, folders: &[LibraryFolder]) -> bool {
+    folders
+        .iter()
+        .filter(|folder| path.starts_with(&folder.path))
+        .max_by_key(|folder| folder.path.components().count())
+        .is_some_and(|folder| !folder.path.is_dir())
+}
+
 /// A library entry for the ROM at `path` with the given header, found
 /// outside the library folders.
 pub fn entry_for(path: &Path, header: &CartridgeHeader) -> LibraryEntry {

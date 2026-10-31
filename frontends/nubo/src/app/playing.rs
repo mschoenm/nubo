@@ -407,6 +407,16 @@ impl App {
             self.stop_game();
         }
 
+        // The game starts, so its data goes by a name it owns from now on,
+        // before anything of it is read.
+        if !self.fresh
+            && let Err(error) =
+                self.library
+                    .claim_names(&rom.path, &header, &self.settings.shared.library_folders)
+        {
+            self.toasts.error(error);
+        }
+
         let resume_state = if resume && self.settings.shared.resume_games && !self.fresh {
             save_states::load(&rom.path, Slot::Resume).unwrap_or_else(|error| {
                 self.keep_unloadable_state(&rom.path, Slot::Resume, error);
