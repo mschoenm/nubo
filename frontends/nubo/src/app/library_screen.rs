@@ -541,12 +541,13 @@ impl App {
     /// same title but other contents may be a new version or another game:
     /// it waits for the player to say which (`DialogKind::SameTitle`), and
     /// this returns `None`; the answer starts it. A game that isn't one the
-    /// emulator can start isn't kept, and says why when it fails to start.
+    /// emulator can start, such as a zip file damaged past the header, isn't
+    /// kept, and says why when it fails to start.
     /// Games started from the library come from what it keeps, so they
     /// aren't kept again.
     #[cfg(target_arch = "wasm32")]
     pub(super) fn keep_game(&mut self, mut rom: Rom) -> Option<Rom> {
-        if nubo_core::Emulator::read_rom_header(&rom.bytes).is_ok() {
+        if nubo_core::Emulator::check_rom(&rom.bytes).is_ok() {
             match self.library.add_game(&rom, SameTitle::Ask) {
                 Ok(Kept::As(path)) => rom.path = path,
                 Ok(Kept::Ask) => {

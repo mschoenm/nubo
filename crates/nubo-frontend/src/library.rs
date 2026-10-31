@@ -978,14 +978,16 @@ impl Library {
     /// checksums is taken as the same file when its size is the same, as
     /// before. Pictures go unless the file is the same, so they are made
     /// again. Fails, keeping nothing, if `rom` isn't a game the emulator can
-    /// start.
+    /// start: a zip file is unpacked whole to check it
+    /// ([`nubo_core::Emulator::check_rom`]), so one damaged past the header
+    /// isn't kept either.
     #[cfg(all(feature = "web", not(feature = "desktop")))]
     pub fn add_game(
         &mut self,
         rom: &crate::rom::Rom,
         same_title: SameTitle,
     ) -> Result<Kept, String> {
-        let header = nubo_core::Emulator::read_rom_header(&rom.bytes)
+        let header = nubo_core::Emulator::check_rom(&rom.bytes)
             .map_err(|error| format!("{} isn't a game Nubo can play: {error}", rom.name()))?;
         let checksum = crc32fast::hash(&rom.bytes);
         let Some(path) = self.place_for(
