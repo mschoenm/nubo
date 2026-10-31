@@ -81,6 +81,12 @@ impl Serial {
         self.bits_transferred < 8 && (self.cgb_mode || !self.is_high_speed_clock)
     }
 
+    /// Selects the normal clock speed, as an SC write does when the high
+    /// speed clock bit doesn't exist.
+    pub(super) fn use_normal_clock(&mut self) {
+        self.is_high_speed_clock = false;
+    }
+
     fn clock_counter_bit(&self) -> u16 {
         // Only a CGB can set the high speed bit (`set_control`).
         if self.is_high_speed_clock {

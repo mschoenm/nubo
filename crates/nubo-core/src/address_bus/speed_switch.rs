@@ -116,6 +116,22 @@ impl SpeedSwitch {
         (cgb || !switching) && self.halt_units <= SPEED_SWITCH_HALT_UNITS && reachable
     }
 
+    /// Whether the CPU runs at double speed or a switch is in progress: a
+    /// delay, freeze or halt still running. STOP's hold on the timers isn't
+    /// counted, since STOP sets it without a switch too.
+    pub(super) fn is_double_speed_or_switching(&self) -> bool {
+        self.cgb_double_speed
+            || self.double_speed_delay != 0
+            || self.freeze != 0
+            || self.halt_units != 0
+            || self.halt_ended
+    }
+
+    /// Clears KEY1's armed bit, so the next STOP doesn't switch speed.
+    pub(super) fn disarm(&mut self) {
+        self.armed = false;
+    }
+
     /// Whether no switch is in progress, so M-cycles run as usual.
     pub(super) fn is_idle(&self) -> bool {
         self.double_speed_delay == 0
