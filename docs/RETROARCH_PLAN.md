@@ -51,7 +51,8 @@ Where the code differs from the plan below:
   much states vary (well under 2 KiB over thousands of states of busy test programs).
 - **Saving and loading got faster** for run-ahead: lists of bytes are written and read in one go, and the power-on
   state a load starts from is made once per game. Saving went from about 1 ms to 60 µs and loading from 5-7 ms to
-  0.45 ms (a frame takes about 0.5 ms), with the same bytes stored.
+  0.45 ms (a frame takes about 0.5 ms), with the same bytes stored. Later, writing each field in place and reading
+  it straight from the state's bytes (issue #302) took saving to about 20 µs and loading to 75-95 µs.
 - **`CartridgeEffects: Send`**, so the emulator is `Send` and the core can keep it in a `static Mutex`.
 - **Pixel format:** when the frontend refuses XRGB8888, the core converts to the default 0RGB1555.
 - **A call that finishes no frame hands over the last frame again** instead of `NULL`, which RetroArch accepts as a

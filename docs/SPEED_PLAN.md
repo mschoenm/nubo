@@ -75,6 +75,26 @@ In time, best of 3 rounds of 30 s with `cargo xtask compare-emulators` (the tabl
 runs. Times vary by up to 50% on shared machines, so the gap to the other emulators, measured in the
 same run, is what to compare.
 
+## Save states
+
+RetroArch's run-ahead and rewind save and load a state every frame, so their speed matters too. Since
+issue #302, `FieldWriter` writes each field in place and fills in its length afterwards, and
+`read_fields` hands each field its part of the state's bytes without copying it. Before, both copied
+every field's bytes once per level it was nested in, so VRAM and the frame buffers were copied several
+times on every save and load. The bytes stored are the same. Measured with a small timing program on
+Tobu Tobu Girl after 600 frames, 2,000 saves and 2,000 loads each (2026-10-31):
+
+| Model | State | Save before | Save after | Load before | Load after |
+|---|---|---|---|---|---|
+| DMG | 154 KiB | 47 µs | 18 to 25 µs | 316 µs | 75 to 96 µs |
+| CGB | 154 KiB | 44 µs | 19 µs | 300 µs | 75 µs |
+| SGB | 228 KiB | 84 µs | 24 µs | 404 µs | 93 µs |
+
+A load still makes three passes: it saves the running emulator to fall back on, reads the power-on
+state, then reads the saved one. Skipping the power-on pass for a state of this exact build would save
+about a third more, but a damaged state would then keep the running emulator's values where it can't
+be read instead of the power-on ones, so it was left out.
+
 ## Tried, without gain
 
 Each of these kept every result the same but saved nothing measurable (under 1%, or cost more), so

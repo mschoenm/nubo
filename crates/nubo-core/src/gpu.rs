@@ -35,7 +35,6 @@ use crate::serializable::{Serializable, read_name, unreadable_value, write_varia
 use crate::sgb::Sgb;
 use crate::utils::is_bit_set;
 use nubo_serializable_derive::Serializable;
-use std::io::{Read, Write};
 
 /// Which part of the line the PPU is working on. The mode the CPU reads from STAT can differ
 /// from it for a few dots, so that is tracked separately in `Gpu::visible_mode`. Save states
@@ -140,7 +139,7 @@ pub(crate) enum OamDmaAccess {
 
 /// Stored as the variant's name and the destination (0 when there is none), like a derived enum.
 impl Serializable for OamDmaAccess {
-    fn serialize(&self, writer: &mut dyn Write) -> std::io::Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> std::io::Result<()> {
         let (variant, destination) = match *self {
             OamDmaAccess::Free => ("Free", 0u8),
             OamDmaAccess::Running { destination } => ("Running", destination),
@@ -150,11 +149,11 @@ impl Serializable for OamDmaAccess {
         destination.serialize(writer)
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> std::io::Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> std::io::Result<()> {
         let variant = read_name(reader)?;
         let mut destination = 0u8;
         destination.deserialize(reader)?;
-        *self = match variant.as_str() {
+        *self = match variant {
             "Free" => OamDmaAccess::Free,
             "Running" => OamDmaAccess::Running { destination },
             "PausedByHalt" => OamDmaAccess::PausedByHalt,

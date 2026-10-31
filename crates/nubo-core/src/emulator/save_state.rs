@@ -34,7 +34,7 @@ use crate::serializable::{
     FieldWriter, Serializable, collect_unreadable, note_variants, read_fields, stored_layout,
     unreadable_value,
 };
-use std::io::{self, Read, Write};
+use std::io;
 
 /// What every save state starts with. It has no line break, so no tool that
 /// converts line endings can damage it.
@@ -99,7 +99,7 @@ impl SaveStateHeader {
     }
 
     /// Writes the header as named fields, which `split` reads back.
-    fn write(&self, writer: &mut dyn Write) -> io::Result<()> {
+    fn write(&self, writer: &mut Vec<u8>) -> io::Result<()> {
         let mut fields = FieldWriter::new(writer);
         fields.field("nubo_version", &self.nubo_version)?;
         fields.field("nubo_commit", &self.nubo_commit)?;
@@ -176,7 +176,7 @@ fn split(data: &[u8]) -> Result<(SaveStateHeader, &[u8]), SaveStateError> {
 /// component on the address bus as a field of its own next to it, so that the
 /// stored layout follows the hardware rather than which struct owns which.
 impl Serializable for Emulator {
-    fn serialize(&self, writer: &mut dyn Write) -> io::Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> io::Result<()> {
         let mut fields = FieldWriter::new(writer);
         fields.field("cpu", &self.cpu)?;
         self.address_bus()
@@ -184,7 +184,7 @@ impl Serializable for Emulator {
         fields.finish()
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> io::Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> io::Result<()> {
         read_fields(reader, |name, bytes| {
             if name == "cpu" {
                 self.cpu.deserialize(bytes)?;
@@ -308,9 +308,9 @@ impl Emulator {
     /// so a version that stores other values or names than the one before
     /// can't go unnoticed.
     pub fn save_state_layout(&self) -> Vec<String> {
-        let header = stored_layout(|| SaveStateHeader::of(self).write(&mut io::sink()))
+        let header = stored_layout(|| SaveStateHeader::of(self).write(&mut Vec::new()))
             .expect("writing to a sink never fails");
-        let state = stored_layout(|| self.serialize(&mut io::sink()))
+        let state = stored_layout(|| self.serialize(&mut Vec::new()))
             .expect("writing to a sink never fails");
         let mut layout: Vec<String> = header
             .into_iter()

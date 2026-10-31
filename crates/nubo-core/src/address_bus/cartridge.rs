@@ -27,7 +27,6 @@ use crate::address_bus::mbc5::Mbc5CartridgeMapper;
 use crate::error::LoadRomError;
 use crate::serializable::{FieldWriter, Serializable, read_fields};
 use nubo_serializable_derive::Serializable;
-use std::io::{Read, Write};
 use std::sync::Arc;
 
 /// Information about a game, read from the header at the start of its ROM.
@@ -389,7 +388,7 @@ impl CartridgeMapper {
 /// later version picks another controller for a cartridge type, it starts
 /// that one at power-on instead of reading the other's registers.
 impl Serializable for CartridgeMapper {
-    fn serialize(&self, writer: &mut dyn Write) -> std::io::Result<()> {
+    fn serialize(&self, writer: &mut Vec<u8>) -> std::io::Result<()> {
         let mut fields = FieldWriter::new(writer);
         match self {
             Self::RomOnly | Self::RomRam => {}
@@ -402,7 +401,7 @@ impl Serializable for CartridgeMapper {
         fields.finish()
     }
 
-    fn deserialize(&mut self, reader: &mut dyn Read) -> std::io::Result<()> {
+    fn deserialize(&mut self, reader: &mut &[u8]) -> std::io::Result<()> {
         read_fields(reader, |name, bytes| {
             match (name, &mut *self) {
                 ("mbc1", Self::Mbc1(mbc1)) => mbc1.deserialize(bytes)?,
@@ -940,7 +939,7 @@ mod tests {
         assert!(unreadable.is_empty());
         assert_eq!(mbc5.rom_banks(), [0, 1]);
 
-        let layout = crate::serializable::stored_layout(|| mbc1.serialize(&mut std::io::sink()));
+        let layout = crate::serializable::stored_layout(|| mbc1.serialize(&mut Vec::new()));
         assert!(layout.unwrap().contains("mapper.mbc1.bank1: u8"));
     }
 
