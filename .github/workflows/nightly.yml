@@ -357,6 +357,8 @@ jobs:
       - name: Build the web version
         run: cargo xtask build-web
 
+      # `cpu` is the processor model: speed is compared only with nights on
+      # the same model, since GitHub's machines differ by up to twice.
       - name: Write tonight's metrics
         shell: bash
         env:
@@ -391,6 +393,7 @@ jobs:
           jq -n \
             --arg date "$(TZ=Europe/Amsterdam date +%F)" \
             --arg commit "$(git rev-parse --short HEAD)" \
+            --arg cpu "$(awk -F': *' '/^model name/ { print $2; exit }' /proc/cpuinfo)" \
             --arg ci "$CI" --arg advisories "$ADVISORIES" --arg tests "$TESTS" --arg verify_boot "$VERIFY_BOOT" \
             --arg save_states "$SAVE_STATES" --arg eager "$EAGER" --arg random_scenes "$RANDOM_SCENES" \
             --arg flatpak "$FLATPAK" --arg windows "$WINDOWS" --arg libretro "$LIBRETRO" \
@@ -405,7 +408,7 @@ jobs:
             --slurpfile efficiency "$RUNNER_TEMP/efficiency.json" \
             --argjson desktop "$(stat -c %s target/release/nubo)" \
             --argjson wasm "$(stat -c %s target/web/nubo_bg.wasm)" \
-            '{date: $date, commit: $commit,
+            '{date: $date, commit: $commit, cpu: (if $cpu == "" then null else $cpu end),
               tests: {ci: $ci, advisories: $advisories, unit_tests: $tests, verify_boot: $verify_boot,
                       save_states: $save_states, eager: $eager, random_scenes: $random_scenes,
                       flatpak: $flatpak, windows: $windows, libretro: $libretro,
