@@ -700,3 +700,103 @@ fn a_game_on_an_unplugged_library_folder_keeps_its_saves() {
     assert_ne!(library.pictures_as(&other), other);
     assert_eq!(crate::storage::names::stored_path(&data, &owner), owner);
 }
+
+/// A game the browser keeps at `path`, with `title`, the CRC-32 `checksum`
+/// (`None` as kept by a version that didn't keep it) and `size` bytes.
+fn kept(path: &str, title: &str, checksum: Option<u32>, size: u64) -> LibraryEntry {
+    LibraryEntry {
+        title: title.to_owned(),
+        checksum,
+        size,
+        ..LibraryEntry::example(path)
+    }
+}
+
+/// A library of `entries`.
+fn library_of(entries: Vec<LibraryEntry>) -> Library {
+    let mut library = Library::default();
+    library.replace_entries(entries);
+    library
+}
+
+#[test]
+fn the_browser_keeps_a_new_game_under_its_own_file_name() {
+    let library = library_of(Vec::new());
+    let path = Path::new("game.gb");
+
+    assert_eq!(
+        library.place_for(path, "GAME", 1, 10, SameTitle::Ask),
+        Some(PathBuf::from("game.gb"))
+    );
+}
+
+#[test]
+fn the_browser_keeps_the_same_file_where_it_kept_it() {
+    let beside = crate::storage::name_with_hash(Path::new("game.gb"), 7);
+    let library = library_of(vec![
+        kept("game.gb", "GAME", Some(1), 10),
+        kept(beside.to_str().unwrap(), "GAME", Some(7), 10),
+    ]);
+
+    assert_eq!(
+        library.place_for(Path::new("game.gb"), "GAME", 1, 10, SameTitle::Ask),
+        Some(PathBuf::from("game.gb"))
+    );
+    assert_eq!(
+        library.place_for(Path::new("game.gb"), "GAME", 7, 10, SameTitle::Ask),
+        Some(beside)
+    );
+}
+
+#[test]
+fn the_browser_keeps_a_game_with_another_title_beside_the_kept_one() {
+    let library = library_of(vec![kept("game.gb", "ZELDA", Some(1), 10)]);
+
+    assert_eq!(
+        library.place_for(Path::new("game.gb"), "TETRIS", 2, 10, SameTitle::Ask),
+        Some(path_beside(Path::new("game.gb"), "TETRIS"))
+    );
+}
+
+#[test]
+fn the_browser_asks_about_other_contents_with_the_same_title() {
+    let library = library_of(vec![kept("game.gb", "GAME", Some(1), 10)]);
+    let path = Path::new("game.gb");
+
+    assert_eq!(library.place_for(path, "GAME", 2, 10, SameTitle::Ask), None);
+    assert_eq!(
+        library.place_for(path, "GAME", 2, 10, SameTitle::NewVersion),
+        Some(PathBuf::from("game.gb"))
+    );
+    assert_eq!(
+        library.place_for(path, "GAME", 2, 10, SameTitle::AnotherGame),
+        Some(PathBuf::from("game (00000002).gb"))
+    );
+    assert_eq!(
+        crate::rom::display_name(Path::new("game (00000002).gb")),
+        "game"
+    );
+}
+
+#[test]
+fn a_game_kept_before_checksums_is_the_same_file_when_its_size_is() {
+    let library = library_of(vec![kept("game.gb", "GAME", None, 10)]);
+    let path = Path::new("game.gb");
+
+    assert_eq!(
+        library.place_for(path, "GAME", 2, 10, SameTitle::Ask),
+        Some(PathBuf::from("game.gb"))
+    );
+    assert_eq!(library.place_for(path, "GAME", 2, 20, SameTitle::Ask), None);
+}
+
+#[test]
+fn only_hashed_names_beside_a_file_name_are_kept_as_it() {
+    let path = Path::new("game.gb");
+
+    assert!(is_kept_as(path, path));
+    assert!(is_kept_as(Path::new("game (0a1b2c3d).gb"), path));
+    assert!(!is_kept_as(Path::new("game (Rev 1).gb"), path));
+    assert!(!is_kept_as(Path::new("game (0a1b2c3d).gbc"), path));
+    assert!(!is_kept_as(Path::new("other (0a1b2c3d).gb"), path));
+}

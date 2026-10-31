@@ -15,7 +15,7 @@ use crate::views;
 use iced::Task;
 use nubo_core::Model;
 use nubo_frontend::controls::Action;
-use nubo_frontend::library::{self, LibraryEntry, box_art};
+use nubo_frontend::library::{self, LibraryEntry, SameTitle, box_art};
 use nubo_frontend::links;
 use nubo_frontend::model::{self, Console, ModelPreference};
 use nubo_frontend::save_states;
@@ -84,9 +84,12 @@ impl App {
         match message {
             DialogMessage::Closed(message) => {
                 self.dialog = None;
-                if let Some(message) = message {
-                    return self.update(*message);
-                }
+                let task = match message {
+                    Some(message) => self.update(*message),
+                    None => Task::none(),
+                };
+                self.ask_about_same_title();
+                return task;
             }
             DialogMessage::ShowGameMenu(path, page) => self.show_game_menu(path, page),
             DialogMessage::UnfoldConsole { path, unfolded, on } => {
@@ -227,6 +230,7 @@ impl App {
                 configured,
                 remembers,
             } => Some(other_model_question(*saved, *configured, *remembers)),
+            DialogKind::SameTitle(path) => Some(same_title_question(path)),
         }
     }
 
@@ -520,6 +524,17 @@ impl App {
     /// Asks whether to download box art, once the library has a folder (in
     /// the browser, a game) and the player hasn't answered yet. Box art waits
     /// for the answer.
+    /// Asks about the first game waiting in `App::same_title_waiting` (see
+    /// `DialogKind::SameTitle`), once no other dialog is open; closing one
+    /// asks again.
+    pub(super) fn ask_about_same_title(&mut self) {
+        if self.dialog.is_none()
+            && let Some((rom, _)) = self.same_title_waiting.first()
+        {
+            self.dialog = Some(Dialog::new(DialogKind::SameTitle(rom.path.clone())));
+        }
+    }
+
     pub(super) fn ask_about_box_art(&mut self) {
         if box_art::AVAILABLE
             && !self.fresh
@@ -974,6 +989,42 @@ fn other_model_question(saved: Model, configured: Model, remembers: bool) -> Dia
         ],
         dismiss: answer(ResumeAnswer::Cancel),
         click_outside_dismisses: true,
+        back_button: false,
+    }
+}
+
+/// The question whether the game picked as `path` is a new version of the
+/// one the browser keeps under the same file name and title, or another
+/// game with the same title (see `nubo_frontend::library::SameTitle`).
+fn same_title_question(path: &Path) -> DialogContent {
+    let name = nubo_frontend::rom::display_name(path);
+    let answer =
+        |answer| DialogAction::CloseThen(LibraryMessage::SameTitleAnswered(Some(answer)).into());
+    DialogContent {
+        title: format!("Is this a new version of {name}?"),
+        text: Some(String::from(
+            "You already have a game with this file name and title, but this file is \
+             different. A new version replaces it and keeps its saves. Another game gets saves \
+             of its own.",
+        )),
+        notice: None,
+        layout: Layout::Buttons,
+        choices: vec![
+            Choice::new(
+                Icon::RefreshCw,
+                "New version of this game (keeps its saves)",
+                ChoiceStyle::Primary,
+                answer(SameTitle::NewVersion),
+            ),
+            Choice::new(
+                Icon::Plus,
+                "Another game (saves of its own)",
+                ChoiceStyle::Secondary,
+                answer(SameTitle::AnotherGame),
+            ),
+        ],
+        dismiss: DialogAction::CloseThen(LibraryMessage::SameTitleAnswered(None).into()),
+        click_outside_dismisses: false,
         back_button: false,
     }
 }

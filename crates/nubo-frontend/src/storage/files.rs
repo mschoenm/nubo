@@ -10,7 +10,8 @@
 //!
 //! In the data folder, battery saves go to `saves/`, cheats to `cheats/`,
 //! save states to `states/` (see [`crate::save_states`]) and the library's
-//! cache next to them.
+//! cache next to them, each named after the name the game owns, which
+//! `names.toml` records (see [`super::names`]).
 //!
 //! A run that must not touch the player's data, such as the app's hidden
 //! `capture` command, puts a folder of its own in their place for the whole

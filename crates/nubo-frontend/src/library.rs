@@ -104,6 +104,12 @@ pub struct LibraryEntry {
     /// was read, so a scan can tell whether to read it again. In the browser,
     /// when the game was kept.
     modified: u64,
+    /// The CRC-32 of the file the browser keeps, so adding a game with the
+    /// same file name and title can tell the same file from a different
+    /// one (see `Library::add_game`). `None` on the desktop, and for a
+    /// game kept by a version that didn't keep it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    checksum: Option<u32>,
 }
 
 impl LibraryEntry {
@@ -196,6 +202,7 @@ impl LibraryEntry {
             added: None,
             size: 0,
             modified: 0,
+            checksum: None,
         }
     }
 
@@ -870,7 +877,7 @@ impl Library {
     /// which may show another game of that file name, are made again.
     /// Returns why the record of names couldn't be read or saved; the names
     /// still hold for this run. The browser keeps each game under a name of
-    /// its own already (see [`Library::add_game`]), so it claims nothing.
+    /// its own already (see `Library::add_game`), so it claims nothing.
     pub fn claim_names(
         &mut self,
         path: &Path,
@@ -955,22 +962,40 @@ impl Library {
     /// Keeps the file of `rom` in the library, as the browser build does
     /// for every game the player adds or opens (see [`KEEPS_GAMES`]), and
     /// lists it among all games. Returns the path it is kept under, which
-    /// its saves, save states and cheats are named after.
+    /// its saves, save states and cheats are named after, or that the player
+    /// must answer `same_title`'s question first.
     ///
-    /// A game kept before under the same file name with the same header
-    /// title is another version of it, so it is replaced and its saves carry
-    /// over; its pictures go unless the file is the same too, so they are
-    /// made again. A game with another title is another game, so `rom` is
-    /// kept beside it under `path_beside`'s name and never takes its
-    /// saves. Fails, keeping nothing, if `rom` isn't a game the emulator can
+    /// The same file kept before, under any of its names, is kept again
+    /// there. A game kept before under the same file name with another
+    /// header title is another game, so `rom` is kept beside it under
+    /// `path_beside`'s name and never takes its saves. One with the same
+    /// title but other contents may be a newer version of it or another
+    /// game with a title alike (homebrew games often have an empty or
+    /// generic one), which only the player can tell: `same_title` says
+    /// which, or to ask. A newer version replaces it and its saves carry
+    /// over; another game is kept beside it under a name with the CRC-32 of
+    /// its contents in it. A game kept by a version that didn't keep
+    /// checksums is taken as the same file when its size is the same, as
+    /// before. Pictures go unless the file is the same, so they are made
+    /// again. Fails, keeping nothing, if `rom` isn't a game the emulator can
     /// start.
     #[cfg(all(feature = "web", not(feature = "desktop")))]
-    pub fn add_game(&mut self, rom: &crate::rom::Rom) -> Result<PathBuf, String> {
+    pub fn add_game(
+        &mut self,
+        rom: &crate::rom::Rom,
+        same_title: SameTitle,
+    ) -> Result<Kept, String> {
         let header = nubo_core::Emulator::read_rom_header(&rom.bytes)
             .map_err(|error| format!("{} isn't a game Nubo can play: {error}", rom.name()))?;
-        let path = match self.entry(&rom.path) {
-            Some(known) if known.title != header.title => path_beside(&rom.path, &header.title),
-            _ => rom.path.clone(),
+        let checksum = crc32fast::hash(&rom.bytes);
+        let Some(path) = self.place_for(
+            &rom.path,
+            &header.title,
+            checksum,
+            rom.bytes.len() as u64,
+            same_title,
+        ) else {
+            return Ok(Kept::Ask);
         };
         let keep_error = |error| format!("{} couldn't be kept in the browser: {error}", rom.name());
         store::save_rom(&path, &rom.bytes).map_err(keep_error)?;
@@ -981,11 +1006,14 @@ impl Library {
         entry.size = rom.bytes.len() as u64;
         entry.modified = now;
         entry.added = Some(now);
+        entry.checksum = Some(checksum);
 
         let previous = self.entries.iter().position(|known| known.path == path);
         if let Some(index) = previous {
             let previous = &self.entries[index];
-            let unchanged = previous.size == entry.size && previous.title == entry.title;
+            let unchanged = previous.size == entry.size
+                && previous.title == entry.title
+                && previous.checksum.is_none_or(|known| known == checksum);
             entry.keep_from(previous, unchanged);
             if !unchanged {
                 store::delete_pictures(&path).map_err(keep_error)?;
@@ -1005,7 +1033,46 @@ impl Library {
         entries.push(entry);
         self.replace_entries(entries);
         self.save()?;
-        Ok(path)
+        Ok(Kept::As(path))
+    }
+
+    /// Where the browser keeps a game picked as `path` with the header
+    /// `title`, whose file has the CRC-32 `checksum` and is `size` bytes
+    /// long, as `Library::add_game` explains; `None` when `same_title`
+    /// says to ask the player first.
+    #[cfg(any(test, all(feature = "web", not(feature = "desktop"))))]
+    fn place_for(
+        &self,
+        path: &Path,
+        title: &str,
+        checksum: u32,
+        size: u64,
+        same_title: SameTitle,
+    ) -> Option<PathBuf> {
+        if let Some(same) = self.entries.iter().find(|entry| {
+            entry.checksum == Some(checksum)
+                && entry.title == title
+                && is_kept_as(&entry.path, path)
+        }) {
+            return Some(same.path.clone());
+        }
+
+        let beside = path_beside(path, title);
+        let version_of = [path, beside.as_path()]
+            .into_iter()
+            .find_map(|kept| self.entry(kept).filter(|entry| entry.title == title));
+        match version_of {
+            None if self.entry(path).is_none() => Some(path.to_path_buf()),
+            None => Some(beside),
+            Some(known) if known.checksum.is_none() && known.size == size => {
+                Some(known.path.clone())
+            }
+            Some(known) => match same_title {
+                SameTitle::Ask => None,
+                SameTitle::NewVersion => Some(known.path.clone()),
+                SameTitle::AnotherGame => Some(crate::storage::name_with_hash(path, checksum)),
+            },
+        }
     }
 
     /// Whether the library keeps the file of the game at `path` (see
@@ -1107,6 +1174,33 @@ impl Library {
 /// [`Library::snapshot`]).
 #[derive(Debug, Clone)]
 pub struct LibrarySnapshot(Vec<LibraryEntry>);
+
+/// What `Library::add_game` does with a game whose file name and header
+/// title are those of a game the browser keeps already, but whose contents
+/// differ.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SameTitle {
+    /// Keeps nothing yet and says the player must answer first
+    /// ([`Kept::Ask`]).
+    Ask,
+    /// It is a newer version of the kept game: it replaces that one, and
+    /// the saves carry over.
+    NewVersion,
+    /// It is another game whose title happens to be the same: it is kept
+    /// beside the other one, with saves of its own.
+    AnotherGame,
+}
+
+/// What `Library::add_game` did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Kept {
+    /// It kept the game under this path, which its saves go by.
+    As(PathBuf),
+    /// It kept nothing: the browser keeps another file with the same file
+    /// name and title, and the player must say whether this one is a new
+    /// version of that game or another game ([`SameTitle`]).
+    Ask,
+}
 
 /// News from watching the library folders (see `watch`).
 #[derive(Debug, Clone)]
@@ -1239,6 +1333,28 @@ fn keeps_file(path: &Path) -> bool {
 #[cfg(not(all(feature = "web", not(feature = "desktop"))))]
 fn keeps_file(_path: &Path) -> bool {
     true
+}
+
+/// Whether the browser keeps a game picked as `path` under `kept`: the
+/// same name, or the same with a hash in brackets after the stem, as
+/// [`path_beside`] and [`SameTitle::AnotherGame`] name them.
+#[cfg(any(test, all(feature = "web", not(feature = "desktop"))))]
+fn is_kept_as(kept: &Path, path: &Path) -> bool {
+    if kept == path {
+        return true;
+    }
+    let hash = kept
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .zip(path.file_stem().and_then(|stem| stem.to_str()))
+        .and_then(|(kept, stem)| kept.strip_prefix(stem))
+        .and_then(|rest| rest.strip_prefix(" ("))
+        .and_then(|rest| rest.strip_suffix(')'));
+    kept.parent() == path.parent()
+        && kept.extension() == path.extension()
+        && hash.is_some_and(|hash| {
+            hash.len() == 8 && hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+        })
 }
 
 /// Where the browser keeps a game whose file name `path` already belongs to

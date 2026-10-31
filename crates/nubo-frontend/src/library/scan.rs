@@ -198,6 +198,7 @@ fn is_unreachable(path: &Path, folders: &[LibraryFolder]) -> bool {
 /// Whether `path` is in one of the library `folders` that can't be reached
 /// now, such as one on an unplugged drive: what is in it hasn't moved or
 /// gone, it is only out of reach.
+#[cfg(feature = "desktop")]
 pub fn is_on_unreachable_folder(path: &Path, folders: &[LibraryFolder]) -> bool {
     folders
         .iter()
@@ -224,6 +225,7 @@ pub fn entry_for(path: &Path, header: &CartridgeHeader) -> LibraryEntry {
         added: None,
         size,
         modified,
+        checksum: None,
     }
 }
 

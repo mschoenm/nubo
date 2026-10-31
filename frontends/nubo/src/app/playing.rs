@@ -175,7 +175,13 @@ impl App {
             }
             GameMessage::RomPicked(Some(Ok(rom))) => {
                 #[cfg(target_arch = "wasm32")]
-                let rom = if self.fresh { rom } else { self.keep_game(rom) };
+                let Some(rom) = (if self.fresh {
+                    Some(rom)
+                } else {
+                    self.keep_game(rom)
+                }) else {
+                    return Task::none();
+                };
                 self.start_game(rom, true);
             }
             GameMessage::RomPicked(Some(Err(error))) => self.toasts.error(error),

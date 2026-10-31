@@ -180,6 +180,11 @@ pub struct App {
     /// The game waiting for the player to say which model it continues on,
     /// while `DialogKind::OtherModel` asks.
     pending_start: Option<playing::PendingStart>,
+    /// Games the browser keeps another file of under the same file name and
+    /// title, waiting in turn for the player to say whether each is a new
+    /// version or another game (`DialogKind::SameTitle`), with whether it
+    /// starts once kept (it was opened rather than added).
+    same_title_waiting: Vec<(Rom, bool)>,
     /// Whether the browser's storage was opened (see
     /// `nubo_frontend::storage::indexed_db`), which the library is read from;
     /// always on the desktop.
@@ -304,6 +309,7 @@ impl App {
             deletions_running: 0,
             start_after_deleting: None,
             pending_start: None,
+            same_title_waiting: Vec::new(),
             newer_version: None,
             #[cfg(not(target_arch = "wasm32"))]
             scene_recorder: options.record_scenes.clone(),
@@ -401,7 +407,9 @@ impl App {
     /// never lost, or at once when there is nothing to move: the library
     /// already keeps that game's file (moved at an earlier start, or a newer
     /// file of the same name the player added since, which must not be
-    /// replaced), or the entry isn't a game, which is said once.
+    /// replaced), or the entry isn't a game, which is said once. Its saves
+    /// are under its file name, so a game of that title kept without its
+    /// file is taken as an older version of it, without asking.
     #[cfg(target_arch = "wasm32")]
     fn move_last_game(&mut self, rom: &nubo_frontend::rom::Rom) -> Task<Message> {
         let header = match nubo_core::Emulator::read_rom_header(&rom.bytes) {
@@ -420,8 +428,13 @@ impl App {
 
         let kept = self
             .library
-            .add_game(rom)
-            .and_then(|path| self.library.record_played(&path, &header));
+            .add_game(rom, nubo_frontend::library::SameTitle::NewVersion)
+            .and_then(|kept| match kept {
+                nubo_frontend::library::Kept::As(path) => {
+                    self.library.record_played(&path, &header)
+                }
+                nubo_frontend::library::Kept::Ask => Ok(()),
+            });
         self.watch_recent_games();
         match kept {
             Ok(()) => Task::perform(

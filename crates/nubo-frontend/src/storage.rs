@@ -47,6 +47,9 @@ pub enum Entry<'a> {
 
 impl Entry<'_> {
     /// The entry's file name, such as `game.sav` for the RAM of `game.gb`.
+    /// On the desktop a game's entries go by the name it owns instead, which
+    /// may differ from its ROM's file name (see `names`, used by
+    /// `files::Files::path`).
     pub fn file_name(&self) -> PathBuf {
         match self {
             Entry::Settings => PathBuf::from("settings.toml"),
