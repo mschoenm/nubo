@@ -88,7 +88,7 @@ Each night, also read the open `nightly` issues against the day's changes: close
   2. **Summary:** what changed and why, in a few lines.
   3. **Changes:** a table of file, what changed and why.
   4. **Verification:** the commands above and their results, including that the fingerprints matched.
-  5. **Metrics:** last night against the 14-night medians from the wiki page, with anything flagged.
+  5. **Metrics:** last night against the 14-night medians from the wiki page (speed against nights on the same CPU model only), with anything flagged.
   6. **Suggestions:** what you didn't change and why, most important first, apart from the problems and bugs that went into issues.
   7. **Reviewed:** the commit range of the day's changes and tonight's part, with its files.
 - **When an earlier nightly PR is still open:** make no new changes; open or update tonight's issues as above, and add the rest of tonight's findings to the pull request as a comment, listing the issues first: `gh api repos/mschoenm/nubo/issues/<number>/comments -F body=@/tmp/comment.md`.
