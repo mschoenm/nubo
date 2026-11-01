@@ -178,7 +178,8 @@ impl Session {
     }
 
     /// Adds the frames due since the last tick to the ones due: one for
-    /// each refresh or every few refreshes when frames are locked to them,
+    /// each refresh, every few refreshes or two per refresh when frames are
+    /// locked to them,
     /// otherwise as many as fit in the average time between ticks. Then sets
     /// the emulator's sample rate so the sound keeps up with the frames and
     /// the audio queue stays at its target. `elapsed` is the time since the

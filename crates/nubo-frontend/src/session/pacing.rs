@@ -43,7 +43,7 @@ const CHANGE_TOLERANCE: f64 = 0.05;
 /// to the millisecond (8 or 9 ms apart at 120 Hz).
 const REFRESH_TOLERANCE: f64 = 0.15;
 /// How far one of `LOCKED_REFRESHES_PER_FRAME` may be from a Game Boy frame,
-/// as a share, for frames to lock to it. Covers 59.94 to about 60.3 Hz and
+/// as a share, for frames to lock to it. Covers about 59.1 to 60.3 Hz and
 /// their multiples, and half of them.
 const LOCK_TOLERANCE: f64 = 0.01;
 /// How many refreshes a frame can be locked to: half of one when the browser
@@ -86,9 +86,10 @@ pub struct RefreshRate {
 impl RefreshRate {
     /// Takes in the time in seconds since the last tick. A tick a whole
     /// number of refreshes later (one the browser skipped) keeps frames
-    /// locked; any other tick unlocks them at once, and ten in a row, such
-    /// as after the window moved to a screen with another refresh rate,
-    /// start the measurement over.
+    /// locked, and any other tick unlocks them at once. Ten ticks in a row
+    /// that aren't one refresh apart, such as when the browser starts
+    /// drawing every other refresh or the window moved to a screen with
+    /// another refresh rate, start the measurement over.
     pub fn observe(&mut self, elapsed: f64) {
         let Some(interval) = self.interval() else {
             if elapsed > 0.0 {
