@@ -521,9 +521,6 @@ impl App {
         }
     }
 
-    /// Asks whether to download box art, once the library has a folder (in
-    /// the browser, a game) and the player hasn't answered yet. Box art waits
-    /// for the answer.
     /// Asks about the first game waiting in `App::same_title_waiting` (see
     /// `DialogKind::SameTitle`), once no other dialog is open; closing one
     /// asks again.
@@ -535,6 +532,9 @@ impl App {
         }
     }
 
+    /// Asks whether to download box art, once the library has a folder (in
+    /// the browser, a game) and the player hasn't answered yet. Box art waits
+    /// for the answer.
     pub(super) fn ask_about_box_art(&mut self) {
         if box_art::AVAILABLE
             && !self.fresh
