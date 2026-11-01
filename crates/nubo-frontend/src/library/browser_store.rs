@@ -94,8 +94,8 @@ pub fn read_picture(
     decode_png(&indexed_db::read(&picture_key(kind, rom_path))?.bytes)
 }
 
-/// The saved picture of the game at `rom_path` as a PNG, if there is one;
-/// the browser's games go by their own path (`Library::pictures_as`).
+/// The saved picture kept under `pictures_as`'s name as a PNG, if there is
+/// one; the browser's games go by their own path (`Library::pictures_as`).
 /// Adding another version under the same name (another size; a game with
 /// another header title is kept beside it, see `Library::add_game`)
 /// deletes its pictures (see [`delete_pictures`]), so any that is left is of
@@ -103,11 +103,11 @@ pub fn read_picture(
 pub fn current_picture(
     _cache: &Cache,
     kind: PictureKind,
-    rom_path: &Path,
-    _same_path: &Path,
+    pictures_as: &Path,
+    _rom_path: &Path,
 ) -> Option<Vec<u8>> {
     Some(
-        indexed_db::read(&picture_key(kind, rom_path))?
+        indexed_db::read(&picture_key(kind, pictures_as))?
             .bytes
             .to_vec(),
     )
