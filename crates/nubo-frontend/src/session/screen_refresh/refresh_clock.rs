@@ -41,7 +41,10 @@ impl RefreshClock {
     /// When the browser started drawing the latest frame, in seconds since
     /// the page loaded, or `None` before the first.
     pub fn last_refresh(&self) -> Option<f64> {
-        self.state.last_refresh.get().map(|millis| millis / 1000.0)
+        self.state
+            .last_refresh
+            .get()
+            .map(|milliseconds| milliseconds / 1000.0)
     }
 }
 
