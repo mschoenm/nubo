@@ -981,14 +981,23 @@ impl Library {
     /// start: a zip file is unpacked whole to check it
     /// ([`nubo_core::Emulator::check_rom`]), so one damaged past the header
     /// isn't kept either.
+    ///
+    /// When keeping it fails after its place was chosen (the browser's
+    /// storage refused it), the error still names that place
+    /// ([`NotKept::path`]), so a game started anyway goes by its own saves
+    /// and never by those of the game it was to be kept beside. Once its
+    /// file is kept, the list in memory names it whatever fails after, as
+    /// what is stored does, and the library's next save writes the list.
     #[cfg(all(feature = "web", not(feature = "desktop")))]
     pub fn add_game(
         &mut self,
         rom: &crate::rom::Rom,
         same_title: SameTitle,
-    ) -> Result<Kept, String> {
-        let header = nubo_core::Emulator::check_rom(&rom.bytes)
-            .map_err(|error| format!("{} isn't a game Nubo can play: {error}", rom.name()))?;
+    ) -> Result<Kept, NotKept> {
+        let header = nubo_core::Emulator::check_rom(&rom.bytes).map_err(|error| NotKept {
+            message: format!("{} isn't a game Nubo can play: {error}", rom.name()),
+            path: None,
+        })?;
         let checksum = crc32fast::hash(&rom.bytes);
         let Some(path) = self.place_for(
             &rom.path,
@@ -999,8 +1008,11 @@ impl Library {
         ) else {
             return Ok(Kept::Ask);
         };
-        let keep_error = |error| format!("{} couldn't be kept in the browser: {error}", rom.name());
-        store::save_rom(&path, &rom.bytes).map_err(keep_error)?;
+        let not_kept = |error| NotKept {
+            message: format!("{} couldn't be kept in the browser: {error}", rom.name()),
+            path: Some(path.clone()),
+        };
+        store::save_rom(&path, &rom.bytes).map_err(not_kept)?;
 
         let now = seconds_since_epoch(SystemTime::now());
         let mut entry = scan::entry_for(&path, &header);
@@ -1010,6 +1022,7 @@ impl Library {
         entry.added = Some(now);
         entry.checksum = Some(checksum);
 
+        let mut pictures_deleted = Ok(());
         let previous = self.entries.iter().position(|known| known.path == path);
         if let Some(index) = previous {
             let previous = &self.entries[index];
@@ -1018,7 +1031,7 @@ impl Library {
                 && previous.checksum.is_none_or(|known| known == checksum);
             entry.keep_from(previous, unchanged);
             if !unchanged {
-                store::delete_pictures(&path).map_err(keep_error)?;
+                pictures_deleted = store::delete_pictures(&path);
                 for pictures in [
                     &mut self.box_art,
                     &mut self.title_screens,
@@ -1034,7 +1047,11 @@ impl Library {
         }
         entries.push(entry);
         self.replace_entries(entries);
-        self.save()?;
+        pictures_deleted.map_err(not_kept)?;
+        self.save().map_err(|message| NotKept {
+            message,
+            path: Some(path.clone()),
+        })?;
         Ok(Kept::As(path))
     }
 
@@ -1202,6 +1219,16 @@ pub enum Kept {
     /// name and title, and the player must say whether this one is a new
     /// version of that game or another game ([`SameTitle`]).
     Ask,
+}
+
+/// Why `Library::add_game` couldn't keep a game.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotKept {
+    /// What went wrong, to show the player.
+    pub message: String,
+    /// Where the game was to be kept, which its saves go by even though
+    /// keeping it failed; `None` when it isn't a game Nubo can play.
+    pub path: Option<PathBuf>,
 }
 
 /// News from watching the library folders (see `watch`).
