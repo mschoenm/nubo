@@ -858,7 +858,12 @@ fn the_browser_keeps_no_zip_damaged_past_its_header() {
     assert!(nubo_core::Emulator::read_rom_header(&damaged.bytes).is_ok());
 
     let error = library.add_game(&damaged, SameTitle::Ask).unwrap_err();
-    assert!(error.contains("isn't a game Nubo can play"), "{error}");
+    assert!(
+        error.message.contains("isn't a game Nubo can play"),
+        "{}",
+        error.message
+    );
+    assert_eq!(error.path, None);
     assert!(!library.keeps_file_of(&damaged.path));
     assert_eq!(library.games("").count(), 0);
 

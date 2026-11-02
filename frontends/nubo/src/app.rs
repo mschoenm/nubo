@@ -429,6 +429,7 @@ impl App {
         let kept = self
             .library
             .add_game(rom, nubo_frontend::library::SameTitle::NewVersion)
+            .map_err(|not_kept| not_kept.message)
             .and_then(|kept| match kept {
                 nubo_frontend::library::Kept::As(path) => {
                     self.library.record_played(&path, &header)
