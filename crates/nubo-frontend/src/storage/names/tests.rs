@@ -225,11 +225,11 @@ fn the_record_is_saved_and_read_back() {
     let own = claim(&data, &second, "OTHER", reachable);
     assert_eq!(own.how, How::OwnName);
     assert_eq!(own.problem, None);
-    forget_records();
+    forget_record(&data);
 
     assert_eq!(stored_path(&data, &second), own.stored);
-    let (names, problem) = Names::load(&data);
-    assert_eq!(problem, None);
+    let names = Names::load(&data);
+    assert_eq!(names.problem, None);
     assert_eq!(names.owners.len(), 2);
     let text = fs::read_to_string(data.join("names.toml")).unwrap();
     assert!(text.contains("[[names]]"), "{text}");
@@ -244,10 +244,11 @@ fn a_record_that_can_t_be_parsed_is_kept_aside() {
     fs::create_dir_all(&data).unwrap();
     fs::write(data.join("names.toml"), "names = 3").unwrap();
 
-    let (names, problem) = Names::load(&data);
+    let names = Names::load(&data);
 
-    assert_eq!(names, Names::default());
-    assert!(problem.unwrap().contains("names.kept-1.toml"));
+    assert!(names.owners.is_empty());
+    assert!(!names.read_only);
+    assert!(names.problem.unwrap().contains("names.kept-1.toml"));
     assert_eq!(
         fs::read_to_string(data.join("names.kept-1.toml")).unwrap(),
         "names = 3"
@@ -282,4 +283,149 @@ fn battery_saves_and_cheats_go_by_the_name_the_game_owns() {
             .join(format!("{stem}.gb.toml"))
             .is_file()
     );
+}
+
+#[test]
+fn a_gone_game_s_name_isn_t_taken_over_by_another_title() {
+    let folder = temporary_folder("other-title");
+    let deleted = folder.join("jam1").join("game.gb");
+    let other = folder.join("jam2").join("game.gb");
+    write_rom(&deleted);
+    let mut names = Names::default();
+    names.claim(&deleted, "FIRST", reachable);
+    fs::remove_dir_all(deleted.parent().unwrap()).unwrap();
+    write_rom(&other);
+
+    let (stored, how) = names.claim(&other, "SECOND", reachable);
+
+    assert_eq!(how, How::OwnName);
+    assert_ne!(stored, other);
+    // The deleted game comes back with its own title: it takes its name over.
+    let back = folder.join("jam3").join("game.gb");
+    write_rom(&back);
+    assert_eq!(
+        names.claim(&back, "FIRST", reachable),
+        (back.clone(), How::TookOver)
+    );
+}
+
+#[test]
+fn names_that_differ_only_in_case_or_extension_are_taken() {
+    let folder = temporary_folder("case");
+    let first = folder.join("A").join("Tetris.gb");
+    let upper = folder.join("B").join("TETRIS.GB");
+    let color = folder.join("C").join("tetris.gbc");
+    let accented = folder.join("D").join("Été.gb");
+    let accented_upper = folder.join("E").join("ÉTÉ.gb");
+    for path in [&first, &upper, &color, &accented, &accented_upper] {
+        write_rom(path);
+    }
+    let mut names = Names::default();
+    names.claim(&first, "TETRIS", reachable);
+    names.claim(&accented, "ETE", reachable);
+
+    for path in [&upper, &color, &accented_upper] {
+        let (stored, how) = names.claim(path, "OTHER", reachable);
+        assert_eq!(how, How::OwnName, "{}", path.display());
+        assert_ne!(&stored, path);
+    }
+    // Two hashed names from one folder that differ only in case don't share
+    // a battery save either.
+    let same_folder = folder.join("B").join("tetris.gb");
+    write_rom(&same_folder);
+    let stem = |path: &Path| {
+        let stored = names.stored_path(path, false);
+        stored.file_stem().unwrap().to_string_lossy().to_lowercase()
+    };
+    assert_ne!(stem(&same_folder), stem(&upper));
+}
+
+#[test]
+fn a_game_whose_hashed_name_has_data_claims_it_after_the_record_is_lost() {
+    let folder = temporary_folder("lost-record");
+    let data = folder.join("data");
+    let first = folder.join("A").join("game.gb");
+    let second = folder.join("B").join("game.gb");
+    write_rom(&first);
+    write_rom(&second);
+    let files = Files::in_folders(None, Some(data.clone()));
+    claim(&data, &first, "FIRST", reachable);
+    let own = claim(&data, &second, "SECOND", reachable).stored;
+    files.write(Entry::BatteryRam(&first), b"first").unwrap();
+    files.write(Entry::BatteryRam(&second), b"second").unwrap();
+
+    fs::write(data.join("names.toml"), "names = 3").unwrap();
+    forget_record(&data);
+    // The library looks pictures up as it starts, before any game claims.
+    let _ = picture_path(&data, &second, true);
+
+    let second_claim = claim(&data, &second, "SECOND", reachable);
+    assert_eq!(second_claim.stored, own);
+    assert_eq!(second_claim.how, How::OwnName);
+    assert!(
+        second_claim
+            .problem
+            .is_some_and(|problem| problem.contains("names.kept-1.toml"))
+    );
+    assert_eq!(
+        files.read(Entry::BatteryRam(&second)).unwrap().unwrap(),
+        b"second"
+    );
+
+    let first_claim = claim(&data, &first, "FIRST", reachable);
+    assert_eq!(
+        first_claim,
+        Claim {
+            stored: first.clone(),
+            how: How::Plain,
+            problem: None
+        }
+    );
+    assert_eq!(
+        files.read(Entry::BatteryRam(&first)).unwrap().unwrap(),
+        b"first"
+    );
+}
+
+#[test]
+fn a_read_problem_and_a_save_problem_are_both_reported() {
+    let folder = temporary_folder("both-problems");
+    let data = folder.join("data");
+    let game = folder.join("A").join("game.gb");
+    write_rom(&game);
+    fs::create_dir_all(&data).unwrap();
+    fs::write(data.join("names.toml"), "names = 3").unwrap();
+    forget_record(&data);
+    // A lookup reads the record and keeps it aside, but doesn't report it.
+    assert_eq!(stored_path(&data, &game), game);
+    // A folder where the record goes makes saving it fail.
+    fs::create_dir_all(data.join("names.toml").join("in the way")).unwrap();
+
+    let problem = claim(&data, &game, "GAME", reachable).problem.unwrap();
+
+    assert!(problem.contains("names.kept-1.toml"), "{problem}");
+    assert!(problem.contains("couldn't be saved"), "{problem}");
+    // Both are reported once: the next claim of the same game changes nothing.
+    assert_eq!(claim(&data, &game, "GAME", reachable).problem, None);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_path_that_isn_t_utf_8_gets_the_name_a_lookup_gives() {
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+
+    let folder = temporary_folder("not-utf-8");
+    let owner = folder.join("A").join("game.gb");
+    let odd = folder.join(OsStr::from_bytes(b"B \xff")).join("game.gb");
+    write_rom(&owner);
+    let mut names = Names::default();
+    names.claim(&owner, "GAME", reachable);
+
+    let (stored, how) = names.claim(&odd, "OTHER", reachable);
+
+    assert_eq!(how, How::Unrecorded);
+    assert_ne!(stored, odd);
+    assert_eq!(stored, names.stored_path(&odd, false));
+    assert_eq!(names.owners.len(), 1);
 }

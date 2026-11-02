@@ -12,10 +12,17 @@
 //! - Another ROM with the same file name, at another path, gets a name of
 //!   its own with a hash of its folder in it, such as `game (3f2a91c0).gb`
 //!   (so `game (3f2a91c0).sav` and the rest; see [`hashed_name`]).
+//! - Names are compared without regard to case, since Windows and macOS
+//!   don't tell `Tetris.gb` from `TETRIS.GB`, and by their stems too, since
+//!   battery saves leave the extension out: `game.gb` and `game.gbc` would
+//!   share `game.sav`. So the second of those to start gets a name of its
+//!   own as well.
 //! - A game that moved keeps its saves: when the path that owns a name is
-//!   gone, the ROM with the same file name that starts next takes the name
-//!   over. An owner on a library folder that can't be reached, such as an
-//!   unplugged drive, hasn't moved, so its name is never handed on.
+//!   gone, the ROM with the same file name and the same header title that
+//!   starts next takes the name over. A ROM with another title is another
+//!   game, so it doesn't. An owner on a library folder that can't be
+//!   reached, such as an unplugged drive, hasn't moved, so its name is never
+//!   handed on.
 //! - A copy (both files still there) is another path, so it gets names of
 //!   its own.
 //! - A name is only claimed when a game starts ([`claim`]), never by a
@@ -25,10 +32,14 @@
 //! The record and the names in it are players' data: they must read back
 //! the same in every later version, and a hashed name must never change, so
 //! [`hashed_name`]'s hash is fixed. A record that can't be parsed is kept
-//! aside (`names.kept-1.toml`) and Nubo starts a new one; a hashed name
-//! comes out the same again, so a game whose name was recorded there finds
-//! its saves again. One that can't be read at all is never written over.
+//! aside (`names.kept-1.toml`) and Nubo starts a new one, and the player is
+//! told so as the next game starts. A hashed name comes out the same again,
+//! and a game whose hashed name has data (a battery save, save states or
+//! cheats) claims that name even when the plain name is free, so a game
+//! whose name was recorded there finds its saves again, whichever game
+//! starts first. One that can't be read at all is never written over.
 
+use crate::storage::Entry;
 use crate::storage::files::{keep_aside, write_atomically};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -47,6 +58,12 @@ pub struct Names {
     /// Whether the saved record couldn't be read and is still in place, so
     /// saving would write over it. Claims then last for this run only.
     read_only: bool,
+    /// The data folder the record belongs to, where [`Names::claim`] looks
+    /// for data kept under a game's hashed name. `None` looks nowhere.
+    data_folder: Option<PathBuf>,
+    /// Why the record couldn't be read, until a claim reports it to the
+    /// player.
+    problem: Option<String>,
 }
 
 /// One stored name and the ROM path that owns it, as `names.toml` keeps it.
@@ -97,10 +114,11 @@ pub enum How {
     /// before Nubo kept this record (or by a game of that file name that
     /// hadn't started since) is now this game's.
     Plain,
-    /// It got a name of its own, since another game owns the plain one.
+    /// It got a name of its own, since another game owns the plain one, or
+    /// since data is kept under that name already.
     OwnName,
-    /// Its path isn't valid UTF-8, so it can't be recorded and keeps the
-    /// plain name, as before Nubo kept this record.
+    /// Its path isn't valid UTF-8, so it can't be recorded. It gets the
+    /// name a lookup gives ([`Names::stored_path`]), without recording it.
     Unrecorded,
 }
 
@@ -115,28 +133,25 @@ fn records() -> MutexGuard<'static, Vec<(PathBuf, Names)>> {
 }
 
 /// Runs `work` on the record of `data_folder`, reading it first if this run
-/// hasn't yet. Returns what `work` returns, and why the record couldn't be
-/// read if this was the first time.
-fn with_record<T>(data_folder: &Path, work: impl FnOnce(&mut Names) -> T) -> (T, Option<String>) {
+/// hasn't yet, and returns what `work` returns. Why the record couldn't be
+/// read stays in the record until a claim reports it.
+fn with_record<T>(data_folder: &Path, work: impl FnOnce(&mut Names) -> T) -> T {
     let mut records = records();
-    let mut problem = None;
     let index = match records.iter().position(|(folder, _)| folder == data_folder) {
         Some(index) => index,
         None => {
-            let (names, read_problem) = Names::load(data_folder);
-            problem = read_problem;
-            records.push((data_folder.to_path_buf(), names));
+            records.push((data_folder.to_path_buf(), Names::load(data_folder)));
             records.len() - 1
         }
     };
-    (work(&mut records[index].1), problem)
+    work(&mut records[index].1)
 }
 
 /// The path to name the data of the ROM at `rom_path` after, as the record
 /// in `data_folder` has it, without claiming anything (see
 /// [`Names::stored_path`]). The ROM path itself when that is the plain name.
 pub fn stored_path(data_folder: &Path, rom_path: &Path) -> PathBuf {
-    with_record(data_folder, |names| names.stored_path(rom_path, false)).0
+    with_record(data_folder, |names| names.stored_path(rom_path, false))
 }
 
 /// Like [`stored_path`], for the library's pictures of a game that hasn't
@@ -144,51 +159,68 @@ pub fn stored_path(data_folder: &Path, rom_path: &Path) -> PathBuf {
 /// file name, a plain name nobody owns isn't used either, so the two don't
 /// show each other's pictures before one of them starts.
 pub fn picture_path(data_folder: &Path, rom_path: &Path, shared: bool) -> PathBuf {
-    with_record(data_folder, |names| names.stored_path(rom_path, shared)).0
+    with_record(data_folder, |names| names.stored_path(rom_path, shared))
 }
 
 /// Claims a name for the ROM at `rom_path`, whose header has `title`, as a
 /// game starts (see [`Names::claim`]), and saves the record in
 /// `data_folder` if it changed. `unreachable` says whether a path is on a
-/// library folder that can't be reached now.
+/// library folder that can't be reached now. The first claim after the
+/// record was read reports why it couldn't be read, if it couldn't, together
+/// with why it couldn't be saved.
 pub fn claim(
     data_folder: &Path,
     rom_path: &Path,
     title: &str,
     unreachable: impl Fn(&Path) -> bool,
 ) -> Claim {
-    let ((stored, how, saved), read_problem) = with_record(data_folder, |names| {
+    let (stored, how, problems) = with_record(data_folder, |names| {
         let (stored, how) = names.claim(rom_path, title, unreachable);
         let saved = match how {
             How::TookOver | How::Plain | How::OwnName => names.save(data_folder),
             How::Owned | How::Unrecorded => Ok(()),
         };
-        (stored, how, saved)
+        let problems: Vec<String> = names
+            .problem
+            .take()
+            .into_iter()
+            .chain(saved.err())
+            .collect();
+        (stored, how, problems)
     });
     Claim {
         stored,
         how,
-        problem: read_problem.or(saved.err()),
+        problem: (!problems.is_empty()).then(|| problems.join(". ")),
     }
 }
 
 impl Names {
     /// Reads the record in `data_folder`, or an empty one if there is none
-    /// yet, and why it couldn't be read. One that can't be parsed is kept
-    /// aside first; one that can't be read at all stays in place, and the
-    /// record is then read-only for this run.
-    fn load(data_folder: &Path) -> (Names, Option<String>) {
+    /// yet, keeping why it couldn't be read in [`Names::problem`]. One that
+    /// can't be parsed is kept aside first; one that can't be read at all
+    /// stays in place, and the record is then read-only for this run.
+    fn load(data_folder: &Path) -> Names {
+        let (owners, read_only, problem) = Names::read(data_folder);
+        Names {
+            owners,
+            read_only,
+            data_folder: Some(data_folder.to_path_buf()),
+            problem,
+        }
+    }
+
+    /// The owners recorded in `data_folder`, whether the record must be left
+    /// alone, and why it couldn't be read (see [`Names::load`]).
+    fn read(data_folder: &Path) -> (Vec<Owner>, bool, Option<String>) {
         let path = data_folder.join(FILE_NAME);
         let contents = match fs::read(&path) {
             Ok(contents) => contents,
-            Err(error) if error.kind() == ErrorKind::NotFound => return (Names::default(), None),
+            Err(error) if error.kind() == ErrorKind::NotFound => return (Vec::new(), false, None),
             Err(error) => {
-                let names = Names {
-                    read_only: true,
-                    ..Names::default()
-                };
                 return (
-                    names,
+                    Vec::new(),
+                    true,
                     Some(format!(
                         "Which game owns which saves couldn't be read from {} ({error}), so new games with the same file name share saves this time",
                         path.display()
@@ -202,26 +234,19 @@ impl Names {
                 toml::from_str::<NamesFile>(&text).map_err(|error| error.message().to_owned())
             });
         match parsed {
-            Ok(file) => (
-                Names {
-                    owners: file.names,
-                    read_only: false,
-                },
-                None,
-            ),
+            Ok(file) => (file.names, false, None),
             Err(error) => match keep_aside(&path) {
                 Ok(kept) => (
-                    Names::default(),
+                    Vec::new(),
+                    false,
                     Some(format!(
                         "Which game owns which saves couldn't be read ({error}), so it was kept as {} and started again",
                         kept.display()
                     )),
                 ),
                 Err(keep_error) => (
-                    Names {
-                        read_only: true,
-                        ..Names::default()
-                    },
+                    Vec::new(),
+                    true,
                     Some(format!(
                         "Which game owns which saves couldn't be read from {} ({error}) or kept aside ({keep_error})",
                         path.display()
@@ -269,27 +294,29 @@ impl Names {
     ///
     /// 1. A name it owns already stays its own.
     /// 2. Else, a name of its file name whose owner is gone, and not on a
-    ///    folder that is `unreachable`, was the game's before it moved, so it
-    ///    takes that name over: the one whose owner had the same `title`,
-    ///    else the plain name, else the first.
-    /// 3. Else, the plain name if nobody owns it.
-    /// 4. Else, a name of its own (see [`hashed_name`]).
+    ///    folder that is `unreachable`, and whose owner had the same `title`,
+    ///    was the game's before it moved, so it takes that name over: the
+    ///    plain name if that is one of them, else the first. A gone owner
+    ///    with another title was another game, so its name stays its own.
+    /// 3. Else, the name of its own it would get (see [`hashed_name`]) if
+    ///    data is kept under it already in the data folder, since it had
+    ///    that name in a record that couldn't be read.
+    /// 4. Else, the plain name if nobody owns it, nor a name with the same
+    ///    stem, ignoring case.
+    /// 5. Else, a name of its own.
     ///
-    /// A path that isn't valid UTF-8 can't be recorded, so it keeps the
-    /// plain name, as before Nubo kept this record.
+    /// A path that isn't valid UTF-8 can't be recorded, so it gets the name
+    /// a lookup gives ([`Names::stored_path`]), without recording it.
     pub fn claim(
         &mut self,
         rom_path: &Path,
         title: &str,
         unreachable: impl Fn(&Path) -> bool,
     ) -> (PathBuf, How) {
-        let Some(file_name) = file_name(rom_path) else {
-            return (rom_path.to_path_buf(), How::Unrecorded);
-        };
         let absolute = absolute(rom_path);
-        if absolute.to_str().is_none() {
-            return (rom_path.to_path_buf(), How::Unrecorded);
-        }
+        let Some(file_name) = file_name(rom_path).filter(|_| absolute.to_str().is_some()) else {
+            return (self.stored_path(rom_path, false), How::Unrecorded);
+        };
 
         if let Some(owner) = self.owner_of(rom_path) {
             let name = owner.name.clone();
@@ -301,11 +328,12 @@ impl Names {
             .iter()
             .enumerate()
             .filter(|(_, owner)| {
-                file_name_of(&owner.path) == Some(file_name.as_str())
+                file_name_of(&owner.path).is_some_and(|name| same_name(name, &file_name))
+                    && owner.title == title
                     && is_gone(&owner.path)
                     && !unreachable(&owner.path)
             })
-            .min_by_key(|(_, owner)| (owner.title != title, owner.name != file_name))
+            .min_by_key(|(_, owner)| !same_name(&owner.name, &file_name))
             .map(|(index, _)| index);
         if let Some(index) = moved {
             let owner = &mut self.owners[index];
@@ -315,8 +343,9 @@ impl Names {
             return (rom_path.with_file_name(name), How::TookOver);
         }
 
-        let (name, how) = if self.is_taken(&file_name) {
-            (self.new_name(rom_path, &file_name), How::OwnName)
+        let own_name = self.new_name(rom_path, &file_name);
+        let (name, how) = if self.is_taken(&file_name) || self.has_data(&own_name) {
+            (own_name, How::OwnName)
         } else {
             (file_name, How::Plain)
         };
@@ -334,23 +363,48 @@ impl Names {
     fn owner_of(&self, rom_path: &Path) -> Option<&Owner> {
         let absolute = absolute(rom_path);
         let file_name = file_name(rom_path)?;
-        let same_name = || {
-            self.owners
-                .iter()
-                .filter(|owner| file_name_of(&owner.path) == Some(file_name.as_str()))
+        let with_file_name = || {
+            self.owners.iter().filter(|owner| {
+                file_name_of(&owner.path).is_some_and(|name| same_name(name, &file_name))
+            })
         };
-        same_name()
+        with_file_name()
             .find(|owner| owner.path == absolute)
             .or_else(|| {
                 let canonical = fs::canonicalize(rom_path).ok()?;
-                same_name()
+                with_file_name()
                     .find(|owner| fs::canonicalize(&owner.path).ok() == Some(canonical.clone()))
             })
     }
 
-    /// Whether some path owns the stored name `name` already.
+    /// Whether some path owns the stored name `name` already, or one that
+    /// names the same files: the same name in other case (which Windows and
+    /// macOS don't tell apart), or the same stem (battery saves leave the
+    /// extension out, so `game.gb` and `game.gbc` both save to `game.sav`).
     fn is_taken(&self, name: &str) -> bool {
-        self.owners.iter().any(|owner| owner.name == name)
+        self.owners
+            .iter()
+            .any(|owner| same_name(stem(&owner.name), stem(name)))
+    }
+
+    /// Whether the data folder keeps data under the stored name `name`
+    /// already: a battery save, save states or cheats.
+    fn has_data(&self, name: &str) -> bool {
+        let Some(data_folder) = &self.data_folder else {
+            return false;
+        };
+        let saves = data_folder.join("saves");
+        let stored = Path::new(name);
+        [
+            saves.join(Entry::BatteryRam(stored).file_name()),
+            saves.join(Entry::BatteryClock(stored).file_name()),
+            data_folder.join("states").join(name),
+            data_folder
+                .join("cheats")
+                .join(Entry::Cheats(stored).file_name()),
+        ]
+        .iter()
+        .any(|path| !is_gone(path))
     }
 
     /// The first name of [`hashed_name`]'s for the ROM at `rom_path` that
@@ -385,6 +439,21 @@ pub fn hashed_name(file_name: &str, folder: &str, attempt: u32) -> String {
         .into_owned()
 }
 
+/// Whether two names are the same, ignoring case (any letter, not only
+/// ASCII ones), as on Windows and macOS.
+fn same_name(first: &str, second: &str) -> bool {
+    first == second || first.to_lowercase() == second.to_lowercase()
+}
+
+/// The stem of the stored name `name`, which battery saves are named after
+/// (`game` for `game.gb`).
+fn stem(name: &str) -> &str {
+    Path::new(name)
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or(name)
+}
+
 /// The file name of `path` as text, if it has one that is valid UTF-8.
 fn file_name(path: &Path) -> Option<String> {
     file_name_of(path).map(str::to_owned)
@@ -407,11 +476,13 @@ fn is_gone(path: &Path) -> bool {
     matches!(path.try_exists(), Ok(false))
 }
 
-/// Forgets the records read so far, so the next lookup reads them again,
-/// for tests that change a record's file themselves.
+/// Forgets the record of `data_folder` read so far, so the next lookup
+/// reads it again, for tests that change a record's file themselves. Other
+/// folders' records stay, so tests running at the same time don't lose
+/// theirs.
 #[cfg(test)]
-pub(crate) fn forget_records() {
-    records().clear();
+pub(crate) fn forget_record(data_folder: &Path) {
+    records().retain(|(folder, _)| folder != data_folder);
 }
 
 #[cfg(test)]
