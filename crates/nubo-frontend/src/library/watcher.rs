@@ -196,9 +196,11 @@ fn affects(path: &Path, folders: &[LibraryFolder], games: &[PathBuf]) -> bool {
 
 /// Whether a change at `path` can affect the library: a ROM, or a folder
 /// (which may hold ROMs). Other files, such as a browser's downloads in
-/// progress or hidden files, are ignored, so a busy folder doesn't keep
-/// causing rescans. A folder's name may have a dot in it (`Mr. Do`), so a
-/// folder is told by asking the disk, not by its name.
+/// progress, are ignored while they are there, and hidden files and folders
+/// always, so a busy folder doesn't keep causing rescans. A folder's name
+/// may have a dot in it (`Mr. Do`), so a folder is told by asking the disk,
+/// not by its name, and a path that is gone counts, since it may have been
+/// a folder.
 fn matters(path: &Path) -> bool {
     let hidden = path
         .file_name()
@@ -212,9 +214,8 @@ fn matters(path: &Path) -> bool {
             .iter()
             .any(|known| extension.eq_ignore_ascii_case(known))
     });
-    // A path that is gone (removed, or moved out) can't be asked whether it
-    // was a folder, and the change notification doesn't always say, so it
-    // counts unless it is a file now.
+    // The change notification doesn't always say whether a path that is
+    // gone (removed, or moved out) was a folder.
     rom || !path.is_file()
 }
 

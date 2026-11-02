@@ -161,7 +161,7 @@ A game's saves are named after its file: `Tetris.gb` keeps its in-game save in `
 
 - a game you move to another folder keeps its saves (play it once from the new place);
 - a copy of a game in another folder gets saves of its own;
-- a game on a drive that isn't plugged in keeps its saves for when it's back.
+- a game in a library folder on a drive that isn't plugged in keeps its saves for when it's back.
 
 Renaming a game's file starts it without its saves; rename the save files to match to get them back.
 
