@@ -466,7 +466,9 @@ impl App {
     fn add_game(&mut self, rom: &Rom) -> Result<bool, String> {
         let added = self.library.add_game(rom, SameTitle::Ask);
         self.watch_recent_games();
-        added.map(|kept| kept != Kept::Ask)
+        added
+            .map(|kept| kept != Kept::Ask)
+            .map_err(|not_kept| not_kept.message)
     }
 
     /// The desktop's library finds its games in folders instead.
@@ -496,7 +498,9 @@ impl App {
     }
 
     /// Keeps `rom` in the browser's library as the player's `answer` says,
-    /// and starts it if it `starts` (it was opened rather than added).
+    /// and starts it if it `starts` (it was opened rather than added), under
+    /// the name it was to be kept as even when the browser's storage
+    /// refuses to keep it (see `App::keep_game`).
     #[cfg(target_arch = "wasm32")]
     fn keep_as_answered(&mut self, mut rom: Rom, starts: bool, answer: SameTitle) -> Task<Message> {
         let kept = self.library.add_game(&rom, answer);
@@ -516,8 +520,12 @@ impl App {
                 ])
             }
             Ok(Kept::Ask) => Task::none(),
-            Err(error) => {
-                self.toasts.error(error);
+            Err(not_kept) => {
+                self.toasts.error(not_kept.message);
+                if starts && let Some(path) = not_kept.path {
+                    rom.path = path;
+                    self.start_game(rom, true);
+                }
                 Task::none()
             }
         }
@@ -542,7 +550,9 @@ impl App {
     /// it waits for the player to say which (`DialogKind::SameTitle`), and
     /// this returns `None`; the answer starts it. A game that isn't one the
     /// emulator can start, such as a zip file damaged past the header, isn't
-    /// kept, and says why when it fails to start.
+    /// kept, and says why when it fails to start. One the browser's storage
+    /// refuses to keep still starts under the name it was to be kept as, so
+    /// it never takes the saves of the game it was to be kept beside.
     /// Games started from the library come from what it keeps, so they
     /// aren't kept again.
     #[cfg(target_arch = "wasm32")]
@@ -555,7 +565,12 @@ impl App {
                     self.ask_about_same_title();
                     return None;
                 }
-                Err(error) => self.toasts.error(error),
+                Err(not_kept) => {
+                    self.toasts.error(not_kept.message);
+                    if let Some(path) = not_kept.path {
+                        rom.path = path;
+                    }
+                }
             }
         }
         self.watch_recent_games();
