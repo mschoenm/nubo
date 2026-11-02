@@ -330,14 +330,19 @@ fn names_that_differ_only_in_case_or_extension_are_taken() {
         assert_ne!(&stored, path);
     }
     // Two hashed names from one folder that differ only in case don't share
-    // a battery save either.
+    // a battery save either. File systems that ignore case (APFS, NTFS) keep
+    // the two names as one file, which rightly keeps one name.
     let same_folder = folder.join("B").join("tetris.gb");
     write_rom(&same_folder);
     let stem = |path: &Path| {
         let stored = names.stored_path(path, false);
         stored.file_stem().unwrap().to_string_lossy().to_lowercase()
     };
-    assert_ne!(stem(&same_folder), stem(&upper));
+    if fs::read_dir(folder.join("B")).unwrap().count() == 2 {
+        assert_ne!(stem(&same_folder), stem(&upper));
+    } else {
+        assert_eq!(stem(&same_folder), stem(&upper));
+    }
 }
 
 #[test]
