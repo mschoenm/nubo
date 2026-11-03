@@ -179,12 +179,11 @@ impl Session {
 
     /// Adds the frames due since the last tick to the ones due: one for
     /// each refresh, every few refreshes or two per refresh when frames are
-    /// locked to them,
-    /// otherwise as many as fit in the average time between ticks. Then sets
-    /// the emulator's sample rate so the sound keeps up with the frames and
-    /// the audio queue stays at its target. `elapsed` is the time since the
-    /// last tick in seconds, or `None` on the first tick after the game
-    /// started or went on, which adds none.
+    /// locked to them, otherwise as many as fit in the average time between
+    /// ticks. Then sets the emulator's sample rate so the sound keeps up
+    /// with the frames and the audio queue stays at its target. `elapsed` is
+    /// the time since the last tick in seconds, or `None` on the first tick
+    /// after the game started or went on, which adds none.
     fn make_frames_due(&mut self, elapsed: Option<f64>) {
         let sample_rate = f64::from(self.machine.audio.sample_rate());
         let frame_samples = FRAME_DURATION.as_secs_f64() * sample_rate;
