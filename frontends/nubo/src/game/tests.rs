@@ -1,3 +1,5 @@
+//! Tests for when a running game saves where the player left off.
+
 use super::{AUTOSAVE_INTERVAL, AutosaveTimer};
 use nubo_frontend::time::{Duration, Instant};
 
