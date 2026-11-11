@@ -52,11 +52,16 @@ mod files {
     use super::super::files::{Files, write_atomically};
     use super::*;
     use std::fs;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
-    /// An empty folder in the temporary directory.
+    /// An empty folder in the temporary directory, of its own for every call:
+    /// the tests run as threads of one process, so a name and the process's
+    /// ID alone could hand two tests the same folder.
     fn temporary_folder(name: &str) -> PathBuf {
+        static CALLS: AtomicUsize = AtomicUsize::new(0);
+        let call = CALLS.fetch_add(1, Ordering::Relaxed);
         let folder =
-            std::env::temp_dir().join(format!("nubo-storage-{name}-{}", std::process::id()));
+            std::env::temp_dir().join(format!("nubo-storage-{name}-{}-{call}", std::process::id()));
         let _ = fs::remove_dir_all(&folder);
         folder
     }
