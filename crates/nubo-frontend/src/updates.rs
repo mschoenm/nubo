@@ -1,9 +1,9 @@
 //! Finding out whether a newer Nubo is out, from the newest release on
 //! GitHub, so an app can say so and offer the download for this computer
-//! (`DOWNLOAD_PAGE`). Only the desktop build looks (the
-//! `desktop` feature, with `ureq`), and only once the player said yes to it:
-//! looking tells GitHub that someone runs Nubo. The browser always runs the
-//! newest version.
+//! (`DOWNLOAD_PAGE`). Only the desktop build looks (the `desktop` feature,
+//! with `ureq`), and only once the player said yes to it: looking tells
+//! GitHub that someone runs Nubo. The browser always runs the newest
+//! version.
 
 /// Whether this build can look for a newer version: only the desktop build
 /// can.

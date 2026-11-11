@@ -1,3 +1,6 @@
+//! Tests for turning activity counts into rates and for the temporary
+//! folders the measurement keeps battery saves in.
+
 use super::*;
 
 #[test]
