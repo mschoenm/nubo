@@ -61,14 +61,17 @@ jobs:
       # version of RetroArch that Ubuntu offers today, so the test keeps
       # running against Ubuntu's RetroArch: a new version (an update, or a
       # new runner image) downloads them once and saves a new cache. A slow
-      # Ubuntu mirror once kept this step from finishing in 30 minutes. The
-      # key ends in a hash of the version, so the Caches workflow deletes the
-      # older ones (docs/CI.md, "Caches").
+      # Ubuntu mirror once kept this step from finishing in 30 minutes, and
+      # apt-get update once hung until the job's 45 minutes ran out, so it
+      # gets three tries of 3 minutes (docs/CI.md, "apt"). The key ends in a
+      # hash of the version, so the Caches workflow deletes the older ones
+      # (docs/CI.md, "Caches").
       - name: Find the version of RetroArch Ubuntu offers
         id: retroarch
         if: matrix.platform == 'linux-x86_64'
+        timeout-minutes: 15
         run: |
-          sudo apt-get update
+          for attempt in 1 2 3; do sudo timeout 3m apt-get update -o Acquire::Retries=3 && break; [ "$attempt" -lt 3 ] || exit 1; done
           version=$(apt-cache policy retroarch | awk '/Candidate:/ { print $2 }')
           echo "RetroArch $version"
           echo "hash=$(echo "$version" | sha256sum | cut -c 1-16)" >> "$GITHUB_OUTPUT"

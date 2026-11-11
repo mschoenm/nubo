@@ -35,8 +35,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # apt-get update gets three tries of 3 minutes (docs/CI.md, "apt").
       - name: Install flatpak-builder
-        run: sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder
+        timeout-minutes: 15
+        run: |
+          for attempt in 1 2 3; do sudo timeout 3m apt-get update -o Acquire::Retries=3 && break; [ "$attempt" -lt 3 ] || exit 1; done
+          sudo apt-get install -y flatpak flatpak-builder
 
       - name: Install Rust
         run: rustup toolchain install
