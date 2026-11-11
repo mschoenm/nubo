@@ -18,7 +18,7 @@ iced = { version = "0.14", features = ["advanced", "image-without-codecs"] }
 bytes = "1.12"
 # "file-handle-inner" lets the browser's picker check a file's size before
 # reading it into the page's memory (rom_picker.rs).
-rfd = { version = "0.17", features = ["file-handle-inner"] }
+rfd = { version = "0.18", features = ["file-handle-inner"] }
 lucide-icons = "1.55"
 serde = { version = "1", features = ["derive"] }
 toml = "1"
