@@ -5,11 +5,17 @@ use super::*;
 use crate::storage::Entry;
 use crate::storage::Storage;
 use crate::storage::files::Files;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// An empty folder in the temporary directory, with `roms/` for the games
-/// and `data/` for what Nubo keeps.
+/// and `data/` for what Nubo keeps. Every call gets a folder of its own: the
+/// tests run as threads of one process, so a name and the process's ID alone
+/// could hand two tests the same folder.
 fn temporary_folder(name: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!("nubo-names-{name}-{}", std::process::id()));
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+    let call = CALLS.fetch_add(1, Ordering::Relaxed);
+    let folder =
+        std::env::temp_dir().join(format!("nubo-names-{name}-{}-{call}", std::process::id()));
     let _ = fs::remove_dir_all(&folder);
     fs::create_dir_all(&folder).unwrap();
     folder

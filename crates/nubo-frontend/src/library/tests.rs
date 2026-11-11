@@ -4,14 +4,19 @@
 use super::*;
 use crate::settings::LibraryFolder;
 use std::fs;
-use std::process;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 const TITLE_ADDRESS: usize = 0x134;
 const CGB_FLAG_ADDRESS: usize = 0x143;
 
-/// An empty folder in the temporary directory.
+/// An empty folder in the temporary directory, of its own for every call:
+/// the tests run as threads of one process, so a name and the process's
+/// ID alone could hand two tests the same folder.
 fn temporary_folder(name: &str) -> PathBuf {
-    let folder = std::env::temp_dir().join(format!("nubo-library-{}-{}", name, process::id()));
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+    let call = CALLS.fetch_add(1, Ordering::Relaxed);
+    let folder =
+        std::env::temp_dir().join(format!("nubo-library-{name}-{}-{call}", std::process::id()));
     let _ = fs::remove_dir_all(&folder);
     fs::create_dir_all(&folder).unwrap();
     folder
@@ -682,7 +687,7 @@ fn games_with_the_same_file_name_keep_pictures_of_their_own() {
 #[cfg(feature = "desktop")]
 #[test]
 fn a_game_on_an_unplugged_library_folder_keeps_its_saves() {
-    let root = temporary_folder("unplugged");
+    let root = temporary_folder("unplugged-saves");
     let data = root.join("data");
     let stick = root.join("USB stick");
     let owner = stick.join("game.gb");

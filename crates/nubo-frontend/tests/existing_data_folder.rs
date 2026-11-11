@@ -34,6 +34,7 @@ use nubo_frontend::storage::files::Files;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Where the game was when its data was saved; the file name names its data.
 /// The library has it as played from outside the library folders.
@@ -61,10 +62,16 @@ fn existing_files() -> Files {
     )
 }
 
-/// An empty folder in the temporary directory, to save to.
+/// An empty folder in the temporary directory to save to, of its own for
+/// every call: the tests run as threads of one process, so a name and the
+/// process's ID alone could hand two tests the same folder.
 fn temporary_folder(name: &str) -> PathBuf {
-    let folder =
-        std::env::temp_dir().join(format!("nubo-existing-data-{name}-{}", std::process::id()));
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+    let call = CALLS.fetch_add(1, Ordering::Relaxed);
+    let folder = std::env::temp_dir().join(format!(
+        "nubo-existing-data-{name}-{}-{call}",
+        std::process::id()
+    ));
     let _ = fs::remove_dir_all(&folder);
     folder
 }
