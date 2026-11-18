@@ -31,7 +31,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     env:
-      LINTER: ghcr.io/flathub/flatpak-builder-lint@sha256:fa11d9cf5044a1e251643f4abe58a2d456965bdc76372dc82c57d4f540cacd37
+      LINTER: ghcr.io/flathub/flatpak-builder-lint@sha256:c89248641973487ad2323dacb92b534c258deb95a0f958935f09e1c4945671c0
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
