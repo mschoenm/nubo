@@ -330,10 +330,7 @@ fn build_gambatte(root: &Path) -> Result {
         .filter(|path| !path.ends_with("cinterface.cpp") && !path.ends_with("file_zip.cpp"))
         .collect();
     sources.extend(files_with_extension(&resample, "cpp", false)?);
-    let mut flags: Vec<String> = GAMBATTE_FLAGS
-        .iter()
-        .map(|flag| (*flag).to_owned())
-        .collect();
+    let mut flags = Vec::from(GAMBATTE_FLAGS.map(String::from));
     for include in [
         library.join("src"),
         library.join("include"),
@@ -413,7 +410,7 @@ fn build_binjgb(root: &Path) -> Result {
         .iter()
         .map(|file| source.join(file))
         .collect();
-    let mut flags: Vec<String> = BINJGB_FLAGS.iter().map(|flag| (*flag).to_owned()).collect();
+    let mut flags = Vec::from(BINJGB_FLAGS.map(String::from));
     flags.push(format!("-I{}", source.display()));
     let objects = compile(
         "cc",
@@ -441,14 +438,11 @@ fn build_gearboy(root: &Path) -> Result {
     let miniz = source.join("platforms/shared/dependencies/miniz");
     let mut sources = files_with_extension(&core, "cpp", false)?;
     sources.extend(files_with_extension(&core.join("audio"), "cpp", false)?);
-    let mut flags: Vec<String> = GEARBOY_FLAGS
-        .iter()
-        .map(|flag| (*flag).to_owned())
-        .collect();
+    let mut flags = Vec::from(GEARBOY_FLAGS.map(String::from));
     flags.push(format!("-I{}", core.display()));
     flags.push(format!("-I{}", miniz.display()));
     let mut cxx_flags = flags.clone();
-    cxx_flags.extend(GEARBOY_CXX_FLAGS.iter().map(|flag| (*flag).to_owned()));
+    cxx_flags.extend(GEARBOY_CXX_FLAGS.map(String::from));
     let objects_folder = build_folder(root, Emulator::Gearboy);
     let mut objects = compile(
         "c++",
@@ -516,18 +510,18 @@ fn compile(
             (source.clone(), objects.join(name))
         })
         .collect();
-    in_parallel(jobs.clone(), |(source, object)| {
+    in_parallel(jobs.iter().collect(), |(source, object)| {
         run_quietly(
             Command::new(compiler)
                 .args(flags)
                 .arg("-c")
-                .arg(&source)
+                .arg(source)
                 .arg("-o")
-                .arg(&object),
+                .arg(object),
         )
     })
     .into_iter()
-    .collect::<Result<Vec<()>>>()?;
+    .collect::<Result>()?;
     Ok(jobs.into_iter().map(|(_, object)| object).collect())
 }
 
