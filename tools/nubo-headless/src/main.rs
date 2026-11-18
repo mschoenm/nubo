@@ -4,9 +4,9 @@
 //! however fast the machine is. On the Super Game Boy models the screenshot
 //! is the whole 256×224 picture with its border.
 
-use chrono::Local;
 use clap::Parser;
 use image::RgbaImage;
+use jiff::ZonedDateTime;
 use nubo_core::{
     Emulator, Model, NoSaves, RtcClock, SCREEN_HEIGHT, SCREEN_WIDTH, SGB_FRAME_HEIGHT,
     SGB_FRAME_WIDTH, SgbBorderTime,
@@ -78,7 +78,7 @@ fn save_screenshot(
         .and_then(|stem| stem.to_str())
         .unwrap_or("screenshot");
 
-    let timestamp = Local::now().format("%y%m%d_%H%M%S");
+    let timestamp = ZonedDateTime::now().strftime("%y%m%d_%H%M%S");
     let filename = format!("{rom_stem}_{timestamp}.png");
 
     fs::create_dir_all(output_dir)
