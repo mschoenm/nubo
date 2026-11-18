@@ -56,7 +56,7 @@ pub fn save(game_name: &str, picture: &Picture) -> Result<PathBuf, String> {
     use crate::picture::encode_png;
 
     let png = encode_png(picture.width(), picture.height(), picture.pixels())?;
-    let time = chrono::Local::now().format("%Y-%m-%d %H.%M.%S");
+    let time = jiff::ZonedDateTime::now().strftime("%Y-%m-%d %H.%M.%S");
     let file_name = format!("{game_name} {time}.png");
     crate::links::download(&file_name, "image/png", &png)
         .map_err(|error| format!("Couldn't save the screenshot: {error}"))?;

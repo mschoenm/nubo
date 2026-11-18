@@ -7,9 +7,9 @@ publish = false
 
 [dependencies]
 nubo-core.workspace = true
-chrono = "0.4"
 clap.workspace = true
 image = { version = "0.25", default-features = false, features = ["png"] }
+jiff = "1"
 
 [lints]
 workspace = true

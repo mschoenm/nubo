@@ -11,7 +11,6 @@
 //! clock ([`BorderClock`]) rather than a choice in the menu.
 
 use crate::palettes::DmgPalette;
-use chrono::Timelike;
 use nubo_core::{Emulator, SgbBorder, SgbBorderTime};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -76,7 +75,7 @@ pub fn border_time_at(hour: u32) -> SgbBorderTime {
 /// Which look Nubo's Super Game Boy border has now, by the player's local
 /// clock.
 pub fn border_time_now() -> SgbBorderTime {
-    border_time_at(chrono::Local::now().hour())
+    border_time_at(jiff::ZonedDateTime::now().hour().unsigned_abs().into())
 }
 
 /// Keeps Nubo's Super Game Boy border in step with the player's clock: its
