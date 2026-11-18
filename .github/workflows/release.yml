@@ -55,7 +55,7 @@ jobs:
           esac
 
       - name: Install Rust
-        run: rustup toolchain install
+        run: rustup update --no-self-update stable && rustup toolchain install
 
       - name: Check the version and write the notes
         run: cargo xtask release-notes "$TAG" > "$RUNNER_TEMP/notes.md"
