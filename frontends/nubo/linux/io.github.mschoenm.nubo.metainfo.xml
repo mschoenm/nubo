@@ -71,6 +71,18 @@
   <!-- Newest first. `cargo xtask release-notes` turns the newest one into the notes of the
        GitHub release, and CI checks that it is the version in Cargo.toml. -->
   <releases>
+    <release version="0.14.1" date="2026-11-18">
+      <description>
+        <p>Games with the same file name keep their saves apart in more cases, and a game the browser couldn't keep no longer uses another game's save.</p>
+        <ul>
+          <li>A different game with the same file name no longer takes over the saves of a game that is gone; only a game with the same title does</li>
+          <li>Games whose file names differ only in case, such as Tetris.gb and TETRIS.GB, or only in extension, such as .gb and .gbc, get saves of their own</li>
+          <li>When Nubo can't read its list of save names, it tells you, and a game that had saves under a name of its own finds them again</li>
+          <li>In the browser, a game that couldn't be kept starts under its own name instead of reading and writing another game's battery save</li>
+          <li>Save states made by Nubo 0.4.0 to 0.14.0 still load</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.14.0" date="2026-10-31">
       <description>
         <p>Games with the same file name now get saves of their own, save states load several times faster, and many small fixes make saves, the library and the emulation more dependable.</p>
