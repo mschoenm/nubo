@@ -662,6 +662,10 @@ fn restrict_to_owner(folder: &Path) -> Result {
 
 /// Only Unix has permissions to restrict; the session runs on Linux only.
 #[cfg(not(unix))]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "the same signature as the Unix version"
+)]
 fn restrict_to_owner(_folder: &Path) -> Result {
     Ok(())
 }

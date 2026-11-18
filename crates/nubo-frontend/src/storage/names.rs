@@ -412,8 +412,7 @@ impl Names {
     fn new_name(&self, rom_path: &Path, file_name: &str) -> String {
         let folder = absolute(rom_path)
             .parent()
-            .map(|folder| folder.to_string_lossy().into_owned())
-            .unwrap_or_default();
+            .map_or_default(|folder| folder.to_string_lossy().into_owned());
         (0..)
             .map(|attempt| hashed_name(file_name, &folder, attempt))
             .find(|name| !self.is_taken(name))

@@ -63,9 +63,9 @@ fn generate_blep_table() -> BlepTable {
         *sample /= global_sum;
     }
 
-    for phase in 0..BLEP_PHASES {
+    for (phase, row) in table.iter_mut().enumerate() {
         let mut error: f64 = 1.0;
-        for tap in 0..BLEP_WIDTH {
+        for (tap, level) in row.iter_mut().enumerate() {
             let mut sum: f64 = 0.0;
             for j in 0..BLEP_PHASES {
                 let index = (tap as i64) * (BLEP_PHASES as i64) - (phase as i64) + (j as i64);
@@ -74,9 +74,9 @@ fn generate_blep_table() -> BlepTable {
                 }
             }
             error -= sum;
-            table[phase][tap] = sum as f32;
+            *level = sum as f32;
         }
-        table[phase][BLEP_WIDTH / 2] += error as f32;
+        row[BLEP_WIDTH / 2] += error as f32;
     }
 
     table

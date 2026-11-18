@@ -336,8 +336,7 @@ impl App {
                     .scene
                     .library
                     .as_ref()
-                    .map(|library| library.played.clone())
-                    .unwrap_or_default();
+                    .map_or_default(|library| library.played.clone());
                 let folder = run.library_folder.clone().unwrap_or_default();
                 for (order, game) in (0..).zip(&played) {
                     if let Err(error) = record_played(&mut self.library, &folder, game, order) {
