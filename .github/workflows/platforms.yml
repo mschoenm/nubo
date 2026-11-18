@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust
-        run: rustup toolchain install
+        run: rustup update --no-self-update stable && rustup toolchain install
 
       # The same key as CI's tests on Linux; the nightly runs on main keep
       # the macOS and Windows caches up to date.
