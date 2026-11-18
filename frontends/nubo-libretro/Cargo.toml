@@ -23,7 +23,7 @@ nubo-frontend.workspace = true
 
 [dev-dependencies]
 # Reads the built library's exported symbols (tests/exports.rs).
-object = { version = "0.40", default-features = false, features = ["read", "std"] }
+object = { version = "0.41", default-features = false, features = ["read", "std"] }
 
 # The workspace's lints (root Cargo.toml), except that `unsafe_code` is
 # denied instead of forbidden: a libretro core exports C functions and reads
