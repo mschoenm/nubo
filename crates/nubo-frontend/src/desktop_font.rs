@@ -10,9 +10,7 @@
 pub fn families() -> Vec<String> {
     #[cfg(target_os = "linux")]
     {
-        portal::font()
-            .map(|font| family_names(&font))
-            .unwrap_or_default()
+        portal::font().map_or_default(|font| family_names(&font))
     }
     #[cfg(not(target_os = "linux"))]
     {

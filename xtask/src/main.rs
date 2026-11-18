@@ -423,7 +423,7 @@ fn response(target: &str, root: &Path) -> Response {
     } else if requested.ends_with('/') {
         read_file(file.join("index.html"))
     } else {
-        let query = query.map(|query| format!("?{query}")).unwrap_or_default();
+        let query = query.map_or_default(|query| format!("?{query}"));
         Response::Redirect(format!("/{requested}/{query}"))
     }
 }

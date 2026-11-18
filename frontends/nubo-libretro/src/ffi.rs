@@ -1069,8 +1069,7 @@ pub unsafe extern "C" fn retro_cheat_set(index: c_uint, enabled: bool, code: *co
         };
         let invalid_codes = lock(&CORE)
             .as_mut()
-            .map(|core| core.cheat_set(index, enabled, &code))
-            .unwrap_or_default();
+            .map_or_default(|core| core.cheat_set(index, enabled, &code));
         for invalid in invalid_codes {
             log(
                 RETRO_LOG_WARN,

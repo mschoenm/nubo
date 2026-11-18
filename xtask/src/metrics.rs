@@ -439,7 +439,7 @@ fn test_results(night: &Value) -> Vec<(String, String)> {
     night
         .get("tests")
         .and_then(Value::as_object)
-        .map(|tests| {
+        .map_or_default(|tests| {
             tests
                 .iter()
                 .map(|(key, result)| {
@@ -450,7 +450,6 @@ fn test_results(night: &Value) -> Vec<(String, String)> {
                 })
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 /// The number at the dotted path `key` in `night`.

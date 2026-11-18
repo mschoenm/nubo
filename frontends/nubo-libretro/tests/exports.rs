@@ -2,6 +2,7 @@
 //! when it loads a core: it refuses a core that lacks one.
 
 use object::{NameOrOrdinal, Object};
+use std::fs;
 use std::path::PathBuf;
 
 /// The functions RetroArch looks up, from `CORE_SYMBOLS` in its `runloop.c`.
@@ -33,24 +34,40 @@ const CORE_SYMBOLS: [&str; 25] = [
     "retro_get_memory_size",
 ];
 
-/// The dynamic library Cargo built next to this test, in `target/<profile>/`.
+/// The dynamic library Cargo built for this test, the newest copy near it.
+/// Until Rust 1.100 both sat in `target/<profile>/deps/`. Since then the test
+/// sits in `target/<profile>/build/nubo-libretro/<hash>/out/` and the
+/// library in the `out/` folder of a sibling `<hash>/`. Older builds can
+/// leave stale copies in either place, hence the newest.
 fn library() -> PathBuf {
     let test = std::env::current_exe().unwrap();
-    let deps = test.parent().unwrap();
     let name = format!(
         "{}nubo_libretro{}",
         std::env::consts::DLL_PREFIX,
         std::env::consts::DLL_SUFFIX
     );
-    [deps.join(&name), deps.parent().unwrap().join(&name)]
-        .into_iter()
-        .find(|path| path.exists())
-        .unwrap_or_else(|| panic!("{name} wasn't built next to {}", test.display()))
+    test.ancestors()
+        .skip(1)
+        .take(5)
+        .flat_map(|folder| {
+            let siblings = fs::read_dir(folder)
+                .into_iter()
+                .flatten()
+                .filter_map(Result::ok)
+                .map(|entry| entry.path().join("out").join(&name));
+            std::iter::once(folder.join(&name)).chain(siblings)
+        })
+        .filter_map(|path| Some((fs::metadata(&path).ok()?.modified().ok()?, path)))
+        .max_by_key(|(modified, _)| *modified)
+        .map_or_else(
+            || panic!("{name} wasn't built near {}", test.display()),
+            |(_, path)| path,
+        )
 }
 
 #[test]
 fn the_library_exports_every_function_retroarch_looks_up() {
-    let bytes = std::fs::read(library()).unwrap();
+    let bytes = fs::read(library()).unwrap();
     let file = object::File::parse(bytes.as_slice()).unwrap();
     let exported: Vec<String> = file
         .exports()

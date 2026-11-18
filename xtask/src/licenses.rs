@@ -232,8 +232,7 @@ fn dependencies(package: &str, target: &str) -> Result<Vec<Crate>> {
                 .collect(),
             directory: Path::new(string(&package["manifest_path"]))
                 .parent()
-                .map(Path::to_path_buf)
-                .unwrap_or_default(),
+                .map_or_default(Path::to_path_buf),
             license_file: package["license_file"].as_str().map(str::to_owned),
         })
         .collect();

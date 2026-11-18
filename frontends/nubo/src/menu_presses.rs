@@ -35,8 +35,7 @@ impl MenuPresses {
                 .each
                 .iter()
                 .position(|(known, _)| *known == id)
-                .map(|index| self.each.swap_remove(index).1)
-                .unwrap_or_default();
+                .map_or_default(|index| self.each.swap_remove(index).1);
             held_back.update(previous.state(id).unwrap_or(&released), state, in_menus);
             each.push((id, held_back));
         }
